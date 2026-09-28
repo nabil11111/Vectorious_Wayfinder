@@ -1,0 +1,44 @@
+# Runs on every pull request and every push to main. A pull request cannot merge while this is red.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wayfinder
+          POSTGRES_PASSWORD: wayfinder
+          POSTGRES_DB: wayfinder
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U wayfinder"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://wayfinder:wayfinder@localhost:5432/wayfinder
+      SEED_PASSWORD: wayfinder-demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Migrate and seed a fresh database
+        run: npm run db:migrate && npm run db:seed
+      - name: Schema and migrations agree
+        run: |
+          npm run db:generate -- --name ci-check
+          if [ -n "$(git status --porcelain apps/api/drizzle)" ]; then echo "The schema changed without a migration. Run npm run db:generate and commit it."; exit 1; fi
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
