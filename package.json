@@ -1,0 +1,15 @@
+{
+  "name": "vectorious-wayfinder",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "npm run dev --workspace @wayfinder/api & npm run dev --workspace @wayfinder/web",
+    "build": "npm run build --workspace @wayfinder/web && npm run build --workspace @wayfinder/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace @wayfinder/api",
+    "db:migrate": "npm run db:migrate --workspace @wayfinder/api",
+    "db:seed": "npm run db:seed --workspace @wayfinder/api"
+  }
+}
