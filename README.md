@@ -9,25 +9,53 @@ Hackathon.
 
 ## Setup
 
+You need Docker. Nothing else.
+
 ```bash
-cp .env.example .env
 docker compose up
 ```
 
-To be completed once the stack is in.
+Open http://localhost:3000. The first start builds the image, creates the database, applies the migrations and
+loads the seed data (the booklet's 120 outlets, 60 vehicles, calendar, travel times and service allowances, plus
+our product list and demo accounts). Later starts keep whatever you changed.
+
+To start again from an empty database: `docker compose down -v && docker compose up`.
+
+### Working on the code
+
+```bash
+cp .env.example .env
+docker compose up -d db      # Postgres on localhost:5433
+npm install
+npm run db:migrate && npm run db:seed
+npm run dev                  # API on :3000, web app on :5173
+npm test                     # needs the db running
+```
+
+Changed the schema in `apps/api/src/db/schema`? Run `npm run db:generate` and commit the new file in
+`apps/api/drizzle` with it. CI fails if they disagree.
 
 ## Configuration
 
-Every setting is listed in `.env.example`.
+Every setting is in `.env.example`, and `docker compose up` works without a `.env` file.
+
+| Variable | What it does |
+| --- | --- |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Database login used by compose |
+| `SEED_PASSWORD` | Password for every seeded account |
+| `DATABASE_URL` | Only for running the API outside Docker |
 
 ## Seeded accounts
 
-| Role | Username | Password |
+Password for all of them: `wayfinder-demo` (or whatever `SEED_PASSWORD` is set to).
+
+| Role | Username | Where |
 | --- | --- | --- |
-| Store manager | | |
-| Dispatcher | | |
-| Loader | | |
-| Driver | | |
+| Store manager | `nadeesha` | Fresh Colombo 1 (OUT001) |
+| Dispatcher | `ruwan` | Peliyagoda depot |
+| Loader | `kasun` | Peliyagoda depot |
+| Driver | `prasanna` | Kandy depot |
+| Admin | `admin` | Everything |
 
 ## Judge walkthrough
 
