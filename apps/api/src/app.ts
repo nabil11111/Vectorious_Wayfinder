@@ -17,7 +17,12 @@ export function createApp() {
   const app = express();
   app.set('trust proxy', 1); // Railway sits in front; this makes rate limits see the real client address.
   app.use(helmet());
-  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/v1/health' } }));
+  // Log the method, path, status and time only. Full headers would write session cookies into the logs.
+  app.use(pinoHttp({
+    logger,
+    autoLogging: { ignore: (req) => req.url === '/api/v1/health' },
+    serializers: { req: (req) => ({ method: req.method, url: req.url }), res: (res) => ({ statusCode: res.statusCode }) },
+  }));
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 
