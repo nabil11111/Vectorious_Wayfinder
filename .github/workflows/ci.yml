@@ -36,7 +36,7 @@ jobs:
         run: npm run db:migrate && npm run db:seed
       - name: Schema and migrations agree
         run: |
-          npm run db:generate -- --name ci-check
+          npm run db:generate -w @wayfinder/api -- --name ci-check
           if [ -n "$(git status --porcelain apps/api/drizzle)" ]; then echo "The schema changed without a migration. Run npm run db:generate and commit it."; exit 1; fi
       - name: Tests
         run: npm test
