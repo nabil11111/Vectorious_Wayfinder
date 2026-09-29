@@ -20,5 +20,4 @@ it answers a booklet requirement, a judging criterion, or a question a judge wou
 - **Route solver.** A proper routing library in place of the simple truck fill, once the core works.
 - **Ask the late driver.** When a truck falls behind, the driver screen asks how much longer to the next stop:
   5 min, 10 min or more. One tap updates the ETA the shop and dispatcher see; unanswered, it dismisses itself.
-  Show it only when the phone says the truck is stopped (the booklet: driver screens are for use when safely
-  stopped), with big buttons.
+  A subtle popup that never blocks the screen or asks for attention, and goes away by itself.
