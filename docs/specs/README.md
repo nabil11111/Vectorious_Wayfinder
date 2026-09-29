@@ -1,6 +1,13 @@
 # Specs
 
-We build Wayfinder spec first. Every feature starts here, before any code.
+We build Wayfinder spec first. Every feature starts here, before any code. The flow follows the spec, plan,
+tasks shape used by GitHub Spec Kit and Amazon Kiro:
+
+- **Small feature:** one file, `NNN-name.md`.
+- **Big feature** (planner, offline driver, loading): a folder `NNN-name/` with `spec.md` (what and why),
+  `plan.md` (data, contracts, approach) and `tasks.md` (one line per pull request).
+
+Acceptance criteria are written as "When …, the system shall …", so each one maps to one test.
 
 1. **Spec.** Copy `_template.md` to `NNN-short-name.md`. Say what the feature does, which Figma screen it
    follows, what data goes in and out, and the acceptance criteria. Anything not in the spec is out of scope.
