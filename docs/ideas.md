@@ -18,3 +18,7 @@ it answers a booklet requirement, a judging criterion, or a question a judge wou
 - **Datathon predictions in the planner.** Stop time and lateness risk from the Datathon model, with the
   booklet formula as the fallback when the model is unavailable. Demand forecast drives the capacity screen.
 - **Route solver.** A proper routing library in place of the simple truck fill, once the core works.
+- **Ask the late driver.** When a truck falls behind, the driver screen asks how much longer to the next stop:
+  5 min, 10 min or more. One tap updates the ETA the shop and dispatcher see; unanswered, it dismisses itself.
+  Show it only when the phone says the truck is stopped (the booklet: driver screens are for use when safely
+  stopped), with big buttons.
