@@ -107,9 +107,15 @@ function PastList({ past }: { past: PastOrders }) {
     if (last?.day === day) last.orders.push(order);
     else days.push({ day, orders: [order] });
   }
-  if (!outlet || days.length === 0) return <p className="text-xs leading-[15px] text-muted-foreground">No past orders yet.</p>;
+  // A refresh that failed leaves the list as it was, which may be out of date. A next page that failed says so at
+  // the foot instead.
+  const stale = past.isRefetchError && <StaleNotice busy={past.isFetching} onRetry={() => { void past.refetch(); }} />;
+  if (!outlet || days.length === 0) {
+    return <div className="space-y-2.5">{stale}<p className="text-xs leading-[15px] text-muted-foreground">No past orders yet.</p></div>;
+  }
   return (
     <div className="space-y-4">
+      {stale}
       {days.map(({ day, orders }) => (
         <section key={day}>
           <h3 className="mb-[7px] font-sans text-xs leading-[17px] font-semibold text-muted-foreground">{shortDay(day)}</h3>
