@@ -111,6 +111,19 @@ describe('the complete suggested plan', () => {
     expect(result.input.plan.deferrals.map((d) => d.code)).toEqual(['no_reefer', 'over_capacity']);
   });
 
+  it('AC-17 reports fuel when one vehicle passes timing but another only has fuel left', () => {
+    const input = plannerInput([
+      plannerOrder('older-style', 'OUT019', 'style-folded', 1, { deliveryDate: '2026-06-24', timesDeferred: 1 }),
+      plannerOrder('new-chilled', 'OUT006', 'fresh-chilled-carton', 1),
+    ], { vehicles: [{ ...vehicle('VEH004'), litresUsedThisWeek: vehicle('VEH004').weeklyFuelQuotaL }, vehicle('VEH001')] });
+    // The old Style order takes VEH001's first trip. Its second cannot reach Fresh in time; VEH004 can,
+    // but has no fuel left. A window rejection must not erase the other vehicle's timing survivor.
+    const result = success(buildSuggestedPlan(input));
+    expect(result.input.plan.deferrals).toMatchObject([{ orderId: 'new-chilled', code: 'fuel' }]);
+    expect(result.decisions).toEqual([]);
+    expect(result.input.plan.trips[0]!.stops[0]!.orderIds).toEqual(['older-style']);
+  });
+
   it('AC-18 returns unavailable on nonoperating days with no applicable plan', () => {
     const result = buildSuggestedPlan(plannerInput([plannerOrder('a', 'OUT006')], { operatingDay: false }));
     expect(result.status).toBe('unavailable');
@@ -168,4 +181,3 @@ describe('the complete suggested plan', () => {
     }
   });
 });
-
