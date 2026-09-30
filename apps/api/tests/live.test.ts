@@ -1,6 +1,6 @@
 import { once } from 'node:events';
 import type { Server, ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { connect, type AddressInfo } from 'node:net';
 import { ApiError, LiveEvent } from '@wayfinder/contracts';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
@@ -20,7 +20,7 @@ const server = createApp().listen(0);
 await once(server, 'listening');
 const base = address(server);
 
-// The server's end of every request, so a test can make the write to one stream fail.
+// The server's end of every request, so a test can see or break what the server holds for one stream.
 const served: ServerResponse[] = [];
 server.on('request', (_req, res) => served.push(res));
 
@@ -65,13 +65,29 @@ async function listen(person: Person, at = base) {
 }
 type Stream = Awaited<ReturnType<typeof listen>>;
 
-// What a stream has been sent so far, one entry per message, without the heartbeats. The last piece is left
-// out: it is empty, or a message that has not fully arrived.
-const messages = (stream: Stream) => stream.text.split('\n\n').slice(0, -1).filter((block) => !block.startsWith(':'));
+// The heartbeat as it is written: a comment line, and the empty line that ends it.
+const PING = ': ping\n\n';
+// What a stream has been sent so far, one entry per message, without the heartbeats. Anything else the server
+// wrote stays in, so it cannot slip past a test. The last piece is left out: it is empty, or a message that
+// has not fully arrived.
+const messages = (stream: Stream) => stream.text.split('\n\n').slice(0, -1).filter((block) => block !== ': ping');
 // The changes in those messages. LiveEvent is strict, so one that holds more than a topic and an id fails here.
 const changes = (stream: Stream) => messages(stream).map((block) => LiveEvent.parse(JSON.parse(block.replace('event: change\ndata: ', ''))));
-// Waits for what the server sends a moment after it was asked.
-const soon = (check: () => unknown) => vi.waitFor(check, { timeout: 2000, interval: 10 });
+
+// Waits for what the server sends a moment after it was asked. vi.waitFor would move a held timer on while
+// it waits, so this one only looks again.
+async function soon(check: () => unknown): Promise<void> {
+  const giveUp = performance.now() + 2000;
+  for (;;) {
+    try {
+      await check();
+      return;
+    } catch (err) {
+      if (performance.now() > giveUp) throw err;
+      await new Promise((again) => setTimeout(again, 10));
+    }
+  }
+}
 
 // Opens a stream for each of these people, announces the change and says who was sent it. A second change for
 // everyone follows it. A stream that has that one has everything sent before it, so the test knows who was
@@ -111,12 +127,20 @@ describe('the live stream', () => {
     expect(ruwan.state).toBe('open');
   });
 
-  it('sends the headers at once, before there is anything to say', async () => {
-    // With the heartbeat's timer held still nothing is written after the headers, so fetch can only answer
-    // when they were sent on their own.
+  it('sends the headers at once, and a heartbeat to every stream each time the setting has passed', async () => {
+    // The heartbeat's timer is held still and moved by hand. Until it moves nothing is written after the
+    // headers, so fetch can only answer when they were sent on their own.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    const ruwan = await listen('ruwan');
-    expect(ruwan.res.status).toBe(200);
+    const streams = [await listen('ruwan'), await listen('admin')];
+    vi.advanceTimersByTime(50);
+    await soon(() => expect(streams.map((stream) => stream.text)).toEqual([PING, PING]));
+    vi.advanceTimersByTime(100);
+    await soon(() => expect(streams.map((stream) => stream.text)).toEqual([PING.repeat(3), PING.repeat(3)]));
+    // The timer stops with the last stream and starts again with the next one.
+    closeStreams();
+    const later = await listen('nadeesha');
+    vi.advanceTimersByTime(50);
+    await soon(() => expect(later.text).toBe(PING));
   });
 
   it('AC-18 answers a signed-out person with 401 signed_out', async () => {
@@ -139,6 +163,8 @@ describe('the live stream', () => {
     expect(await whoHears({ topic: 'orders', id: 'an-order', outletId: 'OUT001', depotId: 'Peliyagoda' }, people)).toEqual(['nadeesha', 'ruwan', 'dilshan', 'admin']);
     // OUT002 is another Peliyagoda shop, so its change is not Nadeesha's to hear.
     expect(await whoHears({ topic: 'orders', id: 'another-order', outletId: 'OUT002', depotId: 'Peliyagoda' }, people)).toEqual(['ruwan', 'dilshan', 'admin']);
+    // With the outlet alone, no depot's people are named.
+    expect(await whoHears({ topic: 'orders', outletId: 'OUT001' }, people)).toEqual(['nadeesha', 'admin']);
   });
 
   it('AC-21 sends a change for everyone to every open stream', async () => {
@@ -157,13 +183,16 @@ describe('the live stream', () => {
   });
 
   it('keeps a failed write to one stream away from the code that announced and from the other streams', async () => {
-    const ruwan = await listen('ruwan');
+    const before = await listen('dilshan');
     const broken = await listen('kasun');
-    vi.spyOn(served.at(-1)!, 'write').mockImplementation(() => {
+    const brokenEnd = served.at(-1)!;
+    const after = await listen('ruwan');
+    // The broken stream is between the other two on the list, so the change has to get past it.
+    vi.spyOn(brokenEnd, 'write').mockImplementation(() => {
       throw new Error('write EPIPE');
     });
     expect(() => announce({ topic: 'plans', depotId: 'Peliyagoda' })).not.toThrow();
-    await soon(() => expect(changes(ruwan)).toEqual([{ topic: 'plans' }]));
+    await soon(() => expect([changes(before), changes(after)]).toEqual([[{ topic: 'plans' }], [{ topic: 'plans' }]]));
     // The broken stream is cut, so its screen opens a new one and fetches everything again.
     await broken.over;
     expect(broken.state).toBe('cut');
@@ -204,6 +233,22 @@ describe('the live stream', () => {
     server.once('request', (req) => req.socket.destroy());
     await expect(events(cookies.ruwan)).rejects.toThrow();
     // Had it been put on the list it would stay there for good, and the fifth stream would be refused.
+    for (const person of ['nadeesha', 'ruwan', 'kasun', 'prasanna', 'admin'] as const) await listen(person);
+  });
+
+  it('gives back every place taken on one connection when that connection closes', async () => {
+    // Four requests sent one behind another on a single connection. Only the first of them holds the
+    // connection, and Node tells only that one's response when the connection closes.
+    const asked = served.length;
+    const connection = connect(Number(new URL(base).port), '127.0.0.1');
+    await once(connection, 'connect');
+    connection.write(`GET /api/v1/events HTTP/1.1\r\nHost: wayfinder\r\nCookie: ${cookies.ruwan}\r\n\r\n`.repeat(4));
+    // Each of the four has been dealt with once its headers are written, whether they could be sent or not.
+    await soon(() => expect(served.slice(asked).map((res) => res.headersSent)).toEqual([true, true, true, true]));
+    const closed = once(served.at(-1)!.req.socket, 'close');
+    connection.destroy();
+    await closed;
+    // Had one of them stayed on the list, the five places would not all be free.
     for (const person of ['nadeesha', 'ruwan', 'kasun', 'prasanna', 'admin'] as const) await listen(person);
   });
 
