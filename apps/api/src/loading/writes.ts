@@ -52,12 +52,13 @@ async function openTrip(tx: Tx, caller: DepotCaller, tripId: string, withDepot: 
 }
 
 // One loader write. The same id as the last write applied to the trip is a retry, answered with the day as it is and
-// told to nobody, so nothing counts twice (rule 10). Otherwise the work checks and writes, and says who hears of it.
+// told to nobody, so nothing counts twice (rule 10). The database keeps an id in small letters, whatever case the phone
+// sent it in. Otherwise the work checks and writes, and says who hears of it.
 async function loaderWrite(caller: DepotCaller, tripId: string, writeId: string, withDepot: boolean,
   work: (tx: Tx, open: OpenTrip) => Promise<Announcement[]>): Promise<LoadingDay> {
   const done = await db.transaction(async (tx) => {
     const open = await openTrip(tx, caller, tripId, withDepot);
-    const told = open.trip.lastWriteId === writeId ? [] : await work(tx, open);
+    const told = open.trip.lastWriteId === writeId.toLowerCase() ? [] : await work(tx, open);
     return { day: await loadingDayOf(tx, caller.depotId, open.moment.at), told };
   });
   for (const change of done.told) announce(change);
