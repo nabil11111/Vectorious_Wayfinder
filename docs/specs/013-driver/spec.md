@@ -31,10 +31,11 @@ These are in `docs/decisions.md`.
 - **D-44 · The driver's day is the loader's day (D-34), and a trip that is out stays on the phone until the driver ends
   it.** The depot has one morning for both, and a late trip must not vanish from its driver at 16:00.
 - **D-45 · Every driver action is saved on the phone first, as the request it will send, and sent oldest first, one at a
-  time, by one tab. The server keeps each applied write's id with its trip, its kind and a hash of its body, and lists the
-  ids in the driver's day, and a write leaves the phone once the day lists it. Each write names the revision of the stop
-  or trip it changes, which the phone works out as it saves.** A delivery happened whether there was a signal or not, so
-  it must never need doing again or count twice, and an id cannot be reused for something else.
+  time, by the one tab that holds the driver's app. The server keeps each applied write's id with its account, trip, kind
+  and a hash of its body, the driver's day lists the ids the account had applied in the last 48 hours, and a write leaves
+  the phone once the day lists it. Each write names the revision of the stop or trip it changes, which the phone works out
+  as it saves.** A delivery happened whether there was a signal or not, so it must never need doing again or count twice,
+  an id cannot be reused for something else, and a trip that has left the day must not strand its last write.
 - **D-46 · A time recorded on the phone is kept when it lies between the trip's last event time and the server's clock,
   read once the trip is locked, and otherwise the nearer of the two is kept. Reopening a stop never moves the last event
   time back.** The phone counts the app clock on from its last contact and can fall behind after a sleep or a clock move,
@@ -44,10 +45,10 @@ These are in `docs/decisions.md`.
   so disputes do not rest on memory, and one write means a delivery never exists without its photo.
 - **D-48 · The driver raises two problems, a shop that refused some and a shop that is closed. The dispatcher answers a
   refusal with "Bring them back", and a closed shop with "Try again on this trip", which sends the stop after the other
-  stops, or "Bring them back", which puts the stop's orders back as placed with their counts cleared while the stop stays
-  closed.** The cartons are on the truck either way, a retried stop must not jump the queue, and the old stop keeps what
-  happened there while its orders start again for the next plan. Writing cartons off, and sending replacements, are the
-  depot's records to add later.
+  stops in the order stops were sent back, or "Bring them back", which puts the stop's orders back as placed with their
+  counts cleared while the stop stays closed and keeps that attempt's counts.** The cartons are on the truck either way,
+  a retried stop must not jump the queue, and the old stop keeps what happened there while its orders start again for
+  the next plan. Writing cartons off, and sending replacements, are the depot's records to add later.
 - **D-49 · The phone keeps the app's files, the signed-in account, the clock's last state, the driver's trip and the
   waiting writes, and reads them at once on start, so the driver's screens open with no signal. A service worker keeps the
   files and never an answer from the API.** A phone reloads tabs, the camera often does it, and a queue behind a page that
@@ -68,6 +69,7 @@ alone below 640 wide beside a status chip), the avatar and the plain bell. Words
 |  | The waiting sheet | No frame | "Waiting to send · 1", a row per record: "Stop 2 · Fresh Wellawatte · saved 03:48". "Not accepted · 1", a row per refused record with the server's sentence: "Stop 2 · Fresh Wellawatte · That trip is not on your list.", and "Clear". "Retry sync" in orange while something waits. |
 |  | Sign in again | No frame | A yellow line: "Sign in again to send 1 waiting record." with "Sign in". |
 |  | Not saved | No frame | "Could not save on this phone. Try again." in red on top, the screen stays where it was, and nothing is sent. |
+|  | Another tab | No frame | "Wayfinder is open in another tab." in place of the driver's screens, in every tab but the one that holds the driver's app, until that tab closes (rule 10). |
 | Today's trip `/driver` | Loading | Loading · skeleton | Grey blocks for the day line, the card and two rows, on the first load with nothing kept on the phone. |
 |  | Ready | Driver · Today's trip | "Thu 25 Jun · trip 1". The card: the design's van, "VEH035", "leaves 04:36 · in 1 h 5 min", "Fresh · Colombo · back by 06:10" and the green chip "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda". "2 stops", then a row per stop in plan order: "1", "Fresh Nugegoda", "05:00 to 07:30", "23 of 24 cartons"; "2", "Fresh Wellawatte", "05:30 to 08:00", "94 cartons". The orange "Start trip". |
 |  | Not loaded yet | No frame | The same card with the grey chip "Not loaded yet", or "Being loaded" while the loader works, "Start trip" greyed and "Start trip works once VEH035 is loaded." |
@@ -77,7 +79,7 @@ alone below 640 wide beside a status chip), the avatar and the plain bell. Words
 |  | The top line | Driver · Next stop, · after refusal, · after no answer | The latest problem of the trip, else the last stop done. Green: "✓ Stop 1 Fresh Nugegoda delivered 03:38" with "synced", or "on this phone" while it waits. Yellow: "! Stop 2 · 92 delivered · 2 refused" with "sent" or "on this phone", and "Keep the 2 cartons on the truck. The depot will tell you what to do." Yellow: "! Stop 2 · not delivered · nobody there" and "The depot decides: retry on this trip or another day." Once answered, the second line is the answer: "Ruwan, dispatcher · 03:52 · Bring the 2 chilled cartons back to Peliyagoda." |
 |  | No signal | Driver · No signal | The yellow bar with the no-signal picture, "No signal · 1 waiting to send", or "No signal · everything is sent", in place of the top line. |
 |  | Back online | Driver · connection restored | The green bar with the design's sync picture, "Back online · 1 stop sent" and "Wellawatte reached the depot", and the dark tick that closes it. It also goes once the next stop is done. |
-|  | Try again | No frame | The stop the dispatcher sent back comes after the other unfinished stops (rule 4), with the answer as the top line: "Ruwan, dispatcher · 03:52 · Try Fresh Wellawatte again after the other stops." |
+|  | Try again | No frame | The stop the dispatcher sent back comes after the other unfinished stops and after any stop sent back before it (rule 4), with the answer as the top line: "Ruwan, dispatcher · 03:52 · Try Fresh Wellawatte again after the other stops." |
 | Unload `/driver` | Counting | Driver · Unload, · last stop, · offline | "Stop 1 of 2", the shop picture and "Fresh Nugegoda", "street". A card per line, chilled before dry: the design's chilled or dry goods picture and "Chilled" or "Dry" (the item's name for Style and Tech), −, the count, "/12" and +. The count starts at 0 and can be typed. Under a line the loader went short on, the design's shortfall picture and "Loader flagged 1 carton short at the depot", and that line counts to "3 /4". The orange "Done unloading", greyed until every line is counted to what was loaded, and "Something's wrong". |
 | Proof `/driver/proof` | Take it | Driver · Proof, · last stop, · offline | "Stop 1 of 2", the shop, "Photo of the cartons at the door", the dashed box with the design's proof-photo picture, and the orange "Take photo", which opens the camera, or the file picker on a laptop. |
 |  | Preview | Driver · photo preview | "Check that the cartons are visible", the photo in the box, the orange "Save delivery" and "Retake photo". |
@@ -110,10 +112,11 @@ cartons and 3 of 4 dry, window 05:00 to 07:30, street) and stop 2 Fresh Wellawat
    vehicle's two trips are never out at once: a start takes the depot's lock, so two starts of one vehicle's trips go one
    after the other and the second finds the first out. The leaving time is the plan's, not a gate (open question 1).
    *Dilshan starts at 03:31, 1 h 5 min before 04:36.*
-4. **A stop.** The next stop is the first unfinished stop in plan order among those not sent back, and a stop sent back
-   by "Try again" comes after them. An arrival or a save at any other stop is refused (`not_next`). "I've arrived" records
-   the arrival. The unload counts are the driver's own tally, as the loader's ticks are (spec 012, rule 4): they are kept
-   in the tab, not saved, and "Done unloading" works once every line is counted to what was loaded. A delivery is then
+4. **A stop.** The next stop is the first unfinished stop in plan order among those not sent back, and the stops sent back
+   by "Try again" come after them, in the order they were sent back. An arrival or a save at any other stop is refused
+   (`not_next`). "I've arrived" records the arrival. The unload counts are the driver's own tally, as the loader's ticks
+   are (spec 012, rule 4): they are kept in the tab, not saved, and "Done unloading" works once every line is counted to
+   what was loaded. A delivery is then
    every line as loaded, with a photo (D-47): a whole JPEG, starting `FF D8` and ending `FF D9`, of at most 500 KB, whose
    frame header gives at most 2000 px a side. Anything less than every line goes through "Something's wrong", so the
    counts add up (rule 9). Saving makes the stop `delivered`, each line's delivered count its loaded count, and each order
@@ -127,13 +130,16 @@ cartons and 3 of 4 dry, window 05:00 to 07:30, street) and stop 2 Fresh Wellawat
    crushed at the bottom". OUT002's two orders are delivered at 46 and 46, 92 in all.*
 6. **The shop is closed.** The driver may add a photo and a note, and "Save attempt and move on" makes the stop `closed`.
    Nothing is delivered, the stop's orders stay `loaded`, and a problem of kind `closed` goes to the dispatcher, counting
-   what stays on the truck line by line. *At Fresh Wellawatte instead: "Nobody at the shop · since 03:45", "Waited · 3
-   min", "Lights off, gate locked", "94 cartons stay on the truck", counted 48 and 46.*
+   what stays on the truck line by line. From then on a closed stop's lines show that attempt, on the phone and on Live
+   day: loaded as its problem counted them and nothing delivered, whatever later happens to its orders. *At Fresh
+   Wellawatte instead: "Nobody at the shop · since 03:45", "Waited · 3 min", "Lights off, gate locked", "94 cartons stay
+   on the truck", counted 48 and 46.*
 7. **Back at the depot.** "I'm back at the depot" is offered once every stop is delivered, refused or closed, and makes
    the trip `done` at the time kept. *At 03:55: "Back at Peliyagoda", "Checked in at the depot 03:55".*
 8. **The answers (D-48).** The dispatcher answers a driver's problem once, from Live day's "Needs you" (spec 012). A
    refusal's one answer is "Bring them back". A closed shop's are "Try again on this trip", which opens the stop again
-   with a `retry` mark while the trip is out, so it comes after the other unfinished stops, and "Bring them back", which
+   while the trip is out, marked with the app clock's time it was sent back, so it comes after the other unfinished stops
+   and after any stop sent back before it, and "Bring them back", which
    makes the stop's orders `placed` again with their lines' loaded and delivered counts cleared, so the next plan lists
    them as carried over and loads them afresh. The old stop stays `closed`, and the audit row of the answer keeps what that
    attempt counted. The driver sees who answered, when and one sentence. *"Bring them back": "Ruwan, dispatcher · 03:52
@@ -144,12 +150,16 @@ cartons and 3 of 4 dry, window 05:00 to 07:30, street) and stop 2 Fresh Wellawat
    117 + 1 = 118. The refusal: 115 + 2 + 1 = 118. The closed shop: 23 + 94 + 1 = 118.*
 10. **Saved on the phone first (D-45, D-49, D-50).** An action is saved in the browser's database, as the exact request
     it will send with its photo, under the signed-in account, before the screen moves on. If the phone cannot save it,
-    the screen says so and stays, and nothing is sent. One tab sends, oldest first, one write at a time. A send with no
-    answer in 15 seconds is dropped and sent again later with the same id. A write's answer is never shown: after each
-    write the phone fetches the day again. The day lists the ids of the writes the server has applied, and the phone takes
-    those writes off its queue before it shows the trip or sends anything, so a write whose answer was lost is never
-    applied twice on screen or on the server. The server answers an id it has applied, with the same content, as done,
-    and refuses the same id with anything else as `write_reused`. Each write names the revision of its stop, or of the
+    the screen says so and stays, and nothing is sent. One tab owns the driver's app: the tab that holds the browser's lock
+    `wayfinder-driver`, for as long as it is open, fetches the day, keeps it and sends, and any other tab says "Wayfinder
+    is open in another tab." and does nothing until that one closes. It sends oldest first, one write at a time. A send,
+    or a fetch of the day, with no answer in 15 seconds is dropped and tried again on the retry schedule, a write with the
+    same id. A write's answer is never shown: after each write the phone fetches the day again. The day lists the ids of
+    every write the account had applied, or had answered again, in the last 48 hours, whichever trips it shows, and the
+    phone takes those writes off its queue before it shows the trip or sends anything. A write stays on the phone until
+    a fetched day lists it, so one whose answer was lost is never applied twice on screen or on the server, even once
+    its trip has left the day. The server answers an id it has applied, with the same content, as done, and refuses the
+    same id with anything else as `write_reused`. Each write names the revision of its stop, or of the
     trip for a start and an end, worked out from what the phone has saved before, so a phone that missed another phone's
     change is refused as `stale`. A refused write is never sent again: it moves to "Not accepted" with the server's
     sentence until the driver clears it, and the writes after it carry on. A write answered `signed_out` waits until the
@@ -188,9 +198,12 @@ it, 400 `unknown_record`. The answers and the photo are the depot's dispatcher's
 one sentence (`plan.md`, Contracts), which the phone keeps under "Not accepted".
 - **No signal (D-45).** The action is saved on the phone and the screen moves on. The chip and the bar say so, and the
   write goes when the signal is back.
-- **The answer is lost.** The next fetch of the day lists the write as applied, and the phone takes it off its queue. A
-  send before that fetch is answered as done.
-- **A request hangs.** After 15 seconds the phone gives up on it and sends the same write again later.
+- **The answer is lost.** The next fetch of the day lists the write as applied, for 48 hours and whatever trips the day
+  shows, and the phone takes it off its queue. A send before that fetch is answered as done.
+- **A request hangs.** After 15 seconds the phone gives up on a send or a fetch and tries again on the retry schedule, a
+  write with the same id, which stays on the phone until a fetched day lists it.
+- **Two tabs.** Only the tab holding the driver's app fetches, keeps and sends. Another says "Wayfinder is open in
+  another tab." and does nothing.
 - **An id reused.** The same id with other content is refused, `write_reused`, "This record was already sent with other
   details."
 - **Two phones on one trip.** The later write names an old revision: `stale`, "Fresh Wellawatte was changed on another
@@ -199,8 +212,9 @@ one sentence (`plan.md`, Contracts), which the phone keeps under "Not accepted".
   refused with `stops_left`, "Stop 2 is not done yet.", and the phone shows Wellawatte as the next stop.
 - **The day was reset.** Writes for the old trip get `unknown_record`, "That trip is not on your list.", and wait under
   "Not accepted" until cleared.
-- **Signed out, or another account.** The writes stay under their account, the phone says "Sign in again to send 1
-  waiting record.", and they go once the same driver signs in. Another account on the phone never sees or sends them.
+- **Signed out, or another account.** A write answered `signed_out` stays waiting, never refused, under its account. The
+  phone says "Sign in again to send 1 waiting record.", and the writes go once the same driver signs in. Another account
+  on the phone never sees or sends them.
 - **The phone cannot save.** "Could not save on this phone. Try again." The screen stays and nothing is sent.
 - **A photo that is not right.** The phone shrinks it first. The server refuses anything but a whole JPEG of at most 500
   KB and 2000 px a side with `invalid_input`, "The photo must be a whole JPEG of at most 500 KB."
@@ -232,11 +246,11 @@ reset. A helper runs the walkthroughs of specs 009, 010 and 012 to VEH035 ready 
 - [ ] **AC-1** When `dilshan` reads his day at Wed 24 Jun 16:00 before any send, the system shall answer Thu 25 Jun with
   `planSent` false and no trips, at Wed 24 Jun 15:59 Wed 24 Jun and no trips, and at Sat 27 Jun 16:00 no day. It shall
   write nothing.
-- [ ] **AC-2** When VEH035 is ready, the day shall hold VEH035 trip 1: van, reefer, Fresh, Colombo, `ready`, ready 02:36,
-  leaving 04:36, back by 06:10, no write applied, and stops in plan order, none sent back: Fresh Nugegoda, Colombo,
-  street, window 05:00 to 07:30, note "Ring the bell at the side door.", lines 12 and 8 chilled and 4 dry loaded at 12, 8
-  and 3; then Fresh Wellawatte, window 05:30 to 08:00, no note, 48 chilled and 46 dry, all loaded. Nothing is arrived or
-  delivered.
+- [ ] **AC-2** When VEH035 is ready, the day shall list no applied write and hold VEH035 trip 1: van, reefer, Fresh,
+  Colombo, `ready`, ready 02:36, leaving 04:36, back by 06:10, and stops in plan order, none sent back: Fresh Nugegoda,
+  Colombo, street, window 05:00 to 07:30, note "Ring the bell at the side door.", lines 12 and 8 chilled and 4 dry loaded
+  at 12, 8 and 3; then Fresh Wellawatte, window 05:30 to 08:00, no note, 48 chilled and 46 dry, all loaded. Nothing is
+  arrived or delivered.
 - [ ] **AC-3** When a trip of the caller's is `out` on an earlier day, it shall come first, and a `done` trip of the day
   shall stay listed. Another driver's trips shall not be listed. *A test sets the rows.*
 - [ ] **AC-4** When spec 012's ready and spec 010's send and unsend commit, the system shall also announce `driver` to the
@@ -259,9 +273,8 @@ reset. A helper runs the walkthroughs of specs 009, 010 and 012 to VEH035 ready 
 - [ ] **AC-9** *Unit.* When `applyDriverWrite` applies each of the six writes, it shall set what rules 3 to 7 set and raise
   its record's revision by one, and a refusal or a closed shop shall add its problem with the write's id. When
   `tripFigures` reads the three endings of rule 9, it shall give their counts, what is still on the truck and the next
-  stop, a stop sent back coming after the other unfinished ones, and a closed stop whose orders' counts were cleared
-  shall still count from its problem's lines. When `phoneView` gets a day that lists a waiting write's id as applied, it
-  shall drop that write and apply only the others.
+  stop, the stops sent back coming after the other unfinished ones in the order they were sent back. When `phoneView`
+  gets a day that lists a waiting write's id as applied, it shall drop that write and apply only the others.
 - [ ] **AC-10** *Unit.* When a photo is checked, the system shall take a whole JPEG of at most 500 KB and 2000 px a side,
   and refuse a truncated file with no `FF D9` end, a forged start with no frame header behind its `FF D8`, a file over
   500 KB, and a picture 2400 px wide.
@@ -283,9 +296,9 @@ reset. A helper runs the walkthroughs of specs 009, 010 and 012 to VEH035 ready 
   kept, write the delivered counts 12, 8 and 3, store the photo under the write's id, make the three orders `delivered`
   with their revisions up, write `stop.delivered`, and announce `driver` to the depot and `orders` to OUT001 and the
   depot. Nadeesha's open list shall show her three orders delivered.
-- [ ] **AC-17** When a delivery, refusal or closed shop names a stop not arrived, the system shall answer 409
-  `not_arrived`, one already done 409 `stop_done`, and a delivery with no photo or one the check refuses 400
-  `invalid_input`, and change nothing.
+- [ ] **AC-17** When an arrival or a save names a stop already done, the system shall answer 409 `stop_done`, not
+  `not_next`, though a done stop is never the next one; a save at a stop not arrived 409 `not_arrived`; and a delivery
+  with no photo or one the check refuses 400 `invalid_input`. Nothing changes.
 
 ### Problems and the end of the trip
 - [ ] **AC-18** When the refusal of rule 5 is saved, the system shall make Wellawatte `refused`, write the delivered counts
@@ -313,7 +326,9 @@ reset. A helper runs the walkthroughs of specs 009, 010 and 012 to VEH035 ready 
 - [ ] **AC-25** When the answer to Nugegoda's arrival is lost, the day read next shall list the arrival's id, `phoneView`
   shall take it off the queue, and the delivery built from that view shall be accepted, with one `stop.arrived` and one
   `stop.delivered` in the audit log. Sent without the drop, the delivery would name a revision one too high and be refused
-  as `stale`.
+  as `stale`. When the answer to the end of the trip is lost and the clock moves past 16:00, so the day no longer shows
+  VEH035, the day read next shall still list the end's id and the queue shall empty. A write answered more than 48 hours
+  ago shall not be listed until it is sent again, when it shall be answered as done and listed once more.
 - [ ] **AC-26** When a write's time lies after the server's clock or before the trip's last event time, the system shall
   keep the nearer bound, and its audit row shall hold the phone's time and the time kept. After "Try again" empties a
   stop's times, an arrival the phone dates before them shall be kept at the trip's last event time.
@@ -328,23 +343,26 @@ reset. A helper runs the walkthroughs of specs 009, 010 and 012 to VEH035 ready 
 ### The answers
 - [ ] **AC-30** When `ruwan` reads what needs him after the refusal, the system shall list the problem with its kind,
   reason, note, photo, Dilshan and time, VEH035 `out` with Dilshan and no stops left, the stop's arrival, save and loaded
-  times with nothing flagged at the dock, and the chilled line loaded 48 with 2 refused.
+  times with nothing flagged at the dock, and the chilled line loaded 48, 46 delivered and 2 refused.
 - [ ] **AC-31** When `ruwan` answers the refusal "Bring them back", the system shall decide it with Ruwan and the time,
   write `issue.decided`, and announce `issues` and `driver`, and Dilshan's day shall show the answer. Any other answer to
   a refusal shall get 400 `invalid_input`.
 - [ ] **AC-32** When `ruwan` answers a closed shop "Try again on this trip", the system shall empty the stop's arrival,
-  save time and outcome, mark it `retry`, raise its revision and leave its orders `loaded`, and on a trip that is `done`
-  answer 409 `trip_not_out`.
-- [ ] **AC-33** When Nugegoda is closed and sent back with "Try again" while Wellawatte is unfinished, the next stop shall
-  be Wellawatte, an arrival at Nugegoda shall get 409 `not_next`, and once Wellawatte is done, Nugegoda shall be next and
-  take its arrival and delivery.
+  save time and outcome, mark it with the app clock's time it was sent back, raise its revision and leave its orders
+  `loaded`, and on a trip that is `done` answer 409 `trip_not_out`.
+- [ ] **AC-33** When Nugegoda is closed and sent back while Wellawatte is unfinished, Wellawatte shall be next and an
+  arrival at Nugegoda shall get 409 `not_next`. When Wellawatte is then closed and sent back too, Nugegoda, sent back
+  first, shall be next. When Nugegoda is closed and sent back a second time, Wellawatte shall be next, and once it is
+  delivered Nugegoda shall take its arrival and delivery.
 - [ ] **AC-34** When `ruwan` answers the closed shop "Bring them back", the system shall make OUT002's two orders `placed`
   with their revisions up and their lines' loaded and delivered counts empty, keep the counts of that attempt in the audit
-  row, leave the stop `closed`, and announce `orders` to OUT002 and the depot. Dilshan's day shall still show 94 cartons
-  not delivered at Wellawatte, and at Thu 25 Jun 16:00 Friday's board shall list the two orders as carried over.
-- [ ] **AC-35** When Nugegoda is closed and brought back, then planned for Fri 26 Jun, loaded again, and its dry line
-  flagged again at the dock, the system shall take the flag and write Friday's loaded counts, and Thursday's stop 1 shall
-  still read `closed`.
+  row, leave the stop `closed`, and announce `orders` to OUT002 and the depot. Dilshan's day shall still show Wellawatte's
+  lines loaded at 48 and 46 and none delivered, and at Thu 25 Jun 16:00 Friday's board shall list the two orders as
+  carried over.
+- [ ] **AC-35** When Nugegoda is closed and brought back, then planned for Fri 26 Jun, loaded again with its dry line
+  flagged again at 2 of 4 and sent short, and delivered on Friday, the system shall take the second flag, and Thursday's
+  stop 1 shall still read `closed` with its lines loaded at 12, 8 and 3 and none delivered, in Dilshan's day read at
+  Thursday's time and in the problem as Live day reads it.
 - [ ] **AC-36** When an answer does not fit its problem's kind, the system shall answer 400 `invalid_input`, and spec 012's
   `stale` and `unknown_record` shall hold for the driver's kinds. Nothing changes.
 - [ ] **AC-37** When `ruwan` asks for the refusal's photo, the system shall answer the JPEG. Another depot's problem shall
@@ -374,25 +392,30 @@ reset. A helper runs the walkthroughs of specs 009, 010 and 012 to VEH035 ready 
   accepted" with "That trip is not on your list." once the network is back, and "Clear" shall empty the list.
 - [ ] **AC-44** When the phone cannot save a write (DevTools' simulated storage quota set to its smallest), the screen
   shall say "Could not save on this phone. Try again.", stay where it was, and send nothing.
-- [ ] **AC-45** When writes wait for `dilshan` and `chaminda` signs in on the same browser, the screen shall show no waiting
+- [ ] **AC-45** When a waiting write meets 401 (the session cookie deleted in DevTools), it shall stay waiting and not be
+  marked refused, the phone shall ask the driver to sign in again, and once `dilshan` has, it shall be sent and applied
+  once. When writes wait for `dilshan` and `chaminda` signs in on the same browser, the screen shall show no waiting
   record and send none of them, and when `dilshan` signs in again they shall be sent. *The writes are held by blocking
   `/api/v1/driver/writes` in DevTools.*
 - [ ] **AC-46** When the computer's clock is moved two hours ahead and the page reloaded with the network off, against the
   hosted app, the screen shall open and save an arrival, and once the network is back the server shall keep the arrival
   at its own clock, not two hours ahead.
 - [ ] **AC-47** When a send hangs (a DevTools network profile with 20 seconds of latency), the phone shall give it up after
-  15 seconds and send the same write again later, and it shall be applied once. With the network off, the network tab
-  shall show `/api/v1/health` asked on the retry schedule.
-- [ ] **AC-48** When two tabs of the driver's screen are open with writes waiting, each write shall be sent by one tab only,
-  as the network tabs show.
+  15 seconds and send the same write again later, and it shall be applied once. When the fetch after a write fails (the
+  day's own address blocked in DevTools once the write is sent), the write shall stay waiting and not be sent again, the
+  fetch shall be tried on the retry schedule, and once a fetched day lists the write it shall leave the phone, applied
+  once. With the network off, the network tab shall show `/api/v1/health` asked on the retry schedule.
+- [ ] **AC-48** When a second tab of the driver's screen is opened, it shall show "Wayfinder is open in another tab." and
+  never fetch the day, keep it or send a write, as its network tab and the phone's database show, and when the first tab
+  closes the second shall take over.
 - [ ] **AC-49** When the other states occur, the screen shall show them as the table says: loading, could not load with the
   API stopped and nothing kept, no trip before the send, not loaded yet, sign in again, the photo that cannot be used, and
   Day done with records waiting.
 - [ ] **AC-50** When a reviewer reads `features/driver`, they shall find no count worked out there but through
-  `tripFigures`, only formats, the minutes to leaving and waited, and the forms' own tally and counters; the sender inside
-  `navigator.locks.request('wayfinder-driver-sender', …)` with a 15 second limit on each send; the health probe
-  independent of `navigator.onLine`; and, as spec 012's AC-33 asks, no write's answer put in the view, only the day
-  fetched again after each write.
+  `tripFigures`, only formats, the minutes to leaving and waited, and the forms' own tally and counters; the whole sync
+  loop, fetching the day, keeping it and sending, inside `navigator.locks.request('wayfinder-driver', …)` held for the
+  tab's life; a 15 second limit on each send and each fetch; the health probe independent of `navigator.onLine`; and, as
+  spec 012's AC-33 asks, no write's answer put in the view, only the day fetched again after each write.
 - [ ] **AC-51** When a reviewer reads the service worker's settings and the network tab with the network off, `/api`
   requests shall fail and never come from the service worker.
 
@@ -476,6 +499,12 @@ Friday's plan while Thursday's stop 2 stays closed.
 11. States the design lacks: not loaded yet, no trip, could not load, the waiting sheet, not accepted, sign in again, could
     not save on this phone, the unusable photo, the answer on the phone, a stop to try again, and Day done with records
     waiting.
+
+## Known limits
+1. **The server checks a photo's structure and never decodes the picture.** It takes a file that starts `FF D8`, ends `FF
+   D9`, is at most 500 KB and whose frame header gives at most 2000 px a side. The phone makes every photo from a canvas,
+   so a real one always decodes. A file made to pass the check without decoding would show as a broken picture on the
+   dispatcher's card and harm nothing else.
 
 ## Open questions
 1. **May the driver start before the trip's leaving time?** The demo clock starts the road at 03:30 and VEH035 leaves at
