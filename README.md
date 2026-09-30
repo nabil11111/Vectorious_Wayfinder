@@ -48,6 +48,8 @@ Every setting is in `.env.example`, and `docker compose up` works without a `.en
 | `SEED_PASSWORD` | Password for the seeded demo accounts |
 | `SEED_ADMIN_PASSWORD` | Password for the seeded admin account |
 | `TRUST_PROXY` | Proxies in front of the app: `0` when reached directly, `1` on Railway |
+| `DEMO_MODE` | `true` runs the app on its own clock with the seeded delivery day. `false` uses the real clock and seeds no day |
+| `LIVE_HEARTBEAT_MS`, `LIVE_MAX_STREAMS` | The live stream to open screens: how often it sends a heartbeat, and how many streams may be open at once |
 | `DATABASE_URL` | Only for running the API outside Docker |
 
 ## Seeded accounts

@@ -15,6 +15,13 @@
       "when": 1790769715836,
       "tag": "0001_trip-limit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790778281068,
+      "tag": "0002_demo-day",
+      "breakpoints": true
     }
   ]
 }

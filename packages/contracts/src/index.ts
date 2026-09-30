@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 // Shared between the web app and the API. Keep it to shapes that cross the wire; no database types here.
+export * from './demo';
 
 export const ROLES = ['store_manager', 'dispatcher', 'loader', 'driver', 'admin'] as const;
 export const Role = z.enum(ROLES);
