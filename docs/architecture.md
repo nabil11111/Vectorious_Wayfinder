@@ -37,5 +37,6 @@ flowchart LR
 
 ## How a change gets in
 
-Branch, pull request, a teammate reviews, CI passes (typecheck, fresh migrate and seed, schema matches
-migrations, tests, build), merge. `main` is always deployable.
+Spec, branch, pull request, a review by someone who did not write it, CI passes (typecheck, fresh migrate and
+seed, schema matches migrations, tests, build), merge. `main` is always deployable. The full loop is in
+`docs/specs/README.md`.

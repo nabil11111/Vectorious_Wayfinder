@@ -75,3 +75,5 @@ Anything we built differently from our Designathon submission, and why.
 - `docs/architecture.md` - main components and how they connect
 - `docs/data-model.md` - how the system stores and connects its data
 - `docs/ai-disclosure.md` - what was AI-assisted, what was not, and how we used the tools
+- `docs/specs/` - how we build, the map of the whole build, and one spec per feature
+- `docs/decisions.md` - the choices that shape the app, and why we made them
