@@ -31,10 +31,12 @@ export function ViewPlanPage() {
   if (!query.data) {
     return query.isError ? <CannotLoad date={date} error={query.error} busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : <ViewSkeleton date={date} />;
   }
-  return <ViewPlan date={date} board={query.data} />;
+  // A board kept from an earlier visit may be from before a reset, so only one read or answered since this page
+  // opened is passed on to the board's queue.
+  return <ViewPlan date={date} board={query.data} fresh={query.isFetchedAfterMount && !query.isError} />;
 }
 
-function ViewPlan({ date, board }: { date: string; board: PlanBoard }) {
+function ViewPlan({ date, board, fresh }: { date: string; board: PlanBoard; fresh: boolean }) {
   const qc = useQueryClient();
   const saver = usePlanSaver();
   const navigate = useNavigate();
@@ -45,7 +47,9 @@ function ViewPlan({ date, board }: { date: string; board: PlanBoard }) {
   const items = checkItems(board.check?.problems ?? []);
   const blocked = board.check?.ok !== true;
   // The board's queue keeps up with the plan this page shows, so a send names the revision on screen.
-  useEffect(() => { saver.sync(board); }, [saver, board]);
+  useEffect(() => {
+    if (fresh) saver.sync(board);
+  }, [saver, board, fresh]);
 
   // A send and a back to edit wait for the board's save on its way and answer with the board. The board's queue
   // runs them when this is its day; any other day's plan goes on its own.
@@ -55,7 +59,7 @@ function ViewPlan({ date, board }: { date: string; board: PlanBoard }) {
     const call = kind === 'send' ? sendPlan : unsendPlan;
     let problem: string | null = null;
     if (saver.date === date) {
-      saver.sync(board);
+      if (fresh) saver.sync(board);
       problem = await saver.act((day, ref) => call(day, ref));
     } else {
       try {
