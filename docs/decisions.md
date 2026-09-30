@@ -147,3 +147,24 @@ window stays a hard check, so a dry order that misses its window is still deferr
 **D-42 · 1 Oct · A shop's new order keeps its own place in the queue and does not take its older order's
 priority** (the lead's pick, until Nabil answers). The waiting goods are protected first, and a new bulk order
 cannot push another shop's waiting order back.
+
+**D-51 · 1 Oct · One write builds the suggested plan and saves it in one transaction.** The draft and the orders the
+planner splits land together or not at all, so a refused build leaves the board as it was. It saves with the same
+`replaceDraft` and checks as a hand save (D-29).
+
+**D-52 · 1 Oct · A build replaces the whole draft, and the screen asks first.** The planner plans the day from the
+shops' orders (spec 011), so splits made on the draft are joined back before it plans, and a mix of hand trips and
+suggested ones would be neither plan. Each vehicle keeps its driver, since a driver is not part of the allocation
+(D-31).
+
+**D-53 · 1 Oct · The plan keeps its suggestion.** When it was built, the draft it saved, the planner's reason for every
+order and its decisions stay with the plan, so the reasons, "Changes" and "Back to the suggestion" survive a reload.
+Hand edits leave it as built, and the next build replaces it.
+
+**D-54 · 1 Oct · The planner's decisions are accepted before the plan is sent.** Leaving early, an order that waited
+waiting again and a late order waiting are the dispatcher's calls (D-10, D-11, D-19), and a checker warning is not
+consent (spec 011). An edit that changes the planner's choice ends its decision.
+
+**D-55 · 1 Oct · "why?" shows the planner's reason for an order** (our pick, until Nabil answers). A judge and a
+dispatcher must be able to ask why an order went where it did. The design's chips that ask why the dispatcher changed
+the suggestion are not built, because a deferral already carries its reason (spec 010, rule 7).
