@@ -174,7 +174,7 @@ it('AC-13 permits exactly one of two simultaneous starts for VEH004', async () =
   const stored = await db.select().from(trips).where(inArray(trips.id, pair.map(trip => trip.tripId)));
   expect(stored.filter(trip => trip.status === 'out')).toHaveLength(1);
   expect(stored.filter(trip => trip.status === 'ready')).toHaveLength(1);
-  expect((await db.select().from(auditLog).where(eq(auditLog.action, 'trip.started')))).toHaveLength(1);
+  expect((await db.select().from(auditLog).where(and(eq(auditLog.action, 'trip.started'), inArray(auditLog.entityId, pair.map(trip => trip.tripId)))))).toHaveLength(1);
 });
 
 it('AC-14 refuses an arrival until out, then records Nugegoda’s arrival and its revision after commit', async () => {
