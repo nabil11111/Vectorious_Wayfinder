@@ -1,3 +1,4 @@
+import { SplitOrderRequest } from '@wayfinder/contracts';
 import { describe, expect, it } from 'vitest';
 import { computeLoad } from '../load';
 import { vehicle } from '../testing/shared';
@@ -114,6 +115,25 @@ describe('planner splits and coverage limits', () => {
     expect(proposal.split.keep).toEqual([{ productId: 'heavy', quantity: 0 }, { productId: 'light', quantity: 2 }]);
     expect(proposal.kept.lines).toEqual([{ productId: 'light', quantity: 2 }]);
     expect(chosen({ ...source, lines: [{ productId: 'heavy', quantity: 1 }] }, { products })).toMatchObject({ best: null, proposal: null, code: 'over_capacity' });
+  });
+
+  it('AC-15 returns keep in the existing split request contract, including zero products', () => {
+    const original = plannerOrder('00000000-0000-4000-8000-000000000001', 'OUT001', 'fresh-chilled-carton', 180);
+    const result = chosen(original).proposal!;
+    expect(SplitOrderRequest.safeParse({ planId: null, demoDay: 1, orderId: original.id, keep: result.split.keep }).success).toBe(true);
+  });
+
+  it('AC-17 names no split limit when there is no slot or no space even for one carton', () => {
+    const source = plannerOrder('child', 'OUT006', 'fresh-dry-carton', 180, { splitFrom: 'parent' });
+    expect(chosen(source, { vehicles: [] }).detail).toBeUndefined();
+    expect(chosen(source, { vehicles: [{ ...vehicle('VEH012'), weightCapKg: 1, volumeCapM3: 0.001 }] }).detail).toBeUndefined();
+    const input = empty(plannerInput([], { vehicles: [vehicle('VEH012')] }));
+    input.plan.trips = [
+      { vehicleId: 'VEH012', tripNo: 1, stops: [{ outletId: 'OUT019', orderIds: ['style'] }] },
+      { vehicleId: 'VEH012', tripNo: 2, stops: [{ outletId: 'OUT026', orderIds: ['far'] }] },
+    ];
+    input.orders = [plannerOrder('style', 'OUT019', 'style-folded'), plannerOrder('far', 'OUT026')];
+    expect(chooseAllocation(input, source, 3).detail).toBeUndefined();
   });
 
   it('AC-16 caps effective orders at 300, including both children', () => {

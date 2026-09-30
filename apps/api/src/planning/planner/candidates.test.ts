@@ -25,7 +25,7 @@ describe('whole-order planner candidates', () => {
     const a = dry('a', 'OUT026');
     const input = day([a], [trip('VEH012', 1, [a])], [vehicle('VEH012'), vehicle('VEH008')]);
     expect(candidateSlots(input, dry('b', 'OUT030')).slots.map((s) => [s.vehicleId, s.tripNo, s.existing])).toEqual([
-      ['VEH012', 1, true], ['VEH012', 2, false], ['VEH008', 1, false],
+      ['VEH012', 1, true], ['VEH008', 1, false], ['VEH012', 2, false],
     ]);
     expect(candidateSlots(input, dry('c')).slots.some((s) => s.vehicleId === 'VEH012' && s.tripNo === 1)).toBe(false);
     input.plan.trips.push(trip('VEH012', 2, [dry('d')]));
@@ -67,6 +67,22 @@ describe('whole-order planner candidates', () => {
       [{ ...vehicle('VEH008'), id: 'B' }, { ...vehicle('VEH008'), id: 'A' }]);
     expect(candidateSlots(equal, dry('c')).slots.map((s) => [s.vehicleId, s.tripNo])).toEqual([['B', 1], ['B', 2], ['A', 1]]);
     expect(candidateSlots(day([], [], equal.vehicles), dry('c')).slots.map((s) => s.vehicleId)).toEqual(['A', 'B']);
+  });
+
+  it('AC-6 uses a smaller vehicle first trip before a larger vehicle second trip', () => {
+    const old = order('old-style', 'OUT019', 'style-folded', 1);
+    const input = day([old], [trip('VEH001', 1, [old])], [vehicle('VEH001'), vehicle('VEH002')]);
+    expect(chooseWhole(input, order('cold', 'OUT026', 'fresh-chilled-carton', 1)).best?.slot)
+      .toEqual({ vehicleId: 'VEH002', tripNo: 1, existing: false });
+  });
+
+  it('AC-7 caps Fresh closing at 07:59 before comparing opening times', () => {
+    const existing = dry('existing', 'OUT004');
+    const input = day([existing], [trip('VEH012', 1, [existing])]);
+    Object.assign(input.outlets.find((s) => s.id === 'OUT004')!, { windowOpen: 420, windowClose: 480 });
+    Object.assign(input.outlets.find((s) => s.id === 'OUT006')!, { windowOpen: 400, windowClose: 540 });
+    const attempt = tryCandidate(input, dry('new', 'OUT006'), { vehicleId: 'VEH012', tripNo: 1, existing: true });
+    expect(attempt.input.plan.trips[0]!.stops.map((s) => s.outletId)).toEqual(['OUT006', 'OUT004']);
   });
 
   it('AC-7 consolidates a shop and keeps its orders in accepted priority order', () => {

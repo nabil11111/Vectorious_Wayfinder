@@ -13,6 +13,7 @@ export interface CandidateAttempt {
   input: PlanInput;
   check: PlanCheck | null;
   stage: RejectionStage | 'accepted';
+  selectionReason?: string;
 }
 export interface CandidateSlots { slots: CandidateSlot[]; refusal?: 'no_reefer' | 'no_van' }
 
@@ -50,6 +51,7 @@ export function candidateSlots(input: PlanInput, order: EngineOrder): CandidateS
     return Number(av.temp === 'reefer' && !load.needsReefer) - Number(bv.temp === 'reefer' && !load.needsReefer)
       || Number(av.type === 'van' && shop.parking !== 'van_only') - Number(bv.type === 'van' && shop.parking !== 'van_only')
       || Number(b.existing) - Number(a.existing)
+      || a.tripNo - b.tripNo
       || bv.volumeCapM3 - av.volumeCapM3 || bv.weightCapKg - av.weightCapKg || bv.kmPerL - av.kmPerL
       || compare(av.id, bv.id) || a.tripNo - b.tripNo;
   });
@@ -125,15 +127,49 @@ export function tryCandidate(input: PlanInput, order: EngineOrder, slot: Candida
   return { slot, ...checked, stage };
 }
 
-export function chooseWhole(input: PlanInput, order: EngineOrder): CandidateSlots & { best: CandidateAttempt | null; stages: RejectionStage[] } {
-  const candidates = candidateSlots(input, order);
-  const stages: RejectionStage[] = [];
-  // Sorted slots make the first passing candidate the tuple's winner. Splitting is not considered until
-  // this search has exhausted every whole-order candidate.
-  for (const slot of candidates.slots) {
-    const attempt = tryCandidate(input, order, slot);
-    if (attempt.stage === 'accepted') return { ...candidates, best: attempt, stages };
-    stages.push(attempt.stage);
+const needsEarlierDeparture = (attempt: CandidateAttempt) =>
+  attempt.input.plan.trips.some((trip) => trip.leaveAt !== undefined);
+
+// Attempts arrive in structural tuple order. The leading departure preference applies across all of
+// them, so a usual-time run can beat even an existing run that would need an earlier start.
+export function rankAttempts(attempts: CandidateAttempt[]): CandidateAttempt[] {
+  return [...attempts].sort((a, b) => Number(needsEarlierDeparture(a)) - Number(needsEarlierDeparture(b)));
+}
+
+export function selectAttempt(input: PlanInput, order: EngineOrder, attempts: CandidateAttempt[]): CandidateAttempt | null {
+  const passing = rankAttempts(attempts.filter((attempt) => attempt.stage === 'accepted'));
+  const [best, next] = passing;
+  if (!best) return null;
+  let reason = 'the only run that could carry these goods';
+  if (next) {
+    const av = lookup(input.vehicles, 'vehicle')(best.slot.vehicleId);
+    const bv = lookup(input.vehicles, 'vehicle')(next.slot.vehicleId);
+    const shop = lookup(input.outlets, 'shop')(order.outletId);
+    const chilled = computeLoad(order.lines, input.products).needsReefer;
+    if (needsEarlierDeparture(best) !== needsEarlierDeparture(next)) reason = 'keeps the usual leaving times';
+    else if (!chilled && av.temp !== bv.temp) reason = 'keeps fridge trucks free';
+    else if (shop.parking !== 'van_only' && av.type !== bv.type) reason = 'keeps vans free';
+    else if (best.slot.existing !== next.slot.existing) reason = 'fills an existing run';
+    else if (best.slot.tripNo !== next.slot.tripNo) reason = 'uses a first run before a second';
+    else if (av.volumeCapM3 !== bv.volumeCapM3) reason = 'more volume broke the tie';
+    else if (av.weightCapKg !== bv.weightCapKg) reason = 'more weight capacity broke the tie';
+    else if (av.kmPerL !== bv.kmPerL) reason = 'uses less fuel per kilometre';
+    else reason = 'vehicle ID breaks the tie';
   }
-  return { ...candidates, best: null, stages };
+  // A skipped earlier-departure candidate can otherwise be hidden behind another usual-time runner-up.
+  if (!needsEarlierDeparture(best) && attempts.some((a) => a.stage === 'accepted' && needsEarlierDeparture(a)
+    && attempts.indexOf(a) < attempts.indexOf(best))) reason = 'keeps the usual leaving times';
+  return { ...best, selectionReason: reason };
+}
+
+export function chooseWhole(input: PlanInput, order: EngineOrder): CandidateSlots & {
+  best: CandidateAttempt | null; stages: RejectionStage[]; attempts: CandidateAttempt[];
+} {
+  const candidates = candidateSlots(input, order);
+  const trials = candidates.slots.map((slot) => tryCandidate(input, order, slot));
+  const attempts = rankAttempts(trials.filter((attempt) => attempt.stage !== 'accepted'));
+  return {
+    ...candidates, best: selectAttempt(input, order, trials), attempts,
+    stages: attempts.map((attempt) => attempt.stage as RejectionStage),
+  };
 }

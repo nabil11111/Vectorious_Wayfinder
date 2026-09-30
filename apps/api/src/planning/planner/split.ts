@@ -1,5 +1,5 @@
 import type { PlanInput, PlannerOrder, PlannerSplit } from '../types';
-import { candidateInput, capacityFits, chooseWhole, tryCandidate, type CandidateAttempt, type CandidateSlot } from './candidates';
+import { candidateInput, capacityFits, chooseWhole, rankAttempts, selectAttempt, tryCandidate, type CandidateAttempt, type CandidateSlot } from './candidates';
 import { compare } from './priority';
 import { furthestRejection, type PlannerDeferralCode } from './reasons';
 
@@ -9,12 +9,13 @@ export interface Allocation {
   proposal: SplitProposal | null;
   code?: PlannerDeferralCode;
   detail?: string;
+  attempts: CandidateAttempt[];
 }
 
 const splitLimit = (order: PlannerOrder, effectiveCount: number): string | null => {
   if (order.splitFrom !== null) return 'this existing child cannot be split again';
   if (order.lines.length > 10) return 'automatic splits allow at most 10 product lines';
-  if (order.lines.some((line) => line.quantity > 999)) return 'automatic splits allow at most 999 units per product line';
+  if (order.lines.some((line) => line.quantity > 999)) return 'automatic splits allow at most 999 per product line';
   if (effectiveCount >= 300) return 'splitting would exceed the 300-order limit';
   return null;
 };
@@ -56,24 +57,30 @@ export function proposePart(input: PlanInput, order: PlannerOrder, slot: Candida
 
 export function chooseAllocation(input: PlanInput, order: PlannerOrder, effectiveCount: number): Allocation {
   const whole = chooseWhole(input, order);
-  if (whole.best) return { best: whole.best, proposal: null };
-  if (whole.refusal) return { best: null, proposal: null, code: whole.refusal };
+  if (whole.best) return { best: whole.best, proposal: null, attempts: whole.attempts };
+  if (whole.refusal) return { best: null, proposal: null, code: whole.refusal, attempts: whole.attempts };
   const limit = splitLimit(order, effectiveCount);
-  const stages = [...whole.stages];
+  const partial: { attempt: CandidateAttempt; proposal: SplitProposal }[] = [];
   if (!limit) {
-    // Slot order is the same tuple used for whole orders. The amount carried never outranks that policy.
     for (const slot of whole.slots) {
       const proposal = proposePart(input, order, slot);
-      if (!proposal) continue;
-      const attempt = tryCandidate(input, proposal.kept, slot);
-      if (attempt.stage === 'accepted') return { best: attempt, proposal };
-      stages.push(attempt.stage);
+      if (proposal) partial.push({ attempt: tryCandidate(input, proposal.kept, slot), proposal });
     }
   }
-  const code = furthestRejection(stages);
-  const detail = code === 'over_capacity'
-    ? limit ?? (whole.slots.length ? 'compatible trips lack weight or volume room for a whole order or a unit'
-      : 'no district/brand slot remains within two trips per vehicle and the board limits')
-    : undefined;
-  return { best: null, proposal: null, code, ...(detail ? { detail } : {}) };
+  const best = selectAttempt(input, order, partial.map((part) => part.attempt));
+  if (best) {
+    const proposal = partial.find((part) => part.attempt.slot === best.slot)!.proposal;
+    return { best, proposal, attempts: whole.attempts };
+  }
+  // Pair each slot's whole and partial refusal before ranking, so explanations describe the highest
+  // ranked vehicle at the exhausted stage rather than whichever phase happened to run first.
+  const attempts = rankAttempts(whole.slots.flatMap((slot) => [
+    ...whole.attempts.filter((attempt) => attempt.slot === slot),
+    ...partial.filter((part) => part.attempt.slot === slot).map((part) => part.attempt),
+  ]));
+  const code = furthestRejection(attempts.map((attempt) => attempt.stage as Exclude<typeof attempt.stage, 'accepted'>));
+  // A split-write restriction only explains the refusal if at least one positive piece had room.
+  const hadRoom = limit && code === 'over_capacity' && whole.slots.some((slot) => order.lines.some((line) =>
+    capacityFits(candidateInput(input, { ...order, lines: [{ ...line, quantity: 1 }] }, slot), slot.tripNo)));
+  return { best: null, proposal: null, code, attempts, ...(hadRoom ? { detail: limit } : {}) };
 }
