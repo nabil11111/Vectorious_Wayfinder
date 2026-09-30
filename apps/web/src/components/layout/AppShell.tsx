@@ -3,8 +3,9 @@ import { Bell, LogOut } from 'lucide-react';
 import { NavLink } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ROLE_LABEL, useLogout, useMe } from '@/features/auth/api';
-import { useClock } from '@/lib/useNow';
+import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
+import { DemoClock } from './DemoClock';
 import { Wordmark } from './Wordmark';
 
 export type NavItem = { to: string; label: string; icon?: ReactNode };
@@ -14,13 +15,15 @@ export type NavItem = { to: string; label: string; icon?: ReactNode };
 export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place?: string; children: ReactNode }) {
   const { data: me } = useMe();
   const logout = useLogout();
-  const clock = useClock();
+  // The app's own time, never the device's (spec 008).
+  const clock = useAppClock();
   if (!me) return null;
 
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-card px-4 py-3 md:px-6">
-        <span className="font-mono text-2xl font-bold tabular-nums md:hidden">{clock}</span>
+        <span className="font-mono text-2xl font-bold tabular-nums md:hidden">{clock.time}</span>
+        <DemoClock clock={clock} as="sheet" className="md:hidden" />
         <Wordmark className="hidden md:inline-flex" />
         {nav.length > 0 && (
           <nav className="ml-4 hidden gap-1 md:flex">
@@ -32,7 +35,8 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
           </nav>
         )}
         <div className="flex-1" />
-        <span className="hidden font-mono text-lg font-bold tabular-nums md:inline">{clock}</span>
+        <span className="hidden font-mono text-lg font-bold tabular-nums md:inline">{clock.time}</span>
+        <DemoClock clock={clock} as="panel" className="hidden md:inline-flex" />
         <button type="button" aria-label="Notifications" className="rounded-full p-1.5 hover:bg-muted"><Bell className="size-6" /></button>
         <div className="hidden text-right leading-tight sm:block">
           <div className="text-sm font-bold">{me.displayName}</div>
