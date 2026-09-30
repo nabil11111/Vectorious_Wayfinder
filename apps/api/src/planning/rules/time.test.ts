@@ -1,4 +1,4 @@
-import type { Problem, ProblemCode } from '@wayfinder/contracts';
+import { Problem, type ProblemCode } from '@wayfinder/contracts';
 import { describe, expect, it } from 'vitest';
 import { PlanInputError } from '../errors';
 import { inputFor, outlets } from '../testing/shared';
@@ -104,7 +104,7 @@ describe('rules for time', () => {
   it('AC-31 reports trips_overlap when a second trip leaves before the first is ready again, and gives the earliest it can leave', () => {
     const overlap = (leaveAt: string) => [{
       code: 'trips_overlap', level: 'block', vehicleId: 'VEH012', tripNo: 2,
-      message: `VEH012 trip 2 leaves at ${leaveAt}, before VEH012 is back from trip 1 and reloaded at 06:18.`, fix: 'Leave at 06:18 or later.',
+      message: `VEH012 trip 2 leaves at ${leaveAt}, before VEH012 is back from trip 1 and reloaded at 06:18.`, fix: 'Leave at 06:18 or later.', leaveAt: 378,
     }];
     const chained = (leaveAt: string) => check('Peliyagoda', [gampaha, { ...colombo, leaveAt: toMinutes(leaveAt) }]);
     expect(chained('05:30')).toEqual(overlap('05:30'));
@@ -125,7 +125,7 @@ describe('rules for time', () => {
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT010'], '07:07')])).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT010',
       message: 'VEH012 trip 1 reaches OUT010 at 07:31, 1 minute after its delivery window closes at 07:30.',
-      fix: 'Leave by 07:06 to reach every stop in time.',
+      fix: 'Leave by 07:06 to reach every stop in time.', leaveAt: 426,
     }]);
 
     // The booklet's exception. Leaving Kandy at 03:00 the fourth Badulla shop, which closes at 08:00, is reached
@@ -133,7 +133,7 @@ describe('rules for time', () => {
     expect(only(check('Kandy', [trip('VEH044', 1, badulla, '03:00')]), 'window_missed')).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH044', tripNo: 1, stopSeq: 4, outletId: 'OUT113',
       message: 'VEH044 trip 1 reaches OUT113 at 08:00, and Fresh shops must be reached before 08:00.',
-      fix: 'Leave by 02:59 to reach every stop in time.',
+      fix: 'Leave by 02:59 to reach every stop in time.', leaveAt: 179,
     }]);
     // Leaving at 02:59 it is reached at 07:59, and nothing blocks the plan.
     expect(check('Kandy', [trip('VEH044', 1, badulla, '02:59')]).filter((p) => p.level === 'block')).toEqual([]);
@@ -143,7 +143,7 @@ describe('rules for time', () => {
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '11:20')], { outlets: out017Open('10:00', '11:30') })).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
       message: 'VEH012 trip 1 reaches OUT017 at 11:44, 14 minutes after its delivery window closes at 11:30.',
-      fix: 'Leave by 11:06 to reach every stop in time.',
+      fix: 'Leave by 11:06 to reach every stop in time.', leaveAt: 666,
     }]);
   });
 
@@ -161,7 +161,7 @@ describe('rules for time', () => {
     const afterSlot = (leaveBy: string) => [{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
       message: 'VEH012 trip 1 reaches OUT017 at 12:45, 15 minutes after its mall\'s delivery hours of 10:30 to 12:30 end.',
-      fix: `Leave by ${leaveBy} to reach every stop in time.`,
+      fix: `Leave by ${leaveBy} to reach every stop in time.`, leaveAt: toMinutes(leaveBy),
     }];
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '12:21')], { outlets: out017Open('09:00', '17:00') })).toEqual(afterSlot('12:06'));
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '12:21')], { outlets: out017Open('10:00', '11:30') })).toEqual(afterSlot('11:06'));
@@ -182,7 +182,7 @@ describe('rules for time', () => {
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '09:46')], freshInMall)).toEqual([{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
       message: 'VEH012 trip 1 reaches OUT017 at 10:10, 10 minutes after its mall\'s delivery hours of 06:00 to 10:00 end, and Fresh shops must be reached before 08:00.',
-      fix: 'Leave by 07:35 to reach every stop in time.',
+      fix: 'Leave by 07:35 to reach every stop in time.', leaveAt: 455,
     }]);
   });
 
@@ -236,7 +236,7 @@ describe('rules for time', () => {
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT008'], '03:30')])).toEqual([{
       code: 'long_wait', level: 'warn', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT008',
       message: 'VEH012 trip 1 reaches OUT008 at 03:54 and waits 66 minutes for its delivery window to open at 05:00.',
-      fix: 'Leave at 04:36 to arrive as it opens.',
+      fix: 'Leave at 04:36 to arrive as it opens.', leaveAt: 276,
     }]);
     // A wait of exactly 30 minutes is not long.
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT008'], '04:06')])).toEqual([]);
@@ -262,7 +262,7 @@ describe('rules for time', () => {
     expect(only(check('Kandy', [trip('VEH044', 1, badulla)]), 'window_missed')).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH044', tripNo: 1, stopSeq: 4, outletId: 'OUT113',
       message: 'VEH044 trip 1 reaches OUT113 at 08:30, 30 minutes after its delivery window closes at 08:00, and Fresh shops must be reached before 08:00.',
-      fix: fix('02:59'),
+      fix: fix('02:59'), leaveAt: 179,
     }]);
     // Every late stop of a trip carries the same time. Leaving at 04:30 the last three shops are late.
     expect(only(check('Kandy', [trip('VEH044', 1, badulla, '04:30')]), 'window_missed').map((p) => [p.outletId, p.fix]))
@@ -281,7 +281,7 @@ describe('rules for time', () => {
     // As a second trip the vehicle is only ready at 06:18, which is too late, so there is no fix.
     const second = check('Peliyagoda', [gampaha, trip('VEH012', 2, toOut010, '06:30')]);
     expect(second).toMatchObject([{ code: 'window_missed', outletId: 'OUT010' }]);
-    expect(second.map((p) => p.fix)).toEqual([undefined]);
+    expect(second.map((p) => [p.fix, p.leaveAt])).toEqual([[undefined, undefined]]);
     // The minute the vehicle is ready is not too early: a second trip to OUT006, OUT004 and OUT010 set to 06:30
     // reaches the last at 07:42, and leaving at 06:18 reaches it at 07:30.
     expect(check('Peliyagoda', [gampaha, trip('VEH012', 2, ['OUT006', 'OUT004', 'OUT010'], '06:30')]))
@@ -291,7 +291,7 @@ describe('rules for time', () => {
     expect(check('Peliyagoda', [gampaha, { ...colombo, leaveAt: toMinutes('06:30') }])).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 2, stopSeq: 4, outletId: 'OUT014',
       message: 'VEH012 trip 2 reaches OUT014 at 08:06, 6 minutes after its delivery window closes at 08:00, and Fresh shops must be reached before 08:00.',
-      fix: fix('06:23'),
+      fix: fix('06:23'), leaveAt: 383,
     }]);
 
     // Never before midnight. No shop in the data needs it, so OUT110 in Badulla, 186 minutes from Kandy, is given
@@ -302,14 +302,38 @@ describe('rules for time', () => {
       message: 'VEH044 trip 1 reaches OUT110 at 06:36, 216 minutes after its delivery window closes at 03:00.',
     }]);
     // Midnight itself is not too early: with the window closing at 03:06 the fix says 00:00.
-    expect(beforeDawn('03:06')).toMatchObject([{ code: 'window_missed', outletId: 'OUT110', fix: fix('00:00') }]);
+    expect(beforeDawn('03:06')).toMatchObject([{ code: 'window_missed', outletId: 'OUT110', fix: fix('00:00'), leaveAt: 0 }]);
 
     // A missed mall slot carries the fix too: set to 10:40 the Style trip reaches OUT015 at 11:04.
     expect(check('Peliyagoda', [trip('VEH012', 1, styleShops, '10:40')])).toEqual([{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT015',
       message: 'VEH012 trip 1 reaches OUT015 at 11:04, 4 minutes after its mall\'s delivery hours of 09:00 to 11:00 end.',
-      fix: fix('10:36'),
+      fix: fix('10:36'), leaveAt: 636,
     }]);
+  });
+
+
+  it('spec 010 AC-17 gives the Kurunegala late stop its 03:07 suggestion as minutes', () => {
+    const kurunegala = trip('VEH002', 1, ['OUT068', 'OUT065', 'OUT069', 'OUT066', 'OUT067']);
+    const problems = check('Peliyagoda', [kurunegala]);
+    expect(only(problems, 'window_missed')).toEqual([{
+      code: 'window_missed', level: 'block', vehicleId: 'VEH002', tripNo: 1, stopSeq: 5, outletId: 'OUT067',
+      message: 'VEH002 trip 1 reaches OUT067 at 07:53, 23 minutes after its delivery window closes at 07:30.',
+      fix: 'Leave by 03:07 to reach every stop in time.', leaveAt: 187,
+    }]);
+    expect(only(check('Peliyagoda', [{ ...kurunegala, leaveAt: 187 }]), 'window_missed')).toEqual([]);
+  });
+
+  it('spec 010 AC-17 never offers a next-day leaving time that the draft cannot save', () => {
+    // Both departures are valid form inputs, but trip 1 only gets back after midnight. Its overlap fix is
+    // useful prose, while a one-click departure must remain on the plan day (00:00 through 23:59).
+    const problems = check('Peliyagoda', [
+      trip('VEH012', 1, ['OUT019'], '23:59'), trip('VEH012', 2, ['OUT019'], '23:59'),
+    ]);
+    const [overlap] = only(problems, 'trips_overlap');
+    expect(overlap).toBeDefined();
+    expect(overlap!.leaveAt).toBeUndefined();
+    expect(Problem.safeParse(overlap).success).toBe(true);
   });
 
   it('leaves a trip with no stops to the rule for empty trips', () => {
