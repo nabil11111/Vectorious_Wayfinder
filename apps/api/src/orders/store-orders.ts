@@ -6,7 +6,7 @@ import { and, desc, eq, gte, inArray, max, ne, notInArray, sql, type SQL } from 
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { db, type Db, type Tx } from '../db/client';
 import { PRODUCTS } from '../db/fixtures';
-import { calendarDays, deferrals, orderLines, orders, outlets, plans, products, stopOrders, stops, trips } from '../db/schema';
+import { calendarDays, deferrals, depots, orderLines, orders, outlets, plans, products, stopOrders, stops, trips } from '../db/schema';
 import { depotDate, depotInstant, depotMinutes, now } from '../lib/clock';
 import { HttpError } from '../lib/errors';
 import { announce } from '../lib/live';
@@ -280,6 +280,10 @@ export function saveDraft(caller: Caller, body: SaveDraftRequest): Promise<Store
 // Places the drafts the request names, and answers with the next order as it is now and the orders placed.
 export async function placeOrders(caller: Caller, body: PlaceOrdersRequest): Promise<PlaceOrdersResponse> {
   const done = await db.transaction(async (tx) => {
+    // Planning holds this depot for no key update. Place takes a share first, so a send sees either the
+    // whole placement or none of it, and both paths take the depot before any shop row (spec 010).
+    await tx.select({ id: depots.id }).from(depots)
+      .innerJoin(outlets, eq(outlets.depotId, depots.id)).where(eq(outlets.id, caller.outletId)).for('share', { of: depots });
     await lockShop(tx, caller.outletId);
     const at = now();
     const shop = await readShop(tx, caller.outletId);
