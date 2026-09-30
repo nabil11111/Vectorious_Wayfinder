@@ -86,6 +86,36 @@ describe('security basics', () => {
     expect(res.headers['x-content-type-options']).toBe('nosniff');
   });
 
+  // docker compose serves the app over plain http on localhost. A browser that does not treat localhost as secure
+  // would drop a Secure cookie there, and upgrading every request to https would break the page.
+  it('asks for no https upgrade, and sets the cookie Secure only when the request came over https', async () => {
+    const health = await request(app).get('/api/v1/health');
+    expect(health.headers['content-security-policy']).not.toMatch(/upgrade-insecure-requests/);
+
+    const plain = await request(app).post('/api/v1/auth/login').send({ username: 'kasun', password });
+    expect(plain.status).toBe(200);
+    expect(plain.headers['set-cookie']?.[0]).not.toMatch(/Secure/);
+
+    // Hosted, the proxy in front ends https and says so; the app trusts it when TRUST_PROXY is set.
+    const proxied = createApp();
+    proxied.set('trust proxy', 1);
+    const hosted = await serve(proxied);
+    try {
+      const secure = await request(hosted).post('/api/v1/auth/login').set('X-Forwarded-Proto', 'https').send({ username: 'kasun', password });
+      expect(secure.status).toBe(200);
+      expect(secure.headers['set-cookie']?.[0]).toMatch(/Secure/);
+    } finally {
+      await stop(hosted);
+    }
+  });
+
+  // Judges who share one network share one address. Only failed sign-ins count towards the limit.
+  it('lets every role sign in many times from one address', async () => {
+    const tries = [];
+    for (let i = 0; i < 12; i++) tries.push(await request(app).post('/api/v1/auth/login').send({ username: 'dilshan', password }));
+    expect(tries.map((res) => res.status)).toEqual(Array(12).fill(200));
+  });
+
   // Keep this one last: it uses up the sign-in allowance for this test file.
   it('blocks rapid password guessing, even when each try claims a different address', async () => {
     const tries = [];
