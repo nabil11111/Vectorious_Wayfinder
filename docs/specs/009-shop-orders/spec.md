@@ -1,6 +1,6 @@
 # 009 · Shop orders
 
-**Status:** Ready, with one open point at the bottom  ·  **Owner:**  ·  **Design:** the shop's frames for Today, New orders (Fresh, Style, Tech), Orders, Orders placed and Help, on a phone and a desktop
+**Status:** Done, with one open point at the bottom  ·  **Owner:**  ·  **Design:** the shop's frames for Today, New orders (Fresh, Style, Tech), Orders, Orders placed and Help, on a phone and a desktop
 
 Piece A1 of [the map](../000-map.md). The frames are exported in `tech-triathlon-ops/design/export`.
 
