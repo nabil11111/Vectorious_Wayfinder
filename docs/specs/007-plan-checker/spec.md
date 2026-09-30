@@ -1,6 +1,6 @@
 # 007 · Plan checker: load, timeline and rules
 
-**Status:** Ready  ·  **Owner:**  ·  **Design:** no screens of its own. Its numbers show on Dispatcher · Edit plan and View plan, Shop · New orders and Loader · Load a truck.
+**Status:** Done  ·  **Owner:**  ·  **Design:** no screens of its own. Its numbers show on Dispatcher · Edit plan and View plan, Shop · New orders and Loader · Load a truck.
 
 Pieces B1 to B3 of [the map](../000-map.md). It replaces specs 001 and 002. It checks a plan and does not
 build one: that is the planner (B4), which gets its own spec.
