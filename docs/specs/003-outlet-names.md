@@ -1,6 +1,6 @@
 # 003 · Outlet names
 
-**Status:** Ready  ·  **Owner:**  ·  **Design:** every screen that names a shop (Fresh Nugegoda, Fresh Koggala, …)
+**Status:** Done  ·  **Owner:**  ·  **Design:** every screen that names a shop (Fresh Nugegoda, Fresh Koggala, …)
 
 ## Why
 `outlets.csv` has ids but no names, so the seed calls them "Fresh Colombo 1". The designs use real places.
@@ -14,11 +14,11 @@ inside its district. The seed uses it and falls back to the numbered name.
 Reads the fixture in `apps/api/src/db/seed.ts`; updates `outlets.name`.
 
 ## Acceptance criteria
-- [ ] All 120 outlets have a unique name inside their own district, brand first.
-- [ ] OUT001 is Fresh Nugegoda, and other names already in the Figma file are reused where the district fits.
-- [ ] After seeding, existing outlets get the new names too.
-- [ ] Running the seed twice changes nothing.
-- [ ] The README says these names are ours, not from the booklet.
+- [x] All 120 outlets have a unique name inside their own district, brand first.
+- [x] OUT001 is Fresh Nugegoda, and other names already in the Figma file are reused where the district fits.
+- [x] After seeding, existing outlets get the new names too.
+- [x] Running the seed twice changes nothing.
+- [x] The README says these names are ours, not from the booklet.
 
 ## Out of scope
 Coordinates or maps.

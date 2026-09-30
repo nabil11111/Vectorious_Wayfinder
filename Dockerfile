@@ -20,6 +20,7 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/drizzle ./apps/api/drizzle
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 COPY --from=build /app/data/shared ./data/shared
+COPY --from=build /app/data/fixtures ./data/fixtures
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s CMD node -e "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

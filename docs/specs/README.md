@@ -56,7 +56,7 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | Spec | Feature | Status |
 | --- | --- | --- |
 | [000](000-map.md) | The map: every piece, in build order | Ready |
-| [003](003-outlet-names.md) | Outlet names | Ready |
+| [003](003-outlet-names.md) | Outlet names | Done |
 | [004](004-admin-vehicles.md) | Admin: vehicles | Ready |
 | [005](005-admin-outlets.md) | Admin: outlets | Ready (after 004) |
 | [006](006-admin-products.md) | Admin: products | Ready (after 004) |
