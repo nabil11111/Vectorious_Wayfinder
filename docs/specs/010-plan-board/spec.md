@@ -53,7 +53,7 @@ load only. What the planner adds is not drawn (see "Left for the planner").
 |  | Below 1024 wide, no day left, could not load | No frame | The header and counts on top, then three tabs: Unplanned, Planning and Done. "No delivery day is left to plan." A card with "Try again". |
 | View plan `/dispatcher/plan/2026-06-25` | Not ready | View plan | "View plan · Thu 25 Jun", "← Back to edit", "Send plan · N checks open" greyed, the counts, the vehicles by brand and district (each row with its trips' times, stop dots, kg and m³ and its first problem, opening to its stops), and "Checks · N" with "Not ready · N blockers": each block, then each warning, with its fix and "Open in edit". The orders on no trip are one item. Below 1024 wide the checks come first. |
 |  | Ready | View plan · ready to send | "Send plan to loaders and drivers" in orange, "Checks · all clear" or the warnings, "Ready", "✓ N orders on N trips" and "✓ N deferred, each with a reason the shop will read". |
-|  | Sent | View plan · sent | "✓ Sent 16:14 · loaders and 1 driver" in place of the button, "Sent 16:14" over the kept checks (none for the seed's older plans), and "← Back to edit" while no trip is loading. The address keeps the day, so a reload or a clock move still shows it, and the board goes here once its plan is sent. |
+|  | Sent | View plan · sent | "✓ Sent 16:14 · loaders and 1 driver" in place of the button, "Sent 16:14" over the kept checks (none for the seed's older plans), and "← Back to edit" while the board says `canUnsend`. The address keeps the day, so a reload or a clock move still shows it, and the board goes here once its plan is sent. |
 
 ## Rules
 Examples use the seeded day with the clock at Wed 24 Jun 16:00. Times are depot time.
@@ -139,10 +139,11 @@ Examples use the seeded day with the clock at Wed 24 Jun 16:00. Times are depot 
     each stop keeps its arrival and departure, and each trip writes its litres to `fuel_log` on the plan's day (D-20),
     a vehicle's rows adding up to its litres in the plan: the first trip writes its own and the second the rest.
     *VEH010 with two 63 km trips in Gampaha shows 11.3 litres on each and needs 22.5, so its rows are 11.3 and 11.2.*
-    "Back to edit" (D-33) works while every trip is `planned`. Under the same locks it makes the plan a draft again
-    with its revision up and `sent_check` cleared, deletes its trips' fuel rows, keeps its deferrals in the draft, and
-    gives each of its orders back `placed`, or `deferred` if an earlier sent plan deferred it. Once a trip is
-    `loading` or later it is refused with 409 `loading_started`.
+    "Back to edit" (D-33) works while the plan is sent, every trip is `planned` and the board's day is still the
+    plan's (D-28). The board says so in `canUnsend`, so the link shows only then. Under the same locks it makes the
+    plan a draft again with its revision up and `sent_check` cleared, deletes its trips' fuel rows, keeps its
+    deferrals in the draft, and gives each of its orders back `placed`, or `deferred` if an earlier sent plan
+    deferred it. Once a trip is `loading` or later it is refused with 409 `loading_started`.
 12. **The numbers.** The API works out every number shown, from the checker's result and the tables, with whole
     percentages (halves up) and sums in tenths and thousandths as the checker makes them. The screen may group, sort
     and count rows and place stops on the timeline. It never times, weighs or adds up a load, distance, litre or percent.

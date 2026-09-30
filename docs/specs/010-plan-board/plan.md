@@ -28,7 +28,7 @@ day, as in `PlanCheck`. Days are `YYYY-MM-DD`, moments ISO strings. A write's da
 | `BoardOrder` | `id`, `outletId`, `temp`, `deliveryDate` (the day the shop wanted), `lines` (`OrderLine`), `load` (`Load`), `carriedOver`, `timesDeferred`, `lastDeferral` (`code`, `reason`) or null, and `splitFrom` and `originalUnits`, or null. |
 | `BoardShop`, `BoardVehicle`, `BoardDriver` | A shop: `id`, `name`, `brand`, `district`, `dockType`, `parking`, `windowOpen`, `windowClose`, `mallOpen` and `mallClose` or null, and `unloadMin`. A vehicle: `id`, `type`, `temp`, `weightCapKg`, `volumeCapM3`, `working`, `offReason` or null, `litresLeft` and `fuelLeftPct`. A driver: `id` and `name`. |
 | `TripFigures`, `BoardCounts` | Per trip `vehicleId`, `tripNo`, `kgPct`, `m3Pct` and `timePct`. The counts of rule 12: `vehiclesUsed`, `vehiclesWorking`, `trips`, `ordersDue`, `ordersOnTrips`, `ordersDeferred`, `ordersUnplanned`, `fuelWeekPct`, `fridgeM3Used`, `fridgeM3Working`, `stops`, `stopsOnTime`, `km`, `hoursOnRoad` and `drivers`. |
-| `PlanBoard` | `depot`, `demoDay`, `day` (`date`, `cutoffAt`, `open`) or null, `plan` (a `DraftPlan` with `id` or null, `revision`, `status`, `savedAt`, `sentAt` and whether every trip is `planned`), `dropped` (order ids, rule 2), `check`, `orders`, `shops`, `vehicles`, `drivers`, `figures` and `counts`. `check`, `figures` and `counts` are null for a sent plan with no kept check. |
+| `PlanBoard` | `depot`, `demoDay`, `day` (`date`, `cutoffAt`, `open`) or null, `plan` (a `DraftPlan` with `id` or null, `revision`, `status`, `savedAt`, `sentAt` and `canUnsend`), `dropped` (order ids, rule 2), `check`, `orders`, `shops`, `vehicles`, `drivers`, `figures` and `counts`. `check`, `figures` and `counts` are null for a sent plan with no kept check. |
 | `SlotSearch` | `orderId`, `revision`, `slots` (`vehicleId`, `tripNo`, `stopSeq`, `newStop`, `arriveAt`) and `refused` (`vehicleId`, `tripNo`, `problem`). |
 
 Changed shapes: `ORDER_STATUSES` gains `split` (`store.ts`), `TRIP_STATUSES` is new, and `Problem` gains `leaveAt`, an
@@ -62,9 +62,10 @@ from the app clock and the operating days (rule 1), and `GET /plans/:date` is gi
 4. `checkPlan` for a draft, then the figures and counts of rule 12.
 
 **Every write**, in one transaction:
-1. In demo mode, lock the `demo_day` row `for share` and read the clock and its `day` from it. Then lock the depot's
-   row `for no key update`, which lets a reset's reseed check its foreign keys. A reset locks `demo_day` `for update`
-   first, so writes and resets take the same order, and every planning write of the depot, for any day, queues here.
+1. In demo mode, lock the `demo_day` row `for share`, then the depot's row `for no key update`, which lets a reset's
+   reseed check its foreign keys. Only then take the one clock instant the write uses, and its `day`, from the locked
+   `demo_day` row, so a write that waited judges the time it runs at. A reset locks `demo_day` `for update` first, so
+   writes and resets take the same order, and every planning write of the depot, for any day, queues here.
 2. The path's day must be the board's (`no_plan_day`, `day_moved`) with its orders closed (`orders_open`).
 3. With a `planId`, the depot's plan for that day must have that id (`stale`), be a draft (`plan_sent`) and have that
    revision (`stale`). Without one, no plan may exist for that day and `demoDay` must be the clock's `day` (`stale`),
@@ -85,7 +86,9 @@ from the app clock and the operating days (rule 1), and `GET /plans/:date` is gi
   Then write rule 11: the plan `published` with `published_at` and `sent_check`, the stops' times, the orders' statuses
   with each revision up by one, and one `fuel_log` row per trip with the note "Sent plan". Audit `plan.sent`.
 - **Unsend.** Step 3 wants the plan sent, not a draft (else `stale`), and a trip past `planned` is `loading_started`.
-  Then undo the send as rule 11 says, audit `plan.unsent`, and announce as a send does.
+  Then undo the send as rule 11 says, audit `plan.unsent`, and announce as a send does. Whatever moves a trip past
+  `planned` (the loader in A3) takes the same two locks first and checks the plan is sent and its revision current,
+  so an unsend and a loading start can never cross. A3's spec carries that rule and its test.
 
 **Slots.** `GET /plans/:date/slots?orderId=` reads in the snapshot. For each trip of the draft the order is not on, a
 copy of the input with the order moved there as rule 4 says goes to the checker. The trip is a slot when the copy has
@@ -98,7 +101,8 @@ no block with that trip's vehicle and the order's stop has times, and otherwise 
   on the depot's `plans` and `orders` messages, and the minute timer does the rest (spec 008).
 - **The save queue** is the shop form's (`features/store/draft-form.ts` on `nabil/shop-orders`). One save is in flight;
   a change made meanwhile goes into the local draft and rides the next save. A write's answer counts only if its plan
-  id and `demoDay` match the board on screen and its revision is newer. A refetch waits while a change is pending,
+  id and `demoDay` match the board on screen and its revision is newer, or, for the first save, the screen held no
+  plan and the answer brings the new plan's id, which the screen then keeps with the queued changes. A refetch waits while a change is pending,
   unless it shows another plan, day or `demoDay`: that is a reset or a new day, which drops pending changes and answers
   on their way. Every save sent without an answer is kept, and on `stale`, if the server's draft equals one of them,
   the screen carries on from it and sends the pending changes. Otherwise `stale`, `plan_sent` and `day_moved` drop the

@@ -173,8 +173,9 @@ export const PlanBoard = z.object({
     status: z.enum(['draft', 'published']),
     savedAt: Moment.nullable(),
     sentAt: Moment.nullable(),
-    // Every trip still planned, so a sent plan can go back to edit (D-33).
-    allTripsPlanned: z.boolean(),
+    // The plan is sent, every trip is still planned and its day is still the board's, so it can go back to edit
+    // (D-33). The server works it out; the screen shows "Back to edit" only then.
+    canUnsend: z.boolean(),
   }),
   // Orders the draft named that are no longer the day's, taken out of it (rule 2).
   dropped: z.array(z.uuid()),
