@@ -78,7 +78,7 @@ from the app clock and the operating days (rule 1), and `GET /plans/:date` is gi
 - **Split.** Check the order and `keep` as rule 8 says. Set the original to `split` with its revision up, insert both
   parts with their lines, and put the first part in the original's place on its stop. `partsAddUp` must hold before
   the commit. Write the audit row `order.split` and announce `orders` to the shop too.
-- **Join.** Check as rule 8 says. Remove both parts' deferrals in this draft and the first from its stop, and the stop
+- **Join.** Check as rule 8 says. Take both parts off their stops and out of the deferrals in this draft, and a stop
   if left empty, delete both parts, and give the original back its status with its revision up. Write `order.joined`
   and announce `orders` to the shop too.
 - **Send.** Store the draft as `boardOf` cleans it, then check it: not `ok` is `not_ready` with the blocks, a split whose

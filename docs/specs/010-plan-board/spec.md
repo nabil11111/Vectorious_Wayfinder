@@ -114,10 +114,11 @@ Examples use the seeded day with the clock at Wed 24 Jun 16:00. Times are depot 
    start `placed` with the original's shop, temperature, wanted day, note, placed time and placer. The original becomes
    `split`, keeps its lines and is never planned, and its revision goes up. The first part takes its place on its stop
    and the second starts unplanned. A part or an order deferred in the draft cannot be split (409 `cannot_split`), nor
-   an order on two stops (400 `invalid_input`). "Join" works while both parts are `placed` and in no other plan and the
-   second is on no stop. It removes either part's deferral in this draft and the first from its stop (and a stop left
-   empty), deletes both, and gives the original back `placed`, or `deferred` if a sent plan deferred it, unplanned and
-   with its revision up. Only this plan changes, and the send checks again that the parts add up.
+   an order on two stops (400 `invalid_input`). "Join" works while both parts are `placed` and in no other plan,
+   wherever this draft has put them: once moved, the two parts are alike, so nothing needs to know which came first.
+   It takes both off their stops (and a stop left empty) and out of this draft's deferrals, deletes both, and gives the
+   original back `placed`, or `deferred` if a sent plan deferred it, unplanned and with its revision up. Only this plan
+   changes, and the send checks again that the parts add up.
    *OUT017's 135 boxes on VEH023, keeping the 50 boxes of folded clothing and 25 cartons of shoes: a first part of 75
    boxes, 1,050 kg and 15.5 m³, and a second of 60 boxes (45 rail boxes of hanging garments and 15 cartons of bags),
    765 kg and 15.6 m³.*
