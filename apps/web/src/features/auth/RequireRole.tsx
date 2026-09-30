@@ -9,8 +9,9 @@ import { HOME, useMe } from './api';
 export function RequireRole({ roles }: { roles: Role[] }) {
   const me = useMe();
   if (me.isPending) return null;
-  // A check that failed is not a sign-out: the person may still be signed in with the server out of reach.
-  if (me.isError) return <CannotReach busy={me.isFetching} onRetry={() => void me.refetch()} />;
+  // A check that failed is not a sign-out: the person may still be signed in with the server out of reach. Once
+  // someone is known, a later check that fails keeps their screen, which says so where it matters.
+  if (me.isError && me.data === undefined) return <CannotReach busy={me.isFetching} onRetry={() => void me.refetch()} />;
   if (!me.data) return <Navigate to="/login" replace />;
   if (!roles.includes(me.data.role) && me.data.role !== 'admin') return <Navigate to={HOME[me.data.role]} replace />;
   return <Outlet />;
@@ -19,7 +20,7 @@ export function RequireRole({ roles }: { roles: Role[] }) {
 export function HomeRedirect() {
   const me = useMe();
   if (me.isPending) return null;
-  if (me.isError) return <CannotReach busy={me.isFetching} onRetry={() => void me.refetch()} />;
+  if (me.isError && me.data === undefined) return <CannotReach busy={me.isFetching} onRetry={() => void me.refetch()} />;
   return <Navigate to={me.data ? HOME[me.data.role] : '/login'} replace />;
 }
 
