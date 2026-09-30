@@ -37,8 +37,8 @@ export function NextOutCard({ truck, at, busy, starting, onStart }: {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Label>Next out</Label>
-          <h2 className="mt-1.5 text-[22px] leading-7 font-bold lg:text-[30px] lg:leading-9">{truckName(truck)} · {leaves(truck)}</h2>
-          <p className="mt-2 text-[15px] leading-5 text-muted-foreground lg:mt-2.5">{sub}</p>
+          <h2 className="mt-[7px] text-[22px] leading-7 font-bold lg:mt-[9px] lg:text-[30px] lg:leading-9">{truckName(truck)} · {leaves(truck)}</h2>
+          <p className="mt-[5px] text-[15px] leading-5 text-muted-foreground lg:mt-[7px]">{sub}</p>
         </div>
         <img src={truckIcon(truck)} alt="" className="-mt-1 size-14 shrink-0 object-contain lg:mt-1 lg:size-20" />
       </div>

@@ -67,15 +67,15 @@ function FlagForm({ truck, stop, writes }: { truck: LoadingTruck; stop: LoadingS
   return (
     <div>
       <BackLink to={`/loader/trucks/${truck.tripId}`}>{truckName(truck)}</BackLink>
-      <div className="mt-3.5 lg:mt-4">
+      <div className="mt-2.5 lg:mt-3.5">
         {writes.refused && <Refused>{writes.refused}</Refused>}
         {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
       </div>
       <div className="grid grid-cols-1 gap-y-3 lg:grid-cols-[minmax(0,680fr)_minmax(0,420fr)] lg:items-start lg:gap-x-6">
-        <Card className="px-5 pt-4 pb-3">
+        <Card className="px-4 pt-4 pb-3 lg:px-5 lg:pt-[19px]">
           <h1 className="text-[22px] leading-7 font-bold">Stop {stop.seq} · {stop.shopName}</h1>
-          <p className="mt-2.5 text-[13px] leading-4 text-muted-foreground">{truckName(truck)} · {leaves(truck)}</p>
-          <ul className="mt-2">
+          <p className="mt-3 text-[13px] leading-4 text-muted-foreground">{truckName(truck)} · {leaves(truck)}</p>
+          <ul className="mt-[3px]">
             {stop.lines.map((l) => {
               const count = flagged.has(l.lineId) ? l.going : countAt(l);
               return (
@@ -103,7 +103,7 @@ function FlagForm({ truck, stop, writes }: { truck: LoadingTruck; stop: LoadingS
           </ul>
         </Card>
 
-        <Card className="flex flex-col px-5 pt-4 pb-5 lg:min-h-[calc(100dvh-162px)]">
+        <Card className="flex flex-col px-4 pt-4 pb-5 lg:min-h-[calc(100dvh-162px)] lg:px-5 lg:pt-[19px]">
           <h2 className="text-[22px] leading-7 font-bold">What’s wrong?</h2>
           <Reasons value={reason} onChange={setReason} disabled={busy} />
           {line ? (
@@ -162,7 +162,7 @@ function Reasons({ value, onChange, disabled }: { value: FlagReason; onChange: (
   );
 }
 
-const STEP = 'flex size-[46px] shrink-0 items-center justify-center rounded-[10px] border bg-card text-[22px] leading-none font-semibold outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:text-muted-foreground/65';
+const STEP = 'flex size-[42px] shrink-0 items-center justify-center rounded-[10px] border bg-card text-[22px] leading-none font-semibold outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:text-muted-foreground/65 lg:size-[46px]';
 
 // The picked line's counter: its picture and name, "at the dock", and − the count /quantity +. It runs from 0 to the
 // line's quantity, and the number can be typed as well.

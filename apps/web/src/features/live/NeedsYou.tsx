@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { IssueList } from '@wayfinder/contracts';
 import { Check } from 'lucide-react';
@@ -15,8 +14,8 @@ import type { Answering } from './issues';
 const CARD = 'rounded-[14px] bg-card shadow-[0_2px_6px_color-mix(in_srgb,var(--foreground)_8%,transparent)]';
 
 // Live day's "Needs you" column (spec 012, D-39): the green line of the answer just sent, then the depot's open
-// problems, oldest first, each in full in one outlined card, or "Nothing needs you right now." A7 builds the rest of
-// Live day around it and keeps it as it is.
+// problems, oldest first, each in full in its own outlined card, or "Nothing needs you right now." A7 builds the
+// rest of Live day around it and keeps it as it is.
 export function NeedsYou({ query, answering, className }: { query: UseQueryResult<IssueList>; answering: Answering; className?: string }) {
   if (!query.data) {
     return (
@@ -50,18 +49,19 @@ export function NeedsYou({ query, answering, className }: { query: UseQueryResul
         </div>
       )}
       {open.length > 0 ? (
-        <div className="rounded-[14px] border-2 border-foreground bg-card px-3.5 pt-3 pb-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-sans text-[11px] leading-[14px] font-semibold text-muted-foreground">Needs you · {open.length}</h2>
-            <RaisedAt issue={open[0]!} />
+        // A card per open problem, oldest first. The column's heading sits in the first one with its time, as the
+        // frame draws it, and every later card has its time beside its title.
+        open.map((issue, i) => (
+          <div key={issue.id} className="rounded-[14px] border-2 border-foreground bg-card px-3.5 pt-3 pb-3.5">
+            {i === 0 && (
+              <div className="mb-2.5 flex items-center justify-between gap-3">
+                <h2 className="font-sans text-[11px] leading-[14px] font-semibold text-muted-foreground">Needs you · {open.length}</h2>
+                <RaisedAt issue={issue} />
+              </div>
+            )}
+            <IssueCard issue={issue} answering={answering} time={i > 0} className={i > 0 ? 'pt-1' : undefined} />
           </div>
-          {open.map((issue, i) => (
-            <Fragment key={issue.id}>
-              {i > 0 && <hr className="mt-5 border-border" />}
-              <IssueCard issue={issue} answering={answering} time={i > 0} className={i > 0 ? 'mt-5' : 'mt-2'} />
-            </Fragment>
-          ))}
-        </div>
+        ))
       ) : (
         <div className={cn(CARD, 'px-5 py-[18px]')}>
           <h2 className="font-sans text-[11px] leading-[14px] font-semibold text-muted-foreground">Needs you</h2>

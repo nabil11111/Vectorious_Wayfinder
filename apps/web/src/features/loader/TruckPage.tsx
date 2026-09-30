@@ -82,14 +82,14 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
   return (
     <div>
       <BackLink to="/loader">Trucks</BackLink>
-      <div className="mt-3.5 lg:mt-4">
+      <div className="mt-2.5 lg:mt-3.5">
         {writes.refused && <Refused>{writes.refused}</Refused>}
         {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
         {stale && <div className="mb-3">{stale}</div>}
       </div>
       <div className="grid grid-cols-1 gap-y-3 lg:grid-cols-[minmax(0,680fr)_minmax(0,420fr)] lg:grid-rows-[auto_1fr] lg:gap-x-6">
         <LoadCard truck={truck} at={at} className="lg:col-start-1 lg:row-start-1" />
-        <Card className="flex flex-col px-5 pt-4 pb-5 lg:sticky lg:top-[77px] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:min-h-[calc(100dvh-162px)] lg:self-start">
+        <Card className="flex flex-col px-4 pt-4 pb-5 lg:sticky lg:top-[77px] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:min-h-[calc(100dvh-162px)] lg:self-start lg:px-5 lg:pt-[18px]">
           {current ? (
             <NowLoading truck={truck} stop={current} started={loading} ticks={ticks} flagged={flagged} />
           ) : (
@@ -116,8 +116,8 @@ function NowLoading({ truck, stop, started, ticks, flagged }: {
   return (
     <>
       <Label>{started ? 'Now loading' : 'Goes in first'} · stop {stop.seq}</Label>
-      <h2 className="mt-2.5 text-2xl leading-8 font-bold">{stop.shopName}</h2>
-      <ul className="mt-2">
+      <h2 className="mt-[15px] text-2xl leading-8 font-bold">{stop.shopName}</h2>
+      <ul className="mt-1.5">
         {stop.lines.map((line) => (
           <LineRow key={line.lineId} line={line} words={lineWords(line, brand)} ticked={ticks.isTicked(line.lineId)} flagged={flagged.has(line.lineId)} onToggle={() => ticks.toggle(line.lineId)} />
         ))}

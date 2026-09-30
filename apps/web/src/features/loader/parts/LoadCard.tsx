@@ -8,7 +8,7 @@ import { Card, Label, LoadBar, StopChip, Tag } from './ui';
 // "← Trucks" and "← VEH035": the way back, as the frames write it.
 export function BackLink({ to, children }: { to: string; children: string }) {
   return (
-    <Link to={to} className="inline-flex items-center gap-2 rounded-md py-1 text-[15px] leading-5 font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+    <Link to={to} className="-mt-1 flex w-fit items-center gap-2 rounded-md py-1 text-[15px] leading-5 font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:-mt-2">
       <span aria-hidden="true" className="text-base">←</span>
       {children}
     </Link>
@@ -20,20 +20,20 @@ export function BackLink({ to, children }: { to: string; children: string }) {
 export function LoadCard({ truck, at, className }: { truck: LoadingTruck; at: number | null; className?: string }) {
   const until = untilLeaving(truck.leavesAt, at);
   return (
-    <Card className={cn('px-5 pt-3.5 pb-4 lg:pb-3.5', className)}>
+    <Card className={cn('px-4 pt-[18px] pb-4 lg:px-5 lg:pb-3.5', className)}>
       <div className="flex items-start gap-2.5">
-        <img src={truckIcon(truck)} alt="" className="mt-0.5 size-[52px] shrink-0 object-contain lg:size-12" />
+        <img src={truckIcon(truck)} alt="" className="mt-0.5 size-12 shrink-0 object-contain" />
         <div className="min-w-0 flex-1">
           <h1 className="text-[22px] leading-7 font-bold">{truck.status === 'planned' ? truckName(truck) : `Loading ${truckName(truck)}`}</h1>
           <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">{vehicleWords(truck)} · {tripLine(truck)}</p>
         </div>
-        <p className="mt-1.5 shrink-0 whitespace-nowrap">
+        <p className="mt-[15px] shrink-0 whitespace-nowrap lg:mt-1.5">
           <span className="font-heading text-[32px] leading-9 font-bold">{whole(truck.on.units)}</span>
           <span className="ml-1 text-base leading-5 text-muted-foreground">/{whole(truck.units)}</span>
         </p>
       </div>
-      <LoadBar on={truck.on.units} of={truck.units} className="mt-3 lg:mt-2" />
-      <div className="mt-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:justify-between lg:gap-3">
+      <LoadBar on={truck.on.units} of={truck.units} className="mt-2" />
+      <div className="mt-2 flex flex-col gap-1 lg:mt-1.5 lg:flex-row lg:items-baseline lg:justify-between lg:gap-3">
         <p className="text-sm leading-5 font-semibold">{[leaves(truck), until].filter(Boolean).join(' · ')}</p>
         <p className="font-mono text-[13px] leading-5 text-muted-foreground">{loadFigure(truck)}</p>
       </div>

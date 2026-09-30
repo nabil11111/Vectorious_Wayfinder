@@ -68,7 +68,7 @@ function Trucks({ day, writes }: { day: LoadingDay; writes: LoaderWrites }) {
             <DayNote>Every truck is loaded.</DayNote>
           )}
         </div>
-        <NextList trucks={others} from={next ? 2 : 1} className="lg:-mt-[3px]" />
+        <NextList trucks={others} from={next ? 2 : 1} className="lg:mt-0.5" />
       </div>
     </div>
   );

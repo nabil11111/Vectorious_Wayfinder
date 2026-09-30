@@ -33,14 +33,14 @@ export function IssueCard({ issue, answering, time, className }: { issue: Issue;
       </div>
       <p className="mt-2 text-[11px] leading-[15px] text-muted-foreground">{issuePlace(issue)}</p>
 
-      <dl className="mt-[13px] space-y-1 text-[11px] leading-[14px]">
+      <dl className="mt-[9px] space-y-1 text-[11px] leading-[14px]">
         <Row label="Loader" value={raisedLine(issue)} first />
         <Row label="At the dock" value={issue.lines.map((line) => countedLine(line, brand)).join(', ')} />
         {issue.note && <Row label="Note" value={issue.note} />}
       </dl>
 
-      <p id={`answer-${issue.id}`} className="mt-4 text-xs leading-4 font-semibold">What should the loader do?</p>
-      <div role="radiogroup" aria-labelledby={`answer-${issue.id}`} className="mt-3 space-y-2.5">
+      <p id={`answer-${issue.id}`} className="mt-[13px] text-xs leading-4 font-semibold">What should the loader do?</p>
+      <div role="radiogroup" aria-labelledby={`answer-${issue.id}`} className="mt-[9px] space-y-2.5">
         {LOADING_DECISIONS.map((decision) => (
           <button
             key={decision}
@@ -50,20 +50,20 @@ export function IssueCard({ issue, answering, time, className }: { issue: Issue;
             disabled={busy}
             onClick={() => setChoice(decision)}
             className={cn(
-              'flex w-full items-center gap-3 rounded-[10px] bg-card px-[11px] py-[9px] text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+              'flex w-full items-center gap-3 rounded-[10px] bg-card px-[11px] py-1.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
               choice === decision ? 'border-2 border-foreground' : 'm-px w-[calc(100%-2px)] border',
             )}
           >
             <span aria-hidden="true" className={cn('size-[14px] shrink-0 rounded-full', choice === decision ? 'bg-foreground' : 'border-[1.5px] border-muted-foreground/60')} />
             <span className="min-w-0">
               <span className="block text-xs leading-4 font-semibold">{ANSWER[decision].title}</span>
-              <span className="mt-px block text-[10px] leading-[14px] text-muted-foreground">{ANSWER[decision].line}</span>
+              <span className="block text-[10px] leading-[14px] text-muted-foreground">{ANSWER[decision].line}</span>
             </span>
           </button>
         ))}
       </div>
 
-      <Button className={orangeButton('mt-4 h-[34px] w-full text-xs')} disabled={busy} focusableWhenDisabled onClick={() => answering.decide(issue, choice)}>
+      <Button className={orangeButton('mt-[13px] h-[34px] w-full text-xs')} disabled={busy} focusableWhenDisabled onClick={() => answering.decide(issue, choice)}>
         {sending ? 'Sending…' : 'Send to loader'}
       </Button>
       {answering.failed === issue.id && <p role="alert" className="mt-2 text-xs leading-4 font-semibold text-bad">Could not send. Try again.</p>}
