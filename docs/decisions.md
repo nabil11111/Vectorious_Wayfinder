@@ -71,7 +71,7 @@ One brand and one district per trip, the 270 and 480 minute budgets and whole or
 **Why.** The Datathon is judged separately. The rules that bind the Hackathon build are capacity, temperature,
 outlet access, delivery windows and fuel quotas, and those can never be switched off.
 
-Whole orders stopped being a default on 30 Sep, see D-17.
+Whole orders stopped being a default on 30 Sep, see D-17. One district per trip became a hard rule, see D-23.
 
 ## D-10 · 29 Sep · A shop that waited last time is protected
 
@@ -173,3 +173,20 @@ The phone shrinks the photo before sending it.
 
 **Why.** One place to back up, and it behaves the same in Docker and on the hosted app, with no disk or
 storage service to set up.
+
+## D-23 · 30 Sep · A trip stays inside one district
+
+The rule checker refuses a trip with stops in two districts.
+
+**Why.** The booklet's travel data has the drive from a depot to a district and the drive between two stops
+inside it. It has no figure for the drive between two districts, so such a trip cannot be given honest times
+or a fuel figure. This takes one district per trip out of the defaults in D-09. Mixing brands on a trip is
+still a choice the dispatcher can turn on.
+
+## D-24 · 30 Sep · Trucks have a tail lift and vans do not
+
+A tail-lift item on a van is a warning, not a block.
+
+**Why.** The vehicle data has no tail-lift column, so this is our assumption. A block would cut off the one
+Tech shop that only a van can reach from ever getting a washing machine or a fridge. The dispatcher sees the
+warning and decides.
