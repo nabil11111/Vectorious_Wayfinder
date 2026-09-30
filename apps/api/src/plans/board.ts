@@ -1,8 +1,9 @@
 import { DeferralCode, PlanCheck, type DraftPlan, type PlanBoard, type TripFigures } from '@wayfinder/contracts';
-import { and, desc, eq, inArray, lt, lte } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, lte, sql } from 'drizzle-orm';
 import type { Tx } from '../db/client';
 import { calendarDays, deferrals, demoDay, districtTravel, fuelLog, orderLines, orders, outlets, plans, products, serviceAllowance, stopOrders, stops, trips, users, vehicleDaysOff, vehicles } from '../db/schema';
-import { clockState, depotDate, depotInstant, depotMinutes, now } from '../lib/clock';
+import { demoClockAt, depotDate, depotInstant, depotMinutes, now, realNow } from '../lib/clock';
+import { config } from '../lib/config';
 import { HttpError } from '../lib/errors';
 import { CUTOFF_MINUTES } from '../orders/orderable-day';
 import { snapshot } from '../orders/store-orders';
@@ -21,8 +22,13 @@ export async function operatingDays(tx: Tx): Promise<string[]> {
 }
 
 export async function readMoment(tx: Tx): Promise<BoardMoment> {
-  const [row] = await tx.select({ day: demoDay.day }).from(demoDay);
-  return { at: now(), demoDay: row?.day ?? clockState().day };
+  // TRUNCATE is not MVCC-safe. Hold the reset's tables before the first snapshot query so a reset is
+  // wholly before or after the read. ACCESS SHARE is allowed in a read-only transaction.
+  await tx.execute(sql`lock table ${orders}, ${plans}, ${fuelLog}, ${vehicleDaysOff} in access share mode`);
+  if (!config.DEMO_MODE) return { at: now(), demoDay: 1 };
+  const [row] = await tx.select().from(demoDay);
+  if (!row) throw new Error('The demo day has no clock row. Run the seed first.');
+  return { at: new Date(demoClockAt(row, realNow()).now), demoDay: row.day };
 }
 
 export function getBoard(caller: Planner, date?: string): Promise<PlanBoard> {
