@@ -8,6 +8,7 @@ import { config } from '../lib/config';
 import { logger } from '../lib/logger';
 import { moveAdminOffSharedPassword } from './admin-password';
 import { db, pool } from './client';
+import { seedDemoDay } from './demo-day';
 import { DEMO_USERS, PRODUCTS } from './fixtures';
 import * as s from './schema';
 
@@ -109,6 +110,9 @@ await db.insert(s.users).values(DEMO_USERS.map((u) => ({
 }))).onConflictDoNothing();
 
 if (await moveAdminOffSharedPassword()) logger.info('admin moved off the shared demo password');
+
+// In demo mode: the app's clock, and the delivery day the walkthrough runs on. Written once (spec 008).
+if (await seedDemoDay()) logger.info('demo day written');
 
 logger.info({ outlets: outletRows.length, vehicles: vehicleRows.length, users: DEMO_USERS.length }, 'seed done');
 await pool.end();

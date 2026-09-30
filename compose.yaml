@@ -28,6 +28,9 @@ services:
       SEED_PASSWORD: ${SEED_PASSWORD:-wayfinder-demo}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-wayfinder-admin}
       TRUST_PROXY: ${TRUST_PROXY:-0}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      LIVE_HEARTBEAT_MS: ${LIVE_HEARTBEAT_MS:-20000}
+      LIVE_MAX_STREAMS: ${LIVE_MAX_STREAMS:-200}
     ports:
       - "3000:3000"
 

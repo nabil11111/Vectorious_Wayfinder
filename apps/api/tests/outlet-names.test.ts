@@ -15,8 +15,9 @@ const shops = read('shared/outlets.csv');
 const named = read('fixtures/outlet-names.csv');
 const nameOf = new Map(named.map((r) => [r.outlet_id!, r.name!]));
 
-// The seed is a script that closes the database when it is done, so it runs the way people run it.
-const seed = () => execFileSync('npm', ['run', 'db:seed'], { cwd: api, stdio: 'pipe' });
+// The seed is a script that closes the database when it is done, so it runs the way people run it. On Windows
+// npm is a .cmd file, which only a shell can start.
+const seed = () => execFileSync('npm', ['run', 'db:seed'], { cwd: api, stdio: 'pipe', shell: process.platform === 'win32' });
 afterAll(() => pool.end());
 
 describe('outlet names fixture', () => {

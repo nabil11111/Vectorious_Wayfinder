@@ -5,8 +5,9 @@ import { AdminVehicle } from '@wayfinder/contracts';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { auditLog, users, vehicles } from '../src/db/schema';
+import { serve, stop } from './serve';
 
-const app = createApp();
+const app = await serve(createApp());
 const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 
@@ -18,6 +19,7 @@ async function resetVeh060() {
 
 afterAll(async () => {
   await resetVeh060();
+  await stop(app);
   await pool.end();
 });
 
