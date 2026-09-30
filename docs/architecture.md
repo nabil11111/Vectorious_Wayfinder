@@ -1,7 +1,7 @@
 # Architecture
 
 Wayfinder is one Node application and one Postgres database. The same process serves the web app, the API and
-(later) live updates, so there is one address, one deploy and nothing to keep in sync between services.
+live updates, so there is one address, one deploy and nothing to keep in sync between services.
 
 ```mermaid
 flowchart LR
@@ -9,9 +9,11 @@ flowchart LR
       W[React web app<br/>role screens]
     end
     W -- "HTTPS /api/v1 (JSON, session cookie)" --> A
+    A -- "/api/v1/events: what changed" --> W
     subgraph Node process
       A[Express API<br/>auth, roles, validation] --> S[Domain services<br/>orders, planning, loading, delivery]
       A -. serves built files .-> W
+      K[The app's clock] --> S
     end
     S --> D[(PostgreSQL<br/>reference data, orders, plans, audit)]
     C[data/shared CSVs<br/>from the booklet] -- seed on start --> D
@@ -25,6 +27,20 @@ flowchart LR
 | API | `apps/api` | Express 5. Checks the session and role on every request and validates every input with Zod. |
 | Contracts | `packages/contracts` | Zod schemas both sides import, so the web app and API cannot disagree about a request's shape. |
 | Database | `apps/api/src/db` | Drizzle schema, committed SQL migrations in `apps/api/drizzle`, idempotent seed. |
+
+## The clock
+
+Every time a person sees comes from one clock in the API (`apps/api/src/lib/clock.ts`), never from a device
+(D-18). In demo mode it runs from the seeded day, and the demo control moves it forward a part of the day at a
+time. It is kept in the `demo_day` row, so a restart or a second browser sees the same time. Screens ask for it
+once and count the seconds themselves. A test fails if any other file reads the system time.
+
+## Live updates
+
+After a change is committed, the API announces what changed (`orders`, `plans`, `clock` and so on) on a
+server-sent event stream, `GET /api/v1/events` (D-21). Each open screen hears only what is its business, by
+role, depot or outlet, and fetches the data again itself. The stream carries no data, so a screen that missed
+an announcement is only as stale as its next fetch, and each screen also refetches every minute.
 
 ## Security basics
 
