@@ -168,7 +168,8 @@ export const PlanBoard = z.object({
   depot: z.string(),
   // The clock's `day`, which the first save sends back.
   demoDay: z.number().int().min(1),
-  // The day on the board, when its orders close, and whether they are still open. null when no day can be planned.
+  // The day on the board and when its orders close. open is true once they have closed, so the board can be planned
+  // (spec 010, rule 1). null when no day can be planned.
   day: z.object({ date: Day, cutoffAt: Moment, open: z.boolean() }).nullable(),
   plan: DraftPlan.extend({
     id: z.uuid().nullable(),
