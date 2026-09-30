@@ -1,19 +1,9 @@
 import { z } from 'zod';
+import { Role } from './basics';
 
 // Shared between the web app and the API. Keep it to shapes that cross the wire; no database types here.
 export * from './demo';
-
-export const ROLES = ['store_manager', 'dispatcher', 'loader', 'driver', 'admin'] as const;
-export const Role = z.enum(ROLES);
-export type Role = z.infer<typeof Role>;
-
-export const BRANDS = ['Fresh', 'Style', 'Tech'] as const;
-export const Brand = z.enum(BRANDS);
-export type Brand = z.infer<typeof Brand>;
-
-export const TEMPS = ['chilled', 'dry'] as const;
-export const Temp = z.enum(TEMPS);
-export type Temp = z.infer<typeof Temp>;
+export * from './basics';
 
 export const LoginRequest = z.object({
   username: z.string().trim().min(1).max(64),
@@ -42,3 +32,4 @@ export const ApiError = z.object({
 export type ApiError = z.infer<typeof ApiError>;
 
 export * from './planning';
+export * from './store';
