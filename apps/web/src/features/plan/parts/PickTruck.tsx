@@ -58,15 +58,19 @@ export function PickTruck({ board, draft, index, pick, onChoose, onClose }: {
           const second = freeTripNo(draft, vehicle.id) === 2;
           const ready = second ? index.trip(vehicle.id, 1)?.times?.readyAgainAt : undefined;
           return (
-            <li key={vehicle.id} className="flex items-center gap-3 rounded-[10px] bg-muted px-3.5 py-3">
+            <li key={vehicle.id} className="flex items-center gap-2.5 rounded-[10px] bg-muted px-3 py-3 sm:gap-3 sm:px-3.5">
               <img src={vehicleIcon(vehicle)} alt="" className="size-[30px] shrink-0 object-contain" />
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] leading-4 font-semibold">{vehicle.id} · {vehicleKind(vehicle)} · {tonnes(vehicle.weightCapKg)} · {cubic(vehicle.volumeCapM3)}</p>
+                {/* On a phone the size goes to the second line, so the first never breaks in the middle. */}
+                <p className="text-[13px] leading-4 font-semibold">
+                  {vehicle.id} · {vehicleKind(vehicle)}<span className="max-sm:hidden"> · {tonnes(vehicle.weightCapKg)} · {cubic(vehicle.volumeCapM3)}</span>
+                </p>
                 <p className="mt-1 text-xs leading-[15px] text-muted-foreground">
+                  <span className="sm:hidden">{tonnes(vehicle.weightCapKg)} · {cubic(vehicle.volumeCapM3)} · </span>
                   {second ? `trip 2${ready !== undefined ? ` · ready ${hhmm(ready)}` : ''}` : `fuel ${vehicle.fuelLeftPct}% left`}
                 </p>
               </div>
-              <Button variant="outline" className={plainButton('h-8 w-[88px] text-[13px]')} onClick={() => onChoose(vehicle.id)}>Choose</Button>
+              <Button variant="outline" className={plainButton('h-8 px-3.5 text-[13px] sm:w-[88px]')} onClick={() => onChoose(vehicle.id)}>Choose</Button>
             </li>
           );
         })}
