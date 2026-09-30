@@ -13,7 +13,7 @@ import { NoOpenDay } from './parts/NextOrderCard';
 import { PageHeader } from './parts/PageHeader';
 import { Panel } from './parts/Panel';
 import { QuantityStepper } from './parts/QuantityStepper';
-import { ENTRANCE, TEMP_NAME, brandList, brandUnits, clockTime, cubic, cutoffTime, itemFigures, kilos, lineWords, plural, shortDay, windowWords } from './words';
+import { ENTRANCE, TEMP_NAME, brandList, brandUnits, clockTime, cubic, cutoffTime, inListOrder, itemFigures, kilos, lineWords, plural, shortDay, windowWords } from './words';
 
 // New order (Shop · New orders, and its Style, Tech and desktop frames). The shop orders from its brand's
 // fixed list, the form saves itself as a draft, and one tap places it.
@@ -124,7 +124,7 @@ function OrderForm({ next }: { next: OpenOrder }) {
           <h2 className="text-lg leading-[25px] font-bold">Your order</h2>
           {draft && (
             <ul className="mt-3 space-y-3">
-              {draft.lines.map((line) => {
+              {inListOrder(draft.lines, products).map((line) => {
                 const words = lineWords(outlet.brand, line, products);
                 const temp = products.find((p) => p.id === line.productId)?.temp;
                 return (

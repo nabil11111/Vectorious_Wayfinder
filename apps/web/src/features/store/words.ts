@@ -74,11 +74,21 @@ export const TEMP_NAME: Record<Temp, string> = { chilled: 'Chilled', dry: 'Dry' 
 export const orderTitle = (brand: Brand, order: Pick<StoreOrder, 'temp' | 'units'>) =>
   brand === 'Fresh' ? `${WHOLE.format(order.units)} ${order.temp} ${order.units === 1 ? 'carton' : 'cartons'}` : brandUnits(brand, order.units);
 
+// Lines in the order of the brand's product list, so chilled comes before dry. An item that left the list
+// goes last.
+export function inListOrder(lines: OrderLine[], products: StoreProduct[]) {
+  const place = (line: OrderLine) => {
+    const at = products.findIndex((p) => p.id === line.productId);
+    return at === -1 ? products.length : at;
+  };
+  return [...lines].sort((a, b) => place(a) - place(b));
+}
+
 // What is in an order, in a few words: "8 chilled + 4 dry" for Fresh, whose lines are one per temperature, and
 // the units the server counted for Style and Tech.
 export function mixOf(brand: Brand, lines: OrderLine[], units: number, products: StoreProduct[]) {
   if (brand !== 'Fresh') return brandUnits(brand, units);
-  return lines.map((line) => `${WHOLE.format(line.quantity)} ${products.find((p) => p.id === line.productId)?.temp ?? line.name.toLowerCase()}`).join(' + ');
+  return inListOrder(lines, products).map((line) => `${WHOLE.format(line.quantity)} ${products.find((p) => p.id === line.productId)?.temp ?? line.name.toLowerCase()}`).join(' + ');
 }
 
 // A row of an order: "Chilled" and "8 cartons" for Fresh, the item's own name for Style and Tech.

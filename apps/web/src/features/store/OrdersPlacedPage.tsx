@@ -7,7 +7,7 @@ import { BottomBar } from './parts/BottomBar';
 import { ICON } from './parts/icons';
 import { LoadError, StaleNotice } from './parts/LoadError';
 import { Panel } from './parts/Panel';
-import { clockTime, cutoffDay, lineWords, longDay, statusChip, weekday } from './words';
+import { clockTime, cutoffDay, inListOrder, lineWords, longDay, statusChip, weekday } from './words';
 
 // Orders placed (Shop · Orders placed): what was placed and for which day. It reads what the API holds as
 // placed for the open day, so a reload or "View confirmation" on Today shows the same screen.
@@ -42,10 +42,10 @@ export function OrdersPlacedPage() {
       <Panel line className="mt-[27px] py-0">
         {/* One grid for all rows, so the amounts start at the same place however long the longest is. */}
         <ul className="grid grid-cols-[minmax(0,1fr)_minmax(77px,auto)] gap-x-3">
-          {placed.lines.map((line) => {
+          {inListOrder(placed.lines, products).map((line, i) => {
             const words = lineWords(outlet.brand, line, products);
             return (
-              <li key={line.productId} className="col-span-2 grid grid-cols-subgrid items-center border-b py-4 text-sm leading-[17px]">
+              <li key={`${line.productId}-${i}`} className="col-span-2 grid grid-cols-subgrid items-center border-b py-4 text-sm leading-[17px]">
                 <span className="font-semibold">{words.name}</span>
                 <span className="text-[13px]">{words.amount}</span>
               </li>
