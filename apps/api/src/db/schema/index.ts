@@ -3,5 +3,6 @@ export * from './reference';
 export * from './identity';
 export * from './orders';
 export * from './planning';
+export * from './issues';
 export * from './audit';
 export * from './demo';

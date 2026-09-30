@@ -15,6 +15,8 @@ import { clockRouter, demoClockRouter } from './routes/clock';
 import { demoResetRouter } from './routes/demo-reset';
 import { eventsRouter } from './routes/events';
 import { healthRouter } from './routes/health';
+import { issuesRouter } from './routes/issues';
+import { loadingRouter } from './routes/loading';
 import { plansRouter } from './routes/plans';
 import { storeRouter } from './routes/store';
 
@@ -51,6 +53,8 @@ export function createApp() {
   api.use('/events', eventsRouter);
   api.use('/store', storeRouter);
   api.use('/plans', plansRouter);
+  api.use('/loading', loadingRouter);
+  api.use('/issues', issuesRouter);
   // The demo control exists only in demo mode. With it off these addresses answer 404 like any unknown one.
   if (config.DEMO_MODE) {
     api.use('/demo/clock', demoClockRouter);

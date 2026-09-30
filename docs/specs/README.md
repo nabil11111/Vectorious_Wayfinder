@@ -64,3 +64,5 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [008](008-demo-day/spec.md) | The demo day: clock, live updates and the seeded day | Done |
 | [009](009-shop-orders/spec.md) | Shop orders | Done |
 | [010](010-plan-board/spec.md) | The plan board: the dispatcher plans by hand | Done |
+| [011](011-planner/spec.md) | The planner: the suggested plan's engine | Done |
+| [012](012-loading/spec.md) | Loading: the loader loads and flags, the dispatcher answers | Done |

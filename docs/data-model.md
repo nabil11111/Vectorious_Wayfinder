@@ -25,6 +25,10 @@ erDiagram
     vehicles ||--o{ vehicle_days_off : "off on"
     vehicles ||--o{ fuel_log : "used fuel"
     trips ||--o| fuel_log : "costs"
+    stops ||--o{ issues : "flagged at"
+    issues ||--|{ issue_lines : counts
+    order_lines ||--o{ issue_lines : "counted in"
+    users ||--o{ issues : "raises or decides"
 ```
 
 ## Groups
@@ -36,9 +40,9 @@ erDiagram
 | People | `users`, `sessions` | One role per user. A store manager belongs to an outlet, the others to a depot. |
 | Demand | `orders`, `order_lines` | One order per temperature, because chilled and dry go on different trucks. An order starts as a draft, and a shop has one draft per temperature at most. Lines store only a quantity, one line per item. |
 | Planning | `plans`, `trips`, `stops`, `stop_orders`, `deferrals` | One plan per depot per day. At most two trips per vehicle. Every order is on a stop or deferred with a reason. |
+| Loading and problems | `issues`, `issue_lines`, and on `trips`, `stops` and `order_lines` | A problem is one record whoever raises it: a loader's flag now, a driver's and a shop's later. Its lines hold the counts it found, and the dispatcher decides it once. A trip carries a revision, its ready time and the id of its last loader write; a stop its loaded time; an order line its loaded count (spec 012). |
 | Fleet days | `vehicle_days_off`, `fuel_log` | A vehicle that cannot be used on a date, with the reason. Litres a vehicle used on a date: one history row a day, and one row for each sent trip. The plan checker reads both. |
 | The demo day | `demo_day` | One row: the app's clock, stored as the app's time and the real time it was set, and whether the seeded day has been written. |
 | History | `audit_log` | Who changed what and when, with before and after. |
 
-Execution (deliveries, proof, receipts, loading checks) and notifications are added with the features that
-need them.
+Deliveries, proof and receipts are added with the driver's and the shop's pieces.

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { and, eq, gt } from 'drizzle-orm';
 import type { Me, Role } from '@wayfinder/contracts';
 import { db } from '../db/client';
@@ -48,3 +48,14 @@ export const jsonOnlyWrites: RequestHandler = (req, _res, next) => {
   }
   next();
 };
+
+// requireRole lets an admin through every door, but a depot's plan, its loading and its problems belong to one depot
+// and an admin has none.
+export const requireDepot: RequestHandler = (req, _res, next) => {
+  if (!req.user?.depotId) return next(new HttpError(403, 'no_depot', 'This account does not belong to a depot.'));
+  next();
+};
+
+// The person asking and the depot their account belongs to, once requireRole and requireDepot have passed.
+export interface DepotCaller { userId: string; depotId: string }
+export const depotCallerOf = (req: Request): DepotCaller => ({ userId: req.user!.id, depotId: req.user!.depotId! });

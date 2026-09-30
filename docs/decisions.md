@@ -115,6 +115,31 @@ caller's depot, so the depot switch in the top bar shows the depot and changes n
 lists go out of date when plans change and wants the dispatcher's decisions to reach the loader. Once a trip is
 loading, changes go through the loader's flag and the dispatcher's answer (A3) and Live day (A7).
 
+**D-34 · 1 Oct · The loader's day is today until 16:00, then the next operating day.** By then the day's trucks have
+left and the next day is being planned, while D-28's 03:30 would hide trucks that leave later that morning.
+
+**D-35 · 1 Oct · The loader loads last stop first, and a truck's counts are written when it is marked ready.** The
+stop order is what the loader needs, so the server holds it, and the counts that left the dock are the ones the driver
+and the shop check against.
+
+**D-36 · 1 Oct · A problem is an `issues` row whoever raises it, with the lines it counts, and a loader's flag is its
+first kind.** The dispatcher decides every problem in one place, and the driver (A4) and the shop (A5) add their kinds
+without a new table.
+
+**D-37 · 1 Oct · The dispatcher answers a loader's flag once, with "Go short" or "Load it all".** The design draws only
+the loader's side of the answer, these are the two things a dock can do, and taking an order off a truck changes the
+plan, which is Live day's (A7).
+
+**D-38 · 1 Oct · The loader works online.** The dock has the depot's connection, the booklet's coverage gaps are on
+the road, and the loader frames draw no offline state. A write that fails is sent again with the same id, so it never
+counts twice.
+
+**D-39 · 1 Oct · Loading builds only the "Needs you" column of Live day and the dispatcher's bell count.** A flagged
+truck needs the dispatcher to see the flag and answer it, and the rest of Live day is A7's.
+
+**D-40 · 1 Oct · The loader's screens show what the data holds: one list in leaving order, with no waves, dock numbers
+or call buttons.** Every trip has its own leaving time (D-19), and the data has no docks and no phone numbers.
+
 **D-41 · 1 Oct · The planner serves chilled orders before dry ones of the same waiting age, even when a dry one
 closes earlier** (the lead's pick, until Nabil answers). Fridge trips are what the seeded day is short of, and a
 window stays a hard check, so a dry order that misses its window is still deferred with its reason.

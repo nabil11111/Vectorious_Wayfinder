@@ -106,7 +106,19 @@ are what the demo clock shows.
 7. **The shop sees it.** As `nadeesha`, Orders shows her three orders "Planned · Thu 25 Jun". **Back to edit**
    on View plan turns the plan into a draft again until loading starts, and her cards follow within a second.
 
-Loading, driving and the shop's receipt come with the next pieces.
+8. **Loading, last stop first.** Move the demo clock on to "Loading, Thu 02:30" and sign in as `kasun` on a phone (or
+   a narrow window). Today's trucks: VEH035 leaves 04:36, in 2 h 6 min, and "Goes in first" lists stop 2, Fresh
+   Wellawatte (94 cartons), above stop 1, Fresh Nugegoda (24). Start loading, tick Wellawatte's two lines and press
+   **Stop 2 loaded**: "94 /118" and "0.6 / 1.0 t · 3.5 / 7.0 m³".
+9. **A problem at the dock.** On Fresh Nugegoda press **Flag a problem**, pick the 4 dry cartons, keep Short, count 3,
+   add a note and send it to the dispatcher. The dry line reads "1 short", and Mark ready waits for the answer.
+10. **The dispatcher answers.** As `ruwan`, the bell shows 1. Live day's "Needs you" holds the card "1 dry carton
+    short · Fresh Nugegoda · stop 1 · VEH035". Keep **Go short** and press **Send to loader**.
+11. **Ready.** On Kasun's phone the answer shows without a reload. Tick the chilled lines, press Stop 1 loaded and then
+    **Mark ready**: "VEH035 is ready · 117 of 118 on · 1 short". Nadeesha's three orders now read "Loaded", and View plan
+    no longer offers Back to edit.
+
+Driving and the shop's receipt come with the next pieces.
 
 ## Departures from the design
 
@@ -151,6 +163,23 @@ Anything we built differently from our Designathon submission, and why.
 - **Problems** show as lines under the trip's timeline, and failures as short notices.
 - **View plan** says "h on the road" where the design says "h driving", because the figure includes unloading.
 - **States the design lacks:** orders still open, no day left, deferring, splitting, saving, not saved and refused.
+
+**Loading and Live day**
+- **One list of trucks in leaving order,** with no "Wave 1 · 03:30" and "Wave 2 · 08:30" tabs, no dock numbers and no
+  call buttons: every trip has its own leaving time (D-19), and the data has no docks or phone numbers (D-40).
+- **The day line** has no shift name, and the place reads "Peliyagoda dock".
+- **Every stop has its own row** where the design joins the last two, and a stop lists its lines (Style and Tech lines
+  also name the item).
+- **The flag has no photo yet;** proof photos come with the driver's piece.
+- **The load figure is what is on the truck so far.**
+- **The dispatcher answers a loader's flag** with "Go short" or "Load it all" and "Send to loader" (D-37); the design
+  draws answers only for the driver's problems. There is no Undo yet, and the loader's answer line says what was chosen.
+- **The ready screen names the trip's driver,** where the design names Kasun, who is our loader.
+- **Live day shows only its "Needs you" column** for now; the trucks' timelines come with the dashboard piece.
+- **Small differences:** the flag form asks to tap the line first, the "loading" chip is yellow, and an answer also
+  shows under its stop's lines while that stop is still loading.
+- **States the design lacks:** no plan out, nothing to load, every truck loaded, no day left, a truck no longer on the
+  list, waiting for the answer, saving, not saved, refused, and nothing needs you.
 
 ## Docs
 
