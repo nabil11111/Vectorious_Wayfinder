@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Me, type LoginRequest, type Role } from '@wayfinder/contracts';
 import { api, ApiRequestError } from '@/lib/api';
@@ -24,18 +25,30 @@ function keptAccount(): Me | undefined {
 }
 
 
-// Any API 401 invalidates the account kept for offline startup. Waiting writes stay under their owner.
-window.addEventListener('wayfinder-signed-out', () => keepAccount(null));
-
 // null means signed out; the query never throws for a plain 401.
 export function useMe() {
+  const qc = useQueryClient();
+  useEffect(() => {
+    // Clear both forms of identity so the login page can open immediately. Account-owned waiting writes stay.
+    const signedOut = () => {
+      keepAccount(null);
+      void qc.cancelQueries({ queryKey: meKey });
+      qc.setQueryData(meKey, null);
+    };
+    window.addEventListener('wayfinder-signed-out', signedOut);
+    return () => window.removeEventListener('wayfinder-signed-out', signedOut);
+  }, [qc]);
   return useQuery({
     queryKey: meKey,
     initialData: keptAccount,
     initialDataUpdatedAt: 0,
     networkMode: 'always',
-    queryFn: async () => {
-      try { return keepAccount(await api<Me>('/auth/me')); }
+    queryFn: async ({ signal }) => {
+      try {
+        const me = await api<Me>('/auth/me', { signal });
+        signal.throwIfAborted();
+        return keepAccount(me);
+      }
       catch (e) { if (e instanceof ApiRequestError && e.status === 401) return keepAccount(null); throw e; }
     },
     staleTime: 5 * 60_000,
@@ -45,16 +58,18 @@ export function useMe() {
 export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
+    onMutate: () => qc.cancelQueries({ queryKey: meKey }),
     mutationFn: (body: LoginRequest) => api<Me>('/auth/login', { method: 'POST', json: body }),
-    onSuccess: (me) => qc.setQueryData(meKey, keepAccount(me)),
+    onSuccess: async (me) => { await qc.cancelQueries({ queryKey: meKey }); qc.setQueryData(meKey, keepAccount(me)); },
   });
 }
 
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
+    onMutate: () => qc.cancelQueries({ queryKey: meKey }),
     mutationFn: () => api<void>('/auth/logout', { method: 'POST', json: {} }),
-    onSuccess: () => { keepAccount(null); qc.setQueryData(meKey, null); qc.clear(); },
+    onSuccess: async () => { await qc.cancelQueries({ queryKey: meKey }); keepAccount(null); qc.clear(); qc.setQueryData(meKey, null); },
   });
 }
 

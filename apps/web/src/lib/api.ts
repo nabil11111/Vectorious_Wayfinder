@@ -21,9 +21,13 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     headers: { ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
+  // A transport may already have delivered its answer when its query is cancelled. That answer must not
+  // sign out a newer account or replace state kept after a reset.
+  rest.signal?.throwIfAborted();
   if (res.status === 401) window.dispatchEvent(new Event('wayfinder-signed-out'));
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => null);
+  rest.signal?.throwIfAborted();
   if (!res.ok) {
     const parsed = ApiError.safeParse(body);
     if (parsed.success) throw new ApiRequestError(res.status, parsed.data.error.code, parsed.data.error.message, parsed.data.error.details);

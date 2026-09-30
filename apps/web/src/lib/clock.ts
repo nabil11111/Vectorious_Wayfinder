@@ -88,7 +88,11 @@ export interface AppClock {
 
 // The time on screen. It comes from GET /clock, runs on by itself and is drawn again every 15 seconds.
 export function useAppClock(): AppClock {
-  const query = useQuery({ queryKey: clockKey, initialData: keptClock, initialDataUpdatedAt: 0, networkMode: 'always', queryFn: async () => hold(await api<ClockState>('/clock')) });
+  const query = useQuery({ queryKey: clockKey, initialData: keptClock, initialDataUpdatedAt: 0, networkMode: 'always', queryFn: async ({ signal }) => {
+    const clock = await api<ClockState>('/clock', { signal });
+    signal.throwIfAborted();
+    return hold(clock);
+  } });
   const state = query.data;
   const retry = () => void query.refetch();
   const [reading, setReading] = useState(() => performance.now());
