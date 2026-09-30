@@ -203,6 +203,7 @@ it('AC-23 marks VEH035 ready after "Go short": ready at the clock, the counts th
   const orderIds = [...new Set(lines.map((l) => l.orderId))];
   const ordersBefore = await db.select().from(orders).where(inArray(orders.id, orderIds));
   freeze(THU, 2 * 60 + 36);
+  vi.mocked(announce).mockClear();
   let committed = false;
   const transaction = db.transaction.bind(db);
   const spy = vi.spyOn(db, 'transaction').mockImplementation((async (...args: Parameters<typeof db.transaction>) => {

@@ -89,6 +89,7 @@ it('AC-7 refuses a truck, stop or line of another depot with unknown_record and 
 it("AC-9 starts VEH035: loading, its revision up, the audit row and the loading day, told after the commit, and the plan can no longer go back to edit", async () => {
   const { truck, plan } = await sent();
   expect((await board()).plan.canUnsend).toBe(true);
+  vi.mocked(announce).mockClear();
   let committed = false;
   const transaction = db.transaction.bind(db);
   const spy = vi.spyOn(db, 'transaction').mockImplementation((async (...args: Parameters<typeof db.transaction>) => {
