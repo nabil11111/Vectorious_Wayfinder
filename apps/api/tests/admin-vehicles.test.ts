@@ -3,11 +3,15 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { AdminVehicle } from '@wayfinder/contracts';
 import { createApp } from '../src/app';
 import { pool } from '../src/db/client';
+import { serve, stop } from './serve';
 
-const app = createApp();
+const app = await serve(createApp());
 const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
-afterAll(() => pool.end());
+afterAll(async () => {
+  await stop(app);
+  await pool.end();
+});
 
 // One sign-in per account. The API allows ten sign-ins per 15 minutes.
 const dispatcher = request.agent(app);
