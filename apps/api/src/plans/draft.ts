@@ -23,11 +23,14 @@ export async function openPlan(tx: Tx, caller: Planner, date: string, ref: PlanR
   const [depot] = await tx.select().from(depots).where(eq(depots.id, caller.depotId)).for('no key update');
   if (!depot) throw unknownRecord(caller.depotId);
   const moment: BoardMoment = clock ? { at: new Date(demoClockAt(clock, realNow()).now), demoDay: clock.day } : { at: now(), demoDay: 1 };
+  const [existing] = await tx.select().from(plans).where(and(eq(plans.depotId, caller.depotId), eq(plans.date, date)));
+  // A reset reopens orders at 15:00. Its old references must still be stale (AC-13/16), so identity is
+  // checked before the open-day refusals; a current reference still receives the day's precise refusal.
+  if (ref.planId === null ? ref.demoDay !== moment.demoDay : !existing || existing.id !== ref.planId) throw stale();
   const day = boardDay(depotDate(moment.at), depotMinutes(moment.at), await operatingDays(tx));
   if (!day) throw new HttpError(409, 'no_plan_day', 'No delivery day is left to plan.');
   if (day.date !== date) throw new HttpError(409, 'day_moved', `Trucks for ${date} leave from 03:30, so its plan can no longer be sent.`, { date: day.date });
   if (!day.open) throw new HttpError(409, 'orders_open', 'Orders for this day are still open.', { date, cutoffAt: depotInstant(day.cutoffDate, CUTOFF_MINUTES).toISOString() });
-  const [existing] = await tx.select().from(plans).where(and(eq(plans.depotId, caller.depotId), eq(plans.date, date)));
   if (ref.planId !== null) {
     if (!existing || existing.id !== ref.planId) throw stale();
     if (published) {
