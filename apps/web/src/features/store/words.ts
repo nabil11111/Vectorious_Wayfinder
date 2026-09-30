@@ -64,6 +64,8 @@ export const countOf = (quantity: number, unit: string) => `${WHOLE.format(quant
 // What a brand calls its units together: "12 cartons", "100 boxes", "3 items".
 const BRAND_UNIT: Record<Brand, string> = { Fresh: 'carton', Style: 'box', Tech: 'item' };
 export const brandUnits = (brand: Brand, units: number) => countOf(units, BRAND_UNIT[brand]);
+// The heading of a brand's item list: "Style boxes", "Tech items".
+export const brandList = (brand: Brand) => `${brand} ${plural(BRAND_UNIT[brand])}`;
 
 export const TEMP_NAME: Record<Temp, string> = { chilled: 'Chilled', dry: 'Dry' };
 

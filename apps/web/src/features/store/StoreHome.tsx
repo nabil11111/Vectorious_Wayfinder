@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router';
 import { AppShell, ComingNext, type NavItem } from '@/components/layout/AppShell';
 import { HelpPage } from './HelpPage';
+import { NewOrderPage } from './NewOrderPage';
 import { useNextOrder } from './next-order';
+import { OrdersPlacedPage } from './OrdersPlacedPage';
 import { ICON } from './parts/icons';
 import { TodayPage } from './TodayPage';
 
@@ -26,8 +28,8 @@ export function StoreHome() {
       <Routes>
         <Route index element={<TodayPage />} />
         <Route path="orders" element={<ComingNext title="Orders" what="Open and past orders. Figma: Shop · Orders." />} />
-        <Route path="orders/new" element={<ComingNext title="New order" what="The order form for the shop's brand. Figma: Shop · New orders." />} />
-        <Route path="orders/placed" element={<ComingNext title="Orders placed" what="What was placed and for which day. Figma: Shop · Orders placed." />} />
+        <Route path="orders/new" element={<NewOrderPage />} />
+        <Route path="orders/placed" element={<OrdersPlacedPage />} />
         <Route path="deliveries" element={<ComingNext title="Deliveries" what="Confirm what arrived and report anything short or damaged. Figma: Shop · Confirm delivery." />} />
         <Route path="help" element={<HelpPage />} />
         <Route path="*" element={<Navigate to="/store" replace />} />
