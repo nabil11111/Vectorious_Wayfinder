@@ -62,7 +62,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
     <div className="flex min-h-full flex-col">
       <div className="flex flex-wrap items-start gap-x-2.5 gap-y-2 px-3.5 pt-3.5">
         {vehicle && <img src={vehicleIcon(vehicle)} alt="" className="mt-0.5 size-8 shrink-0 object-contain" />}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-56">
           <h2 className="text-base leading-5 font-bold">
             Planning · {trip.vehicleId} ·{' '}
             <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={(driverId) => change(setDriver(draft, trip.vehicleId, driverId))} />

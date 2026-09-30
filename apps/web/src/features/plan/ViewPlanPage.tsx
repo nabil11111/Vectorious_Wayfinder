@@ -148,7 +148,8 @@ function Vehicles({ board, index }: { board: PlanBoard; index: BoardIndex }) {
   }).filter((section) => section.trips.length > 0);
 
   if (sections.length === 0) {
-    return <Column className="p-5"><p className="text-sm text-muted-foreground">No trip yet. Start one on the plan board.</p></Column>;
+    const words = board.plan.status === 'published' ? 'This plan has no trips.' : 'No trip yet. Start one on the plan board.';
+    return <Column className="p-5"><p className="text-sm text-muted-foreground">{words}</p></Column>;
   }
   return sections.map(({ brand, trips, districts }) => {
     const leaving = trips.flatMap((trip) => index.trip(trip.vehicleId, trip.tripNo)?.times?.leaveAt ?? []).sort((a, b) => a - b);

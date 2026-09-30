@@ -50,7 +50,7 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
   return (
     <li className="border-t py-2.5">
       <div className="flex items-start gap-2">
-        <button type="button" onClick={() => onOpen(key)} className="min-w-0 flex-1 rounded-sm text-left text-xs leading-[15px] font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+        <button type="button" onClick={() => onOpen(key)} className="mr-auto min-w-0 max-w-[160px] rounded-sm text-left text-xs leading-[17px] font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
           {title}
         </button>
         <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${title}` : `Show the stops of ${title}`} onClick={() => setOpen(!open)} className="-mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-sm font-bold text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
