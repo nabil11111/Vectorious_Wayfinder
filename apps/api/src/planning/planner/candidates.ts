@@ -3,7 +3,7 @@ import { checkPlan } from '../check';
 import { computeLoad } from '../load';
 import { lookup } from '../lookup';
 import { cargoProblems } from '../rules/cargo';
-import type { EngineOrder, PlanInput, PlanTrip } from '../types';
+import type { EngineOrder, PlanInput } from '../types';
 import { compare, effectiveWindow } from './priority';
 import type { RejectionStage } from './reasons';
 
@@ -34,13 +34,15 @@ export function candidateSlots(input: PlanInput, order: EngineOrder): CandidateS
   for (const vehicle of fleet) {
     const trips = input.plan.trips.filter((t) => t.vehicleId === vehicle.id);
     for (const trip of trips) {
+      const sameStop = trip.stops.find((s) => s.outletId === shop.id);
+      if (sameStop ? sameStop.orderIds.length >= 300 : trip.stops.length >= 40) continue;
       if (trip.stops.every((s) => shopOf(s.outletId).district === shop.district
         && (input.settings.mixBrands || shopOf(s.outletId).brand === shop.brand))) {
         slots.push({ vehicleId: vehicle.id, tripNo: trip.tripNo, existing: true });
       }
     }
     const next = Math.max(0, ...trips.map((t) => t.tripNo)) + 1;
-    if (next <= 2) slots.push({ vehicleId: vehicle.id, tripNo: next, existing: false });
+    if (next <= 2 && input.plan.trips.length < 76) slots.push({ vehicleId: vehicle.id, tripNo: next, existing: false });
   }
   const vehicleOf = lookup(fleet, 'vehicle');
   slots.sort((a, b) => {
