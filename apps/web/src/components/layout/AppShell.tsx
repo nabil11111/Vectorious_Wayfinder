@@ -26,7 +26,9 @@ const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatch
 
 // One shell for every role, matching the Figma top bars. On a phone the nav becomes bottom tabs (shop); on a
 // desktop it sits in the top bar (dispatcher, shop on a desktop). Loader and driver pass no nav at all.
-export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place?: string; children: ReactNode }) {
+// bar is a page's own control in the top bar, such as the dispatcher's depot switch (spec 010). wide lets a page use
+// the full width of a large screen, such as the plan board's three columns.
+export function AppShell({ nav = [], place, bar, wide = false, children }: { nav?: NavItem[]; place?: string; bar?: ReactNode; wide?: boolean; children: ReactNode }) {
   const { data: me } = useMe();
   const logout = useLogout();
   // The app's own time, never the device's, and the stream that keeps every open screen current (spec 008).
@@ -51,6 +53,7 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
           </nav>
         )}
         <div className="flex-1" />
+        {bar && <div className="hidden shrink-0 md:block">{bar}</div>}
         <span className="hidden font-mono text-lg font-bold tabular-nums md:inline">{clock.time}</span>
         <DemoClock clock={clock} as="panel" className="hidden md:inline-flex" />
         {/* The design's bell, last on a phone. A count never goes into the picture: it will sit over the corner as a
@@ -77,7 +80,7 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
         </Popover>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">{children}</main>
+      <main className={cn('mx-auto w-full flex-1 p-4 md:p-6', !wide && 'max-w-6xl')}>{children}</main>
 
       {nav.length > 0 && (
         <nav className="sticky bottom-0 grid border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden" style={{ gridTemplateColumns: `repeat(${nav.length}, 1fr)` }}>
