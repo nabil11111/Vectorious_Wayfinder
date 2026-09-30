@@ -1,7 +1,49 @@
 # Specs
 
 We build Wayfinder spec first. Every feature starts here, before any code. The flow follows the spec, plan,
-tasks shape used by GitHub Spec Kit and Amazon Kiro:
+tasks shape used by GitHub Spec Kit and Amazon Kiro.
+
+Start with [the map](000-map.md). It lists every piece of the build in order, what the pieces share, and what
+we cut first if time runs short.
+
+## How a piece gets built
+
+We do not write every spec up front. The map fixes what all pieces share, then each piece goes through the
+same loop, and the spec for the next piece is written while the current one is being built.
+
+A builder can be a teammate or a coding agent working from the spec. The rules are the same for both, and
+`docs/ai-disclosure.md` records which it was.
+
+1. **Spec.** Copy `_template.md`. Say what the piece does, which Figma screens it follows, what data goes in
+   and out, and the acceptance criteria. Anything not in the spec is out of scope. A decision made on the way
+   goes into [`docs/decisions.md`](../decisions.md).
+2. **Shared parts first.** Database tables, the migration and the request shapes in `packages/contracts` are
+   written by one person before anyone builds on them. Two people changing tables at the same time produce
+   migrations that clash.
+3. **Tests from the spec.** Each acceptance criterion becomes a test. For business rules (planning, validation,
+   load maths) the tests are written and committed before the code.
+4. **Build.** One branch per task. A task names the files it may touch, so the API and the screens of one
+   piece can be built at the same time without stepping on each other.
+5. **Check.** Typecheck, the full test suite and the build run again on the joined branch. Then someone clicks
+   through the screens at phone size, next to the Figma frames.
+6. **Review.** The reviewer is never the one who wrote it: a teammate, or a second AI tool that did not build
+   it. They check the code against each acceptance criterion, not against taste, and look for security and
+   data mistakes. A finding that is real gets a failing test first, then the fix.
+7. **Merge.** The pull request says what changed, how it was checked and how it works. CI must be green.
+   Nabil merges. `main` is always deployable.
+
+## Done means
+
+- Every acceptance criterion has a test or a written click-through check, and they pass.
+- CI is green: typecheck, fresh migrate and seed, schema matches migrations, tests, build.
+- Someone who did not write it has reviewed it.
+- Loader and driver screens work at phone size.
+- No sample data in components and no silent fallbacks. If a request fails, the screen says so.
+- The README walkthrough, the departures from the design and the AI disclosure are updated when the piece
+  touches them.
+- The person who opened the pull request can explain every line of it.
+
+## Spec files
 
 - **Small feature:** one file, `NNN-name.md`.
 - **Big feature** (planner, offline driver, loading): a folder `NNN-name/` with `spec.md` (what and why),
@@ -9,18 +51,12 @@ tasks shape used by GitHub Spec Kit and Amazon Kiro:
 
 Acceptance criteria are written as "When …, the system shall …", so each one maps to one test.
 
-1. **Spec.** Copy `_template.md` to `NNN-short-name.md`. Say what the feature does, which Figma screen it
-   follows, what data goes in and out, and the acceptance criteria. Anything not in the spec is out of scope.
-2. **Tests from the spec.** Each acceptance criterion becomes a test. For business rules (planning, validation,
-   load maths) the tests are written and committed before the code.
-3. **Build and review.** One branch per spec. The pull request links the spec, CI must be green, and the
-   reviewer checks the result against the acceptance criteria, not against taste.
-
 The Figma file is the spec for how screens look. These files are the spec for how the system behaves. New
 ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 
 | Spec | Feature | Status |
 | --- | --- | --- |
+| [000](000-map.md) | The map: every piece, in build order | Draft |
 | [001](001-load-calculator.md) | Load calculator | Ready |
 | [002](002-plan-rules.md) | Plan rules as tests | Ready |
 | [003](003-outlet-names.md) | Outlet names | Ready |
