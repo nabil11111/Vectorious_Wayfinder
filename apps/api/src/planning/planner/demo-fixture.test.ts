@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest';
+import { checkPlan } from '../check';
+import { computeLoad } from '../load';
+import { buildSuggestedPlan } from './build';
+import { prepareInput } from './priority';
+import { demoFixture } from './testing/demo';
+
+describe('the exact seeded planner day without a database', () => {
+  it('AC-21 reconstructs the placed and waiting orders, real seed IDs, workshop and fuel history', async () => {
+    const { input, fuelHistory } = await demoFixture();
+    expect(input.date).toBe('2026-06-25');
+    expect(input.depotId).toBe('Peliyagoda');
+    expect(input.orders).toHaveLength(102);
+    expect(input.orders.filter((o) => o.deliveryDate === input.date)).toHaveLength(98);
+    expect(input.orders.find((o) => o.outletId === 'OUT002' && o.lines[0]?.productId === 'fresh-chilled-carton')?.id)
+      .toBe('99ad1370-c157-54a8-a55e-ad41ae176e68');
+    expect(input.orders.some((o) => o.outletId === 'OUT001' && o.deliveryDate === input.date)).toBe(false);
+    expect(computeLoad(input.orders.flatMap((o) => o.lines), input.products)).toMatchObject({ units: 4942, kg: 39531, m3: 284.64 });
+    const cold = input.orders.flatMap((o) => o.lines).filter((l) => l.productId === 'fresh-chilled-carton');
+    expect(cold.reduce((sum, line) => sum + line.quantity, 0)).toBe(1825);
+    expect(computeLoad(cold, input.products).m3).toBe(67.525);
+    const working = input.vehicles.filter((v) => v.available && v.depotId === input.depotId);
+    expect(working).toHaveLength(35);
+    expect(input.vehicles.filter((v) => !v.available).map((v) => v.id)).toEqual(['VEH003', 'VEH005', 'VEH036']);
+    expect(working.filter((v) => v.temp === 'reefer' && v.type === 'truck')).toHaveLength(5);
+    expect(working.filter((v) => v.temp === 'reefer' && v.type === 'van')).toHaveLength(1);
+    expect(working.filter((v) => v.temp === 'reefer').reduce((sum, v) => sum + v.volumeCapM3, 0)).toBeCloseTo(140.7, 8);
+    expect(fuelHistory).toHaveLength(111);
+    expect(fuelHistory.reduce((sum, row) => sum + row.litres, 0)).toBe(6945);
+    const depotFleet = input.vehicles.filter((v) => v.depotId === input.depotId);
+    expect(depotFleet.reduce((sum, v) => sum + v.weeklyFuelQuotaL, 0)).toBe(18600);
+    expect(depotFleet.reduce((sum, v) => sum + v.litresUsedThisWeek, 0)).toBe(6945);
+    expect(input.vehicles.find((v) => v.id === 'VEH001')?.litresUsedThisWeek).toBe(300);
+    expect(prepareInput(input).orders.slice(0, 4).map((o) => [o.outletId, o.deliveryDate, o.timesDeferred])).toEqual([
+      ['OUT060', '2026-06-23', 2], ['OUT001', '2026-06-24', 1], ['OUT054', '2026-06-24', 1], ['OUT030', '2026-06-24', 1],
+    ]);
+  });
+
+  it('AC-21 returns a valid plan with every seeded unit accounted for exactly once', async () => {
+    const { input } = await demoFixture();
+    const result = buildSuggestedPlan(input);
+    expect(result.status).not.toBe('unavailable');
+    if (result.status === 'unavailable') throw new Error('Expected a checked seeded-day suggestion');
+    expect(result.check.ok).toBe(true);
+    expect(result.check).toEqual(checkPlan(result.input));
+    expect(computeLoad(result.input.orders.flatMap((o) => o.lines), input.products))
+      .toEqual(computeLoad(input.orders.flatMap((o) => o.lines), input.products));
+    const assigned = result.input.plan.trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds));
+    const deferred = result.input.plan.deferrals.map((d) => d.orderId);
+    expect([...assigned, ...deferred].sort()).toEqual(result.input.orders.map((o) => o.id).sort());
+    expect(new Set([...assigned, ...deferred]).size).toBe(result.input.orders.length);
+    expect(result.choices).toHaveLength(102);
+  });
+});
