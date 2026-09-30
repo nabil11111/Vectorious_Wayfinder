@@ -11,8 +11,8 @@ const tenths = (n: number) => Math.round(n * 10);
 export const tripKm: TripKm = (travel, stops) => (tenths(travel.outKm) * 2 + tenths(travel.betweenKm) * (stops - 1)) / 10;
 
 // To 1 decimal for what is shown. The division is done on whole numbers (the vehicles table keeps km per litre
-// to 2 decimals), so exactly half a tenth always goes up. The quota rule never reads litres, it compares
-// kilometres (AC-34).
+// to 2 decimals), so exactly half a tenth always goes up. Whether a plan passes a quota is decided on kilometres,
+// never on these (AC-34).
 export const tripLitres: TripLitres = (km, kmPerL) => Math.round((tenths(km) * 100) / Math.round(kmPerL * 100)) / 10;
 
 export const vehicleFuel: VehicleFuelOf = (input, times) => {
@@ -26,10 +26,12 @@ export const vehicleFuel: VehicleFuelOf = (input, times) => {
     // The plan's litres are the trips' shown litres added up, so the lines on a screen add up to the total.
     planTenths += tenths(trip.litres);
   }
-  const leftTenths = tenths(vehicle.weeklyFuelQuotaL) - tenths(vehicle.litresUsedThisWeek) - planTenths;
+  // The litres used are held in tenths like the rest, so the three figures always add up to the quota.
+  const usedTenths = tenths(vehicle.litresUsedThisWeek);
+  const leftTenths = tenths(vehicle.weeklyFuelQuotaL) - usedTenths - planTenths;
   return {
     vehicleId: vehicle.id,
-    litresBefore: vehicle.litresUsedThisWeek,
+    litresBefore: usedTenths / 10,
     litresPlan: planTenths / 10,
     litresLeft: leftTenths / 10,
     quotaL: vehicle.weeklyFuelQuotaL,
