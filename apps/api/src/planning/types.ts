@@ -56,7 +56,9 @@ export interface PlanInput {
 // What the pieces hand each other inside the checker.
 export interface TripLoad { vehicleId: string; tripNo: number; load: Load }
 export interface VehicleTimes { vehicleId: string; trips: { tripNo: number; times: TripTimes | null }[] }
-export type VehicleFuel = Pick<VehicleDay, 'vehicleId' | 'litresBefore' | 'litresPlan' | 'litresLeft' | 'quotaL'>;
+// kmPlan is the plan's kilometres for the vehicle. The quota rule compares on it, so rounding the litres for
+// display can never hide a plan that is over (spec 007, AC-34).
+export type VehicleFuel = Pick<VehicleDay, 'vehicleId' | 'litresBefore' | 'litresPlan' | 'litresLeft' | 'quotaL'> & { kmPlan: number };
 
 // The functions each file exports. They are fixed here so the files can be written apart and still fit.
 //   load.ts            computeLoad

@@ -7,7 +7,7 @@ import { z } from 'zod';
 export const BLOCK_CODES = [
   'over_weight', 'over_volume', 'needs_reefer', 'van_only', 'wrong_depot',
   'order_not_planned', 'order_twice', 'deferral_incomplete', 'order_wrong_outlet', 'empty_trip', 'stop_repeated',
-  'cross_district', 'too_many_trips', 'trips_overlap', 'window_missed', 'mall_slot_missed',
+  'cross_district', 'no_travel_data', 'too_many_trips', 'trips_overlap', 'window_missed', 'mall_slot_missed',
   'fuel_over_quota', 'not_operating_day', 'vehicle_off',
 ] as const;
 export const WARN_CODES = ['no_tail_lift', 'mixed_brands', 'over_time_budget', 'leaves_early', 'long_wait'] as const;
@@ -85,7 +85,8 @@ export const TripCheck = z.object({
   vehicleId: z.string(),
   tripNo: z.number().int(),
   load: Load,
-  // null when the trip cannot be timed: no stops, stops in two districts, or no travel figures.
+  // null when the trip cannot be timed: no stops, stops in two districts, or no travel figures. Such a trip
+  // always carries a block, so its plan is never ok.
   times: TripTimes.nullable(),
 });
 export type TripCheck = z.infer<typeof TripCheck>;
