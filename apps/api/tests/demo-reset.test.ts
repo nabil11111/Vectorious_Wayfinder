@@ -6,7 +6,7 @@ import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { clearDemoDay, demoId, seedDemoDay } from '../src/db/demo-day';
 import {
-  auditLog, deferrals, demoDay, fuelLog, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, vehicleDaysOff, vehicles,
+  auditLog, deferrals, demoDay, fuelLog, issueLines, issues, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, vehicleDaysOff, vehicles,
 } from '../src/db/schema';
 import { clockState, depotDate, depotInstant, depotMinutes, initClock, realNow } from '../src/lib/clock';
 import * as live from '../src/lib/live';
@@ -117,7 +117,7 @@ const everyTable = async () => rowsIn((await tables()).filter((table) => !KEPT.s
 const raised = (held: Record<string, Row[]>, revision: number, day: number) => ({ ...held, demo_day: [{ ...held.demo_day?.[0], revision, day }] });
 
 // The tables a day of work changes, which are the ones AC-39 names.
-const WORKED = ['orders', 'order_lines', 'plans', 'deferrals', 'trips', 'stops', 'stop_orders', 'fuel_log', 'vehicle_days_off', 'vehicles', 'outlets', 'products'];
+const WORKED = ['orders', 'order_lines', 'plans', 'deferrals', 'trips', 'stops', 'stop_orders', 'issues', 'issue_lines', 'fuel_log', 'vehicle_days_off', 'vehicles', 'outlets', 'products'];
 
 // A day of work, written straight into the tables because the pieces that do it are not built yet. A later
 // piece that adds a table adds a row of it here and its name above, so a reset is held to that table too.
@@ -139,6 +139,11 @@ async function workTheDay() {
   const [stop] = await db.insert(stops).values({ tripId: trip!.id, seq: 1, outletId: 'OUT004' }).returning();
   await db.insert(stopOrders).values({ stopId: stop!.id, orderId: demoId('order', `${THU}:OUT004:dry`) });
   await db.insert(deferrals).values({ planId: plan!.id, orderId: demoId('order', `${THU}:OUT003:chilled`), code: 'over_capacity', reason: 'The fridge van was full.' });
+
+  // Kasun finds that stop's dry cartons short and flags them: a problem and the line it counts (spec 012).
+  const [line] = await db.select({ id: orderLines.id }).from(orderLines).where(eq(orderLines.orderId, demoId('order', `${THU}:OUT004:dry`)));
+  const [flag] = await db.insert(issues).values({ kind: 'loading', reason: 'short', stopId: stop!.id, raisedBy: people.loader.id, raisedAt: depotInstant(THU, 2 * 60 + 33) }).returning();
+  await db.insert(issueLines).values({ issueId: flag!.id, orderLineId: line!.id, counted: 1 });
 
   // The trip's litres are logged, a truck goes into the workshop and the fridge van comes out of it early.
   await db.insert(fuelLog).values({ vehicleId: 'VEH010', date: THU, litres: '12.5', tripId: trip!.id });
