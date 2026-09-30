@@ -5,5 +5,7 @@ try { process.loadEnvFile('../../.env'); } catch { /* CI sets the variables itse
 process.env.NODE_ENV = 'test';
 
 export default defineConfig({
-  test: { include: ['tests/**/*.test.ts', 'src/**/*.test.ts'], fileParallelism: false },
+  // The tests hit a real database, and on a busy laptop a request can take seconds. A generous limit keeps a
+  // slow machine from reading as a failing test.
+  test: { include: ['tests/**/*.test.ts', 'src/**/*.test.ts'], fileParallelism: false, testTimeout: 30_000, hookTimeout: 30_000 },
 });
