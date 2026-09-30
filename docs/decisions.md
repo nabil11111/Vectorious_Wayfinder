@@ -148,10 +148,11 @@ save-first queue, and the waiting receipt belongs with the shop confirming what 
 ends it.** The depot has one morning for both, and a late trip must not vanish from its driver at 16:00.
 
 **D-45 · 1 Oct · Every driver action is saved on the phone first, as the request it will send, and sent oldest first, one
-at a time, by one tab. The server keeps each applied write's id with its trip, its kind and a hash of its body, and lists
-the ids in the driver's day, and a write leaves the phone once the day lists it. Each write names the revision of the
-stop or trip it changes, which the phone works out as it saves.** A delivery happened whether there was a signal or not,
-so it must never need doing again or count twice, and an id cannot be reused for something else.
+at a time, by the one tab that holds the driver's app. The server keeps each applied write's id with its account, trip,
+kind and a hash of its body, the driver's day lists the ids the account had applied in the last 48 hours, and a write
+leaves the phone once the day lists it. Each write names the revision of the stop or trip it changes, which the phone
+works out as it saves.** A delivery happened whether there was a signal or not, so it must never need doing again or
+count twice, an id cannot be reused for something else, and a trip that has left the day must not strand its last write.
 
 **D-46 · 1 Oct · A time recorded on the phone is kept when it lies between the trip's last event time and the server's
 clock, read once the trip is locked, and otherwise the nearer of the two is kept. Reopening a stop never moves the last
@@ -164,10 +165,10 @@ proof so disputes do not rest on memory, and one write means a delivery never ex
 
 **D-48 · 1 Oct · The driver raises two problems, a shop that refused some and a shop that is closed. The dispatcher
 answers a refusal with "Bring them back", and a closed shop with "Try again on this trip", which sends the stop after the
-other stops, or "Bring them back", which puts the stop's orders back as placed with their counts cleared while the stop
-stays closed.** The cartons are on the truck either way, a retried stop must not jump the queue, and the old stop keeps
-what happened there while its orders start again for the next plan. Writing cartons off, and sending replacements, are
-the depot's records to add later.
+other stops in the order stops were sent back, or "Bring them back", which puts the stop's orders back as placed with
+their counts cleared while the stop stays closed and keeps that attempt's counts.** The cartons are on the truck either
+way, a retried stop must not jump the queue, and the old stop keeps what happened there while its orders start again
+for the next plan. Writing cartons off, and sending replacements, are the depot's records to add later.
 
 **D-49 · 1 Oct · The phone keeps the app's files, the signed-in account, the clock's last state, the driver's trip and the
 waiting writes, and reads them at once on start, so the driver's screens open with no signal. A service worker keeps the
