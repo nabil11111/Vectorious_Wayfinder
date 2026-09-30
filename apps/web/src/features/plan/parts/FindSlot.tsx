@@ -48,7 +48,8 @@ export function FindSlot({ screen, index, orderId, change, onPut, onStartTrip, o
     );
   }
 
-  const current = slots.data && slots.data.revision === board.plan.revision ? slots.data : null;
+  // Offers stand only for the saved draft they were worked out on: a change on its way hides them until it is saved.
+  const current = saved && slots.data && slots.data.revision === board.plan.revision ? slots.data : null;
   const put = (key: TripKey) => {
     change(addOrders(draft, key, [order]));
     onPut(key);

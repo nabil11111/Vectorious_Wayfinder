@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
 import type { BoardCounts, Brand, DraftTrip, PlanBoard } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StaleNotice } from '@/features/store/parts/LoadError';
 import { reasonOf } from '@/features/store/words';
 import { ApiRequestError } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -33,10 +34,12 @@ export function ViewPlanPage() {
   }
   // A board kept from an earlier visit may be from before a reset, so only one read or answered since this page
   // opened is passed on to the board's queue.
-  return <ViewPlan date={date} board={query.data} fresh={query.isFetchedAfterMount && !query.isError} />;
+  // A refresh that fails keeps the plan on screen, and says it may be out of date.
+  const stale = query.isError ? <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : null;
+  return <ViewPlan date={date} board={query.data} fresh={query.isFetchedAfterMount && !query.isError} stale={stale} />;
 }
 
-function ViewPlan({ date, board, fresh }: { date: string; board: PlanBoard; fresh: boolean }) {
+function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoard; fresh: boolean; stale: ReactNode }) {
   const qc = useQueryClient();
   const saver = usePlanSaver();
   const navigate = useNavigate();
@@ -63,6 +66,8 @@ function ViewPlan({ date, board, fresh }: { date: string; board: PlanBoard; fres
       problem = await saver.act((day, ref) => call(day, ref));
     } else {
       try {
+        // A read of this day already on its way would land after the answer and bring back the plan before it.
+        await qc.cancelQueries({ queryKey: dayKey(date) });
         const answer = await call(date, refOf(board));
         qc.setQueryData(dayKey(date), answer);
       } catch (error) {
@@ -104,6 +109,7 @@ function ViewPlan({ date, board, fresh }: { date: string; board: PlanBoard; fres
           {send}
         </div>
       </header>
+      {stale && <div className="mt-3">{stale}</div>}
       {refused && <p role="alert" className="mt-3 rounded-[10px] bg-bad-tint px-3 py-2 text-xs leading-[15px] font-semibold text-bad">{refused}</p>}
       {board.counts && <Counts counts={board.counts} />}
       <div className="mt-3.5 grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
