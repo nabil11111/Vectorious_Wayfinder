@@ -174,6 +174,6 @@ export function markReady(caller: DepotCaller, tripId: string, body: MarkReadyRe
       after: { status: 'ready', revision: trip.revision + 1, readyAt: moment.at.toISOString(), lines: lines.map((l) => ({ lineId: l.lineId, loadedQty: l.going })) } });
     // Each shop on the truck hears of its orders with its depot, as a shop's place does.
     const shops = [...new Set(truck.stops.map((s) => s.outletId))];
-    return [{ topic: 'loading', depotId: caller.depotId }, ...shops.map((outletId) => ({ topic: 'orders', outletId, depotId: caller.depotId }))];
+    return [{ topic: 'loading', depotId: caller.depotId }, { topic: 'driver', depotId: caller.depotId }, ...shops.map((outletId) => ({ topic: 'orders', outletId, depotId: caller.depotId }))];
   });
 }

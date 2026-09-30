@@ -230,9 +230,10 @@ it('AC-23 marks VEH035 ready after "Go short": ready at the clock, the counts th
   const audits = await auditsOf(truck.tripId, 'trip.ready');
   expect(audits).toHaveLength(1);
   expect(audits[0]).toMatchObject({ actorId: kasunId, after: { status: 'ready', lines: lines.map((l) => ({ lineId: l.lineId, loadedQty: l.going })) } });
-  expect(told()).toHaveLength(3);
+  expect(told()).toHaveLength(4);
   expect(told()).toEqual(expect.arrayContaining([
-    { topic: 'loading', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT001', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT002', depotId: 'Peliyagoda' },
+    { topic: 'loading', depotId: 'Peliyagoda' }, { topic: 'driver', depotId: 'Peliyagoda' },
+    { topic: 'orders', outletId: 'OUT001', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT002', depotId: 'Peliyagoda' },
   ]));
 
   const list = StoreOrderList.parse((await nadeesha.get('/api/v1/store/orders?list=open')).body);
