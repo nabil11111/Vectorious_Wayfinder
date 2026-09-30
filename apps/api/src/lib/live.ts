@@ -55,6 +55,9 @@ function hears(user: Me, change: Announcement): boolean {
 // role, depot and outlet. Takes it off when the connection closes. Throws 503 too_many_streams when the list
 // is full.
 export function openStream(user: Me, res: Response): void {
+  // The session is looked up before this runs, and a screen can be gone by then. Nothing will say so a second
+  // time, so on the list it would stay for good.
+  if (res.destroyed) return;
   if (streams.size >= config.LIVE_MAX_STREAMS) throw new HttpError(503, 'too_many_streams', 'Too many live streams are open right now.');
   // The headers go out at once, so the screen knows the stream is open before there is anything to say.
   // no-transform and X-Accel-Buffering keep a proxy from compressing the stream or holding it back.

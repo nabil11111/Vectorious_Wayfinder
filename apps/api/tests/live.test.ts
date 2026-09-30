@@ -201,7 +201,7 @@ describe('the live stream', () => {
   it('keeps no place for a stream whose screen was gone before it opened', async () => {
     // The session is looked up before the stream opens, and a screen can leave in that moment. Here the
     // connection is closed as soon as the request is in.
-    server.once('request', (_req, res) => res.destroy());
+    server.once('request', (req) => req.socket.destroy());
     await expect(events(cookies.ruwan)).rejects.toThrow();
     // Had it been put on the list it would stay there for good, and the fifth stream would be refused.
     for (const person of ['nadeesha', 'ruwan', 'kasun', 'prasanna', 'admin'] as const) await listen(person);
