@@ -160,3 +160,25 @@ it('checks all 25 trips in under a second', async () => {
   expect(result.slots.length + result.refused.length).toBe(25);
   expect(elapsed).toBeLessThan(1000);
 });
+
+it('every offered slot can be saved when its shop already has ten small orders on the stop', async () => {
+  const orderId = carried('OUT030').id;
+  const smallOrders = await db.insert(orders).values(Array.from({ length: 10 }, () => ({
+    outletId: 'OUT030', deliveryDate: DATE, temp: 'dry' as const, status: 'placed' as const,
+  }))).returning();
+  await db.insert(orderLines).values(smallOrders.map((o) => ({ orderId: o.id, productId: 'fresh-dry-carton', quantity: 1 })));
+  const saved = await save({ ...empty(), trips: [{ ...trip([]), stops: [{ outletId: 'OUT030', orderIds: smallOrders.map((o) => o.id) }] }] });
+  const response = await search(orderId);
+  expect(response.status).toBe(200);
+  const result = SlotSearch.parse(response.body);
+  // Every advertised position must be usable by the ordinary save path that "Put it here" calls.
+  for (const slot of result.slots) {
+    const changed = structuredClone(saved.plan);
+    const target = changed.trips.find((t) => t.vehicleId === slot.vehicleId && t.tripNo === slot.tripNo)!;
+    if (slot.newStop) target.stops.push({ outletId: 'OUT030', orderIds: [orderId] });
+    else target.stops[slot.stopSeq - 1]!.orderIds.push(orderId);
+    const applied = await as.put(`${URL}/draft`).send({ planId: saved.plan.id, revision: saved.plan.revision, plan: changed });
+    expect(applied.status, JSON.stringify(applied.body)).toBe(200);
+  }
+  expect(result.slots.length + result.refused.length).toBe(1);
+});
