@@ -14,7 +14,7 @@ import { serve, stop } from './serve';
 const testClock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async (original) => {
   const clock = await original<typeof import('../src/lib/clock')>();
-  return { ...clock, demoClockAt: (...args: Parameters<typeof clock.demoClockAt>) => ({ ...clock.demoClockAt(...args), now: testClock.at }) };
+  return { ...clock, demoClockAt: (...args: Parameters<typeof clock.demoClockAt>) => ({ ...clock.demoClockAt(...args), now: testClock.at || clock.demoClockAt(...args).now }) };
 });
 vi.mock('../src/lib/live', async (original) => ({ ...await original<typeof import('../src/lib/live')>(), announce: vi.fn() }));
 const freeze = (date = '2026-06-24', minute = 960) => { const at = depotInstant(date, minute); testClock.at = at.toISOString(); setClockForTests(at); };
@@ -24,6 +24,7 @@ const DATE = '2026-06-25';
 const URL = `/api/v1/plans/${DATE}/draft`;
 const empty = (): DraftPlan => ({ mixBrands: false, trips: [], deferrals: [] });
 const reset = () => db.transaction(async (tx) => { await clearDemoDay(tx); await seedDemoDay(tx); });
+let originalClock: typeof demoDay.$inferSelect;
 let board: PlanBoard;
 let dilshan: string;
 let prasanna: string;
@@ -33,6 +34,7 @@ const save = (plan: DraftPlan, reference = ref()) => as.put(URL).send({ ...refer
 const code = (res: request.Response) => [res.status, res.body.error?.code];
 
 beforeAll(async () => {
+  originalClock = (await db.select().from(demoDay))[0]!;
   expect((await as.post('/api/v1/auth/login').send({ username: 'ruwan', password: process.env.SEED_PASSWORD ?? 'wayfinder-demo' })).status).toBe(200);
   dilshan = (await db.select().from(users).where(eq(users.username, 'dilshan')))[0]!.id;
   prasanna = (await db.select().from(users).where(eq(users.username, 'prasanna')))[0]!.id;
@@ -42,7 +44,7 @@ beforeEach(async () => {
   board = PlanBoard.parse((await as.get('/api/v1/plans')).body);
   vi.mocked(announce).mockClear();
 });
-afterAll(async () => { await reset(); setClockForTests(null); await stop(server); await pool.end(); });
+afterAll(async () => { await reset(); await db.update(demoDay).set(originalClock); setClockForTests(null); await stop(server); await pool.end(); });
 
 it('AC-2 and AC-3 refuse open orders, a moved day and the calendar end without writing', async () => {
   freeze('2026-06-24', 959);
@@ -181,4 +183,15 @@ it('AC-18 applies and clears a custom departure and normalizes a lone second tri
   expect(b.check!.problems.filter((p) => p.vehicleId === 'VEH002').map((p) => p.code)).toEqual(expect.arrayContaining(['leaves_early', 'over_time_budget']));
   const regular = PlanBoard.parse((await save({ ...empty(), trips: [{ ...t, tripNo: 1 }] }, ref(b))).body);
   expect(regular.check!.trips[0]!.times!.stops.at(-1)!.arriveAt).toBe(473);
+});
+
+it('refuses pre-reset references as stale even though resetting opens orders again', async () => {
+  const initial = ref();
+  const saved = PlanBoard.parse((await save(empty())).body);
+  testClock.at = '';
+  setClockForTests(null);
+  expect((await as.post('/api/v1/demo/reset').send({})).status).toBe(200);
+  expect(PlanBoard.parse((await as.get('/api/v1/plans')).body).day!.open).toBe(false);
+  expect(code(await save(empty(), initial))).toEqual([409, 'stale']);
+  expect(code(await save(empty(), ref(saved)))).toEqual([409, 'stale']);
 });

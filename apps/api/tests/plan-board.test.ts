@@ -21,8 +21,10 @@ const freeze = (at: Date | null) => { testClock.at = at?.toISOString() ?? null; 
 
 const server = await serve(createApp());
 const actors = new Map<string, ReturnType<typeof request.agent>>();
+let originalClock: typeof demoDay.$inferSelect;
 const reset = () => db.transaction(async (tx) => { await clearDemoDay(tx); await seedDemoDay(tx); });
 beforeAll(async () => {
+  originalClock = (await db.select().from(demoDay))[0]!;
   await reset();
   await initClock();
   freeze(depotInstant('2026-06-24', 960));
@@ -33,7 +35,7 @@ beforeAll(async () => {
     actors.set(username, agent);
   }
 });
-afterAll(async () => { await reset(); freeze(null); await stop(server); await pool.end(); });
+afterAll(async () => { await reset(); await db.update(demoDay).set(originalClock); freeze(null); await stop(server); await pool.end(); });
 
 it('AC-5 protects every endpoint before reading its input', async () => {
   const paths = [['get', ''], ['get', '/2026-06-25'], ['put', '/2026-06-25/draft'],
