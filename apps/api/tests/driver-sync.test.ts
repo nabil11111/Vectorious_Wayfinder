@@ -157,6 +157,19 @@ it('AC-23 binds an id to its time, stop, kind and trip, without applying the cha
     { ...write, kind: 'closed' },
     { ...write, tripId: second.id, stopId: foreignStop.id },
   ]) await rejected(changed, 'write_reused', dilshan, { writeId: write.writeId });
+  // Ownership comes before id reuse, even when the id is already bound to an accepted arrival.
+  for (const [changed, id] of [
+    [{ ...write, stopId: foreignStop.id }, foreignStop.id],
+    [{ ...write, kind: 'refuse', reason: 'damaged', note: '', lines: [{ lineId: driverStop(own, 2).lines[0]!.lineId, refused: 1 }] }, driverStop(own, 2).lines[0]!.lineId],
+  ] as const) {
+    const before = await heldDriverRows();
+    vi.mocked(announce).mockClear();
+    const res = await driver.send(changed);
+    expect(code(res)).toEqual([400, 'unknown_record']);
+    expect(res.body.error.details).toEqual({ id });
+    expect(await heldDriverRows()).toEqual(before);
+    expect(announce).not.toHaveBeenCalled();
+  }
   expect(driverStop(driverTrip(current), 1).revision).toBe(1);
 });
 
