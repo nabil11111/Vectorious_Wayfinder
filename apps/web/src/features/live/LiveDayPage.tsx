@@ -33,7 +33,7 @@ export function LiveDayPage() {
       <div className="mt-4 grid grid-cols-1 gap-5 lg:mt-[11px] lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
         <section aria-label="Trucks" className="order-2 rounded-[14px] bg-card p-5 shadow-[0_2px_6px_color-mix(in_srgb,var(--foreground)_8%,transparent)] lg:order-1">
           <p className="text-[13px] leading-[18px] text-muted-foreground">
-            Trucks: each truck’s stops on a timeline, and the day’s drops and events. Figma: Dispatcher · Live day.
+            Trucks: each truck’s stops on a timeline, and the day’s drops and events.
           </p>
         </section>
         <NeedsYou query={query} answering={answering} className="order-1 lg:order-2" />

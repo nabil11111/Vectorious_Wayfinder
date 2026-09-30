@@ -1,6 +1,6 @@
 # 012 · Loading
 
-**Status:** Spec, reviewed, with three open questions at the bottom  ·  **Owner:**  ·  **Design:** Loader · Today's trucks (tablet and phone), · next truck and · loading; Loader · Load a truck (tablet and phone) and · all on; Loader · Flag a problem (tablet and phone); Loader · Truck ready; and the right-hand column of Dispatcher · Live day · issue open, · issue open · decision sent and · Live day · loading.
+**Status:** Done, with two open questions at the bottom  ·  **Owner:**  ·  **Design:** Loader · Today's trucks (tablet and phone), · next truck and · loading; Loader · Load a truck (tablet and phone) and · all on; Loader · Flag a problem (tablet and phone); Loader · Truck ready; and the right-hand column of Dispatcher · Live day · issue open, · issue open · decision sent and · Live day · loading.
 
 Piece A3 of [the map](../000-map.md). It starts where spec 010 ends, with a sent plan whose trips are `planned`. The
 clock, live updates and the seeded day are spec 008's, and every load comes from spec 007's calculator.
