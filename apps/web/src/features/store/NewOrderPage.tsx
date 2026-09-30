@@ -197,7 +197,7 @@ function Checkout({ next, saving, placing, refused, onPlace }: { next: StoreNext
       <p className="text-xs leading-[15px] text-muted-foreground" aria-live="polite">{totals && `${totals.join(' · ')} · `}{saved}</p>
       {refused && <p role="alert" className="mt-2 text-xs leading-[15px] font-semibold text-bad">{refused}</p>}
       <Button
-        className={cn(ORANGE, 'mt-2.5 h-14 w-full text-[17px] lg:mt-3')}
+        className={cn(ORANGE, 'mt-2.5 h-14 w-full text-[17px] lg:mt-3', placing && 'disabled:bg-primary disabled:text-primary-foreground')}
         disabled={!draft || saving !== 'saved' || placing}
         focusableWhenDisabled={placing}
         onClick={onPlace}

@@ -92,6 +92,10 @@ export const itemFigures = (product: StoreProduct) => `${product.unit} · ${kilo
 
 export const ENTRANCE: Record<DockType, string> = { street: 'Street', rear_dock: 'Rear dock', mall_bay: 'Mall loading bay' };
 
+// "Fresh · Nugegoda", the way Help writes the shop. A shop's name is its brand and then its place (spec 003).
+export const brandAndPlace = (outlet: StoreOutlet) =>
+  outlet.name.startsWith(`${outlet.brand} `) ? `${outlet.brand} · ${outlet.name.slice(outlet.brand.length + 1)}` : outlet.name;
+
 // "05:00 to 07:30" on the form, "05:00–07:30" in a card's line.
 export const windowWords = (outlet: StoreOutlet) => `${outlet.windowOpen} to ${outlet.windowClose}`;
 export const windowShort = (outlet: StoreOutlet) => `${outlet.windowOpen}–${outlet.windowClose}`;

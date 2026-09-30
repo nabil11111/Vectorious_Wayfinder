@@ -2,7 +2,9 @@ import { Link } from 'react-router';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNextOrder } from './next-order';
 import { orangeLink } from './parts/actions';
+import { PageHeader } from './parts/PageHeader';
 import { Panel } from './parts/Panel';
+import { brandAndPlace } from './words';
 
 // Help (Shop · Help): who to contact, and where a missing or damaged delivery is reported. The words are the
 // frame's. Only the shop's name comes from the API, and the help stays readable when that cannot load.
@@ -11,12 +13,11 @@ export function HelpPage() {
 
   return (
     <div className="max-w-xl lg:pt-2.5">
-      <h1 className="font-sans text-[22px] leading-[27px] font-bold">Help</h1>
-      <div className="mt-[7px] text-[13px] leading-4 text-muted-foreground">
-        {next.data ? <p>{next.data.outlet.name}</p>
+      <PageHeader title="Help" className="mt-[7px] text-[13px] leading-4">
+        {next.data ? <p>{brandAndPlace(next.data.outlet)}</p>
           : next.isError ? <p role="alert">Could not load your shop’s name.</p>
           : <Skeleton className="h-4 w-28" />}
-      </div>
+      </PageHeader>
 
       <Panel line className="mt-[26px] pb-[22px]">
         <h2 className="font-sans text-[17px] leading-6 font-semibold">Contact your depot</h2>
