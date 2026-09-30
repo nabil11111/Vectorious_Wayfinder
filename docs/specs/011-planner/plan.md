@@ -23,8 +23,9 @@ checks the current day, snapshot and leaving times. A checker warning is not pro
 
 ## How it works
 All production files are in `apps/api/src/planning/planner/`. Reuse sibling modules directly, without importing
-the board or seed. `Problem.leaveAt` from **010 AC-17 must land first**: its contract exists on this base branch,
-but the time rule still emits only text fixes. Do not implement a second earlier-departure search here.
+the board or seed. `Problem.leaveAt` from 010 AC-17 has landed with the plan board's API: the time rule in
+`planning/rules/time.ts` now gives each departure fix as a number. Use it, and do not write a second
+earlier-departure search here.
 
 | File | What it holds |
 | --- | --- |
@@ -69,7 +70,8 @@ order's shop, wanted day and goods. Output orders use priority order, with each 
 5. If any write fails or its reply is lost, stop and refetch. Some splits may already be stored; do not blindly
    replay them or claim the sequence was atomic. The saved board is recoverable through ordinary edit/join.
 
-Only each existing write is atomic. This protocol specifies reuse, not new endpoints or an implemented apply
+The lead may instead give the board one write that runs these steps in a single transaction on the server,
+which makes the whole apply atomic; the engine's output is the same either way. Only each existing write is atomic. This protocol specifies reuse, not new endpoints or an implemented apply
 button. It creates no automatic send. Spec 010's Find a slot remains an append-or-merge search on existing trips;
 the planner's sorted stops and new trips are a separate search, sharing the checker rather than that route.
 

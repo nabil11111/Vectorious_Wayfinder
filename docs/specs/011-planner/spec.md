@@ -1,9 +1,9 @@
 # 011 · Planner: the suggested plan
 
-**Status:** Draft for lead review  ·  **Owner:**  ·  **Design:** no screens in this piece. Its result feeds Dispatcher · Edit plan and View plan.
+**Status:** Spec, reviewed by the lead  ·  **Owner:**  ·  **Design:** no screens in this piece. Its result feeds Dispatcher · Edit plan and View plan.
 
 Piece B4 of [the map](../000-map.md), after the checker (007). This specifies the pure engine and its hand-off
-to the board (010). The two proposed policy choices at the bottom await Nabil's answer.
+to the board (010). The two policy choices at the bottom are the lead's picks (D-41, D-42) until Nabil answers.
 
 ## Why
 Planning and allocation earns 20% of the marks. A judge must be able to ask why one order went before another
@@ -151,8 +151,8 @@ draft in place, global route optimisation, brand-mixing comparisons and a new de
 board integration. The apply protocol in `plan.md` is its contract, not a claim that it exists in 010 today.
 
 ## Open questions for Nabil
-1. **Chilled before an earlier-closing new dry order?** Proposed: yes, after waiting age, as priority step 2 says.
+1. **Chilled before an earlier-closing new dry order?** Proposed and picked (D-41): yes, after waiting age, as priority step 2 says.
    Fridge trips are the seeded shortage; the window remains a hard check, and any missed-window deferral is shown.
-2. **Does a shop's new order inherit its old order's priority?** Proposed: no. Protect all outstanding waiting
+2. **Does a shop's new order inherit its old order's priority?** Proposed and picked (D-42): no. Protect all outstanding waiting
    goods first and flag any remainder for a decision; new goods keep their own rank. This uses the history the
    board actually supplies and does not let a new bulk order push another waiting shop back.
