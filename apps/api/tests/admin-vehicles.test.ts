@@ -1,10 +1,11 @@
 import request from 'supertest';
 import { and, eq } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AdminVehicle } from '@wayfinder/contracts';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { auditLog, users, vehicles } from '../src/db/schema';
+import * as live from '../src/lib/live';
 import { serve, stop } from './serve';
 
 const app = await serve(createApp());
@@ -79,9 +80,12 @@ describe('POST /api/v1/admin/vehicles/:id/archive', () => {
     expect(row?.archivedAt).toBeNull();
   });
 
-  it('archives VEH060 for the admin and lists it last', async () => {
+  it('archives VEH060 for the admin, lists it last and tells every open admin screen', async () => {
+    const announce = vi.spyOn(live, 'announce');
     const res = await admin.post('/api/v1/admin/vehicles/VEH060/archive').send({});
     expect(res.status).toBe(200);
+    expect(announce).toHaveBeenCalledWith({ topic: 'admin' });
+    announce.mockRestore();
     const parsed = AdminVehicle.safeParse(res.body);
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
