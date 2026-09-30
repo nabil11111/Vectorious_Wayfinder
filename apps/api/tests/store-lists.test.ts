@@ -79,10 +79,10 @@ afterAll(async () => {
 // An order as it sits in the tables at some point of its journey: some cartons of its temperature. Each is
 // placed a minute after the one made before it, so the order they were made in is the order they were placed in.
 let minutes = 0;
-async function order(temp: Temp, status: OrderStatus, deliveryDate: string, { outletId = MINE, cartons = 10 } = {}) {
+async function order(temp: Temp, status: OrderStatus, deliveryDate: string, { outletId = MINE, cartons = 10, id }: { outletId?: string; cartons?: number; id?: string } = {}) {
   minutes += 1;
   const placedAt = status === 'draft' ? null : new Date(at('2026-04-01', '08:00').getTime() + minutes * 60_000);
-  const [row] = await db.insert(orders).values({ outletId, temp, status, deliveryDate, placedAt }).returning();
+  const [row] = await db.insert(orders).values({ id, outletId, temp, status, deliveryDate, placedAt }).returning();
   await db.insert(orderLines).values({ orderId: row!.id, productId: `fresh-${temp}-carton`, quantity: cartons });
   return row!.id;
 }
@@ -193,11 +193,16 @@ describe('the lists of a shop\'s orders', () => {
   it('AC-39 lists an order wanted for an earlier day that is on a sent plan for today, with its scheduled day', async () => {
     // Wanted Tue 2 Jun. Tuesday's plan left it out, and Wednesday's carries it.
     const carriedOver = await order('chilled', 'planned', TUE);
-    await plan(TUE, { leavesOut: { [carriedOver]: 'The fridge van was full.' } });
-    await plan(WED, { carries: { [MINE]: [carriedOver] } });
+    // This one went out on Tuesday, came back and is on Wednesday's plan again. It counts for the later plan.
+    const secondTry = await order('dry', 'planned', TUE);
+    await plan(TUE, { carries: { [MINE]: [secondTry] }, leavesOut: { [carriedOver]: 'The fridge van was full.' } });
+    await plan(WED, { carries: { [MINE]: [carriedOver, secondTry] } });
 
     const today = await list(mine, 'today');
-    expect(today.orders.map((o) => [o.id, o.deliveryDate, o.scheduledDate, o.status, o.deferralReason])).toEqual([[carriedOver, TUE, WED, 'planned', null]]);
+    expect(today.orders.map((o) => [o.id, o.deliveryDate, o.scheduledDate, o.status, o.deferralReason])).toEqual([
+      [carriedOver, TUE, WED, 'planned', null],
+      [secondTry, TUE, WED, 'planned', null],
+    ]);
 
     // On the day it was wanted it is not coming, and on the day after it has been.
     setClockForTests(at(TUE, '09:00'));
@@ -248,17 +253,23 @@ describe('the lists of a shop\'s orders', () => {
       '2026-05-22', '2026-05-21', '2026-05-20', '2026-05-19', '2026-05-18', '2026-05-16', '2026-05-15', '2026-05-14', '2026-05-13', '2026-05-12',
       '2026-05-11', '2026-05-09', '2026-05-08'];
     const received: { id: string; day: string; temp: Temp }[] = [];
-    const receive = async (temp: Temp, day: string) => received.push({ id: await order(temp, 'received', day), day, temp });
+    const receive = async (temp: Temp, day: string, id?: string) => received.push({ id: await order(temp, 'received', day, { id }), day, temp });
+    // Two of them get an id of their own, so that each page ends where going on takes more than the next id.
+    // One was wanted on Thu 21 May and came on Fri 22 May, so it is listed under the day it came. The lowest
+    // id there is puts it first among that Friday's chilled orders, which makes it the twentieth order.
+    const late = { id: '00000000-0000-4000-8000-000000000000', wanted: '2026-05-21', came: '2026-05-22' };
+    // The fortieth is Mon 11 May's chilled order. It has the highest id there is, and that day's dry order
+    // still comes after it.
+    const highest = { id: 'ffffffff-ffff-4fff-bfff-ffffffffffff', day: '2026-05-11' };
+    const ownId: Record<string, string> = { [late.wanted]: late.id, [highest.day]: highest.id };
     // Made oldest first and dry before chilled, so the order they come back in is not the order they went in.
     for (const day of [...days].reverse()) {
       await receive('dry', day);
-      await receive('chilled', day);
+      await receive('chilled', day, ownId[day]);
     }
     await receive('chilled', days[0]!);
-    // One of them was wanted on Mon 11 May and came on Wed 13 May, so it is listed under the day it came.
-    const late = received.find((o) => o.day === '2026-05-11' && o.temp === 'dry')!;
-    await plan('2026-05-13', { carries: { [MINE]: [late.id] } });
-    late.day = '2026-05-13';
+    await plan(late.came, { carries: { [MINE]: [late.id] } });
+    received.find((o) => o.id === late.id)!.day = late.came;
     // Orders that are not received are in no page, and neither are another shop's.
     await order('dry', 'delivered', TUE);
     await order('chilled', 'placed', THU);
@@ -273,11 +284,13 @@ describe('the lists of a shop\'s orders', () => {
 
     const first = await list(mine, 'past');
     expect(first.orders).toHaveLength(20);
+    expect(first.orders.at(-1)).toMatchObject({ id: late.id, deliveryDate: late.wanted, scheduledDate: late.came });
     expect(first.nextCursor).toEqual(expect.any(String));
     // An order that is received after the first page was read does not move the pages that follow.
     await order('dry', 'received', WED);
     const second = await list(mine, 'past', first.nextCursor!);
     expect(second.orders).toHaveLength(20);
+    expect(second.orders.at(-1)).toMatchObject({ id: highest.id, deliveryDate: highest.day, temp: 'chilled' });
     const third = await list(mine, 'past', second.nextCursor!);
     expect(third.orders).toHaveLength(5);
     expect(third.nextCursor).toBeNull();
@@ -286,8 +299,6 @@ describe('the lists of a shop\'s orders', () => {
     expect(first.orders.slice(0, 4).map((o) => [o.deliveryDate, o.temp, o.status])).toEqual([
       [days[0], 'chilled', 'received'], [days[0], 'chilled', 'received'], [days[0], 'dry', 'received'], [days[1], 'chilled', 'received'],
     ]);
-    const came = [...first.orders, ...second.orders, ...third.orders].find((o) => o.id === late.id);
-    expect(came).toMatchObject({ deliveryDate: '2026-05-11', scheduledDate: '2026-05-13' });
 
     // A list that ends exactly on a full page has no next page.
     for (let n = 0; n < 19; n++) await order('dry', 'received', MON, { outletId: THEIRS });
