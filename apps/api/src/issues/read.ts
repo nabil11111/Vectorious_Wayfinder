@@ -1,9 +1,13 @@
-import { FlagReason, LoadingDecision, PlanCheck, type Issue } from '@wayfinder/contracts';
-import { eq, inArray, type SQL } from 'drizzle-orm';
+import { FlagReason, LoadingDecision, PlanCheck, type Issue, type IssueList } from '@wayfinder/contracts';
+import { and, eq, inArray, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Tx } from '../db/client';
 import { issueLines, issues, orderLines, orders, outlets, plans, products, stops, trips, users } from '../db/schema';
-import { byLoadOrder, sentTrip } from '../loading/loader-day';
+import { depotDate, depotMinutes } from '../lib/clock';
+import { byLoadOrder, loaderDay, sentTrip } from '../loading/loader-day';
+import type { DepotCaller } from '../middleware/auth';
+import { snapshot } from '../orders/store-orders';
+import { operatingDays, readMoment } from '../plans/board';
 
 // Problems as the screens show them (spec 012, D-36): each with its truck and when it leaves, its stop and shop, the
 // people who raised and answered it by name, and the lines it counts in the loader's order.
@@ -52,4 +56,18 @@ export async function issuesOf(tx: Tx, where: SQL | undefined): Promise<Issue[]>
       lines,
     };
   });
+}
+
+// What needs the dispatcher (rule 9, D-39): the depot's open problems, oldest first, whatever day their truck is on,
+// and the loader's day for the title.
+export async function issueListOf(tx: Tx, depotId: string, at: Date): Promise<IssueList> {
+  return {
+    day: loaderDay(depotDate(at), depotMinutes(at), await operatingDays(tx)),
+    issues: await issuesOf(tx, and(eq(plans.depotId, depotId), eq(issues.status, 'open'))),
+  };
+}
+
+// GET /issues, in one read-only snapshot that a reset waits behind.
+export function listIssues(caller: DepotCaller): Promise<IssueList> {
+  return snapshot(async (tx) => issueListOf(tx, caller.depotId, (await readMoment(tx)).at));
 }
