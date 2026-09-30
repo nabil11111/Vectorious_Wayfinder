@@ -67,8 +67,8 @@ Codes of spec 010 used again: `stale`, `plan_sent`, `day_moved` with `date`, `or
    `split:<id>:keep` becomes the first part's id and `split:<id>:rest` the second's.
 8. `suggestionOf` makes the draft: the planner's trips (vehicle, trip number, `leaveAt` or null, step 2's driver for
    that vehicle or null, and stops) and deferrals (code and reason), with step 2's "Mix brands" and every id mapped.
-   `validateDraft` checks it against the board as a save would. A failure there is a planner fault, answered 500 with
-   nothing written.
+   `validateDraft` checks it, as a save would, against the board read after step 7, which holds the new parts. A
+   failure there is a planner fault, answered 500 with nothing written.
 9. `replaceDraft` with that draft, then `plans.suggestion`: `builtAt` is the clock instant, `plan` the draft as
    `boardOf` reads it back, and the choices and decisions have their ids mapped and none accepted.
 10. The audit row `plan.suggested`: before, the revision and the replaced draft's trips and deferrals; after, the trips,

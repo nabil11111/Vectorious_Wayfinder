@@ -59,7 +59,7 @@ numbers a build produces depend on the planner (AC-1 pins them), so N stands for
 |  | Putting it back | No frame | A dialog: "Put the suggestion back?", "Your 2 changes are undone. Vehicles keep their drivers.", then "Back to the suggestion" and "Keep my changes". |
 |  | Refused | No frame | The server's sentence in red under the middle's buttons, with "Try again". A refusal that reloads the board (`stale`, `plan_sent`, `day_moved`) does so with spec 010's line. |
 |  | Below 1024 wide | No frame | Spec 010's three tabs. "Build the suggested plan" moves the page to the Planning tab, which shows Building, and the dialogs fit a phone. |
-| View plan `/dispatcher/plan/:date` | Decisions open | View plan, the Suggestions card's place and look | Above Checks, "Decisions · N" with the design's second-trip picture and "N open" in the warning colour. Each decision: a title ("VEH002 trip 1 leaves early, at 03:07", "Fresh Dickwella waits again", "Fresh Negombo would be late, so it waits"), the planner's sentence, "Accept" and "Open in edit". "Accept all N" in orange at the bottom. In the header, "Suggested plan · 16:00" beside the title, and the send greyed as "Send plan · N checks open", counting the checks and the open decisions. Checks keeps "Ready" back while a decision is open. |
+| View plan `/dispatcher/plan/:date` | Decisions open | View plan, the Suggestions card's place and look | Above Checks, "Decisions · N" with the design's second-trip picture and "N open" in the warning colour. Each decision: a title ("VEH002 trip 1 leaves early, at 03:07", "Fresh Dickwella waits again", "Fresh Negombo would be late, so it waits"), the planner's sentence, "Accept" and "Open in edit". "Accept all N" in orange at the bottom. A decision an edit has ended is not listed, and a sent plan, or another day's, offers no Accept. In the header, "Suggested plan · 16:00" beside the title, and the send greyed as "Send plan · N checks open", counting the checks and the open decisions. Checks keeps "Ready" back while a decision is open. |
 |  | Ready | View plan · ready to send | "Decisions · all made" with "Accepted" in green, each with "✓ Accepted 16:08". "Checks · all clear", "Ready" and the orange send, as spec 010's. |
 |  | Sent | View plan · sent | Spec 010's sent state, with "Suggested plan · 16:00" and the accepted decisions kept. |
 
@@ -175,10 +175,11 @@ use made-up data. Screens get a click-through in Nabil's Chrome at 1440 × 900 a
   and a vehicle the suggestion uses shall keep its driver. *Rule 3's draft: Dilshan still on VEH035.*
 
 ### Refusals and what a build tells
-- [ ] **AC-7** When a build names a plan id or revision that is not the plan's, or a first build's demo day is not the
-  clock's, the system shall answer 409 `stale`; for a sent plan 409 `plan_sent`; before the orders close 409
-  `orders_open`; after the day moved 409 `day_moved`; and with no day left 409 `no_plan_day`. Each changes nothing.
-  *One test per case.*
+- [ ] **AC-7** When a build or an accept has no session, the system shall answer 401 `signed_out`, to a store manager,
+  loader or driver 403 `forbidden`, and to an admin 403 `no_depot`. When a build names a plan id or revision that is not
+  the plan's, or a first build's demo day is not the clock's, it shall answer 409 `stale`; for a sent plan 409
+  `plan_sent`; before the orders close 409 `orders_open`; after the day moved 409 `day_moved`; and with no day left 409
+  `no_plan_day`. Each changes nothing. *One test per case.*
 - [ ] **AC-8** When the planner finds no plan that passes every check, or the day has more than 300 orders, the system
   shall answer 409 `planner_unavailable` with its sentence and change nothing: no plan made, no order split or joined
   back, the draft as it was. *A test makes the planner answer `unavailable`, and another places orders until Thursday
@@ -200,8 +201,9 @@ use made-up data. Screens get a click-through in Nabil's Chrome at 1440 × 900 a
   depot and answer the board with them closed. A key that is not an open decision of the plan shall get 400
   `invalid_input`, and AC-7's refusals apply. Each refusal changes nothing.
 - [ ] **AC-13** When a plan with an open decision is sent, the system shall answer 409 `decisions_open` with their keys
-  and change nothing. Once each is accepted or ended by an edit, the send shall go as spec 010's does. *AC-1's day: the
-  send refused, every decision accepted with one request, then sent.*
+  and change nothing. Once each is accepted or ended by an edit, the send shall go as spec 010's does. *AC-4's day,
+  whose 30 waiting cartons always carry a `waited_again` decision: the send refused, every decision accepted with one
+  request, then sent.*
 
 ### The screens
 - [ ] **AC-14** The build. On the empty board "Build the suggested plan" is orange beside "Start a blank trip", and
@@ -216,9 +218,10 @@ use made-up data. Screens get a click-through in Nabil's Chrome at 1440 × 900 a
   deferring an order the suggestion had on a trip adds one naming the order, and choosing a driver adds none. "Back to
   the suggestion" asks, puts the suggestion back with the drivers kept, and "Changes · 0" follows. After a hand split
   of an order the suggestion names, "Back to the suggestion" is gone.
-- [ ] **AC-18** View plan. With AC-1's decisions: "Decisions · N" above Checks, each with Accept and Open in edit, and
-  "Accept all N" in orange, the send greyed. Accepting all turns the send orange and Checks "Ready", and the send gives
-  the sent state, which keeps "Suggested plan · 16:00" and the accepted decisions after a reload.
+- [ ] **AC-18** View plan. With AC-1's decisions (or AC-4's day, should the merged planner leave the seeded day none):
+  "Decisions · N" above Checks, each with Accept and Open in edit, and "Accept all N" in orange, the send greyed.
+  Accepting all turns the send orange and Checks "Ready", and the send gives the sent state, which keeps "Suggested
+  plan · 16:00" and the accepted decisions after a reload.
 - [ ] **AC-19** Refusals and a phone. `planner_unavailable` shows its sentence in red in the middle column with "Try
   again", and a stale build reloads the board with spec 010's line. At 390 wide the build runs from the Planning tab,
   the dialogs fit, and "why?" opens.
@@ -239,11 +242,14 @@ examples. The totals after the build are the ones AC-1 pins, which the lead writ
 4. Under Done, open the Fresh · Matara trip that carries Fresh Dickwella's chilled cartons and press "why?" on its stop:
    rank 1, the order that has waited since Tue 23 Jun. Press "why?" on a deferred order: why no tested trip reached the
    shop in its window, and "to decide".
-5. Open VEH035's trip, which carries Fresh Nugegoda's chilled cartons, and choose Dilshan as its driver. "Changes · 0"
-   stays, as a driver is not a change.
-6. Press "Move down" on a stop: "Changes · 1". Press "Back to the suggestion" and confirm: "Changes · 0" again.
-7. Open View plan: "Suggested plan · 16:00" and "Decisions · N". Press "Accept all N": "Decisions · all made", "Checks ·
-   all clear" and "Ready". Press "Send plan to loaders and drivers": "✓ Sent 16:05 · loaders and 1 driver".
+5. Open VEH035's trip 1 (the only working fridge van, and Fresh Nugegoda takes vans only, so Nadeesha's chilled cartons
+   are on it) and choose Dilshan as its driver, which puts him on both its trips. "Changes · 0" stays, as a driver is
+   not a change.
+6. From a stop's ⋮ menu press "Move down": "Changes · 1". Press "Back to the suggestion" and confirm: "Changes · 0"
+   again.
+7. Open View plan: "Suggested plan · 16:00" and, when the planner left any, "Decisions · N". Press "Accept all N":
+   "Decisions · all made", "Checks · all clear" and "Ready". Press "Send plan to loaders and drivers": "✓ Sent 16:05 ·
+   loaders and 1 driver".
 8. Loading follows spec 012 on VEH035 (open question 1).
 
 ## Out of scope
