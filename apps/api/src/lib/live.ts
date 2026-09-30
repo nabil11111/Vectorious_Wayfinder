@@ -55,16 +55,20 @@ function hears(user: Me, change: Announcement): boolean {
 // role, depot and outlet. Takes it off when the connection closes. Throws 503 too_many_streams when the list
 // is full.
 export function openStream(user: Me, res: Response): void {
+  const connection = res.req.socket;
   // The session is looked up before this runs, and a screen can be gone by then. Nothing will say so a second
   // time, so on the list it would stay for good.
-  if (res.destroyed) return;
+  if (connection.destroyed) return;
   if (streams.size >= config.LIVE_MAX_STREAMS) throw new HttpError(503, 'too_many_streams', 'Too many live streams are open right now.');
   // The headers go out at once, so the screen knows the stream is open before there is anything to say.
   // no-transform and X-Accel-Buffering keep a proxy from compressing the stream or holding it back.
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' });
   res.flushHeaders();
   streams.set(res, user);
-  res.on('close', () => drop(res));
+  // Node tells a response that its connection closed only while the response holds that connection. A request
+  // sent behind another on the same connection does not hold it, so there the connection itself is watched.
+  if (res.socket) res.once('close', () => drop(res));
+  else connection.once('close', () => drop(res));
   // A comment line to every stream, so the proxies in front of the hosted app keep a quiet one open.
   heartbeat ??= setInterval(() => {
     for (const open of streams.keys()) send(open, ': ping\n\n');
