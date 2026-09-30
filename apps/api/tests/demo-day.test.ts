@@ -1,10 +1,11 @@
 import { DEMO_DAY } from '@wayfinder/contracts';
-import { and, eq, isNull, sql, TransactionRollbackError } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { db, pool, type Tx } from '../src/db/client';
 import { clearDemoDay, demoId, seedDemoDay } from '../src/db/demo-day';
 import {
-  deferrals, demoDay, fuelLog, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicleDaysOff, vehicles,
+  auditLog, deferrals, demoDay, districtTravel, fuelLog, orderLines, orders, outlets, plans, products, sessions, stopOrders, stops, trips, users,
+  vehicleDaysOff, vehicles,
 } from '../src/db/schema';
 import { depotDate, depotInstant, depotMinutes, realNow } from '../src/lib/clock';
 
@@ -22,17 +23,19 @@ const DEFERRAL_CODES = ['no_reefer', 'over_capacity', 'no_van', 'window', 'fuel'
 
 // Other test files may have moved the clock or changed the day, and this one must leave both as it found
 // them. So each test runs in one transaction: it removes the day and the clock row, which is what an empty
-// database is to the seed, does its work and is rolled back.
+// database is to the seed, does its work and is rolled back. The rollback is an error of our own, thrown
+// after the work is done, so nothing the seed throws can be mistaken for it and end a test early.
+class RolledBack extends Error {}
 async function onEmptyDatabase(work: (tx: Tx) => Promise<void>): Promise<void> {
   try {
     await db.transaction(async (tx) => {
       await clearDemoDay(tx);
       await tx.delete(demoDay);
       await work(tx);
-      tx.rollback();
+      throw new RolledBack();
     });
   } catch (err) {
-    if (!(err instanceof TransactionRollbackError)) throw err;
+    if (!(err instanceof RolledBack)) throw err;
   }
 }
 
@@ -92,21 +95,24 @@ function workingFridgeVehicles(tx: Tx, date: string) {
 const userId = async (tx: Tx, username: string) => (await tx.select().from(users).where(eq(users.username, username)))[0]!.id;
 
 // The tables the day lives in. Trips, stops and the orders on them are not seeded. People add them.
-const DAY_TABLES = ['demo_day', 'orders', 'order_lines', 'plans', 'deferrals', 'trips', 'stops', 'stop_orders', 'vehicle_days_off', 'fuel_log'] as const;
+const DAY_TABLES = ['demo_day', 'orders', 'order_lines', 'plans', 'deferrals', 'trips', 'stops', 'stop_orders', 'vehicle_days_off', 'fuel_log'];
 const NOTHING = Object.fromEntries(DAY_TABLES.map((table) => [table, 0]));
+// What clearing the day must never touch: the people, their sign-ins, the audit log and the booklet's data.
+const KEPT_TABLES = ['users', 'sessions', 'audit_log', 'depots', 'outlets', 'vehicles', 'products', 'calendar_days', 'district_travel', 'service_allowance'];
 
-// Every row of those tables as the database holds it, in a fixed order. The columns that say when the system
+// Every row of some tables as the database holds it, in a fixed order. The columns that say when the system
 // really wrote a row differ from one run to the next, so a comparison between two runs leaves them out.
-async function everyRow(tx: Tx, { realTime = true } = {}) {
+async function rowsIn(tx: Tx, tables: string[], { realTime = true } = {}) {
   const row = realTime ? sql`to_jsonb(t)` : sql`to_jsonb(t) - '{created_at,updated_at,clock_set_at,seeded_at}'::text[]`;
   const held: Record<string, unknown[]> = {};
-  for (const table of DAY_TABLES) {
+  for (const table of tables) {
     const found = await tx.execute<{ row: unknown }>(sql`select ${row} as row from ${sql.identifier(table)} t order by 1`);
     held[table] = found.rows.map((r) => r.row);
   }
   return held;
 }
-const rowCounts = async (tx: Tx) => Object.fromEntries(Object.entries(await everyRow(tx)).map(([table, rows]) => [table, rows.length]));
+const everyRow = (tx: Tx, options?: { realTime?: boolean }) => rowsIn(tx, DAY_TABLES, options);
+const rowCounts = async (tx: Tx, tables = DAY_TABLES) => Object.fromEntries(Object.entries(await rowsIn(tx, tables)).map(([table, rows]) => [table, rows.length]));
 
 describe('the seeded day on an empty database', () => {
   it('AC-1 holds the clock at Wed 24 Jun 2026 15:00 depot time, in the part ordering, with revision 0 and day 1', async () => {
@@ -115,7 +121,9 @@ describe('the seeded day on an empty database', () => {
       const rows = await tx.select().from(demoDay);
       expect(rows).toHaveLength(1);
       const clock = rows[0]!;
-      expect([depotDate(clock.clockBase), depotMinutes(clock.clockBase)]).toEqual([WED, 15 * 60]);
+      // 15:00 to the second, which is 09:30 UTC.
+      expect(clock.clockBase).toEqual(depotInstant(WED, 15 * 60));
+      expect(clock.clockBase.toISOString()).toBe('2026-06-24T09:30:00.000Z');
       // The part of an instant is the last part that has started by then.
       const part = DEMO_DAY.parts.filter((p) => new Date(p.at).getTime() <= clock.clockBase.getTime()).at(-1);
       expect(part?.key).toBe('ordering');
@@ -363,25 +371,63 @@ describe('the seeded day on an empty database', () => {
       expect(await seedDemoDay(tx)).toBe(true);
       expect(await everyRow(tx, { realTime: false })).toEqual(first);
 
-      // An order's id is worked out from its wanted date, its shop and its temperature, so it is the same on
-      // every machine. OUT002's chilled order for Thursday is the one pinned beside demoId.
-      const written = await tx.select().from(orders);
-      for (const o of written) expect([o.outletId, o.id]).toEqual([o.outletId, demoId('order', `${o.deliveryDate}:${o.outletId}:${o.temp}`)]);
-      const out002 = written.find((o) => o.outletId === 'OUT002' && o.temp === 'chilled' && o.deliveryDate === THU);
-      expect(out002?.id).toBe('99ad1370-c157-54a8-a55e-ad41ae176e68');
+      // An id is worked out from what the row is, so it is the same on every machine. An order's comes from
+      // its wanted date, its shop and its temperature. OUT002's chilled order for Thursday is the one pinned
+      // beside demoId.
+      const orderKey = new Map<string, string>();
+      for (const o of await tx.select().from(orders)) {
+        orderKey.set(o.id, `${o.deliveryDate}:${o.outletId}:${o.temp}`);
+        expect(o.id).toBe(demoId('order', orderKey.get(o.id)!));
+      }
+      expect(orderKey.get('99ad1370-c157-54a8-a55e-ad41ae176e68')).toBe(`${THU}:OUT002:chilled`);
+
+      // The other kinds are keyed as the list in demo-day.ts says: a line by its order and its product, a plan
+      // by its date and depot, a deferral by its plan's date and its order, a fuel row by its date and vehicle.
+      const planDate = new Map<string, string>();
+      for (const p of await tx.select().from(plans)) {
+        planDate.set(p.id, p.date);
+        expect(p.id).toBe(demoId('plan', `${p.date}:${p.depotId}`));
+      }
+      for (const line of await tx.select().from(orderLines)) expect(line.id).toBe(demoId('line', `${orderKey.get(line.orderId)}:${line.productId}`));
+      for (const d of await tx.select().from(deferrals)) expect(d.id).toBe(demoId('deferral', `${planDate.get(d.planId)}:${orderKey.get(d.orderId)}`));
+      for (const row of await tx.select().from(fuelLog)) expect(row.id).toBe(demoId('fuel', `${row.date}:${row.vehicleId}`));
     });
   });
 
   it('AC-37 writes none of the day when it fails partway', async () => {
-    await onEmptyDatabase(async (tx) => {
-      // A history row for a vehicle and a day the seed writes too. Fuel comes after the orders, the plans and
-      // the workshop rows, so the seed is most of the way through when it clashes.
-      await tx.insert(fuelLog).values({ vehicleId: 'VEH002', date: TUE, litres: '5' });
+    // A row that is already there clashes with one the seed writes. One for each table it writes, in the
+    // order it writes them, so the seed stops at its first insert, in the middle and at its last. A row that
+    // needs an order or a plan to hang off gets one of its own, dated far from the seeded day.
+    const elsewhere = '2099-01-03';
+    const anOrder = async (tx: Tx) => (await tx.insert(orders).values({ outletId: 'OUT060', deliveryDate: elsewhere, temp: 'chilled' }).returning())[0]!.id;
+    const clashes: [table: string, plant: (tx: Tx) => Promise<unknown>][] = [
+      ['orders', (tx) => tx.insert(orders).values({ id: demoId('order', `${THU}:OUT002:chilled`), outletId: 'OUT002', deliveryDate: THU, temp: 'chilled' })],
+      ['order_lines', async (tx) => tx.insert(orderLines).values({
+        id: demoId('line', `${THU}:OUT002:chilled:fresh-chilled-carton`), orderId: await anOrder(tx), productId: 'fresh-chilled-carton', quantity: 1,
+      })],
+      ['plans', (tx) => tx.insert(plans).values({ depotId: 'Peliyagoda', date: WED })],
+      ['deferrals', async (tx) => {
+        const [plan] = await tx.insert(plans).values({ depotId: 'Peliyagoda', date: elsewhere }).returning();
+        await tx.insert(deferrals).values({
+          id: demoId('deferral', `${WED}:${TUE}:OUT060:chilled`), planId: plan!.id, orderId: await anOrder(tx), code: 'no_reefer', reason: 'Already there.',
+        });
+      }],
+      ['vehicle_days_off', (tx) => tx.insert(vehicleDaysOff).values({ vehicleId: 'VEH003', date: TUE, reason: 'Already there' })],
+      ['fuel_log', (tx) => tx.insert(fuelLog).values({ vehicleId: 'VEH002', date: TUE, litres: '5' })],
+    ];
+    for (const [table, plant] of clashes) {
+      await onEmptyDatabase(async (tx) => {
+        await plant(tx);
+        const before = await everyRow(tx);
 
-      await expect(seedDemoDay(tx)).rejects.toMatchObject({ cause: { constraint: 'fuel_log_history_day' } });
+        // 23505 is what Postgres answers when a row is already there.
+        await expect(seedDemoDay(tx)).rejects.toMatchObject({ cause: { code: '23505', table } });
 
-      expect(await rowCounts(tx)).toEqual({ ...NOTHING, fuel_log: 1 });
-    });
+        // The rows put in first are as they were, and there is nothing of the day: no order, and no clock row.
+        expect([table, await everyRow(tx)]).toEqual([table, before]);
+        expect([table, (await rowCounts(tx)).demo_day]).toEqual([table, 0]);
+      });
+    }
   });
 
   it('stops and writes none of the day when an account it needs is not there', async () => {
@@ -431,13 +477,34 @@ describe('the seeded day on an empty database', () => {
       await tx.insert(fuelLog).values({ vehicleId: 'VEH010', date: THU, litres: '12.5', tripId: trip!.id });
       await tx.update(demoDay).set({ clockBase: new Date(DEMO_DAY.parts[2].at), revision: 5, day: 3 });
       const [clock] = await tx.select().from(demoDay);
-      const people = await tx.select().from(users);
+      // A sign-in and an audit row, so every table that must stay holds something the cascade could take.
+      await tx.insert(sessions).values({ id: 'a-sign-in', userId: await userId(tx, 'ruwan'), expiresAt: depotInstant(THU, 24 * 60) });
+      await tx.insert(auditLog).values({ action: 'demo.clock_moved', entity: 'demo_day', entityId: '1' });
+      const kept = await rowCounts(tx, KEPT_TABLES);
+      expect(KEPT_TABLES.filter((table) => kept[table] === 0)).toEqual([]);
 
       await clearDemoDay(tx);
 
       expect(await rowCounts(tx)).toEqual({ ...NOTHING, demo_day: 1 });
       expect(await tx.select().from(demoDay)).toEqual([{ ...clock!, seededAt: null }]);
-      expect(await tx.select().from(users)).toEqual(people);
+      // The cascade follows whatever points at an order or a plan. It must never reach these.
+      expect(await rowCounts(tx, KEPT_TABLES)).toEqual(kept);
+    });
+  });
+
+  it('leaves VEH001 the fuel for the three near districts and for none of the four far ones', async () => {
+    await seeded(async (tx) => {
+      const [truck] = await tx.select().from(vehicles).where(eq(vehicles.id, 'VEH001'));
+      const [used] = await tx.select({ litres: sql<number>`sum(${fuelLog.litres})::int` }).from(fuelLog).where(eq(fuelLog.vehicleId, 'VEH001'));
+      const left = truck!.weeklyFuelQuotaL - used!.litres;
+      expect(left).toBe(40);
+
+      // There and back, with no stops counted. Kurunegala is the nearest of the far four: 95 km out and 95 km
+      // back is 190 km, and 190 ÷ 4.7 km per litre is 40.4 litres.
+      const districts = await tx.select().from(districtTravel).where(eq(districtTravel.depotId, 'Peliyagoda'));
+      const litresFor = (district: string) => (2 * districts.find((d) => d.district === district)!.depotToDistrictKm) / Number(truck!.kmPerL);
+      expect(litresFor('Kurunegala').toFixed(1)).toBe('40.4');
+      expect(districts.map((d) => d.district).filter((district) => litresFor(district) <= left).sort()).toEqual(['Colombo', 'Gampaha', 'Kalutara']);
     });
   });
 });
