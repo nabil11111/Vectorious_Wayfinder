@@ -239,6 +239,10 @@ it('AC-17 rejects saves without arrival, a second arrival, missing or broken pho
     const res = await refused({ ...base, photo: `data:image/jpeg;base64,${bytes.toString('base64')}` }, 400, 'invalid_input');
     expect(res.body.error.message).toBe('The photo must be a whole JPEG of at most 500 KB.');
   }
+  for (const invalid of ['data:image/png;base64,AAAA', 'data:image/jpeg;base64,%%%%', `data:image/jpeg;base64,${'A'.repeat(700_000)}`]) {
+    const res = await refused({ ...base, photo: invalid }, 400, 'invalid_input');
+    expect(res.body.error.message).toBe('The photo must be a whole JPEG of at most 500 KB.');
+  }
   trip = await write(trip, 'deliver', 3 * 60 + 38, 1, { photo });
   moment = at(3 * 60 + 39).toISOString();
   for (const body of [driverWrite(trip, 'arrive', moment, 1), driverWrite(trip, 'deliver', moment, 1, { photo }), driverWrite(trip, 'closed', moment, 1),
