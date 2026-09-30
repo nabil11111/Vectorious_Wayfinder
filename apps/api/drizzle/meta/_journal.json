@@ -29,6 +29,13 @@
       "when": 1790781118052,
       "tag": "0003_shop-orders",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790797531875,
+      "tag": "0004_plan-board",
+      "breakpoints": true
     }
   ]
 }
