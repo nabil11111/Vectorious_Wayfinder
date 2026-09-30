@@ -1,8 +1,8 @@
-import { FlagReason, LoadingDecision, PlanCheck, type Issue, type IssueList } from '@wayfinder/contracts';
+import { IssueReason, IssueDecision, PlanCheck, type Issue, type IssueList } from '@wayfinder/contracts';
 import { and, eq, inArray, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Tx } from '../db/client';
-import { issueLines, issues, orderLines, orders, outlets, plans, products, stops, trips, users } from '../db/schema';
+import { issueLines, issues, orderLines, orders, outlets, plans, products, stops, trips, users, photos } from '../db/schema';
 import { depotDate, depotMinutes } from '../lib/clock';
 import { byLoadOrder, loaderDay, sentTrip } from '../loading/loader-day';
 import type { DepotCaller } from '../middleware/auth';
@@ -14,12 +14,13 @@ import { operatingDays, readMoment } from '../plans/board';
 
 const raiser = alias(users, 'raiser');
 const decider = alias(users, 'decider');
+const driver = alias(users, 'driver');
 
 // The problems `where` picks, oldest first. It may name the problem, its stop, its trip or its plan.
 export async function issuesOf(tx: Tx, where: SQL | undefined): Promise<Issue[]> {
   const rows = await tx.select({
-    issue: issues, stop: { id: stops.id, seq: stops.seq, outletId: stops.outletId }, shopName: outlets.name,
-    trip: { id: trips.id, vehicleId: trips.vehicleId, tripNo: trips.tripNo }, planId: plans.id, raisedBy: raiser.displayName, decidedBy: decider.displayName,
+    issue: issues, stop: { id: stops.id, seq: stops.seq, outletId: stops.outletId, arrivedAt: stops.arrivedAt, doneAt: stops.doneAt, loadedAt: stops.loadedAt }, shopName: outlets.name,
+    trip: { id: trips.id, vehicleId: trips.vehicleId, tripNo: trips.tripNo, status: trips.status, driver: driver.displayName }, planId: plans.id, raisedBy: raiser.displayName, decidedBy: decider.displayName,
   }).from(issues)
     .innerJoin(stops, eq(stops.id, issues.stopId))
     .innerJoin(outlets, eq(outlets.id, stops.outletId))
@@ -27,6 +28,7 @@ export async function issuesOf(tx: Tx, where: SQL | undefined): Promise<Issue[]>
     .innerJoin(plans, eq(plans.id, trips.planId))
     .innerJoin(raiser, eq(raiser.id, issues.raisedBy))
     .leftJoin(decider, eq(decider.id, issues.decidedBy))
+    .leftJoin(driver, eq(driver.id, trips.driverId))
     .where(where)
     .orderBy(issues.raisedAt, issues.id);
   if (!rows.length) return [];
@@ -35,24 +37,29 @@ export async function issuesOf(tx: Tx, where: SQL | undefined): Promise<Issue[]>
   const checks = new Map(sent.map((plan) => [plan.id, { date: plan.date, check: plan.check === null ? null : PlanCheck.parse(plan.check) }]));
   const counted = await tx.select({
     issueId: issueLines.issueId, counted: issueLines.counted, lineId: orderLines.id, quantity: orderLines.quantity, orderId: orders.id, temp: orders.temp,
-    placedAt: orders.placedAt, productId: products.id, name: products.name, unit: products.unit,
+    loaded: orderLines.loadedQty, delivered: orderLines.deliveredQty, placedAt: orders.placedAt, productId: products.id, name: products.name, unit: products.unit,
   }).from(issueLines)
     .innerJoin(orderLines, eq(orderLines.id, issueLines.orderLineId))
     .innerJoin(orders, eq(orders.id, orderLines.orderId))
     .innerJoin(products, eq(products.id, orderLines.productId))
     .where(inArray(issueLines.issueId, rows.map((r) => r.issue.id)));
 
+  const tripStops = await tx.select().from(stops).where(inArray(stops.tripId, rows.map(row => row.trip.id)));
+  const dockFlags = await tx.select({ stopId: issues.stopId }).from(issues).where(and(eq(issues.kind, 'loading'), inArray(issues.stopId, rows.map(row => row.stop.id))));
+  const pictures = await tx.select({ issueId: photos.issueId }).from(photos).where(inArray(photos.issueId, rows.map(row => row.issue.id)));
+
   return rows.map(({ issue, stop, shopName, trip, planId, raisedBy, decidedBy }) => {
     const plan = checks.get(planId)!;
     const lines = counted.filter((line) => line.issueId === issue.id).sort(byLoadOrder)
-      .map(({ lineId, orderId, temp, productId, name, unit, quantity, counted: good }) => ({ lineId, orderId, temp, productId, name, unit, quantity, counted: good }));
+      .map(({ lineId, orderId, temp, productId, name, unit, quantity, counted: good, loaded, delivered }) => ({ lineId, orderId, temp, productId, name, unit, quantity, counted: good, loaded: issue.kind === 'closed' ? good : loaded, delivered: issue.kind === 'closed' ? null : delivered }));
     return {
-      id: issue.id, revision: issue.revision, kind: issue.kind, reason: FlagReason.parse(issue.reason), status: issue.status,
+      id: issue.id, revision: issue.revision, kind: issue.kind, reason: IssueReason.parse(issue.reason), status: issue.status,
       raisedBy, raisedAt: issue.raisedAt.toISOString(), note: issue.note,
-      decision: issue.decision === null ? null : LoadingDecision.parse(issue.decision), decidedBy, decidedAt: issue.decidedAt?.toISOString() ?? null,
-      short: lines.reduce((units, line) => units + line.quantity - line.counted, 0),
-      trip: { ...trip, leavesAt: sentTrip(plan.date, plan.check, trip.vehicleId, trip.tripNo).leavesAt.toISOString() },
-      stop: { ...stop, shopName },
+      decision: issue.decision === null ? null : IssueDecision.parse(issue.decision), decidedBy, decidedAt: issue.decidedAt?.toISOString() ?? null,
+      hasPhoto: pictures.some(photo => photo.issueId === issue.id),
+      short: lines.reduce((units, line) => units + (issue.kind === 'loading' ? line.quantity - line.counted : line.counted), 0),
+      trip: { ...trip, stopsLeft: tripStops.filter(stop => stop.tripId === trip.id && stop.outcome === null).length, leavesAt: sentTrip(plan.date, plan.check, trip.vehicleId, trip.tripNo).leavesAt.toISOString() },
+      stop: { ...stop, arrivedAt: stop.arrivedAt?.toISOString() ?? null, doneAt: stop.doneAt?.toISOString() ?? null, loadedAt: stop.loadedAt?.toISOString() ?? null, flaggedAtDock: dockFlags.some(flag => flag.stopId === stop.id), shopName },
       lines,
     };
   });

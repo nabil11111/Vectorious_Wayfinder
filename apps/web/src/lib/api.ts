@@ -21,6 +21,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     headers: { ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
+  if (res.status === 401) window.dispatchEvent(new Event('wayfinder-signed-out'));
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => null);
   if (!res.ok) {

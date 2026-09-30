@@ -1,4 +1,4 @@
-import type { DecideIssueRequest, DecideIssueResponse } from '@wayfinder/contracts';
+import { DECISIONS_BY_KIND, type DecideIssueRequest, type DecideIssueResponse } from '@wayfinder/contracts';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { auditLog, issues, plans, stops, trips } from '../db/schema';
@@ -23,6 +23,7 @@ export async function decideIssue(caller: DepotCaller, issueId: string, body: De
     if (!row) throw new HttpError(400, 'unknown_record', 'That problem is not on this depot\'s list.', { id: issueId });
     const { issue } = row;
     if (issue.status !== 'open' || issue.revision !== body.revision) throw new HttpError(409, 'stale', 'This problem was already answered.');
+    if (!DECISIONS_BY_KIND[issue.kind].includes(body.decision)) throw new HttpError(400, 'invalid_input', 'That answer does not fit this problem.');
     await tx.update(issues).set({ status: 'decided', decision: body.decision, decidedBy: caller.userId, decidedAt: moment.at, revision: issue.revision + 1 })
       .where(eq(issues.id, issue.id));
     await tx.insert(auditLog).values({ actorId: caller.userId, action: 'issue.decided', entity: 'issue', entityId: issue.id,
