@@ -1,11 +1,12 @@
 import { once } from 'node:events';
-import type { Server, ServerResponse } from 'node:http';
-import { connect, type AddressInfo } from 'node:net';
+import type { ServerResponse } from 'node:http';
+import { connect } from 'node:net';
 import { ApiError, LiveEvent } from '@wayfinder/contracts';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { pool } from '../src/db/client';
 import { announce, closeStreams, type Announcement } from '../src/lib/live';
+import { address, serve, stop } from './serve';
 
 // config.ts reads the settings when it loads, so they are made small before anything imports it: a heartbeat
 // every 50 ms instead of every 20 seconds, and room for five streams instead of 200.
@@ -14,10 +15,7 @@ vi.hoisted(() => {
   process.env.LIVE_MAX_STREAMS = '5';
 });
 
-// supertest cannot hold a stream open, so the app listens on a free port and the tests read it with fetch.
-const address = (of: Server) => `http://127.0.0.1:${(of.address() as AddressInfo).port}`;
-const server = createApp().listen(0);
-await once(server, 'listening');
+const server = await serve(createApp());
 const base = address(server);
 
 // The server's end of every request, so a test can see or break what the server holds for one stream.
@@ -105,12 +103,8 @@ afterEach(() => {
   closeStreams();
   vi.useRealTimers();
 });
-// An open stream or server would keep the test run from ending. close() alone waits for every connection,
-// and fetch can hold a spare one that never sent a request, so they are all closed here.
 afterAll(async () => {
-  const closed = new Promise((done) => server.close(done));
-  server.closeAllConnections();
-  await closed;
+  await stop(server);
   await pool.end();
 });
 
@@ -254,8 +248,7 @@ describe('the live stream', () => {
 
   it('AC-26 ends every open stream when the server is told to stop, so that it can close', async () => {
     // A server of its own, stopped the way server.ts stops on SIGTERM: the streams first, then the server.
-    const stopping = createApp().listen(0);
-    await once(stopping, 'listening');
+    const stopping = await serve(createApp());
     const at = address(stopping);
     const streams = [await listen('ruwan', at), await listen('nadeesha', at), await listen('admin', at)];
     closeStreams();

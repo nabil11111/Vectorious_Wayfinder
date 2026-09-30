@@ -24,6 +24,18 @@ mall in its district (`data/fixtures/outlet-names.csv`).
 
 To start again from an empty database: `docker compose down -v && docker compose up`.
 
+### The demo day
+
+The seed writes one realistic delivery day: Thursday 25 June 2026 from the Peliyagoda depot, with 98 placed
+orders, four chilled orders that earlier plans left out (one of them twice), three vehicles in the workshop and
+the week's fuel used so far.
+It is short of fridge trucks on purpose, so the plan has to defer and explain.
+
+The app runs on its own clock, the same for every screen, starting on Wednesday 24 June at 15:00 with orders
+open. The demo control in the top bar moves the whole app to the next part of the day (orders close at 16:00,
+loading at 02:30, trucks leave at 03:30, delivered by 08:30) and can reset the day to the seed. Every open
+screen follows at once. `DEMO_MODE=false` runs on the real clock with no seeded day.
+
 ### Working on the code
 
 ```bash
@@ -76,6 +88,13 @@ seeded delivery day.
 ## Departures from the design
 
 Anything we built differently from our Designathon submission, and why.
+
+- **Sign in** uses a username and password where the design shows a staff ID and PIN. The seeded accounts are
+  easier to hand to a judge.
+- **No language choice yet.** Every screen is in English.
+- **The demo clock and its control are ours.** The design shows the time of day. The app keeps its own clock so
+  a judge can walk a whole delivery day in minutes, and the control that moves it (and resets the day) exists
+  only in demo mode.
 
 ## Docs
 
