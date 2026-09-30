@@ -114,3 +114,11 @@ caller's depot, so the depot switch in the top bar shows the depot and changes n
 **D-33 · 1 Oct · A sent plan can go back to edit until loading starts** (Nabil). The booklet says printed loading
 lists go out of date when plans change and wants the dispatcher's decisions to reach the loader. Once a trip is
 loading, changes go through the loader's flag and the dispatcher's answer (A3) and Live day (A7).
+
+**D-41 · 1 Oct · The planner serves chilled orders before dry ones of the same waiting age, even when a dry one
+closes earlier** (the lead's pick, until Nabil answers). Fridge trips are what the seeded day is short of, and a
+window stays a hard check, so a dry order that misses its window is still deferred with its reason.
+
+**D-42 · 1 Oct · A shop's new order keeps its own place in the queue and does not take its older order's
+priority** (the lead's pick, until Nabil answers). The waiting goods are protected first, and a new bulk order
+cannot push another shop's waiting order back.

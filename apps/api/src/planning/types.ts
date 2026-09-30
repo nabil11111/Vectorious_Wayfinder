@@ -1,4 +1,4 @@
-import type { Brand, Load, Problem, Temp, TripTimes, VehicleDay } from '@wayfinder/contracts';
+import type { Brand, Load, PlanCheck, Problem, Temp, TripTimes, VehicleDay } from '@wayfinder/contracts';
 
 // The plan checker's own input (spec 007). Plain data in, plain data out: nothing here touches the database,
 // the config or the clock. Every time is minutes after midnight on the plan date, in depot time.
@@ -83,3 +83,16 @@ export type CargoProblems = (input: PlanInput, tripLoads: TripLoad[]) => Problem
 export type CoverageProblems = (input: PlanInput) => Problem[];
 export type TimeProblems = (input: PlanInput, vehicleTimes: VehicleTimes[]) => Problem[];
 export type DayProblems = (input: PlanInput, vehicleFuel: VehicleFuel[]) => Problem[];
+
+// The pure suggested-plan engine (spec 011). History comes from the caller, never from a clock or database.
+export interface PlannerOrder extends EngineOrder { deliveryDate: string; timesDeferred: number; splitFrom: string | null }
+export type PlannerInput = Omit<PlanInput, 'orders' | 'plan'> & { date: string; orders: PlannerOrder[] };
+export interface PlannerSplit { orderId: string; keep: OrderLineQty[]; keptOrderId: string; remainderOrderId: string }
+export interface PlannerChoice { orderId: string; rank: number; resultOrderIds: string[]; reason: string }
+export type PlannerDecision =
+  | { kind: 'early_leave'; vehicleId: string; tripNo: number; leaveAt: number; reason: string }
+  | { kind: 'waited_again' | 'late_order'; orderId: string; reason: string };
+export type PlannerResult =
+  | { status: 'suggested' | 'needs_decision'; input: PlanInput; check: PlanCheck; splits: PlannerSplit[]; choices: PlannerChoice[]; decisions: PlannerDecision[] }
+  | { status: 'unavailable'; check: PlanCheck };
+export type BuildSuggestedPlan = (input: PlannerInput) => PlannerResult;
