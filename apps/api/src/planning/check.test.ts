@@ -96,8 +96,12 @@ describe('the plan checker', () => {
       vehicleId: 'VEH012', tripNo: 1, stopSeq: 2, outletId: 'OUT001',
       message: 'VEH012 trip 1 stops at Fresh shop 1, which only a van can reach, and VEH012 is a truck.',
     });
+    expect(problems.find((p) => p.code === 'needs_reefer')).toMatchObject({
+      vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT005', orderId: 'order-4',
+      message: 'VEH012 trip 1 carries the 276 kg chilled order for Fresh shop 5, and VEH012 is not a fridge vehicle.',
+    });
     expect(problems.find((p) => p.code === 'order_not_planned')).toMatchObject({
-      orderId: 'order-8', outletId: 'OUT026', message: 'An order for Fresh shop 26 is on no trip and is not deferred.',
+      orderId: 'order-8', outletId: 'OUT026', message: 'The 331.2 kg dry order for Fresh shop 26 is on no trip and is not deferred.',
     });
   });
 

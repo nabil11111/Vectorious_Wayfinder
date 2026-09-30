@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kg, litres, m3, toClock, toMinutes } from './words';
+import { kg, litres, m3, orderCalled, toClock, toMinutes } from './words';
 
 describe('how the checker writes times and amounts', () => {
   it('reads a time of day as minutes after midnight and back', () => {
@@ -22,5 +22,13 @@ describe('how the checker writes times and amounts', () => {
     expect(m3(22.8)).toBe('22.8 m³');
     expect(m3(1.776)).toBe('1.776 m³');
     expect(litres(63.6)).toBe('63.6 litres');
+  });
+
+  it('calls an order by its weight, whether it is chilled and its shop', () => {
+    // A Fresh shop has a chilled and a dry order most days, so "an order for the shop" would not say which.
+    expect(orderCalled(276, true, 'Fresh Nugegoda')).toBe('276 kg chilled order for Fresh Nugegoda');
+    expect(orderCalled(331.2, false, 'Fresh Nugegoda')).toBe('331.2 kg dry order for Fresh Nugegoda');
+    // It has no "a" or "an" in front, because 800 kg would need the other one. A sentence says "the".
+    expect(orderCalled(800, false, 'Tech Galle')).toBe('800 kg dry order for Tech Galle');
   });
 });
