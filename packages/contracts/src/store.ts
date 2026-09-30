@@ -10,7 +10,8 @@ const Day = z.iso.date();
 const TimeOfDay = z.string().regex(/^\d{2}:\d{2}$/);
 const Moment = z.iso.datetime();
 
-export const ORDER_STATUSES = ['draft', 'placed', 'planned', 'deferred', 'loaded', 'delivered', 'received', 'cancelled'] as const;
+// split is the original of an order split in two (spec 010): its two parts carry on in its place.
+export const ORDER_STATUSES = ['draft', 'placed', 'planned', 'deferred', 'loaded', 'delivered', 'received', 'cancelled', 'split'] as const;
 export const OrderStatus = z.enum(ORDER_STATUSES);
 export type OrderStatus = z.infer<typeof OrderStatus>;
 
