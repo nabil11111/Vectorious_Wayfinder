@@ -11,6 +11,7 @@ uploads/
 playwright-report/
 test-results/
 
-# Agent notes stay on our machines
+# Agent notes and their work folders stay on our machines
 AGENTS.md
 CLAUDE.md
+.claude/
