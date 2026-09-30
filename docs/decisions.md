@@ -158,8 +158,8 @@ suggested ones would be neither plan. Each vehicle keeps its driver, since a dri
 (D-31).
 
 **D-53 · 1 Oct · The plan keeps its suggestion.** When it was built, the draft it saved, the planner's reason for every
-order and its decisions stay with the plan, so the reasons, "Changes" and "Back to the suggestion" survive a reload.
-Hand edits leave it as built, and the next build replaces it.
+order and its decisions stay with the plan, so the reasons and the decisions survive a reload, and a decision is judged
+against the planner's own choice. Hand edits leave it as built, and the next build replaces it.
 
 **D-54 · 1 Oct · The planner's decisions are accepted before the plan is sent.** Leaving early, an order that waited
 waiting again and a late order waiting are the dispatcher's calls (D-10, D-11, D-19), and a checker warning is not
