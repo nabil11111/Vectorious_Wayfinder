@@ -1,8 +1,5 @@
-import { once } from 'node:events';
-import type { Server } from 'node:http';
 import { ClockState, ROLES, type Role } from '@wayfinder/contracts';
 import { eq, inArray, sql } from 'drizzle-orm';
-import type { Express } from 'express';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
@@ -11,18 +8,9 @@ import { auditLog, demoDay } from '../src/db/schema';
 import { demoClockAt, depotDate, depotMinutes, initClock, now, realNow, restartClock, setClockForTests } from '../src/lib/clock';
 import { config } from '../src/lib/config';
 import * as live from '../src/lib/live';
+import { serve, stop } from './serve';
 
-// Each app gets one server of its own, on the loopback address. Left to itself supertest starts a server for
-// every request, on every address and whatever port is free there. When another program on the machine has
-// that port on 127.0.0.1, the request reaches that program and fails with "socket hang up".
-async function listen(app: Express) {
-  const server = app.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  return server;
-}
-const stop = (server: Server) => new Promise((done) => server.close(done));
-
-const app = await listen(createApp());
+const app = await serve(createApp());
 const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 
@@ -107,7 +95,7 @@ async function startAgain() {
   const fresh = { app: await import('../src/app'), clock: await import('../src/lib/clock'), client: await import('../src/db/client') };
   started.push(() => fresh.client.pool.end());
   await fresh.clock.initClock();
-  const server = await listen(fresh.app.createApp());
+  const server = await serve(fresh.app.createApp());
   started.push(() => stop(server));
   return { app: server, clock: fresh.clock };
 }

@@ -1,5 +1,3 @@
-import { once } from 'node:events';
-import type { AddressInfo } from 'node:net';
 import { ClockState, LiveEvent, ROLES, type Role } from '@wayfinder/contracts';
 import { eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import request from 'supertest';
@@ -12,12 +10,10 @@ import {
 } from '../src/db/schema';
 import { clockState, depotDate, depotInstant, depotMinutes, initClock, realNow } from '../src/lib/clock';
 import * as live from '../src/lib/live';
+import { address, serve, stop } from './serve';
 
-// One server for the whole file, on the loopback address, for the reason clock.test.ts gives. The live stream
-// is read from it with fetch, because supertest cannot hold a stream open.
-const server = createApp().listen(0, '127.0.0.1');
-await once(server, 'listening');
-const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+const server = await serve(createApp());
+const base = address(server);
 const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 
@@ -93,10 +89,7 @@ afterAll(async () => {
   const written = (await db.select({ id: auditLog.id }).from(auditLog)).map((row) => row.id).filter((id) => !auditFound.has(id));
   if (written.length) await db.delete(auditLog).where(inArray(auditLog.id, written));
   for (const { cookie } of Object.values(people)) await request(server).post('/api/v1/auth/logout').set('Cookie', cookie).send({});
-  // close() alone waits for every connection, and fetch can keep one open after its stream has ended.
-  const closed = new Promise((done) => server.close(done));
-  server.closeAllConnections();
-  await closed;
+  await stop(server);
   await pool.end();
 });
 

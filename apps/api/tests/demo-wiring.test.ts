@@ -5,9 +5,13 @@ import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { seedDemoDay } from '../src/db/demo-day';
 import { demoDay } from '../src/db/schema';
+import { serve, stop } from './serve';
 
-const app = createApp();
-afterAll(() => pool.end());
+const app = await serve(createApp());
+afterAll(async () => {
+  await stop(app);
+  await pool.end();
+});
 
 // The shared wiring of spec 008. What each endpoint answers once someone is signed in is tested with the
 // task that builds it.
