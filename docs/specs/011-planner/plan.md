@@ -12,7 +12,7 @@ The lead adds these engine-only types to `planning/types.ts` and exports the ent
 | `PlannerOrder` | `EngineOrder` plus `deliveryDate: string` (YYYY-MM-DD), `timesDeferred: number` (integer >= 0), `splitFrom: string \| null`. History includes the parent's deferrals for an existing child, as 010 does. |
 | `PlannerInput` | `Omit<PlanInput, 'orders' \| 'plan'>` plus `date: string` and `orders: PlannerOrder[]`. No existing draft, persistence reference or clock. |
 | `PlannerSplit` | `orderId: string`, `keep: OrderLineQty[]`, `keptOrderId: string`, `remainderOrderId: string`. `keep` lists every original product once, including zero quantities. |
-| `PlannerChoice` | `orderId: string`, `rank: number` (1-based), `resultOrderIds: string[]`, `reason: string`. One per input order; explain its priority and the actual deciding candidate preference, or the best-ranked refused candidate's checker sentence. A split choice explains where both parts go or why the remainder waits. |
+| `PlannerChoice` | `orderId: string`, `rank: number` (1-based), `resultOrderIds: string[]`, `reason: string`. One per input order; explain its priority and the actual deciding candidate preference, or the best-ranked refused candidate's checker sentence (a compact factual form if needed to fit 200 characters). A split choice explains where both parts go or why the remainder waits. |
 | `PlannerDecision` | A union: `early_leave` has `vehicleId`, `tripNo`, `leaveAt`; `waited_again` and `late_order` have effective `orderId`. Every member has `kind` and a plain `reason`; an early-leave reason names the order whose insertion forced it. |
 | `PlannerResult` | Success: `{ status: 'suggested' \| 'needs_decision', input: PlanInput, check: PlanCheck, splits: PlannerSplit[], choices: PlannerChoice[], decisions: PlannerDecision[] }`. Failure: `{ status: 'unavailable', check: PlanCheck }`. |
 | `BuildSuggestedPlan` | `(input: PlannerInput) => PlannerResult`, implemented by `buildSuggestedPlan`. |
@@ -72,8 +72,9 @@ boxes or items for Fresh, Style or Tech, and no outlet IDs, ISO dates or search 
 uses a semicolon to connect sent and waiting quantities without becoming two sentences. State a split-write or
 second-split limit only when a trip could otherwise carry part, never when no slot exists. For window failures,
 keep enough checker evidence to distinguish this shop being late from an insertion making another shop late.
-Dispatcher choices include rank, priority facts and the actual winning preference; a rejected choice preserves
-the best-ranked candidate's checker evidence using the shop's name and weekday instead of identifiers or ISO dates.
+Dispatcher choices stay within 200 characters and include rank, priority facts and the actual winning preference;
+a rejected choice preserves the best-ranked candidate's checker sentence or a compact factual form when needed
+to fit that limit, retaining the actual relevant times and shop name or district rather than identifiers or ISO dates.
 
 ### Hand-off to the board, for the later integration
 1. Read the board and engine snapshot together. Keep its `PlanRef` outside the engine. Review the complete

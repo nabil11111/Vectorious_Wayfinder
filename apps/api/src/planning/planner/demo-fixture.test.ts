@@ -83,6 +83,7 @@ describe('the exact seeded planner day without a database', () => {
     const servedIds = new Set(assigned);
     const servedOrders = result.input.orders.filter((o) => servedIds.has(o.id));
     const deferredOrders = result.input.orders.filter((o) => !servedIds.has(o.id));
+    expect(deferredOrders).toHaveLength(6);
     // Pin the measured outcome, not a forecast based on aggregate fridge capacity. Exact stop order, trip
     // numbering, explicit leaving changes, order references, splits and reason text are all reviewable.
     expect({
@@ -97,6 +98,24 @@ describe('the exact seeded planner day without a database', () => {
       deferrals: result.input.plan.deferrals,
       decisions: result.decisions,
     }).toMatchSnapshot();
+  });
+
+  it('AC-1/17 explains the seeded choices without IDs, ISO dates, units or search language', async () => {
+    const { input } = await demoFixture();
+    const result = buildSuggestedPlan(input);
+    if (result.status === 'unavailable') throw new Error('Expected a checked seeded-day suggestion');
+    const reasons = [...result.choices, ...result.decisions, ...result.input.plan.deferrals].map((entry) => entry.reason);
+    for (const reason of reasons) {
+      expect(reason).not.toMatch(/OUT\d{3}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f-]{23}|\d{4}-\d{2}-\d{2}|\bunits\b|tested stop order|after earlier choices/);
+      expect(reason.length).toBeLessThanOrEqual(200);
+    }
+    for (const deferral of result.input.plan.deferrals) {
+      expect(deferral.reason).toBe(deferral.reason.trim());
+      expect(deferral.reason.length).toBeGreaterThan(0);
+      expect(deferral.reason.length).toBeLessThanOrEqual(200);
+      expect(deferral.reason).toContain('Thursday');
+      expect(deferral.reason.match(/[.!?](?:\s|$)/g)).toHaveLength(1);
+    }
   });
 
   it('AC-20/21 repeats the exact result with frozen inputs and shuffled seed rows and lines', async () => {

@@ -49,8 +49,9 @@ requires a stated override. The numbered priority above and the rules below are 
   explain the priority (for example, waited since Tuesday, chilled, window closes 07:30) and the rule that decided
   the trip: joining an existing run, using a first run, or the winning capacity or efficiency preference. It shall
   describe the actual AC-6 comparison, never claim "largest" when another earlier preference decided. A deferral
-  uses the checker's own sentence for the best-ranked refused candidate when available, naming the affected shop
-  and relevant time. Reasons use plain words, weekdays and brand goods words, with no outlet IDs, ISO dates or
+  uses the checker's own sentence for the best-ranked refused candidate when available, or a compact factual form
+  when needed to fit 200 characters, preserving the affected shop and actual relevant times. Reasons are at most
+  200 characters and use plain words, weekdays and brand goods words, with no outlet IDs, ISO dates or
   "units"; for example, "joined VEH004's run to Gampaha" or "new run on VEH002, the largest free fridge truck".
 - [ ] **AC-2** When orders compete, the system shall apply priority steps 1 to 7. Pairwise tests isolate every key,
   including an old dry order before a new chilled one and an older district before a newer one.
@@ -106,7 +107,7 @@ requires a stated override. The numbered priority above and the rules below are 
   It is never split again: D-17 sends what fits and 010 forbids splitting a child again. A part already in the input
   must fit whole or wait whole. Both parts retain their parent's priority, so new goods cannot displace waiting goods.
   Automatic splits require at most 10 product lines, each with 1 to 999 units, to fit the split-write contract;
-  otherwise plan or defer the original whole. Name a split limit only when a trip had room for an allowed part;
+  otherwise plan or defer the original whole. Name a split limit only when a trip had room for a positive part;
   with no slot at all, use the ordinary stage's reason.
 - [ ] **AC-14** When choosing the first part, the system shall visit products by product ID: first keep each whole
   line that fits both remaining limits, then revisit leftover lines in that order and take the greatest integer
@@ -138,7 +139,7 @@ requires a stated override. The numbered priority above and the rules below are 
   | Vans among compatible vehicles, for van-only | `no_van` | "No van was free for Fresh Wellawatte on Thursday, which takes vans only." |
   | Trip slots in this district/brand, board and split-write limits, and room for the whole order or allowed part | `over_capacity` | "The trucks going to Kalutara on Thursday were full." Name a split limit only when some trip had room for a part. |
   | On-time candidates, including AC-9 fixes | `window` | "No truck could reach Fresh Kiribathgoda before its window closed at 07:30 on Thursday." If that shop can be reached on time: "The truck that could reach Fresh Kiribathgoda in time would then have been late for its other shops on Thursday." |
-  | Candidates within the remaining weekly fuel | `fuel` | "The trucks that could reach Fresh Matara on Thursday had used up this week's fuel." |
+  | Candidates within the remaining weekly fuel | `fuel` | "The trucks that could reach Fresh Matara on Thursday did not have enough of this week's fuel left." |
 
   For a deferred split remainder, name quantities sent and left in the same sentence, for example "75 of the 135
   boxes for Colombo go on Thursday; the other 60 wait for the next plan because the truck was full." An existing
