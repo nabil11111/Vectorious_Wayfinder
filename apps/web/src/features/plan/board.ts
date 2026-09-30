@@ -52,7 +52,7 @@ export const refOf = (board: PlanBoard): PlanRef =>
   (board.plan.id === null ? { planId: null, demoDay: board.demoDay } : { planId: board.plan.id, revision: board.plan.revision });
 
 // The board can be changed: a day whose orders are closed and whose plan is not sent.
-export const editable = (board: PlanBoard) => board.day !== null && !board.day.open && board.plan.status === 'draft';
+export const editable = (board: PlanBoard) => board.day !== null && board.day.open && board.plan.status === 'draft';
 
 export function useBoard() {
   return useQuery({ queryKey: boardKey, queryFn: fetchBoard });
@@ -259,11 +259,6 @@ class PlanSaver {
     void this.flush();
   };
 
-  undoMove = () => {
-    const undo = this.screen?.undo;
-    if (undo) this.change(undo.before);
-  };
-
   // Try again after a refusal: the same changes, sent again.
   retry = () => {
     if (!this.screen) return;
@@ -302,9 +297,12 @@ class PlanSaver {
       this.tries = 0;
       this.unanswered = [];
       const now = this.screen!;
-      // The board moved on while this save was out (a reset, a new day): its answer is for a plan that is gone.
       if (!counts(now.board, answer)) {
-        void this.flush();
+        // The board moved on while this save was out (a reset, a new day), so its answer is for a plan that is
+        // gone and the changes went with it. An answer that is simply not newer is read as the plan having moved
+        // on elsewhere.
+        if (now.board.demoDay === before.demoDay && now.board.day?.date === before.day?.date) await this.reload('stale', null, before);
+        else void this.flush();
         return;
       }
       this.savedSeq = this.sentSeq;
@@ -409,11 +407,6 @@ class PlanSaver {
       }
       return reasonOf(error);
     }
-  };
-
-  // The board a write outside the queue answered with, such as a send from View plan.
-  took = (board: PlanBoard) => {
-    if (board.day?.date === this.date) this.answered(board, true);
   };
 
   stop() {

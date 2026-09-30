@@ -36,7 +36,8 @@ export function PlanBoardPage() {
   }
   const { board } = screen;
   if (!board.day) return <Message title="Plan board" icon={ICON.day} line="No delivery day is left to plan." />;
-  if (board.day.open) {
+  // The board opens for planning once the day's orders close (rule 1).
+  if (!board.day.open) {
     return <Message title={planFor(board.day.date)} icon={ICON.cutoff} line={`Orders for ${shortDay(board.day.date)} close at ${clockTime(board.day.cutoffAt)}. The board opens then.`} />;
   }
   // A sent plan is read on View plan, whose address keeps the day through a reload or a clock move.
@@ -184,7 +185,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         onRefresh={onRefresh}
         refreshing={refreshing}
       />
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[360px_minmax(0,1fr)_330px]">
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[300px_minmax(0,1fr)_270px] xl:grid-cols-[360px_minmax(0,1fr)_330px]">
         <div className={cn('min-h-0 flex-col gap-4', tab === 'unplanned' ? 'flex' : 'hidden lg:flex')}>
           <OrderLists
             screen={screen}
@@ -199,8 +200,8 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
           />
           <TruckList board={board} draft={draft} />
         </div>
-        <Column aria-label="Planning" className={cn('min-h-[420px] overflow-y-auto lg:min-h-0', tab === 'planning' ? 'flex' : 'hidden lg:flex')}>{inMiddle}</Column>
-        <Column aria-label="Done" className={cn('overflow-y-auto', tab === 'done' ? 'flex' : 'hidden lg:flex')}>
+        <Column aria-label="Planning" className={cn('min-h-[420px] overflow-x-hidden overflow-y-auto lg:min-h-0', tab === 'planning' ? 'flex' : 'hidden lg:flex')}>{inMiddle}</Column>
+        <Column aria-label="Done" className={cn('overflow-x-hidden overflow-y-auto', tab === 'done' ? 'flex' : 'hidden lg:flex')}>
           <DoneList screen={screen} index={index} openKey={open ? keyOf(open) : null} onOpen={openTrip} />
         </Column>
       </div>
@@ -263,7 +264,7 @@ function BoardSkeleton() {
         <Skeleton className="h-3.5 w-80" />
       </div>
       <div className="mt-3 flex justify-end gap-2.5"><Skeleton soft className="h-8 w-40 rounded-[10px]" /><Skeleton soft className="h-8 w-28 rounded-[10px]" /></div>
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[360px_minmax(0,1fr)_330px]">
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[300px_minmax(0,1fr)_270px] xl:grid-cols-[360px_minmax(0,1fr)_330px]">
         <Column className="p-3.5"><div className="flex items-center gap-2.5 pb-2"><Skeleton className="size-6" /><Skeleton className="h-4 w-44" /></div>{rows(6)}</Column>
         <Column className="hidden p-3.5 lg:flex"><div className="flex items-center gap-2.5 pb-2"><Skeleton className="size-7" /><Skeleton className="h-4 w-56" /></div>{rows(5)}</Column>
         <Column className="hidden p-3.5 lg:flex"><div className="flex items-center gap-2.5 pb-2"><Skeleton className="size-6" /><Skeleton className="h-4 w-32" /></div>{rows(3)}</Column>
