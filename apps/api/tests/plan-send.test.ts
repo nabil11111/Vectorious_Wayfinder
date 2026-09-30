@@ -103,7 +103,11 @@ it('AC-4 and AC-29 keep the sent board by date and carry its fuel into Friday', 
 
 it('AC-30 takes back a sent plan, restores earlier deferrals, and sends again without duplicate fuel', async () => {
   const b = await save(); const sent = PlanBoard.parse((await send(b)).body);
+  vi.mocked(announce).mockClear();
   const res = await unsend(sent); expect(res.status).toBe(200); const draft = PlanBoard.parse(res.body);
+  expect(vi.mocked(announce).mock.calls.map(([event]) => event)).toEqual(expect.arrayContaining([
+    { topic: 'plans', depotId: 'Peliyagoda' }, { topic: 'orders', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT026' }, { topic: 'orders', outletId: 'OUT060' },
+  ]));
   expect(draft.plan).toMatchObject({ status: 'draft', revision: 3, sentAt: null, canUnsend: false });
   expect((await db.select().from(plans).where(eq(plans.id, b.plan.id!)))[0]!.sentCheck).toBeNull();
   expect(await db.select().from(fuelLog).where(eq(fuelLog.date, DATE))).toHaveLength(0);
@@ -112,6 +116,20 @@ it('AC-30 takes back a sent plan, restores earlier deferrals, and sends again wi
   expect(draft.plan.deferrals).toEqual(b.plan.deferrals);
   expect((await send(draft)).status).toBe(200); expect(await db.select().from(fuelLog).where(eq(fuelLog.date, DATE))).toHaveLength(1);
   expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, b.plan.id!), eq(auditLog.action, 'plan.unsent')))).toHaveLength(1);
+});
+
+it('AC-30 gives the parts of a split carried-over order back as placed, so they can still be joined', async () => {
+  const waited = board.orders.find((o) => o.outletId === 'OUT060')!;
+  let b = await save({ mixBrands: false, trips: [trip(['OUT026', 'OUT028', 'OUT030'])], deferrals: [] });
+  const line = waited.lines[0]!;
+  const split = await as.post(`${URL}/split`).send({ ...ref(b), orderId: waited.id, keep: [{ productId: line.productId, quantity: line.quantity - 1 }] });
+  expect(split.status).toBe(200); b = PlanBoard.parse(split.body); board = b;
+  const sent = PlanBoard.parse((await send(await save(ready(), b))).body);
+  const res = await unsend(sent); expect(res.status).toBe(200);
+  const parts = await db.select().from(orders).where(eq(orders.splitFrom, waited.id));
+  expect(parts.map((o) => o.status)).toEqual(['placed', 'placed']);
+  const join = await as.post(`${URL}/join`).send({ ...ref(PlanBoard.parse(res.body)), orderId: waited.id });
+  expect(join.status).toBe(200);
 });
 
 it('AC-30 refuses loading and later trips without changing the published plan', async () => {
@@ -124,7 +142,8 @@ it('AC-30 refuses loading and later trips without changing the published plan', 
 });
 
 it('AC-3 refuses send and unsend once the board day moves', async () => {
-  const b = await save(); freeze(DATE, 210); expect(code(await send(b))).toEqual([409, 'day_moved']);
+  const b = await save(); freeze(DATE, 210); const moved = await send(b); expect(code(moved)).toEqual([409, 'day_moved']);
+  expect(moved.body.error.message).toBe('Trucks for Thu 25 Jun leave from 03:30, so its plan can no longer be sent.');
   freeze(); const sent = PlanBoard.parse((await send(b)).body); freeze(DATE, 210); expect(code(await unsend(sent))).toEqual([409, 'day_moved']);
 });
 

@@ -43,7 +43,8 @@ it('AC-5 protects every endpoint before reading its input', async () => {
   for (const [method, suffix] of paths) {
     const url = `/api/v1/plans${suffix}`;
     const call = (agent: ReturnType<typeof request.agent>) => method === 'get' ? agent.get(url) : method === 'put' ? agent.put(url).send({}) : agent.post(url).send({});
-    expect((await call(request.agent(server))).body.error.code).toBe('signed_out');
+    const signedOut = await call(request.agent(server));
+    expect([signedOut.status, signedOut.body.error.code]).toEqual([401, 'signed_out']);
     for (const name of ['nadeesha', 'kasun', 'dilshan']) {
       const res = await call(actors.get(name)!);
       expect([res.status, res.body.error.code]).toEqual([403, 'forbidden']);

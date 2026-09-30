@@ -181,6 +181,8 @@ it('AC-18 applies and clears a custom departure and normalizes a lone second tri
   expect(b.plan.trips[0]!.tripNo).toBe(1);
   expect(b.check!.trips[0]!.times!.stops.at(-1)!.arriveAt).toBe(450);
   expect(b.check!.problems.filter((p) => p.vehicleId === 'VEH002').map((p) => p.code)).toEqual(expect.arrayContaining(['leaves_early', 'over_time_budget']));
+  expect(b.check!.problems.filter((p) => p.vehicleId === 'VEH002' && p.level === 'block')).toEqual([]);
+  expect(b.check!.problems.find((p) => p.vehicleId === 'VEH002' && p.code === 'over_time_budget')!.message).toMatch(/278.*270/);
   const regular = PlanBoard.parse((await save({ ...empty(), trips: [{ ...t, tripNo: 1 }] }, ref(b))).body);
   expect(regular.check!.trips[0]!.times!.stops.at(-1)!.arriveAt).toBe(473);
 });

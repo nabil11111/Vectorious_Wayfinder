@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardDay } from './board-day';
+import { boardDay, dayLabel, percent } from './board-day';
 
 // Only operating days are passed in: Sunday and the 1 May holiday are deliberately absent.
 const operatingDays = [
@@ -56,5 +56,19 @@ describe('the day on the plan board', () => {
   it('returns no board without a delivery day and its preceding operating day', () => {
     expect(boardDay('2026-06-24', 960, [])).toBeNull();
     expect(boardDay('2026-06-24', 960, ['2026-06-25'])).toBeNull();
+  });
+});
+
+describe('the words and figures the board sends', () => {
+  it('writes a day as the screens do', () => {
+    expect(dayLabel('2026-06-25')).toBe('Thu 25 Jun');
+    expect(dayLabel('2026-05-01')).toBe('Fri 1 May');
+  });
+
+  it('rounds a percentage half up, whatever the floating point does', () => {
+    // 35.91 m³ of 38 is exactly 94.5%, which JavaScript computes as 94.49999999999999.
+    expect(percent(35.91, 38)).toBe(95);
+    expect(percent(0, 0)).toBe(0);
+    expect(percent(1, 3)).toBe(33);
   });
 });
