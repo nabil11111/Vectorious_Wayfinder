@@ -48,6 +48,17 @@ describe('rules for fuel and the day', () => {
     // A vehicle's two trips count together. The chained day is 106 km, 15.588 litres, shown as 10.3 + 5.3.
     expect(check([gampaha, colombo], { vehicles: fleet('VEH012', { litresUsedThisWeek: 524.4 }) })).toEqual([]);
     expect(check([gampaha, colombo], { vehicles: fleet('VEH012', { litresUsedThisWeek: 524.5 }) })).toEqual(over('VEH012', '524.5', '15.6', '0.1 litres', '540'));
+    // The sentence goes by the litres all the plan's kilometres need, so its figures add up. Two trips of 24 km
+    // show as 3.5 litres each, and their 48 km need 7.06 litres: with 533.1 used that is 0.16 over.
+    const twoShort = [trip('VEH012', 1, ['OUT005']), trip('VEH012', 2, ['OUT006'])];
+    expect(check(twoShort, { vehicles: fleet('VEH012', { litresUsedThisWeek: 532.9 }) })).toEqual([]);
+    expect(check(twoShort, { vehicles: fleet('VEH012', { litresUsedThisWeek: 533.1 }) })).toEqual(over('VEH012', '533.1', '7.1', '0.2 litres', '540'));
+
+    // The vehicles table keeps km per litre to 2 decimals, and all of it counts. No vehicle in the data uses the
+    // second one, so this figure is made up: at 4.45 km per litre the 280 km are 62.92 litres.
+    const thirstier = (litresUsedThisWeek: number) => check([galle('VEH006')], { vehicles: fleet('VEH006', { kmPerL: 4.45, litresUsedThisWeek }) });
+    expect(thirstier(317)).toEqual([]);
+    expect(thirstier(317.1)).toEqual(over('VEH006', '317.1', '62.9', 'less than 0.1 litres', '380'));
 
     // Each vehicle is measured against its own quota.
     const both = check([galle('VEH006'), galle('VEH010')], { vehicles: fleet('VEH006', { litresUsedThisWeek: 330 }) });

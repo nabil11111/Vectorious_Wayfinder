@@ -39,6 +39,8 @@ const out017Open = (open: string, close: string) => outlets.map((o) => (o.id ===
 describe('rules for time', () => {
   it('finds nothing wrong with the chained day or the Style trip', () => {
     expect(check('Peliyagoda', [gampaha, colombo])).toEqual([]);
+    // The plan may list a vehicle's trips in any order.
+    expect(check('Peliyagoda', [colombo, gampaha])).toEqual([]);
     expect(check('Peliyagoda', [trip('VEH012', 1, styleShops)])).toEqual([]);
   });
 
@@ -257,6 +259,10 @@ describe('rules for time', () => {
     const second = check('Peliyagoda', [gampaha, trip('VEH012', 2, toOut010, '06:30')]);
     expect(second).toMatchObject([{ code: 'window_missed', outletId: 'OUT010' }]);
     expect(second.map((p) => p.fix)).toEqual([undefined]);
+    // The minute the vehicle is ready is not too early: a second trip to OUT006, OUT004 and OUT010 set to 06:30
+    // reaches the last at 07:42, and leaving at 06:18 reaches it at 07:30.
+    expect(check('Peliyagoda', [gampaha, trip('VEH012', 2, ['OUT006', 'OUT004', 'OUT010'], '06:30')]))
+      .toMatchObject([{ code: 'window_missed', outletId: 'OUT010', fix: fix('06:18') }]);
     // A time between the ready time and its own is offered: set to 06:30, trip 2 of the chained day reaches
     // OUT014 at 08:06, and leaving at 06:23 reaches it at 07:59.
     expect(check('Peliyagoda', [gampaha, { ...colombo, leaveAt: toMinutes('06:30') }])).toEqual([{
@@ -291,14 +297,17 @@ describe('rules for time', () => {
 
   it('throws when a trip that can be timed comes without its times, so its windows never pass unchecked', () => {
     const input = inputFor('Peliyagoda', { trips: [gampaha, colombo] });
-    const [day] = timesOf(input);
-    const firstOnly = day ? [{ ...day, trips: day.trips.slice(0, 1) }] : [];
+    const day = timeVehicleDay(input, 'VEH012');
+    expect(timeProblems(input, [day])).toEqual([]);
+
     const handed: [string, VehicleTimes[]][] = [
       ['No times were given for VEH012 trip 1', []],
-      ['No times were given for VEH012 trip 2', firstOnly],
-      ['No times were given for VEH012 trip 1', [{ vehicleId: 'VEH012', trips: [{ tripNo: 1, times: null }, { tripNo: 2, times: null }] }]],
+      ['No times were given for VEH012 trip 2', [{ ...day, trips: day.trips.slice(0, 1) }]],
+      // Handed over as trips that could not be timed.
+      ['No times were given for VEH012 trip 1', [{ ...day, trips: day.trips.map(({ tripNo }) => ({ tripNo, times: null })) }]],
+      // Handed over out of trip-number order, where trip 1 would be checked against the times of trip 2.
+      ['No times were given for VEH012 trip 1', [{ ...day, trips: [...day.trips].reverse() }]],
     ];
-    expect(firstOnly).toHaveLength(1);
     for (const [named, times] of handed) {
       expect(() => timeProblems(input, times)).toThrow(PlanInputError);
       expect(() => timeProblems(input, times)).toThrow(named);
