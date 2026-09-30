@@ -18,10 +18,10 @@ const overBudget = (vehicleId: string, trips: string, took: number, budget: numb
 
 // The latest leaving time before the trip's own that reaches every stop in time, or null when there is none
 // (AC-47). Leaving earlier never makes a stop later, so it steps back a minute at a time and the first time
-// with no late stop is the latest one. It never goes before midnight or before the vehicle is ready from its
-// earlier trip.
-const earlierLeave = (input: PlanInput, trip: PlanTrip, own: Minutes, readyAt: Minutes): Minutes | null => {
-  for (let leaveAt = own - 1; leaveAt >= Math.max(readyAt, 0); leaveAt -= 1) {
+// with no late stop is the latest one. It never goes before notBefore, which is midnight or when the vehicle is
+// ready from its earlier trip.
+const earlierLeave = (input: PlanInput, trip: PlanTrip, own: Minutes, notBefore: Minutes): Minutes | null => {
+  for (let leaveAt = own - 1; leaveAt >= notBefore; leaveAt -= 1) {
     const times = timeTrip(input, trip, leaveAt);
     if (times?.stops.every((stop) => !stop.late)) return leaveAt;
   }
@@ -60,8 +60,8 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
       const districts = [...new Set(shops.map((shop) => shop.district))];
       const [district] = districts;
 
-      // The three trips that cannot be timed, and so have no times to check. One with no stops is reported with
-      // the orders (AC-28).
+      // A trip with no stops, with stops in two districts or with no drive to its district cannot be timed, so it
+      // has no times to check. The first of the three is reported with the orders (AC-28).
       if (district === undefined) continue;
       if (districts.length > 1) {
         report('cross_district', about, `${name} has stops in ${districts.length} districts, ${list.format(districts)}, and a trip stays inside one district.`);
@@ -96,19 +96,22 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
         const reaches = `${name} reaches ${shop.name} at ${toClock(stop.arriveAt)}`;
         const { mallOpen, mallClose } = shop;
         const inMall = mallOpen !== undefined && mallClose !== undefined;
+        // The closing time stays the shop's own, so a Fresh shop reached at 08:00 can be late inside its window.
+        const freshRule = shop.brand === 'Fresh' && stop.arriveAt >= FRESH_DEADLINE ? `, and Fresh shops must be reached before ${toClock(FRESH_DEADLINE)}` : '';
 
-        if (stop.late && inMall && stop.windowOpen > stop.windowClose) {
-          report('mall_slot_missed', here, `${name} stops at ${shop.name}, which takes deliveries from ${toClock(shop.windowOpen)} to ${toClock(shop.windowClose)} while its mall lets them in only from ${toClock(mallOpen)} to ${toClock(mallClose)}, so it can never be reached in time.`);
+        if (stop.late && stop.windowOpen > stop.windowClose) {
+          // No leaving time helps a window that opens after it closes, so there is no fix. A mall slot that never
+          // meets the shop's own window gives one, and so does a shop whose own window is the wrong way round.
+          const never = inMall
+            ? `which takes deliveries from ${toClock(shop.windowOpen)} to ${toClock(shop.windowClose)} while its mall lets them in only from ${toClock(mallOpen)} to ${toClock(mallClose)}`
+            : `whose delivery window opens at ${toClock(stop.windowOpen)} and closes at ${toClock(stop.windowClose)}`;
+          report(inMall ? 'mall_slot_missed' : 'window_missed', here, `${name} stops at ${shop.name}, ${never}, so it can never be reached in time.`);
         } else if (stop.late && inMall && stop.arriveAt > mallClose) {
-          report('mall_slot_missed', here, `${reaches}, ${minutes(stop.arriveAt - mallClose)} after its mall's delivery hours of ${toClock(mallOpen)} to ${toClock(mallClose)} end.`, fix);
+          report('mall_slot_missed', here, `${reaches}, ${minutes(stop.arriveAt - mallClose)} after its mall's delivery hours of ${toClock(mallOpen)} to ${toClock(mallClose)} end${freshRule}.`, fix);
         } else if (stop.late) {
           const afterClosing = stop.arriveAt > stop.windowClose ? `, ${minutes(stop.arriveAt - stop.windowClose)} after its delivery window closes at ${toClock(stop.windowClose)}` : '';
-          // The closing time stays the shop's own, so a Fresh shop reached at 08:00 can be late inside its window.
-          const freshRule = shop.brand === 'Fresh' && stop.arriveAt >= FRESH_DEADLINE ? `, and Fresh shops must be reached before ${toClock(FRESH_DEADLINE)}` : '';
           report('window_missed', here, `${reaches}${afterClosing}${freshRule}.`, fix);
-        }
-
-        if (stop.waitMin > input.settings.waitWarnMin) {
+        } else if (stop.waitMin > input.settings.waitWarnMin) {
           // Only at the first stop does leaving later take the wait away. A later stop follows the ones before it.
           const leaveLater = stop.seq === 1 ? `Leave at ${toClock(times.leaveAt + stop.waitMin)} to arrive as it opens.` : null;
           report('long_wait', here, `${reaches} and waits ${minutes(stop.waitMin)} for its delivery window to open at ${toClock(stop.windowOpen)}.`, leaveLater);
