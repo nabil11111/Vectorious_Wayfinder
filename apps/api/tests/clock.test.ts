@@ -9,6 +9,7 @@ import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { auditLog, demoDay } from '../src/db/schema';
 import { demoClockAt, depotDate, depotMinutes, initClock, now, realNow, restartClock, setClockForTests } from '../src/lib/clock';
+import { config } from '../src/lib/config';
 import * as live from '../src/lib/live';
 
 // Each app gets one server of its own, on the loopback address. Left to itself supertest starts a server for
@@ -40,7 +41,7 @@ const moves = () => db
   .from(auditLog).where(eq(auditLog.action, 'demo.clock_moved'));
 
 // Test files share one database and this one moves the clock. So it keeps the clock row it found and writes
-// it back when it ends, and takes out the audit rows it wrote.
+// it back when it ends, takes out the audit rows it wrote and signs out.
 const [clockFound] = await db.select().from(demoDay);
 const movesFound = new Set((await moves()).map((move) => move.id));
 // What a test started and must end, last one first: the servers and database pools of startAgain().
@@ -54,10 +55,11 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(demoDay);
-  if (clockFound) await db.insert(demoDay).values(clockFound);
+  if (clockFound) await db.insert(demoDay).values(clockFound).onConflictDoUpdate({ target: demoDay.id, set: clockFound });
+  else await db.delete(demoDay);
   const written = (await moves()).map((move) => move.id).filter((id) => !movesFound.has(id));
   if (written.length) await db.delete(auditLog).where(inArray(auditLog.id, written));
+  for (const { cookie } of Object.values(people)) await request(app).post('/api/v1/auth/logout').set('Cookie', cookie).send({});
   await stop(app);
   await pool.end();
 });
@@ -266,6 +268,13 @@ describe('GET /clock', () => {
     setClockForTests(null);
     expect(now().toISOString()).toBe(wed('15:59:59'));
   });
+
+  it('leaves sessions on the real time: the app\'s clock an hour past a session\'s limit signs nobody out', async () => {
+    await setClock(wed('15:00'));
+    // Judged by the app's clock, a session made in the last minute would have ended an hour ago.
+    setClockForTests(new Date(realNow().getTime() + (config.SESSION_TTL_HOURS + 1) * 60 * MINUTE));
+    expect((await getClock('loader')).status).toBe(200);
+  });
 });
 
 describe('POST /demo/clock/next', () => {
@@ -300,14 +309,13 @@ describe('POST /demo/clock/next', () => {
     }
   });
 
-  it('AC-4 goes one part at a time through the day, and signs nobody out on the way', async () => {
+  it('AC-4 goes one part at a time through the day', async () => {
     await setClock(wed('15:00'));
     const day = [['planning', wed('16:00')], ['loading', thu('02:30')], ['on_the_road', thu('03:30')], ['delivered', thu('08:30')]] as const;
     for (const [revision, [part, starts]] of day.entries()) {
       const res = await pressNext('loader', revision);
       expect([res.status, res.body.part, res.body.now, res.body.revision]).toEqual([200, part, starts, revision + 1]);
     }
-    // Wed 15:00 to Thu 08:30 is longer than a session lasts. Sessions run on the real time, so this one holds.
     expect((await getClock('loader')).body).toMatchObject({ part: 'delivered', revision: 4 });
   });
 
@@ -322,6 +330,9 @@ describe('POST /demo/clock/next', () => {
     const { now: said, ...rest } = ClockState.parse(res.body.error.details);
     expect(rest).toEqual({ demo: true, part: 'loading', holdsAt: thu('03:29:59'), next: { part: 'on_the_road', at: thu('03:30') }, revision: 4, day: 1 });
     expect([depotDate(new Date(said)), depotMinutes(new Date(said))]).toEqual(['2026-06-25', 2 * 60 + 30]);
+    // A revision the clock has not reached yet is not the clock's either.
+    const ahead = await pressNext('loader', 5);
+    expect([ahead.status, ahead.body.error.code]).toEqual([409, 'stale_clock']);
 
     expect(await clockRow()).toEqual(moved);
     expect(await moves()).toHaveLength(audited);
@@ -423,8 +434,15 @@ describe('POST /demo/clock/next', () => {
 
 describe('starting the server and starting the day again', () => {
   it('does not start in demo mode when the clock row is missing, and says to run the seed', async () => {
+    await setClock(wed('15:00'));
+    const row = await clockRow();
     await db.delete(demoDay);
-    await expect(initClock()).rejects.toThrow(/seed/i);
+    try {
+      await expect(initClock()).rejects.toThrow(/seed/i);
+    } finally {
+      // The row also holds the note that the seeded day is written, so it goes back whole and at once.
+      await db.insert(demoDay).values(row);
+    }
   });
 
   it('writes the clock back to the first part and raises the revision and the day, inside the caller\'s transaction', async () => {
