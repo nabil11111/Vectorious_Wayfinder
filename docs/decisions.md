@@ -139,3 +139,36 @@ truck needs the dispatcher to see the flag and answer it, and the rest of Live d
 
 **D-40 · 1 Oct · The loader's screens show what the data holds: one list in leaving order, with no waves, dock numbers
 or call buttons.** Every trip has its own leaving time (D-19), and the data has no docks and no phone numbers.
+
+**D-43 · 1 Oct · The driver's no-signal screens come with A4, and A6 keeps only the receipt that waits on the shop's
+phone, built with A5.** The design draws the driver's no-signal states beside the driver's own screens and they share one
+save-first queue, and the waiting receipt belongs with the shop confirming what arrived.
+
+**D-44 · 1 Oct · The driver's day is the loader's day (D-34), and a trip that is out stays on the phone until the driver
+ends it.** The depot has one morning for both, and a late trip must not vanish from its driver at 16:00.
+
+**D-45 · 1 Oct · Every driver action is saved on the phone first, as the request it will send, and sent oldest first, one
+at a time. The server keeps the id of every driver write it applied, and each write names the revision of the stop or
+trip it changes, which the phone works out as it saves.** A delivery happened whether there was a signal or not, so it
+must never need doing again or count twice.
+
+**D-46 · 1 Oct · A time recorded on the phone is kept when it lies between the trip's last recorded time and the server's
+clock, and otherwise the nearer of the two is kept.** The phone counts the app clock on from its last contact and can fall
+behind after a sleep or a clock move, but a record must never land in the future or before what it follows.
+
+**D-47 · 1 Oct · A delivery needs a photo of the goods at the door, and a refused or closed stop may add one. The phone
+shrinks it to 1280 px and 500 KB, and it rides inside the write.** The booklet wants proof so disputes do not rest on
+memory, and one write means a delivery never exists without its photo.
+
+**D-48 · 1 Oct · The driver raises two problems, a shop that refused some and a shop that is closed. The dispatcher
+answers a refusal with "Bring them back" or "Write off on the road", and a closed shop with "Try again on this trip" or
+"Bring them back", which puts the stop's orders back as placed.** These are what the road can do, a replacement is a new
+order and the shop's to ask for (A5), and placed is what the next plan picks up.
+
+**D-49 · 1 Oct · The phone keeps the app's files, the driver's trip and the waiting writes, so the driver's screens open
+with no signal. A service worker keeps the files and never an answer from the API.** A phone reloads tabs, the camera
+often does it, and a queue behind a page that cannot load would strand the driver.
+
+**D-50 · 1 Oct · The phone shows the trip as the server last sent it with the waiting writes applied, through one function
+in the contracts that a test holds the server to.** With no signal the phone must show what the server will say, and one
+function cannot drift from itself.
