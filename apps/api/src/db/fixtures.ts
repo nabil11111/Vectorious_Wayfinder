@@ -15,12 +15,16 @@ export const PRODUCTS = [
 ] as const;
 
 // One account per role, named after the personas in the design, plus a Peliyagoda driver so the shop, dispatcher,
-// loader and a driver all belong to the same depot. The outlet and depot are picked in seed.ts.
+// loader and a driver all belong to the same depot. A store manager belongs to one shop: Nadeesha's is the Fresh
+// shop of the design, and the Style and Tech brands have a manager each so all three order forms can be seen
+// (D-27).
 export const DEMO_USERS = [
-  { username: 'nadeesha', displayName: 'Nadeesha', role: 'store_manager', depot: 'Peliyagoda' },
-  { username: 'ruwan', displayName: 'Ruwan', role: 'dispatcher', depot: 'Peliyagoda' },
-  { username: 'kasun', displayName: 'Kasun', role: 'loader', depot: 'Peliyagoda' },
-  { username: 'dilshan', displayName: 'Dilshan', role: 'driver', depot: 'Peliyagoda' },
-  { username: 'prasanna', displayName: 'Prasanna', role: 'driver', depot: 'Kandy' },
-  { username: 'admin', displayName: 'Admin', role: 'admin', depot: null },
+  { username: 'nadeesha', displayName: 'Nadeesha', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT001' },
+  { username: 'ishara', displayName: 'Ishara', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT017' },
+  { username: 'tharindu', displayName: 'Tharindu', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT064' },
+  { username: 'ruwan', displayName: 'Ruwan', role: 'dispatcher', depot: 'Peliyagoda', outlet: null },
+  { username: 'kasun', displayName: 'Kasun', role: 'loader', depot: 'Peliyagoda', outlet: null },
+  { username: 'dilshan', displayName: 'Dilshan', role: 'driver', depot: 'Peliyagoda', outlet: null },
+  { username: 'prasanna', displayName: 'Prasanna', role: 'driver', depot: 'Kandy', outlet: null },
+  { username: 'admin', displayName: 'Admin', role: 'admin', depot: null, outlet: null },
 ] as const;

@@ -60,6 +60,8 @@ Password for the demo accounts: `wayfinder-demo` (`SEED_PASSWORD`). Admin has it
 | Role | Username | Where |
 | --- | --- | --- |
 | Store manager | `nadeesha` | Fresh Nugegoda (OUT001) |
+| Store manager | `ishara` | Style Liberty Plaza (OUT017) |
+| Store manager | `tharindu` | Tech Matara (OUT064) |
 | Dispatcher | `ruwan` | Peliyagoda depot |
 | Loader | `kasun` | Peliyagoda depot |
 | Driver | `dilshan` | Peliyagoda depot |

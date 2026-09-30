@@ -44,6 +44,13 @@ describe('sign in', () => {
     expect(res.body).toMatchObject({ role: 'driver', depotId: 'Peliyagoda' });
   });
 
+  it('gives the Style and the Tech brand a store manager too, each at their own shop', async () => {
+    const style = await request(app).post('/api/v1/auth/login').send({ username: 'ishara', password });
+    expect(style.body).toMatchObject({ role: 'store_manager', outletId: 'OUT017', depotId: 'Peliyagoda' });
+    const tech = await request(app).post('/api/v1/auth/login').send({ username: 'tharindu', password });
+    expect(tech.body).toMatchObject({ role: 'store_manager', outletId: 'OUT064', depotId: 'Peliyagoda' });
+  });
+
   it('keeps the admin account off the shared demo password', async () => {
     const demo = await request(app).post('/api/v1/auth/login').send({ username: 'admin', password });
     expect(demo.status).toBe(401);
