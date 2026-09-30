@@ -66,9 +66,15 @@ const DRAFT = { outletId: 'OUT001', by: 'nadeesha', chilledCartons: 8, dryCarton
 // are due on Thursday. Each keeps its wanted date and has a deferral in every sent plan that left it out,
 // the latest last. The codes are from the list in spec 007.
 const WAITED_ORDERS = [
-  { outletId: 'OUT001', cartons: 12, wantedFor: WED, leftOut: [{ plan: WED, code: 'over_capacity', reason: 'The fridge van was full.' }] },
-  { outletId: 'OUT030', cartons: 50, wantedFor: WED, leftOut: [{ plan: WED, code: 'no_reefer', reason: 'No fridge truck was left for Gampaha.' }] },
-  { outletId: 'OUT054', cartons: 55, wantedFor: WED, leftOut: [{ plan: WED, code: 'window', reason: 'The truck could not reach the shop before its window closed at 07:30.' }] },
+  { outletId: 'OUT001', cartons: 12, wantedFor: WED, leftOut: [
+    { plan: WED, code: 'over_capacity', reason: 'The fridge van was full.' },
+  ] },
+  { outletId: 'OUT030', cartons: 50, wantedFor: WED, leftOut: [
+    { plan: WED, code: 'no_reefer', reason: 'No fridge truck was left for Gampaha.' },
+  ] },
+  { outletId: 'OUT054', cartons: 55, wantedFor: WED, leftOut: [
+    { plan: WED, code: 'window', reason: 'The truck could not reach the shop before its window closed at 07:30.' },
+  ] },
   { outletId: 'OUT060', cartons: 39, wantedFor: TUE, leftOut: [
     { plan: TUE, code: 'no_reefer', reason: 'No fridge truck was left for Matara.' },
     { plan: WED, code: 'no_reefer', reason: 'No fridge truck was left for Matara. Two were in the workshop.' },
@@ -121,7 +127,8 @@ interface SeedOrder {
 //   plan      its date and depot                      2026-06-24:Peliyagoda
 //   deferral  its plan's date and its order           2026-06-24:2026-06-23:OUT060:chilled
 //   fuel      its date and vehicle                    2026-06-22:VEH001
-const orderKey = (o: Pick<SeedOrder, 'wantedFor' | 'outletId' | 'temp'>) => `${o.wantedFor}:${o.outletId}:${o.temp}`;
+const orderKey = (o: SeedOrder) => `${o.wantedFor}:${o.outletId}:${o.temp}`;
+const orderId = (o: SeedOrder) => demoId('order', orderKey(o));
 const planId = (date: string) => demoId('plan', `${date}:${DEMO_DAY.depotId}`);
 
 // Thursday's placed orders, by the rules at the top.
@@ -140,6 +147,17 @@ function placedOrders(shops: { id: string; brand: Brand }[]): SeedOrder[] {
   return list;
 }
 
+// Nadeesha's draft is two orders, because chilled and dry cartons travel on different trucks.
+const DRAFT_ORDERS: SeedOrder[] = [
+  { outletId: DRAFT.outletId, wantedFor: THU, temp: 'chilled', status: 'draft', lines: [['fresh-chilled-carton', DRAFT.chilledCartons]] },
+  { outletId: DRAFT.outletId, wantedFor: THU, temp: 'dry', status: 'draft', lines: [['fresh-dry-carton', DRAFT.dryCartons]] },
+];
+
+// An order that waited stays under the date its shop wanted, which is also what its id is worked out from.
+const waitedOrder = (w: (typeof WAITED_ORDERS)[number]): SeedOrder => (
+  { outletId: w.outletId, wantedFor: w.wantedFor, temp: 'chilled', status: 'deferred', lines: [['fresh-chilled-carton', w.cartons]] }
+);
+
 // Writes the seeded day and says whether it wrote it. It does nothing when demo mode is off or when the day
 // is already written. It runs in one transaction, so it is all or nothing. Handed a transaction, as the
 // reset does, that becomes a savepoint inside it.
@@ -152,9 +170,12 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
     const [day] = await tx.select().from(demoDay).for('update');
     if (day!.seededAt) return false;
 
-    const shops = await tx.select({ id: outlets.id, brand: outlets.brand }).from(outlets).where(eq(outlets.depotId, DEMO_DAY.depotId)).orderBy(outlets.id);
-    const fleet = await tx.select({ id: vehicles.id, weeklyFuelQuotaL: vehicles.weeklyFuelQuotaL }).from(vehicles).where(eq(vehicles.depotId, DEMO_DAY.depotId)).orderBy(vehicles.id);
-    const people = await tx.select({ id: users.id, username: users.username }).from(users).where(inArray(users.username, [DRAFT.by, SENT_PLANS.by]));
+    const shops = await tx.select({ id: outlets.id, brand: outlets.brand }).from(outlets)
+      .where(eq(outlets.depotId, DEMO_DAY.depotId)).orderBy(outlets.id);
+    const fleet = await tx.select({ id: vehicles.id, weeklyFuelQuotaL: vehicles.weeklyFuelQuotaL }).from(vehicles)
+      .where(eq(vehicles.depotId, DEMO_DAY.depotId)).orderBy(vehicles.id);
+    const people = await tx.select({ id: users.id, username: users.username }).from(users)
+      .where(inArray(users.username, [DRAFT.by, SENT_PLANS.by]));
     const userId = (username: string) => {
       const person = people.find((p) => p.username === username);
       if (!person) throw new Error(`The demo day needs the account "${username}", and it is not there.`);
@@ -165,14 +186,9 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
     // stops the seed and leaves nothing of the day behind.
 
     // The orders and their lines: Thursday's placed ones, Nadeesha's two drafts and the four that waited.
-    const dayOrders: SeedOrder[] = [
-      ...placedOrders(shops),
-      { outletId: DRAFT.outletId, wantedFor: THU, temp: 'chilled', status: 'draft', lines: [['fresh-chilled-carton', DRAFT.chilledCartons]] },
-      { outletId: DRAFT.outletId, wantedFor: THU, temp: 'dry', status: 'draft', lines: [['fresh-dry-carton', DRAFT.dryCartons]] },
-      ...WAITED_ORDERS.map((w): SeedOrder => ({ outletId: w.outletId, wantedFor: w.wantedFor, temp: 'chilled', status: 'deferred', lines: [['fresh-chilled-carton', w.cartons]] })),
-    ];
+    const dayOrders = [...placedOrders(shops), ...DRAFT_ORDERS, ...WAITED_ORDERS.map(waitedOrder)];
     await tx.insert(orders).values(dayOrders.map((o) => ({
-      id: demoId('order', orderKey(o)),
+      id: orderId(o),
       outletId: o.outletId,
       deliveryDate: o.wantedFor,
       temp: o.temp,
@@ -183,7 +199,7 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
     })));
     await tx.insert(orderLines).values(dayOrders.flatMap((o) => o.lines.map(([productId, quantity]) => ({
       id: demoId('line', `${orderKey(o)}:${productId}`),
-      orderId: demoId('order', orderKey(o)),
+      orderId: orderId(o),
       productId,
       quantity,
     }))));
@@ -197,10 +213,13 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
       publishedAt: depotInstant(dayBefore(date), SENT_PLANS.sentAtMinutes),
       createdBy: userId(SENT_PLANS.by),
     })));
-    await tx.insert(deferrals).values(WAITED_ORDERS.flatMap((w) => {
-      const key = orderKey({ wantedFor: w.wantedFor, outletId: w.outletId, temp: 'chilled' });
-      return w.leftOut.map((d) => ({ id: demoId('deferral', `${d.plan}:${key}`), planId: planId(d.plan), orderId: demoId('order', key), code: d.code, reason: d.reason }));
-    }));
+    await tx.insert(deferrals).values(WAITED_ORDERS.flatMap((w) => w.leftOut.map((d) => ({
+      id: demoId('deferral', `${d.plan}:${orderKey(waitedOrder(w))}`),
+      planId: planId(d.plan),
+      orderId: orderId(waitedOrder(w)),
+      code: d.code,
+      reason: d.reason,
+    }))));
 
     // The workshop rows, and the fuel each vehicle used on the days it was out on the road.
     await tx.insert(vehicleDaysOff).values(WORKSHOP.flatMap((w) => w.dates.map((date) => ({ vehicleId: w.vehicleId, date, reason: w.reason }))));

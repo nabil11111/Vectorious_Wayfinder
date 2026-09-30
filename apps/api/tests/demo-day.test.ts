@@ -3,7 +3,9 @@ import { and, eq, isNull, sql, TransactionRollbackError } from 'drizzle-orm';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { db, pool, type Tx } from '../src/db/client';
 import { clearDemoDay, demoId, seedDemoDay } from '../src/db/demo-day';
-import { deferrals, demoDay, fuelLog, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicleDaysOff, vehicles } from '../src/db/schema';
+import {
+  deferrals, demoDay, fuelLog, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicleDaysOff, vehicles,
+} from '../src/db/schema';
 import { depotDate, depotInstant, depotMinutes, realNow } from '../src/lib/clock';
 
 afterAll(() => pool.end());
@@ -205,7 +207,7 @@ describe('the seeded day on an empty database', () => {
     });
   });
 
-  it('AC-31 holds four chilled orders that waited, each with a deferral in the sent plan for Wednesday, and OUT060 with a second one in the plan for Tuesday', async () => {
+  it('AC-31 holds four chilled orders that waited, each deferred in the sent plan for Wednesday, and OUT060 in the plan for Tuesday too', async () => {
     await seeded(async (tx) => {
       const all = await ordersWithLoads(tx);
       const waited = [];
@@ -227,15 +229,17 @@ describe('the seeded day on an empty database', () => {
       ]);
       expect(await tx.select().from(trips)).toEqual([]);
 
-      const why = await tx.select({ plan: plans.date, outletId: orders.outletId, wanted: orders.deliveryDate, status: orders.status, code: deferrals.code, reason: deferrals.reason })
-        .from(deferrals).innerJoin(plans, eq(plans.id, deferrals.planId)).innerJoin(orders, eq(orders.id, deferrals.orderId))
+      // Each deferral with the plan it is in and the order it is about: the shop, the date it wanted and its status.
+      const why = await tx.select({
+        plan: plans.date, outletId: orders.outletId, wanted: orders.deliveryDate, status: orders.status, code: deferrals.code, reason: deferrals.reason,
+      }).from(deferrals).innerJoin(plans, eq(plans.id, deferrals.planId)).innerJoin(orders, eq(orders.id, deferrals.orderId))
         .orderBy(plans.date, orders.outletId);
-      expect(why).toEqual([
-        { plan: TUE, outletId: 'OUT060', wanted: TUE, status: 'deferred', code: 'no_reefer', reason: 'No fridge truck was left for Matara.' },
-        { plan: WED, outletId: 'OUT001', wanted: WED, status: 'deferred', code: 'over_capacity', reason: 'The fridge van was full.' },
-        { plan: WED, outletId: 'OUT030', wanted: WED, status: 'deferred', code: 'no_reefer', reason: 'No fridge truck was left for Gampaha.' },
-        { plan: WED, outletId: 'OUT054', wanted: WED, status: 'deferred', code: 'window', reason: 'The truck could not reach the shop before its window closed at 07:30.' },
-        { plan: WED, outletId: 'OUT060', wanted: TUE, status: 'deferred', code: 'no_reefer', reason: 'No fridge truck was left for Matara. Two were in the workshop.' },
+      expect(why.map((d) => [d.plan, d.outletId, d.wanted, d.status, d.code, d.reason])).toEqual([
+        [TUE, 'OUT060', TUE, 'deferred', 'no_reefer', 'No fridge truck was left for Matara.'],
+        [WED, 'OUT001', WED, 'deferred', 'over_capacity', 'The fridge van was full.'],
+        [WED, 'OUT030', WED, 'deferred', 'no_reefer', 'No fridge truck was left for Gampaha.'],
+        [WED, 'OUT054', WED, 'deferred', 'window', 'The truck could not reach the shop before its window closed at 07:30.'],
+        [WED, 'OUT060', TUE, 'deferred', 'no_reefer', 'No fridge truck was left for Matara. Two were in the workshop.'],
       ]);
       for (const { code } of why) expect(DEFERRAL_CODES).toContain(code);
     });
@@ -262,7 +266,8 @@ describe('the seeded day on an empty database', () => {
   it('AC-33 has 38 chilled orders and 1,825 cartons due on Thursday, in seven districts, with five fridge trucks working', async () => {
     await seeded(async (tx) => {
       // Due on Thursday: placed for that day, or still waiting from an earlier one.
-      const due = (await ordersWithLoads(tx)).filter((o) => o.temp === 'chilled' && ((o.status === 'placed' && o.date === THU) || (o.status === 'deferred' && o.date < THU)));
+      const dueOnThursday = (o: Order) => (o.status === 'placed' && o.date === THU) || (o.status === 'deferred' && o.date < THU);
+      const due = (await ordersWithLoads(tx)).filter((o) => o.temp === 'chilled' && dueOnThursday(o));
       expect(total(due)).toEqual({ orders: 38, units: 1825, kg: 12592.5, m3: 67.525 });
 
       // The spec's table under "Why the day comes up short".
@@ -294,8 +299,10 @@ describe('the seeded day on an empty database', () => {
   it('AC-34 logs 111 fuel rows for Peliyagoda vehicles on 22, 23 and 24 Jun, 300 litres for VEH001 and 201 for VEH002', async () => {
     await seeded(async (tx) => {
       const fleet = await tx.select().from(vehicles).where(eq(vehicles.depotId, 'Peliyagoda')).orderBy(vehicles.id);
-      const fuel = await tx.select({ vehicleId: fuelLog.vehicleId, date: fuelLog.date, litres: fuelLog.litres, tripId: fuelLog.tripId, note: fuelLog.note, depotId: vehicles.depotId, quota: vehicles.weeklyFuelQuotaL })
-        .from(fuelLog).innerJoin(vehicles, eq(vehicles.id, fuelLog.vehicleId)).orderBy(fuelLog.vehicleId, fuelLog.date);
+      const fuel = await tx.select({
+        vehicleId: fuelLog.vehicleId, date: fuelLog.date, litres: fuelLog.litres, tripId: fuelLog.tripId, note: fuelLog.note,
+        depotId: vehicles.depotId, quota: vehicles.weeklyFuelQuotaL,
+      }).from(fuelLog).innerJoin(vehicles, eq(vehicles.id, fuelLog.vehicleId)).orderBy(fuelLog.vehicleId, fuelLog.date);
       expect(fuel).toHaveLength(111);
       expect([...new Set(fuel.map((row) => row.depotId))]).toEqual(['Peliyagoda']);
       expect([...new Set(fuel.map((row) => row.date))].sort()).toEqual([MON, TUE, WED]);
@@ -347,7 +354,9 @@ describe('the seeded day on an empty database', () => {
   it('AC-36 gives every row the same id and content each time it writes the day', async () => {
     await seeded(async (tx) => {
       const first = await everyRow(tx, { realTime: false });
-      expect(await rowCounts(tx)).toEqual({ ...NOTHING, demo_day: 1, orders: 104, order_lines: 142, plans: 2, deferrals: 5, vehicle_days_off: 6, fuel_log: 111 });
+      expect(await rowCounts(tx)).toEqual({
+        ...NOTHING, demo_day: 1, orders: 104, order_lines: 142, plans: 2, deferrals: 5, vehicle_days_off: 6, fuel_log: 111,
+      });
 
       // What a reset does: the day is removed and written again.
       await clearDemoDay(tx);
@@ -411,7 +420,7 @@ describe('the seeded day on an empty database', () => {
     });
   });
 
-  it('clearDemoDay removes every order and plan with all that hangs off them, the fuel and workshop rows and the note that the day is written, and leaves the clock alone', async () => {
+  it('clearDemoDay removes the day with all that hangs off its orders and plans, and leaves the clock alone', async () => {
     await seeded(async (tx) => {
       // What a day of work adds: a plan with a trip, a stop with an order on it and the litres the trip used.
       // And the clock has been moved and the day reset twice.
