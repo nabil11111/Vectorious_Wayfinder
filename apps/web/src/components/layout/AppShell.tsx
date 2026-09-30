@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react';
 import { LogOut } from 'lucide-react';
 import { NavLink } from 'react-router';
+import type { Role } from '@wayfinder/contracts';
 import alertIcon from '@/assets/icons/icon-alert.png';
+import dispatcherIcon from '@/assets/icons/icon-person-dispatcher.png';
+import driverIcon from '@/assets/icons/icon-person-driver.png';
+import loaderIcon from '@/assets/icons/icon-person-loader.png';
+import storeManagerIcon from '@/assets/icons/icon-person-store-manager.png';
 import { Button } from '@/components/ui/button';
 import { ROLE_LABEL, useLogout, useMe } from '@/features/auth/api';
 import { useAppClock } from '@/lib/clock';
@@ -11,6 +16,9 @@ import { DemoClock } from './DemoClock';
 import { Wordmark } from './Wordmark';
 
 export type NavItem = { to: string; label: string; icon?: ReactNode };
+
+// The design's picture of each role, drawn round beside the name. The admin has none, so takes the dispatcher's.
+const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatcher: dispatcherIcon, loader: loaderIcon, driver: driverIcon, admin: dispatcherIcon };
 
 // One shell for every role, matching the Figma top bars. On a phone the nav becomes bottom tabs (shop); on a
 // desktop it sits in the top bar (dispatcher, shop on a desktop). Loader and driver pass no nav at all.
@@ -40,11 +48,15 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
         <div className="flex-1" />
         <span className="hidden font-mono text-lg font-bold tabular-nums md:inline">{clock.time}</span>
         <DemoClock clock={clock} as="panel" className="hidden md:inline-flex" />
-        {/* The design's bell. A count never goes into the picture: it will sit over the corner as a small badge. */}
-        <button type="button" aria-label="Notifications" className="rounded-full p-1 hover:bg-muted"><img src={alertIcon} alt="" className="size-7" /></button>
-        <div className="hidden text-right leading-tight sm:block">
-          <div className="text-sm font-bold">{me.displayName}</div>
-          <div className="text-xs text-muted-foreground">{ROLE_LABEL[me.role]}{place ? ` · ${place}` : ''}</div>
+        {/* The design's bell, last on a phone. A count never goes into the picture: it will sit over the corner as a
+            small badge. */}
+        <button type="button" aria-label="Notifications" className="shrink-0 rounded-full p-1 hover:bg-muted max-md:order-last"><img src={alertIcon} alt="" className="size-7" /></button>
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-border"><img src={AVATAR[me.role]} alt="" className="size-6" /></span>
+          <div className="hidden leading-tight sm:block">
+            <div className="text-sm font-bold">{me.displayName}</div>
+            <div className="text-xs text-muted-foreground">{ROLE_LABEL[me.role]}{place ? ` · ${place}` : ''}</div>
+          </div>
         </div>
         <Button variant="ghost" size="icon" aria-label="Sign out" onClick={() => logout.mutate()}><LogOut /></Button>
       </header>
