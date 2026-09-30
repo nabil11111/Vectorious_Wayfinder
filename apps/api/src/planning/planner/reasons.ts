@@ -37,6 +37,10 @@ const readableName = (shop: EngineOutlet): string => {
 export const shopName = (input: PlannerInput, order: PlannerOrder): string => readableName(shopOf(input, order));
 export const quantityWord = (input: PlannerInput, order: PlannerOrder): 'cartons' | 'boxes' | 'items' =>
   ({ Fresh: 'cartons', Style: 'boxes', Tech: 'items' } as const)[shopOf(input, order).brand];
+// The only vehicles the search could use: fridge ones for chilled goods, vans for a van-only shop. Saying
+// "truck" alone would be untrue when a dry truck reaches the same shop in time on the same plan.
+const vehicleWord = (input: PlannerInput, order: PlannerOrder): string =>
+  `${computeLoad(order.lines, input.products).needsReefer ? 'fridge ' : ''}${shopOf(input, order).parking === 'van_only' ? 'van' : 'truck'}`;
 
 const delaysOtherShops = (order: PlannerOrder, attempts: readonly CandidateAttempt[]): boolean => attempts.some((attempt) => {
   if (attempt.stage !== 'window') return false;
@@ -63,24 +67,24 @@ export function deferralFor(
   input: PlannerInput, order: PlannerOrder, code: PlannerDeferralCode,
   options: { detail?: string; split?: { keptUnits: number; remainingUnits: number }; attempts?: readonly CandidateAttempt[] } = {},
 ): PlanDeferral {
-  const shop = shopOf(input, order), day = weekday(input.date);
+  const shop = shopOf(input, order), day = weekday(input.date), vehicle = vehicleWord(input, order);
   const otherLate = delaysOtherShops(order, options.attempts ?? []);
   const cannotDivideAgain = code === 'over_capacity' && options.detail?.includes('cannot be split again');
   const sentence = (place: string): string => {
     if (options.split) {
       const { keptUnits: kept, remainingUnits: rest } = options.split;
       const cause = code === 'window'
-        ? otherLate ? 'carrying them would make other shops late' : `no truck could reach the shop ${windowDeadline(shop)}`
-        : code === 'fuel' ? "the trucks did not have enough of this week's fuel left"
+        ? otherLate ? 'carrying them would make other shops late' : `no ${vehicle} could reach the shop ${windowDeadline(shop)}`
+        : code === 'fuel' ? `the ${vehicle}s did not have enough of this week's fuel left`
           : code === 'no_reefer' ? 'no fridge truck was free'
             : code === 'no_van' ? 'no van was free'
-              : cannotDivideAgain ? 'the remainder cannot be divided again' : 'the truck was full';
+              : cannotDivideAgain ? 'the remainder cannot be divided again' : `the ${vehicle} was full`;
       return `${kept} of the ${kept + rest} ${quantityWord(input, order)} for ${place} go on ${day}; the other ${rest} wait for the next plan because ${cause}.`;
     }
     if (code === 'no_reefer') return `No fridge truck was free for ${place} on ${day}.`;
     if (code === 'no_van') return `No van was free for ${place} on ${day}, which takes vans only.`;
-    if (code === 'fuel') return `The trucks that could reach ${place} on ${day} did not have enough of this week's fuel left.`;
-    if (code === 'over_capacity') return splitLimitWords(options.detail, place, day) ?? `The trucks going to ${place} on ${day} were full.`;
+    if (code === 'fuel') return `The ${vehicle}s that could reach ${place} on ${day} did not have enough of this week's fuel left.`;
+    if (code === 'over_capacity') return splitLimitWords(options.detail, place, day) ?? `The ${vehicle}s going to ${place} on ${day} were full.`;
     if (shop.mallOpen !== undefined && shop.mallOpen > shop.windowClose) {
       return `The delivery window for ${place} closes at ${toClock(shop.windowClose)}, before the mall opens at ${toClock(shop.mallOpen)} on ${day}.`;
     }
@@ -88,8 +92,8 @@ export function deferralFor(
       return `The mall slot for ${place} closes at ${toClock(shop.mallClose)}, before the shop opens at ${toClock(shop.windowOpen)} on ${day}.`;
     }
     return otherLate
-      ? `The truck that could reach ${place} in time would then have been late for its other shops on ${day}.`
-      : `No truck could reach ${place} ${windowDeadline(shop)} on ${day}.`;
+      ? `The ${vehicle} that could reach ${place} in time would then have been late for its other shops on ${day}.`
+      : `No ${vehicle} could reach ${place} ${windowDeadline(shop)} on ${day}.`;
   };
   let reason = sentence(readableName(shop));
   if (reason.length > 200) reason = sentence(displayName(shop.district.trim()));
@@ -99,7 +103,7 @@ export function deferralFor(
     const { keptUnits: kept, remainingUnits: rest } = options.split;
     const why = code === 'window' ? otherLate ? 'other shops would be late' : `delivery must be ${windowDeadline(shop)}`
       : code === 'fuel' ? "this week's fuel left was not enough"
-        : cannotDivideAgain ? 'the remainder cannot be divided again' : 'the truck was full';
+        : cannotDivideAgain ? 'the remainder cannot be divided again' : `the ${vehicle} was full`;
     reason = `${displayName(shop.district)}: ${kept} ${quantityWord(input, order)} go on ${day}; ${rest} wait because ${why}.`;
   }
   return { orderId: order.id, code, reason };
