@@ -37,6 +37,40 @@ const number = (value: unknown, at: string, positive = false, integer = false, m
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || (positive && value === 0)
     || value > max || (integer && !Number.isSafeInteger(value))) fail(`${at} must be a finite ${positive ? 'positive' : 'nonnegative'}${integer ? ' integer' : ' number'} no greater than ${max}`);
 };
+// Match the units used by load.ts, fuel.ts and cargoProblems. Round-trip comparison accepts ordinary
+// decimal literals such as 6.9 while refusing values that those modules would silently quantize.
+const scaled = (value: number, at: string, scale: number, positive = false): bigint => {
+  number(value, at, positive);
+  const units = Math.round(value * scale);
+  if (!Number.isSafeInteger(units) || units / scale !== value) fail(`${at} must fit checker precision ${1 / scale} and safe scaled integers`);
+  return BigInt(units);
+};
+const safe = (value: bigint, at: string): void => {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) fail(`${at} exceeds safe numeric limits`);
+};
+const largest = (values: bigint[]): bigint => values.reduce((a, b) => a > b ? a : b, 0n);
+
+// These are conservative arithmetic bounds, not route/load calculations. All actual trial calculations
+// still belong to the checker. A day has at most two trips, each with 40 stops, and windows end by 1439.
+const safeDayArithmetic = (input: PlannerInput): void => {
+  const maxOut = largest(input.travel.map((row) => BigInt(row.outMin)));
+  const maxBetween = largest(input.travel.map((row) => BigInt(row.betweenMin)));
+  const maxUnload = largest(input.allowances.map((row) => BigInt(row.minutes)));
+  safe(1439n + 2n * (2n * maxOut + 39n * maxBetween + 40n * maxUnload + BigInt(input.settings.reloadMin)), 'Two-trip timing from travel, allowances and reload');
+
+  const dayKmTenths = 2n * largest(input.travel.map((row) =>
+    2n * scaled(row.outKm, 'travel outKm', 10) + 39n * scaled(row.betweenKm, 'travel betweenKm', 10)));
+  const numerator = dayKmTenths * 100n;
+  safe(numerator, 'Two-trip distance numerator for fuel');
+  for (const vehicle of input.vehicles) {
+    const efficiency = scaled(vehicle.kmPerL, `vehicle ${vehicle.id} kmPerL`, 100, true);
+    const used = scaled(vehicle.litresUsedThisWeek, `vehicle ${vehicle.id} litresUsedThisWeek`, 10);
+    const left = scaled(vehicle.weeklyFuelQuotaL, `vehicle ${vehicle.id} weeklyFuelQuotaL`, 10) - used;
+    safe((left < 0n ? -left : left) * efficiency, `vehicle ${vehicle.id} fuel quota comparison`);
+    // Ceiling bounds the checker's nearest-tenth rounding, including a tie that rounds upward.
+    safe(used + (numerator + efficiency - 1n) / efficiency, `vehicle ${vehicle.id} used and proposed fuel`);
+  }
+};
 const minute = (value: unknown, at: string): void => number(value, at, false, true, 1439);
 const date = (value: unknown, at: string): void => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) fail(`${at} must be a YYYY-MM-DD date`);
@@ -85,8 +119,8 @@ export function prepareInput(input: PlannerInput): PlannerInput {
   if (input.orders.length > 300) fail('At most 300 input orders can be planned');
 
   for (const product of input.products) {
-    number(product.kgPerUnit, `product ${product.id} kgPerUnit`, true);
-    number(product.m3PerUnit, `product ${product.id} m3PerUnit`, true);
+    scaled(product.kgPerUnit, `product ${product.id} kgPerUnit`, 100, true);
+    scaled(product.m3PerUnit, `product ${product.id} m3PerUnit`, 1000, true);
     choice(product.temp, ['chilled', 'dry'], `product ${product.id} temp`);
     flag(product.needsTailLift, `product ${product.id} needsTailLift`);
     flag(product.keepUpright, `product ${product.id} keepUpright`);
@@ -114,14 +148,16 @@ export function prepareInput(input: PlannerInput): PlannerInput {
     choice(vehicle.type, ['truck', 'van'], `${at} type`);
     choice(vehicle.temp, ['reefer', 'ambient'], `${at} temp`);
     flag(vehicle.available, `${at} available`);
-    for (const field of ['weightCapKg', 'volumeCapM3', 'kmPerL'] as const) number(vehicle[field], `${at} ${field}`, true);
-    for (const field of ['weeklyFuelQuotaL', 'litresUsedThisWeek'] as const) number(vehicle[field], `${at} ${field}`);
+    scaled(vehicle.weightCapKg, `${at} weightCapKg`, 100, true);
+    scaled(vehicle.volumeCapM3, `${at} volumeCapM3`, 1000, true);
+    scaled(vehicle.kmPerL, `${at} kmPerL`, 100, true);
+    for (const field of ['weeklyFuelQuotaL', 'litresUsedThisWeek'] as const) scaled(vehicle[field], `${at} ${field}`, 10);
   }
   for (const row of input.travel) {
     text(row.depotId, 'travel depotId');
     text(row.district, 'travel district');
     for (const field of ['outMin', 'betweenMin'] as const) number(row[field], `travel ${row.district} ${field}`, false, true);
-    for (const field of ['outKm', 'betweenKm'] as const) number(row[field], `travel ${row.district} ${field}`);
+    for (const field of ['outKm', 'betweenKm'] as const) scaled(row[field], `travel ${row.district} ${field}`, 10);
   }
   unique(input.travel, 'travel key', (row) => JSON.stringify([row.depotId, row.district]));
   for (const row of input.allowances) {
@@ -130,8 +166,14 @@ export function prepareInput(input: PlannerInput): PlannerInput {
     number(row.minutes, `allowance ${row.brand}/${row.dockType} minutes`, false, true);
   }
   unique(input.allowances, 'allowance key', (row) => JSON.stringify([row.brand, row.dockType]));
+  safeDayArithmetic(input);
 
   const shops = new Map(input.outlets.map((shop) => [shop.id, shop]));
+  const productUnits = new Map(input.products.map((product) => [product.id, {
+    kg: scaled(product.kgPerUnit, `product ${product.id} kgPerUnit`, 100, true),
+    volume: scaled(product.m3PerUnit, `product ${product.id} m3PerUnit`, 1000, true),
+  }]));
+  let allKg = 0n, allVolume = 0n, allUnits = 0n;
   const chilled = new Map<string, boolean>();
   for (const order of input.orders) {
     const at = `order ${order.id}`;
@@ -157,6 +199,18 @@ export function prepareInput(input: PlannerInput): PlannerInput {
     unique(order.lines, `${at} line product`, (line) => line.productId);
     const load = computeLoad(order.lines, input.products);
     if (!Number.isSafeInteger(load.units) || !Number.isFinite(load.kg) || !Number.isFinite(load.m3)) fail(`${at} load exceeds safe numeric limits`);
+    for (const line of order.lines) {
+      const product = productUnits.get(line.productId)!; // computeLoad has already checked the product lookup.
+      const quantity = BigInt(line.quantity);
+      allKg += product.kg * quantity;
+      allVolume += product.volume * quantity;
+      allUnits += quantity;
+    }
+    // Any candidate contains a subset of these goods. Check exact integer sums before Number arithmetic
+    // can erase a unit; reserve five hundredths for computeLoad's nearest-tenth kg rounding as well.
+    safe(allKg + 5n, 'Aggregate order load in hundredths of kg');
+    safe(allVolume, 'Aggregate order load in litres');
+    safe(allUnits, 'Aggregate order load units');
     chilled.set(order.id, load.needsReefer);
   }
 
