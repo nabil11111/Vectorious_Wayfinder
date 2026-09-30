@@ -239,3 +239,14 @@ it('AC-13 answers each of the four writes sent twice in a row with the day as it
     .where(and(eq(auditLog.actorId, kasunId), inArray(auditLog.entityId, [truck.tripId, stopOf(truck, 1).id, stopOf(truck, 2).id, problems[0]!.id])));
   expect(written.map((row) => row.action).sort()).toEqual(['issue.raised', 'stop.loaded', 'stop.loaded', 'trip.loading_started', 'trip.ready']);
 });
+
+it('AC-13 knows a retry by its id in capitals too, as the database keeps an id in small letters', async () => {
+  const { truck, plan } = await sent();
+  const writeId = randomUUID();
+  const first = await loader.start(truck, plan, writeId);
+  expect(first.status).toBe(200);
+  const again = await loader.start(truck, plan, writeId.toUpperCase());
+  expect(again.status).toBe(200);
+  expect(again.body).toEqual(first.body);
+  expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, truck.tripId), eq(auditLog.action, 'trip.loading_started')))).toHaveLength(1);
+});
