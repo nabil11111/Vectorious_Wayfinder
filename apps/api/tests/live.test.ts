@@ -89,9 +89,12 @@ afterEach(() => {
   closeStreams();
   vi.useRealTimers();
 });
-// An open stream or server would keep the test run from ending.
+// An open stream or server would keep the test run from ending. close() alone waits for every connection,
+// and fetch can hold a spare one that never sent a request, so they are all closed here.
 afterAll(async () => {
-  await new Promise((done) => server.close(done));
+  const closed = new Promise((done) => server.close(done));
+  server.closeAllConnections();
+  await closed;
   await pool.end();
 });
 
@@ -119,8 +122,51 @@ describe('the live stream', () => {
   it('AC-18 answers a signed-out person with 401 signed_out', async () => {
     for (const cookie of [undefined, 'wf_session=not-a-session']) {
       const res = await events(cookie);
-      expect([res.status, ApiError.parse(await res.json()).error.code]).toEqual([401, 'signed_out']);
+      expect(res.status).toBe(401);
+      expect(ApiError.parse(await res.json()).error.code).toBe('signed_out');
     }
+  });
+
+  it('AC-19 sends a depot\'s change to its dispatcher, loaders and drivers and to admins, and to nobody else', async () => {
+    const change = { topic: 'plans', depotId: 'Peliyagoda' };
+    expect(await whoHears(change, ['ruwan', 'kasun', 'dilshan', 'admin', 'prasanna'])).toEqual(['ruwan', 'kasun', 'dilshan', 'admin']);
+    // A store manager is left out too, though her shop belongs to that depot.
+    expect(await whoHears(change, ['nadeesha', 'ruwan'])).toEqual(['ruwan']);
+  });
+
+  it('AC-20 sends an outlet\'s change to its store manager as well, and to no other store manager', async () => {
+    const people: Person[] = ['nadeesha', 'ruwan', 'dilshan', 'admin', 'prasanna'];
+    expect(await whoHears({ topic: 'orders', id: 'an-order', outletId: 'OUT001', depotId: 'Peliyagoda' }, people)).toEqual(['nadeesha', 'ruwan', 'dilshan', 'admin']);
+    // OUT002 is another Peliyagoda shop, so its change is not Nadeesha's to hear.
+    expect(await whoHears({ topic: 'orders', id: 'another-order', outletId: 'OUT002', depotId: 'Peliyagoda' }, people)).toEqual(['ruwan', 'dilshan', 'admin']);
+  });
+
+  it('AC-21 sends a change for everyone to every open stream', async () => {
+    const people: Person[] = ['nadeesha', 'ruwan', 'kasun', 'prasanna', 'admin'];
+    expect(await whoHears({ topic: 'clock' }, people)).toEqual(people);
+  });
+
+  it('AC-22 sends the topic and one id, and nothing else', async () => {
+    const nadeesha = await listen('nadeesha');
+    announce({ topic: 'orders', id: 'an-order', outletId: 'OUT001', depotId: 'Peliyagoda' });
+    announce({ topic: 'clock' });
+    await soon(() => expect(messages(nadeesha)).toEqual([
+      'event: change\ndata: {"topic":"orders","id":"an-order"}',
+      'event: change\ndata: {"topic":"clock"}',
+    ]));
+  });
+
+  it('keeps a failed write to one stream away from the code that announced and from the other streams', async () => {
+    const ruwan = await listen('ruwan');
+    const broken = await listen('kasun');
+    vi.spyOn(served.at(-1)!, 'write').mockImplementation(() => {
+      throw new Error('write EPIPE');
+    });
+    expect(() => announce({ topic: 'plans', depotId: 'Peliyagoda' })).not.toThrow();
+    await soon(() => expect(changes(ruwan)).toEqual([{ topic: 'plans' }]));
+    // The broken stream is cut, so its screen opens a new one and fetches everything again.
+    await broken.over;
+    expect(broken.state).toBe('cut');
   });
 
   it('AC-24 leaves an open stream out of the rate limit', async () => {
@@ -140,7 +186,8 @@ describe('the live stream', () => {
   it('AC-25 answers a new stream with 503 too_many_streams when the limit of open streams is reached', async () => {
     for (const person of ['nadeesha', 'ruwan', 'kasun', 'prasanna', 'admin'] as const) await listen(person);
     const sixth = await events(cookies.dilshan);
-    expect([sixth.status, ApiError.parse(await sixth.json()).error.code]).toEqual([503, 'too_many_streams']);
+    expect(sixth.status).toBe(503);
+    expect(ApiError.parse(await sixth.json()).error.code).toBe('too_many_streams');
   });
 
   it('gives the place of a stream back when its screen goes away', async () => {
@@ -155,56 +202,13 @@ describe('the live stream', () => {
     // A server of its own, stopped the way server.ts stops on SIGTERM: the streams first, then the server.
     const stopping = createApp().listen(0);
     await once(stopping, 'listening');
-    const streams = [await listen('ruwan', address(stopping)), await listen('nadeesha', address(stopping)), await listen('admin', address(stopping))];
+    const at = address(stopping);
+    const streams = [await listen('ruwan', at), await listen('nadeesha', at), await listen('admin', at)];
     closeStreams();
     // close() calls back once no connection is left open. A stream that was still open would hold it, and
     // the process, for good.
     await new Promise<void>((done, failed) => stopping.close((err) => (err ? failed(err) : done())));
     await Promise.all(streams.map((stream) => stream.over));
     expect(streams.map((stream) => stream.state)).toEqual(['ended', 'ended', 'ended']);
-  });
-});
-
-describe('an announced change', () => {
-  it('AC-19 goes to the dispatcher, loaders and drivers of its depot and to admins, and to nobody else', async () => {
-    const change = { topic: 'plans', depotId: 'Peliyagoda' };
-    expect(await whoHears(change, ['ruwan', 'kasun', 'dilshan', 'admin', 'prasanna'])).toEqual(['ruwan', 'kasun', 'dilshan', 'admin']);
-    // A store manager is left out too, though her shop belongs to that depot.
-    expect(await whoHears(change, ['nadeesha', 'ruwan'])).toEqual(['ruwan']);
-  });
-
-  it('AC-20 goes to the store manager of its outlet as well, and to no other store manager', async () => {
-    const people: Person[] = ['nadeesha', 'ruwan', 'dilshan', 'admin', 'prasanna'];
-    expect(await whoHears({ topic: 'orders', id: 'an-order', outletId: 'OUT001', depotId: 'Peliyagoda' }, people)).toEqual(['nadeesha', 'ruwan', 'dilshan', 'admin']);
-    // OUT002 is another Peliyagoda shop, so its change is not Nadeesha's to hear.
-    expect(await whoHears({ topic: 'orders', id: 'another-order', outletId: 'OUT002', depotId: 'Peliyagoda' }, people)).toEqual(['ruwan', 'dilshan', 'admin']);
-  });
-
-  it('AC-21 goes to every open stream when it is for everyone', async () => {
-    const people: Person[] = ['nadeesha', 'ruwan', 'kasun', 'prasanna', 'admin'];
-    expect(await whoHears({ topic: 'clock' }, people)).toEqual(people);
-  });
-
-  it('AC-22 is sent as its topic and one id, and nothing else', async () => {
-    const nadeesha = await listen('nadeesha');
-    announce({ topic: 'orders', id: 'an-order', outletId: 'OUT001', depotId: 'Peliyagoda' });
-    announce({ topic: 'clock' });
-    await soon(() => expect(messages(nadeesha)).toEqual([
-      'event: change\ndata: {"topic":"orders","id":"an-order"}',
-      'event: change\ndata: {"topic":"clock"}',
-    ]));
-  });
-
-  it('never fails the code that announced it, or the other streams, when the write to one stream fails', async () => {
-    const ruwan = await listen('ruwan');
-    const broken = await listen('kasun');
-    vi.spyOn(served.at(-1)!, 'write').mockImplementation(() => {
-      throw new Error('write EPIPE');
-    });
-    expect(() => announce({ topic: 'plans', depotId: 'Peliyagoda' })).not.toThrow();
-    await soon(() => expect(changes(ruwan)).toEqual([{ topic: 'plans' }]));
-    // The broken stream is cut, so its screen opens a new one and fetches everything again.
-    await broken.over;
-    expect(broken.state).toBe('cut');
   });
 });
