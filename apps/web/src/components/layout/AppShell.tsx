@@ -17,6 +17,10 @@ import { Wordmark } from './Wordmark';
 
 export type NavItem = { to: string; label: string; icon?: ReactNode };
 
+// A role's home ("/store", "/admin") is the start of every address in its area, so its tab is lit only on the
+// home page itself. Every other tab stays lit on the pages under it, such as Orders on "/store/orders/new".
+const isHome = (to: string) => to.split('/').filter(Boolean).length === 1;
+
 // The design's picture of each role, drawn round beside the name. The admin has none, so takes the dispatcher's.
 const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatcher: dispatcherIcon, loader: loaderIcon, driver: driverIcon, admin: dispatcherIcon };
 
@@ -40,7 +44,7 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
         {nav.length > 0 && (
           <nav className="ml-4 hidden gap-1 md:flex">
             {nav.map((n) => (
-              <NavLink key={n.to} to={n.to} className={({ isActive }) => cn('rounded-lg px-3 py-1.5 text-sm font-medium', isActive ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+              <NavLink key={n.to} to={n.to} end={isHome(n.to)} className={({ isActive }) => cn('rounded-lg px-3 py-1.5 text-sm font-medium', isActive ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground')}>
                 {n.label}
               </NavLink>
             ))}
@@ -78,7 +82,7 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
       {nav.length > 0 && (
         <nav className="sticky bottom-0 grid border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden" style={{ gridTemplateColumns: `repeat(${nav.length}, 1fr)` }}>
           {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} className={({ isActive }) => cn('flex flex-col items-center gap-1 py-2 text-xs', isActive ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+            <NavLink key={n.to} to={n.to} end={isHome(n.to)} className={({ isActive }) => cn('flex flex-col items-center gap-1 py-2 text-xs', isActive ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
               {n.icon}
               {n.label}
             </NavLink>
