@@ -283,6 +283,17 @@ describe('rules for time', () => {
     expect(check('Peliyagoda', [trip('VEH012', 1, [])])).toEqual([]);
   });
 
+  it('leaves the input as it came and says the same thing twice', () => {
+    // Trip 2 is listed first and both trips are late, so the trips are put in order and an earlier leaving time
+    // is searched for.
+    const input = inputFor('Kandy', { trips: [trip('VEH044', 2, ['OUT084']), trip('VEH044', 1, badulla)] });
+    const before = structuredClone(input);
+    const first = timeProblems(input, timesOf(input));
+    expect(only(first, 'window_missed').map((p) => [p.tripNo, p.outletId])).toEqual([[1, 'OUT113'], [2, 'OUT084']]);
+    expect(timeProblems(input, timesOf(input))).toEqual(first);
+    expect(input).toEqual(before);
+  });
+
   it('throws an error that names a vehicle or shop the input does not hold', () => {
     // The times are handed over as nothing, so it is the rules that meet whatever is missing.
     const missing: [string, () => unknown][] = [

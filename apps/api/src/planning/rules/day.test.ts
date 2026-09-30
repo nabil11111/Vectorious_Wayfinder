@@ -92,6 +92,15 @@ describe('rules for fuel and the day', () => {
     expect(check([other], { vehicles: fleet('VEH012', { available: false }) })).toEqual([]);
   });
 
+  it('leaves the input as it came and says the same thing twice', () => {
+    const input = inputFor('Peliyagoda', { trips: [colombo, galle('VEH006'), gampaha], operatingDay: false, vehicles: fleet('VEH006', { litresUsedThisWeek: 330, available: false }) });
+    const before = structuredClone(input);
+    const first = dayProblems(input, fuelOf(input));
+    expect(first.map((p) => p.code)).toEqual(['vehicle_off', 'fuel_over_quota', 'not_operating_day']);
+    expect(dayProblems(input, fuelOf(input))).toEqual(first);
+    expect(input).toEqual(before);
+  });
+
   it('throws an error that names a vehicle the input does not hold', () => {
     const input = inputFor('Peliyagoda', { trips: [gampaha] });
     const missing: [string, () => unknown][] = [
