@@ -139,13 +139,15 @@ export function placesOf(plan: DraftPlan): Map<string, Place> {
 }
 
 // Two drafts hold the same plan when their trips, stops, times, drivers and deferrals are the same, whatever
-// order the trips and deferrals are listed in.
+// order the trips and deferrals are listed in. The server keeps a vehicle's only trip as trip 1 (the contract's
+// DraftPlan note), so a lone trip 2 on screen is the same trip as the board's trip 1.
 const canonical = (plan: DraftPlan) => ({
   mixBrands: plan.mixBrands,
-  trips: [...plan.trips].sort((a, b) => keyOf(a).localeCompare(keyOf(b))).map((trip) => ({
-    key: keyOf(trip), leaveAt: trip.leaveAt, driverId: trip.driverId,
-    stops: trip.stops.map((stop) => ({ outletId: stop.outletId, orderIds: [...stop.orderIds].sort() })),
-  })),
+  trips: plan.trips.map((trip) => ({ ...trip, tripNo: plan.trips.filter((t) => t.vehicleId === trip.vehicleId).length === 1 ? 1 : trip.tripNo }))
+    .sort((a, b) => keyOf(a).localeCompare(keyOf(b))).map((trip) => ({
+      key: keyOf(trip), leaveAt: trip.leaveAt, driverId: trip.driverId,
+      stops: trip.stops.map((stop) => ({ outletId: stop.outletId, orderIds: [...stop.orderIds].sort() })),
+    })),
   deferrals: [...plan.deferrals].sort((a, b) => a.orderId.localeCompare(b.orderId)).map((d) => ({ orderId: d.orderId, code: d.code, reason: d.reason.trim() })),
 });
 export const sameDraft = (a: DraftPlan, b: DraftPlan) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));

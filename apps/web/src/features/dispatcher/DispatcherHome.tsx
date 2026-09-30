@@ -25,13 +25,13 @@ export function DispatcherHome() {
   return (
     <AppShell nav={DISPATCHER_NAV} place={depot ?? undefined} bar={depot && <DepotSwitch depot={depot} />} wide={wide}>
       <Routes>
-        <Route index element={<ComingNext title="Dashboard" what="Tiles for today, what needs you, and the trucks out now. Figma: Dispatcher · Dashboard." />} />
+        <Route index element={<ComingNext title="Dashboard" what="Tiles for today, what needs you, and the trucks out now." />} />
         <Route path="plan" element={<PlanBoardPage />} />
         <Route path="plan/:date" element={<ViewPlanPage />} />
-        <Route path="live" element={<ComingNext title="Live day" what="The trucks on the road and what needs an answer. Figma: Dispatcher · Live day." />} />
-        <Route path="orders" element={<ComingNext title="Orders" what="Every order of the depot and where it is. Figma: Dispatcher · Orders." />} />
-        <Route path="history" element={<ComingNext title="History" what="Days already delivered. Figma: Dispatcher · History." />} />
-        <Route path="fleet" element={<ComingNext title="Fleet" what="The depot's vehicles and their weeks. Figma: Dispatcher · Fleet." />} />
+        <Route path="live" element={<ComingNext title="Live day" what="The trucks on the road and what needs an answer." />} />
+        <Route path="orders" element={<ComingNext title="Orders" what="Every order of the depot and where it is." />} />
+        <Route path="history" element={<ComingNext title="History" what="Days already delivered." />} />
+        <Route path="fleet" element={<ComingNext title="Fleet" what="The depot's vehicles and their weeks." />} />
         <Route path="*" element={<Navigate to="/dispatcher" replace />} />
       </Routes>
     </AppShell>
