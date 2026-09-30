@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { LoadingDay, PlanBoard, type DraftPlan, type DraftTrip, type LoadingDecision, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
-import { eq, sql } from 'drizzle-orm';
+import {
+  DecideIssueResponse, IssueList, LoadingDay, PlanBoard, type DraftPlan, type DraftTrip, type LoadingDecision, type LoadingStop, type LoadingTruck,
+} from '@wayfinder/contracts';
+import { eq } from 'drizzle-orm';
 import type request from 'supertest';
 import { expect } from 'vitest';
 import { db } from '../src/db/client';
@@ -99,10 +101,13 @@ export const answeredTruck = (res: request.Response, vehicleId: string) => {
   return truckOf(LoadingDay.parse(res.body), vehicleId);
 };
 
-// The dispatcher's answer to a flag, written as spec 012's answer writes it: decided by Ruwan at the app clock's time.
-export async function answerFlag(issueId: string, decision: LoadingDecision, at: Date): Promise<void> {
-  const [ruwan] = await db.select({ id: users.id }).from(users).where(eq(users.username, 'ruwan'));
-  await db.update(issues).set({ status: 'decided', decision, decidedBy: ruwan!.id, decidedAt: at, revision: sql`${issues.revision} + 1` }).where(eq(issues.id, issueId));
+// The dispatcher answers a flag from Live day, naming the revision his list shows, at the app clock's time.
+export async function answerFlag(dispatcher: Agent, issueId: string, decision: LoadingDecision): Promise<DecideIssueResponse> {
+  const open = IssueList.parse((await dispatcher.get('/api/v1/issues')).body).issues.find((problem) => problem.id === issueId);
+  if (!open) throw new Error(`Problem ${issueId} is not open.`);
+  const res = await dispatcher.post(`/api/v1/issues/${issueId}/decide`).send({ revision: open.revision, decision });
+  expect(res.status).toBe(200);
+  return DecideIssueResponse.parse(res.body);
 }
 
 // A Kandy plan with one loading trip, written straight into the tables: a truck, stop and line of another depot.

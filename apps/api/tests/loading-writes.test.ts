@@ -165,7 +165,8 @@ it('AC-17 refuses a line already flagged, open or answered, with already_flagged
   expect(again.body.error).toMatchObject({ message: 'The 4 dry cartons for Fresh Nugegoda are already flagged.', details: { lineId: dryLine(truck).lineId } });
   expect(await heldRows()).toEqual(before);
 
-  await answerFlag(truck.issues[0]!.id, 'go_short', depotInstant(THU, 2 * 60 + 35));
+  freeze(THU, 2 * 60 + 35);
+  await answerFlag(ruwan, truck.issues[0]!.id, 'go_short');
   before = await heldRows();
   expect(code(await loader.flag(truck, 1, [{ lineId: dryLine(truck).lineId, counted: 2 }]))).toEqual([409, 'already_flagged']);
   expect(await heldRows()).toEqual(before);
@@ -197,7 +198,8 @@ it('AC-22 refuses ready with stops not loaded, naming them, and with a flag open
 
 it('AC-23 marks VEH035 ready after "Go short": ready at the clock, the counts that left, its five orders loaded and the shops told after the commit', async () => {
   let truck = await flaggedAndLoaded(3);
-  await answerFlag(truck.issues[0]!.id, 'go_short', depotInstant(THU, 2 * 60 + 35));
+  freeze(THU, 2 * 60 + 35);
+  await answerFlag(ruwan, truck.issues[0]!.id, 'go_short');
   truck = truckOf(await loader.read(), 'VEH035');
   const lines = truck.stops.flatMap((s) => s.lines);
   const orderIds = [...new Set(lines.map((l) => l.orderId))];
@@ -240,7 +242,8 @@ it('AC-23 marks VEH035 ready after "Go short": ready at the clock, the counts th
 
 it('AC-23 sends the dry order out empty when its line is counted at 0 and goes short: loaded with 0 on, and 114 cartons on the truck', async () => {
   let truck = await flaggedAndLoaded(0);
-  await answerFlag(truck.issues[0]!.id, 'go_short', depotInstant(THU, 2 * 60 + 35));
+  freeze(THU, 2 * 60 + 35);
+  await answerFlag(ruwan, truck.issues[0]!.id, 'go_short');
   truck = truckOf(await loader.read(), 'VEH035');
   const ready = answeredTruck(await loader.ready(truck), 'VEH035');
   expect(ready).toMatchObject({ status: 'ready', short: 4, on: { units: 114, kg: 786.6, m3: 4.218 } });

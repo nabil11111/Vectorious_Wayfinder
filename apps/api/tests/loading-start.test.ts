@@ -227,7 +227,8 @@ it('AC-13 answers each of the four writes sent twice in a row with the day as it
   loading = await twice((id) => loader.stopLoaded(loading, 2, id));
   loading = await twice((id) => loader.flag(loading, 1, [{ lineId: dryLine(loading).lineId, counted: 3 }], { note: 'Only 3 dry cartons in the store' }, id));
   loading = answeredTruck(await loader.stopLoaded(loading, 1), 'VEH035');
-  await answerFlag(loading.issues[0]!.id, 'go_short', depotInstant(THU, 2 * 60 + 35));
+  freeze(THU, 2 * 60 + 35);
+  await answerFlag(ruwan, loading.issues[0]!.id, 'go_short');
   const answered = truckOf(await loader.read(), 'VEH035');
   loading = await twice((id) => loader.ready(answered, id));
   expect(loading.status).toBe('ready');
