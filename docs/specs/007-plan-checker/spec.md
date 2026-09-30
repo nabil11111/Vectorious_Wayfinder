@@ -1,8 +1,9 @@
-# 007 · Planning engine: load, timeline and rule checker
+# 007 · Plan checker: load, timeline and rules
 
 **Status:** Ready  ·  **Owner:**  ·  **Design:** no screens of its own. Its numbers and checks show on Dispatcher · Edit plan and View plan, Shop · New orders (summary) and Loader · Load a truck.
 
-Pieces B1, B2 and B3 of [the map](../000-map.md). This spec replaces 001 and 002.
+Pieces B1, B2 and B3 of [the map](../000-map.md). This spec replaces 001 and 002. It checks a plan. It does not
+build one: that is the planner (B4, the suggested plan), which gets its own spec later.
 
 ## Why
 The booklet says plans "must account for capacity, temperature requirements, outlet access, delivery windows,

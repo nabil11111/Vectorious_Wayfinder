@@ -63,4 +63,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [004](004-admin-vehicles.md) | Admin: vehicles | Ready |
 | [005](005-admin-outlets.md) | Admin: outlets | Ready (after 004) |
 | [006](006-admin-products.md) | Admin: products | Ready (after 004) |
-| [007](007-planning-engine/spec.md) | Planning engine: load calculator, trip timeline and rule checker | Ready |
+| [007](007-plan-checker/spec.md) | Plan checker: load calculator, trip timeline and rules | Ready |
