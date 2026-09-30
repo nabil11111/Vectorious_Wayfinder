@@ -236,6 +236,6 @@ it('AC-13 answers each of the four writes sent twice in a row with the day as it
   const problems = await db.select().from(issues);
   expect(problems).toHaveLength(1);
   const written = await db.select({ action: auditLog.action }).from(auditLog)
-    .where(inArray(auditLog.entityId, [truck.tripId, stopOf(truck, 1).id, stopOf(truck, 2).id, problems[0]!.id]));
+    .where(and(eq(auditLog.actorId, kasunId), inArray(auditLog.entityId, [truck.tripId, stopOf(truck, 1).id, stopOf(truck, 2).id, problems[0]!.id])));
   expect(written.map((row) => row.action).sort()).toEqual(['issue.raised', 'stop.loaded', 'stop.loaded', 'trip.loading_started', 'trip.ready']);
 });
