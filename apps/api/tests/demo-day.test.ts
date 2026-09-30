@@ -42,7 +42,8 @@ const seeded = (check: (tx: Tx) => Promise<void>) => onEmptyDatabase(async (tx) 
 
 // Every order with its shop and its load, added up from the product list the database holds. The load is
 // kept in whole units, hundredths of a kilo and litres of space, and divided once at the end, because
-// 6.9 × 48 is 331.20000000000005 in JavaScript.
+// 6.9 × 48 is 331.20000000000005 in JavaScript. `strays` counts the lines whose item is not of the shop's
+// brand or not of the order's temperature.
 function ordersWithLoads(tx: Tx) {
   return tx.select({
     id: orders.id, outletId: orders.outletId, date: orders.deliveryDate, temp: orders.temp, status: orders.status,
@@ -52,6 +53,7 @@ function ordersWithLoads(tx: Tx) {
     centikilos: sql<number>`coalesce(sum(${orderLines.quantity} * ${products.kgPerUnit} * 100), 0)::int`,
     litres: sql<number>`coalesce(sum(${orderLines.quantity} * ${products.m3PerUnit} * 1000), 0)::int`,
     tailLift: sql<boolean>`coalesce(bool_or(${products.needsTailLift}), false)`,
+    strays: sql<number>`(count(*) filter (where ${products.brand} <> ${outlets.brand} or ${products.temp} <> ${orders.temp}))::int`,
   }).from(orders)
     .innerJoin(outlets, eq(outlets.id, orders.outletId))
     .leftJoin(orderLines, eq(orderLines.orderId, orders.id))
@@ -131,8 +133,10 @@ describe('the seeded day on an empty database', () => {
       expect(placed).toHaveLength(98);
       expect([...new Set(placed.map((o) => o.date))]).toEqual([THU]);
       expect([...new Set(placed.map((o) => o.depotId))]).toEqual(['Peliyagoda']);
-      // A shop has one order per temperature, never two.
+      // A shop has one order per temperature, never two, and an order holds only items of its shop's brand
+      // and of its own temperature. So a Fresh chilled order is chilled cartons and nothing else.
       expect(new Set(placed.map((o) => `${o.outletId} ${o.temp}`)).size).toBe(98);
+      expect(placed.filter((o) => o.strays > 0 || o.units === 0)).toEqual([]);
 
       const count = (brand: string, temp: string) => placed.filter(is(brand, temp)).length;
       expect({ freshDry: count('Fresh', 'dry'), freshChilled: count('Fresh', 'chilled'), style: count('Style', 'dry'), tech: count('Tech', 'dry') })
@@ -203,12 +207,14 @@ describe('the seeded day on an empty database', () => {
 
   it('AC-31 holds four chilled orders that waited, each with a deferral in the sent plan for Wednesday, and OUT060 with a second one in the plan for Tuesday', async () => {
     await seeded(async (tx) => {
-      const waited = (await ordersWithLoads(tx)).filter((o) => o.status === 'deferred');
-      expect(waited.map((o) => [o.outletId, o.temp, o.units, o.date])).toEqual([
-        ['OUT001', 'chilled', 12, WED],
-        ['OUT030', 'chilled', 50, WED],
-        ['OUT054', 'chilled', 55, WED],
-        ['OUT060', 'chilled', 39, TUE],
+      const all = await ordersWithLoads(tx);
+      const waited = [];
+      for (const o of all.filter((order) => order.status === 'deferred')) waited.push([o.outletId, o.temp, await linesOf(tx, o.id), o.date]);
+      expect(waited).toEqual([
+        ['OUT001', 'chilled', { 'fresh-chilled-carton': 12 }, WED],
+        ['OUT030', 'chilled', { 'fresh-chilled-carton': 50 }, WED],
+        ['OUT054', 'chilled', { 'fresh-chilled-carton': 55 }, WED],
+        ['OUT060', 'chilled', { 'fresh-chilled-carton': 39 }, TUE],
       ]);
 
       // Peliyagoda's plans for Tuesday and Wednesday, which Ruwan sent at 17:00 on the day before. They hold
@@ -369,6 +375,17 @@ describe('the seeded day on an empty database', () => {
     });
   });
 
+  it('stops and writes none of the day when an account it needs is not there', async () => {
+    await onEmptyDatabase(async (tx) => {
+      // Ruwan sent the two plans. The orders are already in when the seed gets to them.
+      await tx.update(users).set({ username: 'someone-else' }).where(eq(users.username, 'ruwan'));
+
+      await expect(seedDemoDay(tx)).rejects.toThrow(/ruwan/);
+
+      expect(await rowCounts(tx)).toEqual(NOTHING);
+    });
+  });
+
   it('places every order at 08:00 plus 5 minutes for each shop number, on the day before it is wanted, with nobody named as its maker', async () => {
     await seeded(async (tx) => {
       const all = await ordersWithLoads(tx);
@@ -431,6 +448,7 @@ describe('the seed with demo mode off', () => {
     const { pool: unused } = await import('../src/db/client');
     try {
       expect(config.DEMO_MODE).toBe(false);
+      // Handed the empty database's transaction, so anything it wrote would show here.
       await onEmptyDatabase(async (tx) => {
         expect(await off.seedDemoDay(tx)).toBe(false);
         expect(await rowCounts(tx)).toEqual(NOTHING);
