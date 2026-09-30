@@ -1,6 +1,6 @@
 # 012 · Loading
 
-**Status:** Draft, with three open questions at the bottom  ·  **Owner:**  ·  **Design:** Loader · Today's trucks (tablet and phone), · next truck and · loading; Loader · Load a truck (tablet and phone) and · all on; Loader · Flag a problem (tablet and phone); Loader · Truck ready; and the right-hand column of Dispatcher · Live day · issue open, · issue open · decision sent and · Live day · loading.
+**Status:** Spec, reviewed, with three open questions at the bottom  ·  **Owner:**  ·  **Design:** Loader · Today's trucks (tablet and phone), · next truck and · loading; Loader · Load a truck (tablet and phone) and · all on; Loader · Flag a problem (tablet and phone); Loader · Truck ready; and the right-hand column of Dispatcher · Live day · issue open, · issue open · decision sent and · Live day · loading.
 
 Piece A3 of [the map](../000-map.md). It starts where spec 010 ends, with a sent plan whose trips are `planned`. The
 clock, live updates and the seeded day are spec 008's, and every load comes from spec 007's calculator.
@@ -131,7 +131,8 @@ where two stops are needed, VEH004 with OUT026 and OUT028 as in spec 010's AC-11
     of the last write applied to its trip is a retry, answered with the truck as it is, so nothing counts twice. A
     write naming another revision is refused as `stale`. An answer names the problem's revision.
 11. **The numbers.** The API works out every count, kilo and cubic metre shown. The screen formats them, counts the
-    minutes to leaving from the app clock on screen, draws the bars, and adds nothing up.
+    minutes to leaving from the app clock on screen, draws the bars, and adds nothing up. The one count it makes is of
+    the rows it lists ("1 truck", "1 stop", "Needs you · 1" and the bell), as spec 010's screen does.
 
 ## Permissions and failure paths
 Only a loader with a depot reads and writes the loading day, and only a dispatcher with a depot reads and answers
@@ -144,7 +145,8 @@ A refusal comes with one sentence (`plan.md`, Contracts), which the screen shows
   changed after this screen loaded it." When the plan was edited and its trips made again, the trip is gone and the
   answer is `unknown_record`, and an open truck page says the truck is not on the list any more.
 - **The day moved on.** A start after 16:00 on the truck's day gets `day_moved`: "Loading has moved on to Fri 26 Jun."
-  The list shows the next day.
+  The list shows the next day. After the calendar's last day there is no day to move on to, and a start gets spec
+  010's `no_plan_day`: "No delivery day is left."
 - **The dock's signal drops (D-38).** A write with no answer shows "Not saved. Check the connection and try again.",
   and "Try again" sends the same write with the same id, so one that had landed is answered as done.
 - **The dispatcher answered in another tab.** `stale`: "This problem was already answered." The column is fetched
@@ -202,8 +204,9 @@ Nabil's Chrome at 390 wide and 1180 × 820 as `kasun`, and at 1440 × 900 as `ru
   anything: the trip is `loading` and the unsend got `loading_started`, or the plan is a draft and the start got
   `plan_changed`.
 - [ ] **AC-11** When a start names a plan that is not sent, or a revision that is not the plan's, the system shall
-  answer 409 `plan_changed`, and when the trip's day is no longer the loader's day, 409 `day_moved`, and change nothing.
-  *The plan taken back to edit, a test raising the plan's revision in the database, and the clock at Thu 25 Jun 16:00.*
+  answer 409 `plan_changed`, when the trip's day is no longer the loader's day, 409 `day_moved`, and when there is no
+  loader's day at all, 409 `no_plan_day`, and change nothing. *The plan taken back to edit, a test raising the plan's
+  revision in the database, the clock at Thu 25 Jun 16:00, and the clock set by the test to Sat 27 Jun 16:00.*
 
 ### Every loader write
 - [ ] **AC-12** When a loader write names a revision that is not the trip's, the system shall answer 409 `stale` and
@@ -223,8 +226,8 @@ Nabil's Chrome at 390 wide and 1180 × 820 as `kasun`, and at 1440 × 900 as `ru
   with that line and count, the reason, the note, Kasun and the time, raise the trip's revision, and announce `loading`
   and `issues`. The loading day shall show the line going out at 3, 1 short, the stop 23 of 24, and the problem.
 - [ ] **AC-17** When a flag lowers no count, gives a count below 0 or not below its line's quantity, names a line that
-  is not on its stop, has a reason not in the list or a note over 200 characters, the system shall answer 400 and write
-  nothing. A line already flagged shall get 409 `already_flagged`, and a trip that is not loading 409 `not_loading`.
+  is not on its stop or names a line twice, has a reason not in the list or a note over 200 characters, the system
+  shall answer 400 and write nothing. A line already flagged shall get 409 `already_flagged`, and a trip that is not loading 409 `not_loading`.
 
 ### The answer
 - [ ] **AC-18** When `ruwan` reads what needs him, the system shall list the depot's open problems, oldest first, each
@@ -245,7 +248,8 @@ Nabil's Chrome at 390 wide and 1180 × 820 as `kasun`, and at 1440 × 900 as `ru
 - [ ] **AC-23** When VEH035 is marked ready after the answer, the system shall make the trip `ready` at the app clock's
   time, write the loaded counts 12, 8 and 3, make its three orders `loaded` with their revisions up, write the audit
   row `trip.ready`, and after the commit announce `loading` to the depot and `orders` to OUT001 and the depot.
-  Nadeesha's open list shall show the three orders `loaded`.
+  Nadeesha's open list shall show the three orders `loaded`. *A second run flags the dry line at 0 of 4 and goes
+  short: the dry order is `loaded` with 0 on, and the truck carries 20 cartons, 138 kg and 0.74 m³.*
 
 ### A reset
 - [ ] **AC-24** When a loader write and a demo reset arrive at once, both shall finish, and the write shall be refused
@@ -267,10 +271,14 @@ Nabil's Chrome at 390 wide and 1180 × 820 as `kasun`, and at 1440 × 900 as `ru
   within a second the list says no plan is out. A start from a tab opened before shows the sentence of the failure
   paths, and the list loads again.
 - [ ] **AC-31** The other states: loading, could not load with the API stopped and "Try again", not saved and "Try
-  again" sending the same write, nothing to load, no day left, a truck not on the list, and on Live day nothing open
-  and could not load.
+  again" sending the same write, nothing to load, a truck not on the list, and on Live day nothing open and could not
+  load. No day left cannot be reached with the demo clock, which stops on Thursday: AC-2 covers the API, and a reader
+  checks the state's sentence.
 - [ ] **AC-32** No sums in the screen. A reviewer reads `features/loader` and `features/live` and finds no count, kilo,
-  cubic metre or short worked out there: only formats, the minutes to leaving and the bars.
+  cubic metre or short worked out there: only formats, the minutes to leaving, the bars and counts of listed rows.
+- [ ] **AC-33** No answer from the past. A reviewer reads `features/loader/loading.ts` and `features/live/issues.ts`:
+  after a write the screen fetches the loading day or the problems again and never puts the write's answer in the
+  query, so an answer that arrives late cannot bring back an older truck or problem.
 
 ## Walkthrough
 It follows spec 010's: Nadeesha has placed her draft, and Ruwan has sent Thursday's plan with OUT001's three orders on
@@ -343,7 +351,8 @@ are examples.
    order. Our pick: yes. In spec 010's walkthrough Ruwan adds OUT002's two orders (Fresh Wellawatte, van only, Colombo:
    48 chilled and 46 dry cartons) after OUT001's, so VEH035 still leaves at 04:36, reaches Fresh Nugegoda at 05:00 and
    Fresh Wellawatte at 05:24, and carries 118 cartons, 814.2 kg and 4.366 m³ of its 1,040 kg and 7.0 m³. Kasun then
-   loads Fresh Wellawatte first, and the steps above change their counts to match.
+   loads Fresh Wellawatte first, and the steps above change their counts to match. The lead settles this at spec
+   010's join, where the board gives the real numbers, before A3's builders start.
 3. **May a loader start a truck the evening before?** Thursday's trucks show from Wed 16:00 (D-34), and starting one
    ends "Back to edit" for Thursday's plan (D-33). Our pick: yes. The walkthrough moves the clock to Loading first, and
    a real night shift starts when the goods are picked, which the app cannot know.

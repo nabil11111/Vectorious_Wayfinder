@@ -7,8 +7,9 @@ One pull request per task. The API tasks write their tests from the criteria fir
   `order_lines`, the tables `issues` and `issue_lines`, and the enums `issue_kind` and `issue_status`), the shapes and
   error codes in `packages/contracts/src/issues.ts` and `loading.ts` with their exports, `lib/day-lock.ts` with step 1
   of 010's writes moved into it and 010's tests still green, the empty `routes/loading.ts` and `routes/issues.ts` with
-  the role and depot checks mounted as `/loading` and `/issues`, the two new tables in `docs/data-model.md`, and A3 as
-  "Building" in the map. D-34 to D-40 are in `docs/decisions.md` already.
+  the role and depot checks mounted as `/loading` and `/issues`, a `bell` slot in `AppShell.tsx` that replaces the
+  plain bell, the two new tables in `docs/data-model.md`, and A3 as "Building" in the map. D-34 to D-40 are in
+  `docs/decisions.md` already, and `snapshot`'s `orders` lock comes with 010's join.
 - [ ] **T1 · The loader's day and reading it** (AC-1 to AC-6, AC-8) · after T0.
   Files: `apps/api/src/loading/loader-day.ts`, `loading/going.ts` and their tests, `loading/day.ts`, `issues/read.ts`,
   the GET route in `routes/loading.ts`, the two `loading` announcements in `plans/send.ts`, and
@@ -18,13 +19,13 @@ One pull request per task. The API tasks write their tests from the criteria fir
   and `loading-writes.test.ts`.
 - [ ] **T3 · What needs the dispatcher, and the answer** (AC-18 to AC-21) · after T2, whose flags its tests raise.
   Files: `issues/decide.ts`, the two routes in `routes/issues.ts`, and `apps/api/tests/issues.test.ts`.
-- [ ] **T4 · The loader's screens** (AC-25 to AC-27, AC-30, the loader's part of AC-29, AC-31 and AC-32) · after T0.
+- [ ] **T4 · The loader's screens** (AC-25 to AC-27, AC-30, the loader's part of AC-29, AC-31 to AC-33) · after T0.
   It uses spec 010's `features/plan/words.ts`. Files: everything in `apps/web/src/features/loader/`.
-- [ ] **T5 · Live day's column and the bell** (AC-28, the dispatcher's part of AC-29, AC-31 and AC-32) · after T4,
+- [ ] **T5 · Live day's column and the bell** (AC-28, the dispatcher's part of AC-29, AC-31 to AC-33) · after T4,
   whose `words.ts` it imports. It uses spec 010's depot switch. Files: everything in `apps/web/src/features/live/`,
-  the Live day route in `features/dispatcher/DispatcherHome.tsx`, `components/layout/Bell.tsx`, and the one line in
-  `AppShell.tsx` that renders it in place of the plain bell.
-- [ ] **T6 · Join and click through** · lead · after T3 and T5. The click-throughs of AC-25 to AC-32 in Nabil's Chrome
+  with `Bell.tsx`, and in `features/dispatcher/DispatcherHome.tsx` the Live day route and the bell passed to the
+  shell's `bell` slot.
+- [ ] **T6 · Join and click through** · lead · after T3 and T5. The click-throughs of AC-25 to AC-33 in Nabil's Chrome
   next to the frames, on a fresh reset through spec 010's walkthrough and then this spec's. The README gets the
   walkthrough's steps and the departures, the map marks A3, and a second tool that did not build it reviews the diff
   against each criterion.

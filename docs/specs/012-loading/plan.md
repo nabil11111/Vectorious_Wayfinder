@@ -31,7 +31,7 @@ The lead writes these into two new files, `packages/contracts/src/issues.ts` and
 | `LoadingStop` | `id`, `seq`, `outletId`, `shopName`, `loaded`, `units`, `going`, `short` and `lines`, chilled before dry, then the order placed first, then the product list's order. |
 | `LoadingTruck` | `tripId`, `revision`, `vehicleId`, `vehicleType` (`truck`, `van`), `vehicleTemp` (`reefer`, `ambient`), `tripNo`, `brand` or null when the trip mixes brands, `district`, `status` (`planned`, `loading`, `ready`), `leavesAt`, `readyAt` or null, `driver` (a name) or null, `weightCapKg`, `volumeCapM3`, `units`, `on` (`units`, `kg`, `m3`), `short`, `stops` (last stop first) and `issues` (the open ones first, then the answered ones, latest first). |
 | `LoadingDay` | `depot`, `day` (the loader's day, or null), `plan` (`id`, `revision`) or null when that day has no sent plan, and `trucks` in the order of rule 2. |
-| `StartLoadingRequest`, `StopLoadedRequest`, `RaiseFlagRequest`, `MarkReadyRequest` | Each has `writeId` (a UUID made on the phone) and `revision` (the trip's). The start adds `plan` (`id`, `revision`). Stop loaded adds `stopId`. The flag adds `stopId`, `reason`, `lines` (1 to 20 of `lineId` and `counted`, 0 to 999) and `note` (trimmed, up to 200, may be empty). |
+| `StartLoadingRequest`, `StopLoadedRequest`, `RaiseFlagRequest`, `MarkReadyRequest` | Each has `writeId` (a UUID made on the phone) and `revision` (the trip's). The start adds `plan` (`id`, `revision`). Stop loaded adds `stopId`. The flag adds `stopId`, `reason`, `lines` (1 to 20 of `lineId` and `counted`, 0 to 999, each `lineId` once) and `note` (trimmed, up to 200, may be empty). |
 
 New error codes, each with a sentence the screens show as it is:
 
@@ -45,7 +45,8 @@ New error codes, each with a sentence the screens show as it is:
 | `flag_open` | 409 | `issueIds` | "The dispatcher has not answered the flag on VEH035 yet." |
 
 Codes of spec 010 used again: `no_depot` 403, `unknown_record` 400 with `id` ("That truck is not on this depot's
-list."), `day_moved` 409 with `date`, the loader's day now ("Loading has moved on to Fri 26 Jun."), `stale` 409
+list."), `day_moved` 409 with `date`, the loader's day now ("Loading has moved on to Fri 26 Jun."), `no_plan_day` 409
+when there is no loader's day at all ("No delivery day is left."), `stale` 409
 ("VEH035 changed on another screen." or "This problem was already answered.") and `invalid_input` 400.
 
 ## How it works
@@ -60,9 +61,11 @@ list."), `day_moved` 409 with `date`, the loader's day now ("Loading has moved o
 | `apps/api/src/routes/loading.ts`, `routes/issues.ts` | The routes behind `requireRole('loader')` or `requireRole('dispatcher')` and the depot check. The lead mounts them as `/loading` and `/issues`. |
 | `apps/web/src/features/loader/` | `LoaderHome` (the routes `/loader`, `/loader/trucks/:tripId` and `/loader/trucks/:tripId/flag`, so `app/router.tsx` does not change), `TrucksPage`, `TruckPage`, `FlagPage`, `loading.ts` (the query and the writes), `ticks.ts`, `words.ts` and `parts/`. |
 | `apps/web/src/features/live/` | `LiveDayPage`, `NeedsYou`, `IssueCard` and `issues.ts` (the query and the answer). |
-| `apps/web/src/components/layout/Bell.tsx` | The design's bell with its red count, which `AppShell` renders in place of the plain one. |
+| `apps/web/src/features/live/Bell.tsx` | The design's bell with its red count, which `DispatcherHome` passes to the shell's `bell` slot (T0) in place of the plain one. |
 
-**Reading**, in one read-only snapshot (`snapshot` from `orders/store-orders.ts`). `GET /loading`:
+**Reading**, in one read-only snapshot (`snapshot` from `orders/store-orders.ts`). The snapshot first takes the
+`orders` table's lock in access share mode: a reset truncates `orders` first, so a read and a reset queue one behind
+the other instead of deadlocking over the other tables (added at spec 010's join, with its test). `GET /loading`:
 1. The loader's day from the app clock and the operating days (rule 1). None gives `day: null`.
 2. The caller's depot's plan for that day, if it is `published`. Otherwise `plan: null` and no trucks.
 3. Its trips that are `planned`, `loading` or `ready`, each with its vehicle, driver, stops, the stops' orders and lines
@@ -86,7 +89,7 @@ list."), `day_moved` 409 with `date`, the loader's day now ("Loading has moved o
    answer `loadingDayOf` from inside the transaction, and announce after the commit.
 
 - **Start.** The trip's plan must be the one named, `published`, at the named revision (`plan_changed`), and on the
-  loader's day (`day_moved`). The trip must be `planned` at the named revision (`stale`). It becomes `loading`. Audit
+  loader's day (`day_moved`, or `no_plan_day` when there is none). The trip must be `planned` at the named revision (`stale`). It becomes `loading`. Audit
   `trip.loading_started`. Announce `loading` and `plans` to the depot.
 - **Stop loaded.** The trip must be `loading` (`not_loading`) at the named revision (`stale`). The stop must be the
   trip's (`unknown_record`) and not loaded (`stale`), and every stop with a higher number loaded (`load_order`, naming
@@ -109,16 +112,19 @@ column of the trip: a ready reads the problems under the trip's lock, so it sees
 
 **The screen.**
 - `/loader` and its pages read `GET /loading` under `['loading']`, and a page finds its truck in it by id. Every write
-  answers the loading day, which replaces the query's data. The live stream fetches it again on `loading`, and a
-  `clock` or `demo` message fetches everything (spec 008).
+  answers the loading day, which the tests read, but the screen never puts that answer in the query: after a write it
+  fetches `['loading']` again. An answer can arrive after a newer fetch (another tablet's write, a reset), and
+  installing it would bring back an older truck. The live stream fetches it again on `loading`, and a `clock` or
+  `demo` message fetches everything (spec 008).
 - A write's id is made when the button is pressed, as a v4 UUID from `crypto.getRandomValues`, and kept until an answer
   comes, so "Try again" sends the same body. Only a write with no answer, a 5xx or a 429 is tried again, and only when
   the loader taps. A refusal shows its sentence, drops the write and fetches again. One write at a time on a screen,
   so its buttons wait while one is out.
 - `ticks.ts` keeps the tick boxes in memory for the tab, by trip and line. The flag form keeps its picked line, reason,
   counts and note in the page, so a refusal or a fetch leaves them.
-- `/dispatcher/live` reads `GET /issues` under `['issues']`, and so does the bell for a dispatcher. The answer replaces
-  the list and keeps the decided problem for the green line.
+- `/dispatcher/live` reads `GET /issues` under `['issues']`, and so does the bell for a dispatcher. After an answer
+  the screen fetches `['issues']` again, for the same reason, and keeps only the decided problem from the answer for the
+  green line.
 
 **Words**, in `features/loader/words.ts`, which may use the formats of `features/plan/words.ts` and
 `features/store/words.ts`, and which Live day imports for the problem's words:
@@ -162,7 +168,7 @@ column of the trip: a ready reads the problems under the trip's lock, so it sees
 | AC-7, AC-9 to AC-13 | Integration | `apps/api/tests/loading-start.test.ts` |
 | AC-14 to AC-17, AC-22 to AC-24 | Integration | `apps/api/tests/loading-writes.test.ts` |
 | AC-18 to AC-21 | Integration | `apps/api/tests/issues.test.ts` |
-| AC-25 to AC-32 | Click-through in Nabil's Chrome at 390 wide and 1180 × 820 as `kasun` and 1440 × 900 as `ruwan`, two browsers for AC-28 to AC-30, and a read of the two feature folders for AC-32 | The lead, on the joined branch |
+| AC-25 to AC-33 | Click-through in Nabil's Chrome at 390 wide and 1180 × 820 as `kasun` and 1440 × 900 as `ruwan`, two browsers for AC-28 to AC-30, and a read of the two feature folders for AC-32 and AC-33 | The lead, on the joined branch |
 
 Integration tests run in the builder's own seeded database (AGENTS.md) and assert the seeded day's numbers. Each file
 starts from the seeded day, puts it back at its end with spec 008's `clearDemoDay` and `seedDemoDay` in one transaction,
