@@ -4,6 +4,7 @@ import { NavLink } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ROLE_LABEL, useLogout, useMe } from '@/features/auth/api';
 import { useAppClock } from '@/lib/clock';
+import { useLive } from '@/lib/live';
 import { cn } from '@/lib/utils';
 import { DemoClock } from './DemoClock';
 import { Wordmark } from './Wordmark';
@@ -15,8 +16,9 @@ export type NavItem = { to: string; label: string; icon?: ReactNode };
 export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place?: string; children: ReactNode }) {
   const { data: me } = useMe();
   const logout = useLogout();
-  // The app's own time, never the device's (spec 008).
+  // The app's own time, never the device's, and the stream that keeps every open screen current (spec 008).
   const clock = useAppClock();
+  useLive();
   if (!me) return null;
 
   return (
