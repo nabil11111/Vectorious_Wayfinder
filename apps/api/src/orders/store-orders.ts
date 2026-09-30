@@ -3,6 +3,7 @@ import {
   type SaveDraftRequest, type StoreNextOrder, type StoreOrder, type StoreOutlet, type StoreProduct,
 } from '@wayfinder/contracts';
 import { and, desc, eq, gte, inArray, max, ne, notInArray, sql, type SQL } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 import { db, type Db, type Tx } from '../db/client';
 import { PRODUCTS } from '../db/fixtures';
 import { calendarDays, deferrals, orderLines, orders, outlets, plans, products, stopOrders, stops, trips } from '../db/schema';
@@ -24,7 +25,7 @@ type Reader = Db | Tx;
 // An item as the form shows it, with what the load calculator needs on top.
 interface Item extends StoreProduct { brand: Brand; keepUpright: boolean; archived: boolean }
 
-interface Shop {
+export interface Shop {
   outlet: StoreOutlet;
   depotId: string;
   // Every item there is, in the product list's order. An order keeps its lines when an item is archived, so
@@ -37,7 +38,7 @@ interface Shop {
 const LIST_ORDER = new Map<string, number>(PRODUCTS.map((product, place) => [product.id, place]));
 const placeInList = (id: string) => LIST_ORDER.get(id) ?? PRODUCTS.length;
 
-async function readShop(on: Reader, outletId: string): Promise<Shop> {
+export async function readShop(on: Reader, outletId: string): Promise<Shop> {
   const [row] = await on.select().from(outlets).where(eq(outlets.id, outletId));
   // An account's outlet points at this table, so its shop is always there.
   if (!row) throw new Error(`No outlet ${outletId}.`);
@@ -69,7 +70,7 @@ const lockShop = (tx: Tx, outletId: string) => tx.select({ id: outlets.id }).fro
 
 // One snapshot for a whole answer, so a place that commits halfway through a read is seen whole or not at
 // all. It is read only: reading never writes.
-const snapshot = <T>(read: (tx: Tx) => Promise<T>) => db.transaction(read, { isolationLevel: 'repeatable read', accessMode: 'read only' });
+export const snapshot = <T>(read: (tx: Tx) => Promise<T>) => db.transaction(read, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 
 interface OpenDay { deliveryDate: string; cutoffAt: Date; cutoffIsToday: boolean }
 
@@ -125,17 +126,24 @@ const lastDeferral = db.selectDistinctOn([deferrals.orderId], { orderId: deferra
   .orderBy(deferrals.orderId, desc(plans.date))
   .as('last_deferral');
 
-// The shop's orders that match, as its screens show them: chilled before dry, then the one placed first. It
-// reads the given shop's orders and no others, whatever the condition asks for.
-async function readOrders(on: Reader, shop: Shop, where: SQL | undefined): Promise<StoreOrder[]> {
-  const rows = await on.select({
+// The day an order counts for: the day of the sent plan it is on, and until then the day the shop wanted.
+export const countsFor = sql<string>`coalesce(${scheduled.date}, ${orders.deliveryDate})`;
+
+// The shop's orders that match, as its screens show them. Unless told otherwise they come chilled before dry,
+// then the one placed first. It reads the given shop's orders and no others, whatever the condition asks for.
+export async function readOrders(
+  on: Reader, shop: Shop, where: SQL | undefined,
+  { orderBy = [orders.temp, orders.placedAt, orders.id], limit }: { orderBy?: (PgColumn | SQL)[]; limit?: number } = {},
+): Promise<StoreOrder[]> {
+  const matching = on.select({
     id: orders.id, deliveryDate: orders.deliveryDate, scheduledDate: scheduled.date, temp: orders.temp, status: orders.status,
     placedAt: orders.placedAt, deferralReason: lastDeferral.reason,
   }).from(orders)
     .leftJoin(scheduled, eq(scheduled.orderId, orders.id))
     .leftJoin(lastDeferral, eq(lastDeferral.orderId, orders.id))
     .where(and(eq(orders.outletId, shop.outlet.id), where))
-    .orderBy(orders.temp, orders.placedAt, orders.id);
+    .orderBy(...orderBy);
+  const rows = await (limit ? matching.limit(limit) : matching);
   const lines = await linesOf(on, rows.map((row) => row.id));
   return rows.map((row) => {
     const own = shownLines(lines.filter((line) => line.orderId === row.id), shop.items);
