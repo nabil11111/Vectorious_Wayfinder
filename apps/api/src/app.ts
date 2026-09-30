@@ -14,6 +14,7 @@ import { clockRouter, demoClockRouter } from './routes/clock';
 import { demoResetRouter } from './routes/demo-reset';
 import { eventsRouter } from './routes/events';
 import { healthRouter } from './routes/health';
+import { storeRouter } from './routes/store';
 
 // Builds the app without listening, so tests can drive it directly.
 export function createApp() {
@@ -43,6 +44,7 @@ export function createApp() {
   api.use('/auth', authRouter);
   api.use('/clock', clockRouter);
   api.use('/events', eventsRouter);
+  api.use('/store', storeRouter);
   // The demo control exists only in demo mode. With it off these addresses answer 404 like any unknown one.
   if (config.DEMO_MODE) {
     api.use('/demo/clock', demoClockRouter);
