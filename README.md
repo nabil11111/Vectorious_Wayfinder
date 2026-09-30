@@ -76,7 +76,7 @@ Password for the demo accounts: `wayfinder-demo` (`SEED_PASSWORD`). Admin has it
 | Store manager | `tharindu` | Tech Matara (OUT064) |
 | Dispatcher | `ruwan` | Peliyagoda depot |
 | Loader | `kasun` | Peliyagoda depot |
-| Driver | `dilshan` | Peliyagoda depot |
+| Driver | `dilshan` | Peliyagoda depot. 34 more drivers there, one per working vehicle (`chaminda`, `lasantha` and so on), for the plan board |
 | Driver | `prasanna` | Kandy depot |
 | Admin | `admin` | Everything |
 

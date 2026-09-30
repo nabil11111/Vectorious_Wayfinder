@@ -27,4 +27,10 @@ export const DEMO_USERS = [
   { username: 'dilshan', displayName: 'Dilshan', role: 'driver', depot: 'Peliyagoda', outlet: null },
   { username: 'prasanna', displayName: 'Prasanna', role: 'driver', depot: 'Kandy', outlet: null },
   { username: 'admin', displayName: 'Admin', role: 'admin', depot: null, outlet: null },
+  // A driver for each of Peliyagoda's 35 working vehicles, so every trip on the plan board can name one as the
+  // design's frames do (spec 010, D-31). Dilshan, above, is the one the walkthrough follows.
+  ...['Chaminda', 'Lasantha', 'Priyantha', 'Sanjeewa', 'Mahesh', 'Nuwan', 'Saman', 'Pradeep', 'Asanka', 'Chathura', 'Kamal',
+    'Sunil', 'Nimal', 'Janaka', 'Roshan', 'Suresh', 'Anura', 'Buddhika', 'Dinesh', 'Gayan', 'Harsha', 'Isuru', 'Jagath',
+    'Kelum', 'Lahiru', 'Madushan', 'Nalin', 'Pasan', 'Rangana', 'Sampath', 'Thilak', 'Udara', 'Viraj', 'Wasantha',
+  ].map((name) => ({ username: name.toLowerCase(), displayName: name, role: 'driver', depot: 'Peliyagoda', outlet: null }) as const),
 ] as const;
