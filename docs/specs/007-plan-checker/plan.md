@@ -34,14 +34,16 @@ The one exception is the test helper `testing/shared.ts`, which reads `data/shar
   of a kilo and thousandths of a cubic metre and divided once at the end. Limits are compared in the same
   whole units, so a load exactly at the limit passes.
 - **Fuel.** Litres are rounded to 1 decimal only for what is shown: each trip's litres, and a vehicle's litres
-  in the plan as the sum of those. The quota check never uses them (AC-34). It asks whether the plan's
+  in the plan, which are what all its kilometres need, rounded once. The quota check never uses them (AC-34).
+  It asks whether the plan's
   kilometres are more than the litres left can cover, which is litres left × km per litre, worked in tenths
   so both sides are whole numbers. For this `vehicleFuel` also hands the plan's kilometres to the quota rule.
 - **Late.** A stop's `late` is true when it is reached after its closing time, when its mall slot and window
   do not overlap, or when it is a Fresh shop reached at 08:00 or later (AC-11, AC-32). `windowOpen` and
   `windowClose` stay the shop's own times, with the mall slot applied.
 - **Messages.** One sentence that names the vehicle and the shop, gives both numbers and uses no code words:
-  "VEH035 trip 1 carries 1,242 kg. Its limit is 1,040 kg." Times read as 07:54. A Fresh stop reached at 08:00
+  "VEH035 trip 1 carries 1,242 kg and its limit is 1,040 kg." An order is called by its weight, chilled or
+  dry, and its shop. Times read as 07:54. A Fresh stop reached at 08:00
   or later is told that Fresh shops must be reached before 08:00. Codes with a `fix`: `over_weight` and
   `over_volume` (how much to take off), `fuel_over_quota` (the litres over, or "less than 0.1 litres" when
   that rounds to 0.0), `trips_overlap` and `long_wait` (the leaving time), and the two late codes (AC-47).

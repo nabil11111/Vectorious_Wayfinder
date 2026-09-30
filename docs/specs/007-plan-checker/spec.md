@@ -1,6 +1,6 @@
 # 007 · Plan checker: load, timeline and rules
 
-**Status:** Ready  ·  **Owner:**  ·  **Design:** no screens of its own. Its numbers show on Dispatcher · Edit plan and View plan, Shop · New orders and Loader · Load a truck.
+**Status:** Done  ·  **Owner:**  ·  **Design:** no screens of its own. Its numbers show on Dispatcher · Edit plan and View plan, Shop · New orders and Loader · Load a truck.
 
 Pieces B1 to B3 of [the map](../000-map.md). It replaces specs 001 and 002. It checks a plan and does not
 build one: that is the planner (B4), which gets its own spec.
@@ -81,7 +81,9 @@ vehicle. Bad input is not a plan problem: the engine throws an error that names 
   between-stops km × (stops - 1), and its litres as kilometres ÷ the vehicle's km per litre, shown to 1
   decimal. *Five Fresh stops in Galle on VEH006 (4.4 km per litre): 120 + 10 × 4 + 120 = 280 km, 63.6 litres.*
 - [ ] **AC-16** When a vehicle's day is summed, the system shall give its litres used before this plan, the
-  litres in this plan and the litres left, which is the quota minus both. *300 + 63.6 leaves 16.4 of 380.*
+  litres in this plan and the litres left, which is the quota minus both. The litres in the plan are what all
+  its kilometres need, rounded once, not its trips' shown litres added up. *300 + 63.6 leaves 16.4 of 380.
+  VEH010 with 517.5 used and two 63 km trips, shown as 11.3 litres each, needs 22.5 and has 0.0 left of 540.*
 
 ### Rule checker (B3): what a vehicle carries, and every order accounted for
 - [ ] **AC-17** When a trip's load is over the vehicle's weight limit, the system shall report `over_weight`
@@ -158,15 +160,17 @@ vehicle. Bad input is not a plan problem: the engine throws an error that names 
 - [ ] **AC-40** When no problem is a block, the system shall return `ok` as true. Warnings never stop a plan.
 - [ ] **AC-41** When it reports a problem, the system shall give its code, its level, one plain sentence with
   the numbers in it, and the vehicle, trip, stop, shop or order it is about.
-- [ ] **AC-42** When it returns, the system shall include each trip's load, times, kilometres and litres and
-  each vehicle's budget minutes and litres. An untimed trip has no times, is skipped by rules that need them
-  and always carries a block (`empty_trip`, `cross_district` or `no_travel_data`), so its plan is never `ok`.
+- [ ] **AC-42** When it returns, the system shall include each trip's load, times, kilometres and litres, and
+  the budget minutes and litres of every vehicle in the input, also one the plan does not drive. An untimed
+  trip has no times, is skipped by rules that need them and always carries a block (`empty_trip`,
+  `cross_district` or `no_travel_data`), so its plan is never `ok`.
 - [ ] **AC-43** When it lists problems, the system shall put blocks before warnings, and inside each group
-  order them by vehicle, trip and stop, with problems about the whole plan last.
+  order them by vehicle, trip and stop. What is about a whole trip follows its stops, what is about a whole
+  vehicle follows its trips, and what is about the whole plan comes last. Trips come back in the same order.
 - [ ] **AC-44** When given the chained day with 48 dry cartons ordered at each of its seven stops, the system
   shall return `ok`, no problems, its times, loads of 993.6 kg and 1,324.8 kg, and 15.6 litres.
 - [ ] **AC-45** When the plan names a vehicle, shop or order that is not in the input, the system shall throw
-  an error that names it.
+  an error that names it. The same goes for an order with a line that cannot be weighed, on a trip or not.
 - [ ] **AC-46** When called twice with the same input, the system shall return the same result and leave the
   input unchanged. No engine file imports anything from outside `apps/api/src/planning` except
   `@wayfinder/contracts`, so it cannot reach the database, the config or the clock.
