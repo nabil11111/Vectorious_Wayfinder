@@ -28,8 +28,9 @@ const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatch
 // sits in the top bar (dispatcher, shop on a desktop), where the dispatcher's six tabs need the room. The plan board
 // turns its columns into tabs at the same width. Loader and driver pass no nav at all.
 // bar is a page's own control in the top bar, such as the dispatcher's depot switch (spec 010). wide lets a page use
-// the full width of a large screen, such as the plan board's three columns.
-export function AppShell({ nav = [], place, bar, wide = false, children }: { nav?: NavItem[]; place?: string; bar?: ReactNode; wide?: boolean; children: ReactNode }) {
+// the full width of a large screen, such as the plan board's three columns. bell replaces the plain bell with one that
+// counts, such as the dispatcher's open problems (spec 012).
+export function AppShell({ nav = [], place, bar, bell, wide = false, children }: { nav?: NavItem[]; place?: string; bar?: ReactNode; bell?: ReactNode; wide?: boolean; children: ReactNode }) {
   const { data: me } = useMe();
   const logout = useLogout();
   // The app's own time, never the device's, and the stream that keeps every open screen current (spec 008).
@@ -59,7 +60,7 @@ export function AppShell({ nav = [], place, bar, wide = false, children }: { nav
         <DemoClock clock={clock} as="panel" className="hidden lg:inline-flex" />
         {/* The design's bell, last on a phone. A count never goes into the picture: it will sit over the corner as a
             small badge. */}
-        <button type="button" aria-label="Notifications" className="shrink-0 rounded-full p-1 hover:bg-muted max-lg:order-last"><img src={alertIcon} alt="" className="size-7" /></button>
+        {bell ?? <button type="button" aria-label="Notifications" className="shrink-0 rounded-full p-1 hover:bg-muted max-lg:order-last"><img src={alertIcon} alt="" className="size-7" /></button>}
         {/* The frames draw no sign-out in the bar, so it sits behind the avatar. */}
         <Popover>
           <PopoverTrigger aria-label={me.displayName} className="flex shrink-0 items-center gap-2.5 rounded-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">

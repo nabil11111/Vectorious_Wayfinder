@@ -1,9 +1,9 @@
 import { DraftPlan, type PlanBoard, type PlanRef, type SavePlanRequest } from '@wayfinder/contracts';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, type Tx } from '../db/client';
-import { deferrals, demoDay, depots, plans, stopOrders, stops, trips } from '../db/schema';
-import { demoClockAt, depotDate, depotInstant, depotMinutes, now, realNow } from '../lib/clock';
-import { config } from '../lib/config';
+import { deferrals, plans, stopOrders, stops, trips } from '../db/schema';
+import { depotDate, depotInstant, depotMinutes } from '../lib/clock';
+import { lockDepotDay } from '../lib/day-lock';
 import { HttpError } from '../lib/errors';
 import { announce } from '../lib/live';
 import { CUTOFF_MINUTES } from '../orders/orderable-day';
@@ -16,13 +16,11 @@ export interface OpenPlan { plan: typeof plans.$inferSelect; moment: BoardMoment
 export const unknownRecord = (id: string) => new HttpError(400, 'unknown_record', 'That record does not belong to this depot and planning day.', { id });
 const stale = () => new HttpError(409, 'stale', 'The plan was changed in another tab, so it was loaded again.');
 
-// Every planning write takes exactly these locks, in this order. The instant is read only after waiting.
+// Every planning write takes exactly these locks, in this order (lib/day-lock.ts). The instant is read only after
+// waiting.
 export async function openPlan(tx: Tx, caller: Planner, date: string, ref: PlanRef, published = false): Promise<OpenPlan> {
-  const [clock] = config.DEMO_MODE ? await tx.select().from(demoDay).for('share') : [];
-  if (config.DEMO_MODE && !clock) throw new Error('The demo day has no clock row. Run the seed first.');
-  const [depot] = await tx.select().from(depots).where(eq(depots.id, caller.depotId)).for('no key update');
-  if (!depot) throw unknownRecord(caller.depotId);
-  const moment: BoardMoment = clock ? { at: new Date(demoClockAt(clock, realNow()).now), demoDay: clock.day } : { at: now(), demoDay: 1 };
+  const moment: BoardMoment | null = await lockDepotDay(tx, caller.depotId);
+  if (!moment) throw unknownRecord(caller.depotId);
   const [existing] = await tx.select().from(plans).where(and(eq(plans.depotId, caller.depotId), eq(plans.date, date)));
   // A reset reopens orders at 15:00. Its old references must still be stale (AC-13/16), so identity is
   // checked before the open-day refusals; a current reference still receives the day's precise refusal.

@@ -1,6 +1,5 @@
-import { Router, type Request, type RequestHandler } from 'express';
-import { HttpError } from '../lib/errors';
-import { requireRole } from '../middleware/auth';
+import { Router, type Request } from 'express';
+import { depotCallerOf, requireDepot, requireRole, type DepotCaller } from '../middleware/auth';
 import { JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, UnsendPlanRequest } from '@wayfinder/contracts';
 import { getBoard } from '../plans/board';
 import { saveDraft } from '../plans/draft';
@@ -14,16 +13,11 @@ import { findSlots } from '../plans/slots';
 // and tasks T1 to T4 of spec 010 add the eight routes.
 export const plansRouter = Router();
 
-// requireRole lets an admin through every door, but a plan belongs to one depot and an admin has none.
-const requireDepot: RequestHandler = (req, _res, next) => {
-  if (!req.user?.depotId) return next(new HttpError(403, 'no_depot', 'This account does not belong to a depot.'));
-  next();
-};
 plansRouter.use(requireRole('dispatcher'), requireDepot);
 
-// The person asking and the depot their account belongs to. Both checks above have passed.
-export interface Planner { userId: string; depotId: string }
-export const plannerOf = (req: Request): Planner => ({ userId: req.user!.id, depotId: req.user!.depotId! });
+// The dispatcher asking and their depot. Both checks above have passed.
+export type Planner = DepotCaller;
+export const plannerOf = depotCallerOf;
 
 const dateOf = (req: Request) => PlanBoard.shape.day.unwrap().shape.date.parse(req.params.date);
 plansRouter.get('/', async (req, res) => { res.json(await getBoard(plannerOf(req))); });
