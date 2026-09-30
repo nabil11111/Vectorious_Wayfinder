@@ -127,6 +127,8 @@ export function statusChip(order: Pick<StoreOrder, 'status' | 'deliveryDate' | '
     case 'delivered': return { label: 'Delivered', tone: 'good' };
     case 'received': return { label: 'Received', tone: 'good' };
     case 'cancelled': return { label: 'Cancelled', tone: 'quiet' };
+    // The shop's lists show a split order's two parts, never the original (spec 010). This is for completeness.
+    case 'split': return { label: 'Split in two', tone: 'quiet' };
   }
 }
 

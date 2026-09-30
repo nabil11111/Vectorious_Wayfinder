@@ -32,8 +32,10 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
   const vehicleOf = lookup(input.vehicles, 'vehicle');
   const outletOf = lookup(input.outlets, 'shop');
   const problems: Problem[] = [];
-  const report = (code: ProblemCode, about: About, message: string, fix?: string | null) => {
-    problems.push({ code, level: levelOf(code), message, ...(fix ? { fix } : {}), ...about });
+  const report = (code: ProblemCode, about: About, message: string, fix?: string | null, leaveAt?: Minutes | null) => {
+    // Trips may run past midnight, but a departure the screen can apply must fit the plan day's time field.
+    const suggestion = leaveAt != null && Number.isInteger(leaveAt) && leaveAt >= 0 && leaveAt <= 1439 ? { leaveAt } : {};
+    problems.push({ code, level: levelOf(code), message, ...(fix ? { fix } : {}), ...suggestion, ...about });
   };
 
   const vehicleIds = new Set(input.plan.trips.map((trip) => vehicleOf(trip.vehicleId).id));
@@ -78,7 +80,7 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
       if (!times) throw new PlanInputError(`No times were given for ${name}`);
 
       if (earlier && times.leaveAt < earlier.readyAt) {
-        report('trips_overlap', about, `${name} leaves at ${toClock(times.leaveAt)}, before ${vehicleId} is back from trip ${earlier.tripNo} and reloaded at ${toClock(earlier.readyAt)}.`, `Leave at ${toClock(earlier.readyAt)} or later.`);
+        report('trips_overlap', about, `${name} leaves at ${toClock(times.leaveAt)}, before ${vehicleId} is back from trip ${earlier.tripNo} and reloaded at ${toClock(earlier.readyAt)}.`, `Leave at ${toClock(earlier.readyAt)} or later.`, earlier.readyAt);
       }
       // A trip with no leaving time of its own never leaves before this, so only a set time can.
       const earliest = earliestLeaveFor(input.settings, shops);
@@ -107,14 +109,15 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
             : `whose delivery window opens at ${toClock(stop.windowOpen)} and closes at ${toClock(stop.windowClose)}`;
           report(inMall ? 'mall_slot_missed' : 'window_missed', here, `${name} stops at ${shop.name}, ${never}, so it can never be reached in time.`);
         } else if (stop.late && inMall && stop.arriveAt > mallClose) {
-          report('mall_slot_missed', here, `${reaches}, ${minutes(stop.arriveAt - mallClose)} after its mall's delivery hours of ${toClock(mallOpen)} to ${toClock(mallClose)} end${freshRule}.`, fix);
+          report('mall_slot_missed', here, `${reaches}, ${minutes(stop.arriveAt - mallClose)} after its mall's delivery hours of ${toClock(mallOpen)} to ${toClock(mallClose)} end${freshRule}.`, fix, leaveBy);
         } else if (stop.late) {
           const afterClosing = stop.arriveAt > stop.windowClose ? `, ${minutes(stop.arriveAt - stop.windowClose)} after its delivery window closes at ${toClock(stop.windowClose)}` : '';
-          report('window_missed', here, `${reaches}${afterClosing}${freshRule}.`, fix);
+          report('window_missed', here, `${reaches}${afterClosing}${freshRule}.`, fix, leaveBy);
         } else if (stop.waitMin > input.settings.waitWarnMin) {
           // Only at the first stop does leaving later take the wait away. A later stop follows the ones before it.
-          const leaveLater = stop.seq === 1 ? `Leave at ${toClock(times.leaveAt + stop.waitMin)} to arrive as it opens.` : null;
-          report('long_wait', here, `${reaches} and waits ${minutes(stop.waitMin)} for its delivery window to open at ${toClock(stop.windowOpen)}.`, leaveLater);
+          const leaveLater = stop.seq === 1 ? times.leaveAt + stop.waitMin : null;
+          const fix = leaveLater === null ? null : `Leave at ${toClock(leaveLater)} to arrive as it opens.`;
+          report('long_wait', here, `${reaches} and waits ${minutes(stop.waitMin)} for its delivery window to open at ${toClock(stop.windowOpen)}.`, fix, leaveLater);
         }
       }
       earlier = { tripNo: trip.tripNo, readyAt: times.readyAgainAt };

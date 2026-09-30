@@ -564,6 +564,48 @@ describe('saving the draft', () => {
 });
 
 describe('placing', () => {
+  it('spec 010 waits for the planning depot before locking the shop, and checks the cutoff after waiting', async () => {
+    setClockForTests(at(TUE, '15:59'));
+    const refs = await savedDraft();
+    const before = await held();
+    const holder = await pool.connect();
+    let pending: Promise<request.Response> | undefined;
+    try {
+      await holder.query('begin');
+      await holder.query('select from depots where id = $1 for no key update', [DEPOT]);
+      const { rows } = await holder.query<{ pid: number }>('select pg_backend_pid() as pid');
+      const pid = rows[0]!.pid;
+      let answered = false;
+      pending = place(fresh, { deliveryDate: WED, refs }).then((res) => { answered = true; return res; });
+
+      // The depot is the only row held by this connection, so being blocked by it proves that a place
+      // queues behind a planning write. No delay alone is treated as evidence of a lock.
+      let waitingForDepot = false;
+      for (let tries = 0; tries < 200 && !answered; tries++) {
+        const { rows: waiting } = await pool.query<{ waiting: boolean }>(
+          'select exists (select from pg_stat_activity where datname = current_database() and $1 = any(pg_blocking_pids(pid))) as waiting', [pid],
+        );
+        if (waiting[0]!.waiting) { waitingForDepot = true; break; }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(waitingForDepot).toBe(true);
+      // This succeeds only if place has not taken the shop first. Reversing the lock order would stop
+      // planning from touching the shop while a place waits for its depot.
+      await holder.query('select from outlets where id = $1 for no key update nowait', [FRESH]);
+      expect(await held()).toEqual(before);
+      setClockForTests(at(TUE, '16:01'));
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+      // Always let the request finish before the file's normal afterEach cleanup.
+      if (pending) await pending;
+    }
+
+    expect(answer(await pending!)).toEqual([409, 'cutoff_passed']);
+    expect(await held()).toEqual(before);
+    expect(announce).not.toHaveBeenCalled();
+  });
+
   it('AC-19 turns each draft into a placed order, records the app clock\'s time and the person, and announces orders to the shop and its depot', async () => {
     setClockForTests(at(TUE, '15:02'));
     const refs = await savedDraft();

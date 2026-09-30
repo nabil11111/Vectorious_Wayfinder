@@ -34,6 +34,9 @@ export const Problem = z.object({
   message: z.string(),
   // What would clear it, for the codes where that is obvious (spec 007, plan.md, "Messages").
   fix: z.string().optional(),
+  // For a fix that is a leaving time, that time in minutes after midnight, so a screen can apply it in one click
+  // (spec 010).
+  leaveAt: z.number().int().min(0).max(1439).optional(),
   vehicleId: z.string().optional(),
   tripNo: z.number().int().optional(),
   // 1 is the first stop.

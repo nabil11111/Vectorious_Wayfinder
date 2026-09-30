@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, date, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { check, date, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { orderStatusEnum, tempEnum } from './enums';
 import { users } from './identity';
 import { outlets, products } from './reference';
@@ -21,6 +21,8 @@ export const orders = pgTable('orders', {
   savedAt: timestamp('saved_at', { withTimezone: true }),
   placedAt: timestamp('placed_at', { withTimezone: true }),
   revision: integer('revision').notNull().default(0),
+  // A part of a split order points at its original, whose status is then split (D-17, spec 010).
+  splitFrom: uuid('split_from').references((): AnyPgColumn => orders.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
@@ -28,6 +30,8 @@ export const orders = pgTable('orders', {
   uniqueIndex('orders_one_draft').on(t.outletId, t.temp).where(sql`${t.status} = 'draft'`),
   // Every list a shop sees reads its own orders by day.
   index('orders_outlet_date').on(t.outletId, t.deliveryDate),
+  // An original's parts are found by it.
+  index('orders_split_from').on(t.splitFrom),
 ]);
 
 export const orderLines = pgTable('order_lines', {

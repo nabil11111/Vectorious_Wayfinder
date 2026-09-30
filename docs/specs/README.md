@@ -63,3 +63,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [007](007-plan-checker/spec.md) | Plan checker: load calculator, trip timeline and rules | Done |
 | [008](008-demo-day/spec.md) | The demo day: clock, live updates and the seeded day | Done |
 | [009](009-shop-orders/spec.md) | Shop orders | Done |
+| [010](010-plan-board/spec.md) | The plan board: the dispatcher plans by hand | Done |

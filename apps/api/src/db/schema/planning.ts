@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
-import { check, date, integer, pgTable, primaryKey, smallint, text, time, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
-import { planStatusEnum } from './enums';
+import { boolean, check, date, integer, jsonb, pgTable, primaryKey, smallint, text, time, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { planStatusEnum, tripStatusEnum } from './enums';
 import { users } from './identity';
 import { orders } from './orders';
 import { depots, outlets, vehicles } from './reference';
@@ -17,6 +17,13 @@ export const plans = pgTable('plans', {
   status: planStatusEnum('status').notNull().default('draft'),
   revision: integer('revision').notNull().default(0),
   publishedAt: timestamp('published_at', { withTimezone: true }),
+  // "Draft saved 16:12" is a time people see, so it comes from the app clock (D-18).
+  savedAt: timestamp('saved_at', { withTimezone: true }),
+  // The checker's setting for this plan (D-09): may one trip carry more than one brand.
+  mixBrands: boolean('mix_brands').notNull().default(false),
+  // The checker's result when the plan was sent, which the sent plan shows. Empty for a draft, and for plans sent
+  // before this column existed, such as the seed's earlier days (spec 010).
+  sentCheck: jsonb('sent_check'),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique('plans_depot_date').on(t.depotId, t.date)]);
@@ -28,7 +35,11 @@ export const trips = pgTable('trips', {
   driverId: uuid('driver_id').references(() => users.id),
   // The booklet allows at most two trips per vehicle per day.
   tripNo: smallint('trip_no').notNull(),
+  // The leaving time the dispatcher set, or empty for the usual time (D-19).
   departAt: time('depart_at'),
+  // Where the trip is in its day. The loader moves it on (A3); once it is loading, its plan can no longer go back
+  // to edit (D-33).
+  status: tripStatusEnum('status').notNull().default('planned'),
 }, (t) => [unique('trips_vehicle_trip').on(t.planId, t.vehicleId, t.tripNo), check('trips_trip_no', sql`${t.tripNo} in (1, 2)`)]);
 
 export const stops = pgTable('stops', {

@@ -24,9 +24,12 @@ const isHome = (to: string) => to.split('/').filter(Boolean).length === 1;
 // The design's picture of each role, drawn round beside the name. The admin has none, so takes the dispatcher's.
 const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatcher: dispatcherIcon, loader: loaderIcon, driver: driverIcon, admin: dispatcherIcon };
 
-// One shell for every role, matching the Figma top bars. On a phone the nav becomes bottom tabs (shop); on a
-// desktop it sits in the top bar (dispatcher, shop on a desktop). Loader and driver pass no nav at all.
-export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place?: string; children: ReactNode }) {
+// One shell for every role, matching the Figma top bars. Below 1024 wide the nav becomes bottom tabs; from 1024 it
+// sits in the top bar (dispatcher, shop on a desktop), where the dispatcher's six tabs need the room. The plan board
+// turns its columns into tabs at the same width. Loader and driver pass no nav at all.
+// bar is a page's own control in the top bar, such as the dispatcher's depot switch (spec 010). wide lets a page use
+// the full width of a large screen, such as the plan board's three columns.
+export function AppShell({ nav = [], place, bar, wide = false, children }: { nav?: NavItem[]; place?: string; bar?: ReactNode; wide?: boolean; children: ReactNode }) {
   const { data: me } = useMe();
   const logout = useLogout();
   // The app's own time, never the device's, and the stream that keeps every open screen current (spec 008).
@@ -38,29 +41,31 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-card px-4 py-3 md:px-6">
-        <span className="font-mono text-2xl font-bold tabular-nums md:hidden">{clock.time}</span>
-        <DemoClock clock={clock} as="sheet" className="md:hidden" />
-        <Wordmark className="hidden md:inline-flex" />
+        <span className="font-mono text-2xl font-bold tabular-nums lg:hidden">{clock.time}</span>
+        <DemoClock clock={clock} as="sheet" className="lg:hidden" />
+        <Wordmark className="hidden lg:inline-flex" />
         {nav.length > 0 && (
-          <nav className="ml-4 hidden gap-1 md:flex">
+          <nav className="ml-4 hidden gap-1 lg:flex">
             {nav.map((n) => (
-              <NavLink key={n.to} to={n.to} end={isHome(n.to)} className={({ isActive }) => cn('rounded-lg px-3 py-1.5 text-sm font-medium', isActive ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+              <NavLink key={n.to} to={n.to} end={isHome(n.to)} className={({ isActive }) => cn('whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium', isActive ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground')}>
                 {n.label}
               </NavLink>
             ))}
           </nav>
         )}
         <div className="flex-1" />
-        <span className="hidden font-mono text-lg font-bold tabular-nums md:inline">{clock.time}</span>
-        <DemoClock clock={clock} as="panel" className="hidden md:inline-flex" />
+        {bar && <div className="hidden shrink-0 lg:block">{bar}</div>}
+        <span className="hidden font-mono text-lg font-bold tabular-nums lg:inline">{clock.time}</span>
+        <DemoClock clock={clock} as="panel" className="hidden lg:inline-flex" />
         {/* The design's bell, last on a phone. A count never goes into the picture: it will sit over the corner as a
             small badge. */}
-        <button type="button" aria-label="Notifications" className="shrink-0 rounded-full p-1 hover:bg-muted max-md:order-last"><img src={alertIcon} alt="" className="size-7" /></button>
+        <button type="button" aria-label="Notifications" className="shrink-0 rounded-full p-1 hover:bg-muted max-lg:order-last"><img src={alertIcon} alt="" className="size-7" /></button>
         {/* The frames draw no sign-out in the bar, so it sits behind the avatar. */}
         <Popover>
           <PopoverTrigger aria-label={me.displayName} className="flex shrink-0 items-center gap-2.5 rounded-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-border"><img src={AVATAR[me.role]} alt="" className="size-6" /></span>
-            <span className="hidden leading-tight sm:block">
+            {/* Between 1024 and 1280 the tabs take the room, so the name waits behind the avatar. */}
+            <span className="hidden leading-tight sm:block lg:hidden xl:block">
               <span className="block text-sm font-bold">{me.displayName}</span>
               <span className="block text-xs text-muted-foreground">{who}</span>
             </span>
@@ -77,12 +82,12 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
         </Popover>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">{children}</main>
+      <main className={cn('mx-auto w-full flex-1 p-4 md:p-6', !wide && 'max-w-6xl')}>{children}</main>
 
       {nav.length > 0 && (
-        <nav className="sticky bottom-0 grid border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden" style={{ gridTemplateColumns: `repeat(${nav.length}, 1fr)` }}>
+        <nav className="sticky bottom-0 grid border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" style={{ gridTemplateColumns: `repeat(${nav.length}, 1fr)` }}>
           {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} end={isHome(n.to)} className={({ isActive }) => cn('flex flex-col items-center gap-1 py-2 text-xs', isActive ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+            <NavLink key={n.to} to={n.to} end={isHome(n.to)} className={({ isActive }) => cn('flex flex-col items-center gap-1 py-2 text-[10px] leading-tight', isActive ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
               {n.icon}
               {n.label}
             </NavLink>

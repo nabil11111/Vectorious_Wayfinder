@@ -1,5 +1,5 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
-import { BRANDS, DOCK_TYPES, ORDER_STATUSES, ROLES, TEMPS } from '@wayfinder/contracts';
+import { BRANDS, DOCK_TYPES, ORDER_STATUSES, ROLES, TEMPS, TRIP_STATUSES } from '@wayfinder/contracts';
 
 export const roleEnum = pgEnum('role', ROLES);
 export const brandEnum = pgEnum('brand', BRANDS);
@@ -11,3 +11,4 @@ export const vehicleTempEnum = pgEnum('vehicle_temp', ['reefer', 'ambient']);
 export const vehicleTypeEnum = pgEnum('vehicle_type', ['truck', 'van']);
 export const orderStatusEnum = pgEnum('order_status', ORDER_STATUSES);
 export const planStatusEnum = pgEnum('plan_status', ['draft', 'published']);
+export const tripStatusEnum = pgEnum('trip_status', TRIP_STATUSES);
