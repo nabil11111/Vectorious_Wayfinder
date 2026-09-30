@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { Bell, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { NavLink } from 'react-router';
+import alertIcon from '@/assets/icons/icon-alert.png';
 import { Button } from '@/components/ui/button';
 import { ROLE_LABEL, useLogout, useMe } from '@/features/auth/api';
 import { useAppClock } from '@/lib/clock';
@@ -39,7 +40,8 @@ export function AppShell({ nav = [], place, children }: { nav?: NavItem[]; place
         <div className="flex-1" />
         <span className="hidden font-mono text-lg font-bold tabular-nums md:inline">{clock.time}</span>
         <DemoClock clock={clock} as="panel" className="hidden md:inline-flex" />
-        <button type="button" aria-label="Notifications" className="rounded-full p-1.5 hover:bg-muted"><Bell className="size-6" /></button>
+        {/* The design's bell. A count never goes into the picture: it will sit over the corner as a small badge. */}
+        <button type="button" aria-label="Notifications" className="rounded-full p-1 hover:bg-muted"><img src={alertIcon} alt="" className="size-7" /></button>
         <div className="hidden text-right leading-tight sm:block">
           <div className="text-sm font-bold">{me.displayName}</div>
           <div className="text-xs text-muted-foreground">{ROLE_LABEL[me.role]}{place ? ` · ${place}` : ''}</div>
