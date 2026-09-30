@@ -8,7 +8,7 @@ import { useNextOrder } from './next-order';
 import { ORANGE } from './parts/actions';
 import { BottomBar } from './parts/BottomBar';
 import { goodsIcon } from './parts/icons';
-import { LoadError } from './parts/LoadError';
+import { LoadError, StaleNotice } from './parts/LoadError';
 import { NoOpenDay } from './parts/NextOrderCard';
 import { PageHeader } from './parts/PageHeader';
 import { Panel } from './parts/Panel';
@@ -30,16 +30,20 @@ export function NewOrderPage() {
       </Page>
     );
   }
+  // A later fetch that fails leaves the last answer on the screen, so the form says it may be out of date and
+  // an old "draft saved" never passes for a fresh one.
+  const stale = next.isError && <StaleNotice busy={next.isFetching} onRetry={() => { void next.refetch(); }} />;
   const { deliveryDate } = next.data;
   if (!deliveryDate) {
     return (
       <Page>
+        {stale}
         <PageHeader title="New order" small />
         <NoOpenDay />
       </Page>
     );
   }
-  return <OrderForm next={{ ...next.data, deliveryDate }} />;
+  return <OrderForm next={{ ...next.data, deliveryDate }} stale={stale} />;
 }
 
 const Page = ({ children }: { children: ReactNode }) => <div className="space-y-2.5 lg:space-y-[22px] lg:pt-2.5">{children}</div>;
@@ -49,7 +53,7 @@ const Notice = ({ children }: { children: ReactNode }) => (
   <p role="status" className="rounded-[10px] bg-warn-tint px-3 pt-2.5 pb-2 text-xs leading-[15px] font-semibold text-warn-ink">{children}</p>
 );
 
-function OrderForm({ next }: { next: OpenOrder }) {
+function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
   const form = useDraftForm(next);
   const { outlet, products, draft, deliveryDate, cutoffAt } = next;
   const fresh = outlet.brand === 'Fresh';
@@ -61,6 +65,7 @@ function OrderForm({ next }: { next: OpenOrder }) {
 
   return (
     <Page>
+      {stale}
       <PageHeader title="New order" small>
         {fresh ? <p>For {shortDay(deliveryDate)}{closes}{next.cutoffIsToday && ' today'}</p> : <p>{outlet.name} · for {shortDay(deliveryDate)}{closes}</p>}
       </PageHeader>
