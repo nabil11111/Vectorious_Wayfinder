@@ -21,3 +21,17 @@ export function boardDay(today: string, minutesNow: number, operatingDays: strin
     open: today > cutoffDate || (today === cutoffDate && minutesNow >= CUTOFF_MINUTES),
   };
 }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// A day as the screens write it, 'Thu 25 Jun', for the sentences the API sends.
+export function dayLabel(date: string): string {
+  const [year, month, day] = date.split('-').map(Number) as [number, number, number];
+  return `${WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]} ${day} ${MONTHS[month - 1]}`;
+}
+
+// A whole percentage, halves up (rule 12). Rounding the quotient to six places first takes away floating-point
+// noise, so 35.91 of 38, exactly 94.5%, is 95 and not 94.
+export const percent = (value: number, total: number) => total ? Math.round(Number(((value * 100) / total).toFixed(6))) : 0;
+

@@ -43,6 +43,9 @@ export type DraftTrip = z.infer<typeof DraftTrip>;
 export const DraftDeferral = z.object({ orderId: z.uuid(), code: DeferralCode, reason: z.string().trim().min(1).max(200) });
 export type DraftDeferral = z.infer<typeof DraftDeferral>;
 
+// A board answers with its draft in one fixed order: trips by vehicle and trip number, a vehicle's only trip as trip
+// 1, each stop's orders and the deferrals by order id, and reasons trimmed. A screen that compares a draft it sent
+// with the board's (the save queue after a stale answer) compares them in that order.
 export const DraftPlan = z.object({
   mixBrands: z.boolean(),
   trips: z.array(DraftTrip).max(76),

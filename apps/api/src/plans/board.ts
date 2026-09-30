@@ -9,11 +9,10 @@ import { CUTOFF_MINUTES } from '../orders/orderable-day';
 import { snapshot } from '../orders/store-orders';
 import { checkPlan, computeLoad, DEFAULT_SETTINGS, toMinutes, type PlanInput } from '../planning';
 import type { Planner } from '../routes/plans';
-import { boardDay } from './board-day';
+import { boardDay, percent } from './board-day';
 
 export interface BoardMoment { at: Date; demoDay: number }
 export const emptyDraft = (): DraftPlan => ({ mixBrands: false, trips: [], deferrals: [] });
-const percent = (value: number, total: number) => total ? Math.round(value * 100 / total) : 0;
 const sum = (values: number[], precision = 1) => Math.round(values.reduce((a, b) => a + b, 0) * 10 ** precision) / 10 ** precision;
 const minutes = (value: string) => toMinutes(value.slice(0, 5));
 

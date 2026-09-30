@@ -70,11 +70,13 @@ export async function unsendPlan(caller: Planner, date: string, body: UnsendPlan
     const loading = storedTrips.find((t) => t.status !== 'planned');
     if (loading) throw new HttpError(409, 'loading_started', 'Loading has started, so this plan cannot go back to edit.', { vehicleId: loading.vehicleId, tripNo: loading.tripNo });
     const board = await boardOf(tx, caller.depotId, date, opened.moment);
-    const ids = board.orders.flatMap((o) => [o.id, ...(o.splitFrom ? [o.splitFrom] : [])]);
+    const ids = board.orders.map((o) => o.id);
     const earlier = ids.length ? await tx.select({ orderId: deferrals.orderId }).from(deferrals).innerJoin(plans, eq(plans.id, deferrals.planId))
       .where(and(inArray(deferrals.orderId, ids), eq(plans.status, 'published'), lt(plans.date, date))) : [];
     const wasDeferred = new Set(earlier.map((d) => d.orderId));
-    for (const order of board.orders) await tx.update(orders).set({ status: wasDeferred.has(order.id) || (order.splitFrom !== null && wasDeferred.has(order.splitFrom)) ? 'deferred' : 'placed',
+    // Each order goes back to what it was before the send. A split part starts placed whatever its original was,
+    // so only its own earlier deferral makes it deferred again.
+    for (const order of board.orders) await tx.update(orders).set({ status: wasDeferred.has(order.id) ? 'deferred' : 'placed',
       revision: sql`${orders.revision} + 1`, updatedAt: sql`now()` }).where(eq(orders.id, order.id));
     if (storedTrips.length) {
       const tripIds = storedTrips.map((t) => t.id);
