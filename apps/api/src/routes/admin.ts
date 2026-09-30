@@ -4,6 +4,7 @@ import type { AdminVehicle } from '@wayfinder/contracts';
 import { db } from '../db/client';
 import { auditLog, vehicles } from '../db/schema';
 import { HttpError } from '../lib/errors';
+import { announce } from '../lib/live';
 import { requireRole } from '../middleware/auth';
 
 export const adminRouter = Router();
@@ -80,5 +81,7 @@ adminRouter.post('/vehicles/:id/archive', async (req, res) => {
     });
     return after;
   });
+  // Once it is committed, every open admin screen fetches its lists again (D-21).
+  announce({ topic: 'admin' });
   res.json(archived);
 });
