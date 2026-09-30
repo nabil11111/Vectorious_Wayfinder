@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { z } from 'zod';
-import { CutoffPassedDetails, StoreOrder, type DraftRefs, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
+import { CutoffPassedDetails, StoreOrder, type DraftRefs, type Me, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
+import { meKey } from '@/features/auth/api';
 import { ApiRequestError } from '@/lib/api';
 import { fetchNextOrder, nextOrderKey, placeOrders, saveDraft } from './next-order';
 import { reasonOf } from './words';
@@ -74,10 +75,12 @@ class DraftForm {
   private timer = 0;
   private retryTimer = 0;
   private tries = 0;
-  // The values of a save that got no answer. The server may have taken it all the same.
-  private unanswered: FormValues | null = null;
+  // The values of every save since the last answer that got no answer. The server may have taken any of them.
+  private unanswered: FormValues[] = [];
   private retriedWithoutItem = false;
   private onScreen = true;
+  // The person who opened the form. Its answers belong to them alone.
+  private owner: string | null;
   private qc: QueryClient;
   private show: (patch: Partial<Screen>) => void;
   private placed: (orders: StoreOrder[]) => void;
@@ -89,6 +92,13 @@ class DraftForm {
     this.qc = qc;
     this.show = show;
     this.placed = placed;
+    this.owner = qc.getQueryData<Me | null>(meKey)?.id ?? null;
+  }
+
+  // An answer can arrive after its person signed out, when the screens' cache was emptied, or after someone else
+  // signed in on this browser. Written into the cache then, it would show one shop's orders to the next person.
+  private stillMine() {
+    return this.owner !== null && this.qc.getQueryData<Me | null>(meKey)?.id === this.owner;
   }
 
   // Off the screen there is nobody to tell.
@@ -125,13 +135,14 @@ class DraftForm {
     const closedDay = this.base.deliveryDate;
     this.base = { ...this.base, deliveryDate: open.data.deliveryDate };
     // Whether the new day closes today is not in the answer. Naming the weekday is true either way.
-    this.qc.setQueryData<StoreNextOrder>(nextOrderKey, (old) => old && { ...old, deliveryDate: open.data.deliveryDate, cutoffAt: open.data.cutoffAt, cutoffIsToday: false });
+    if (this.stillMine()) this.qc.setQueryData<StoreNextOrder>(nextOrderKey, (old) => old && { ...old, deliveryDate: open.data.deliveryDate, cutoffAt: open.data.cutoffAt, cutoffIsToday: false });
     this.tell({ closedDay });
     return true;
   }
 
   // A refusal that trying again cannot fix: load the latest and say so.
   private async loadLatest(error: unknown, whilePlacing: boolean) {
+    if (!this.stillMine()) return;
     let latest: StoreNextOrder;
     try {
       latest = await this.qc.fetchQuery({ queryKey: nextOrderKey, queryFn: fetchNextOrder, staleTime: 0 });
@@ -142,9 +153,9 @@ class DraftForm {
     const code = codeOf(error);
     const shown = this.values;
     const held = valuesOf(latest);
-    if (code === 'stale' && !whilePlacing && this.unanswered && sameValues(held, this.unanswered)) {
+    if (code === 'stale' && !whilePlacing && this.unanswered.some((values) => sameValues(held, values))) {
       // The "somewhere else" was this form: an earlier save arrived and its answer did not. Carry on from it.
-      this.unanswered = null;
+      this.unanswered = [];
       this.takeOver(latest);
       if (sameValues(held, shown)) this.savedSeq = this.sentSeq = this.seq;
       void this.flush();
@@ -176,8 +187,9 @@ class DraftForm {
       await this.qc.cancelQueries({ queryKey: nextOrderKey });
       const answer = await saveDraft(this.request());
       this.running = false;
+      if (!this.stillMine()) return;
       this.tries = 0;
-      this.unanswered = null;
+      this.unanswered = [];
       this.retriedWithoutItem = false;
       this.savedSeq = this.sentSeq;
       this.takeOver(answer);
@@ -189,7 +201,7 @@ class DraftForm {
       if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
         void this.flush();
       } else if (worthRetrying(error)) {
-        this.unanswered = sent;
+        this.unanswered.push(sent);
         // Off the screen there is no reason to keep trying.
         if (!this.onScreen) return;
         this.show({ saving: 'retrying' });
@@ -228,6 +240,7 @@ class DraftForm {
     try {
       await this.qc.cancelQueries({ queryKey: nextOrderKey });
       const answer = await placeOrders({ deliveryDate: this.base.deliveryDate, refs: this.base.refs });
+      if (!this.stillMine()) return;
       this.takeOver(answer);
       this.qc.setQueryData<StoreNextOrder>(nextOrderKey, answer);
       // The open list and Today now hold the placed orders.
