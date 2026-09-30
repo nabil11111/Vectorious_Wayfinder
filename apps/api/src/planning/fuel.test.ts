@@ -58,12 +58,18 @@ describe('trip and vehicle fuel', () => {
   it('AC-16 gives a vehicle\'s litres used before this plan, the litres in this plan and the litres left', () => {
     // 300 + 63.6 leaves 16.4 of 380.
     expect(fuelOf('VEH006', [galle], 300)).toEqual({ vehicleId: 'VEH006', litresBefore: 300, litresPlan: 63.6, litresLeft: 16.4, quotaL: 380, kmPlan: 280 });
-    // The chained day with nothing used yet. Plain JavaScript says 10.3 + 5.3 is 15.600000000000001.
+    // The chained day with nothing used yet: its 106 km need 15.588 litres.
     expect(fuelOf('VEH012', [gampaha, colombo])).toEqual({ vehicleId: 'VEH012', litresBefore: 0, litresPlan: 15.6, litresLeft: 524.4, quotaL: 540, kmPlan: 106 });
 
-    // The litres in the plan are the trips' shown litres added up, so a screen's lines add up. Two trips of 24 km
-    // are 3.5 litres each and 7.0 together, though 48 km in one go would show as 7.1.
-    expect(fuelOf('VEH012', [trip('VEH012', 1, ['OUT005']), trip('VEH012', 2, ['OUT006'])])).toEqual({ vehicleId: 'VEH012', litresBefore: 0, litresPlan: 7, litresLeft: 533, quotaL: 540, kmPlan: 48 });
+    // The litres in the plan are what all its kilometres need, rounded once, and not the trips' shown litres
+    // added up. Two trips of 24 km show as 3.5 litres each, and their 48 km need 7.06, so the plan says 7.1.
+    expect(fuelOf('VEH012', [trip('VEH012', 1, ['OUT005']), trip('VEH012', 2, ['OUT006'])])).toEqual({ vehicleId: 'VEH012', litresBefore: 0, litresPlan: 7.1, litresLeft: 532.9, quotaL: 540, kmPlan: 48 });
+    // That is what keeps a vehicle's line in step with the quota check. VEH010 (5.6 km per litre, 540 litres a
+    // week) with 517.5 used and two 63 km trips to Gampaha ends exactly on its quota: 126 km need 22.5 litres.
+    // Each trip alone is 11.25 litres and shows as 11.3, and added up those would leave -0.1.
+    const twice63 = [trip('VEH010', 1, ['OUT026', 'OUT030']), trip('VEH010', 2, ['OUT028', 'OUT031'])];
+    expect(fuelOf('VEH010', twice63, 517.5)).toEqual({ vehicleId: 'VEH010', litresBefore: 517.5, litresPlan: 22.5, litresLeft: 0, quotaL: 540, kmPlan: 126 });
+    expect(timeVehicleDay(inputFor('Peliyagoda', { trips: twice63 }), 'VEH010').trips.map(({ times }) => times && [times.km, times.litres])).toEqual([[63, 11.3], [63, 11.3]]);
 
     // Exactly on the shown quota nothing is left. Plain JavaScript says 380 - 316.4 - 63.6 is 0.00000000000002.
     expect(fuelOf('VEH006', [galle], 316.4)).toEqual({ vehicleId: 'VEH006', litresBefore: 316.4, litresPlan: 63.6, litresLeft: 0, quotaL: 380, kmPlan: 280 });
