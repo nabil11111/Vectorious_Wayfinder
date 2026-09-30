@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import type { LoadingDay, LoadingLine, LoadingStop, LoadingTruck } from '@wayfinder/contracts';
+import type { Issue, LoadingDay, LoadingLine, LoadingStop, LoadingTruck } from '@wayfinder/contracts';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,6 +22,12 @@ import { allOnLine, answeredBy, answerSentence, brandOfStop, countOf, lineWords,
 // marked ready once every stop is on and every flag is answered.
 export function TruckPage() {
   const { tripId = '' } = useParams();
+  // A write belongs to its truck: another truck opened from the Next list starts with none, and no sentence of the
+  // truck before it.
+  return <TruckScreen key={tripId} tripId={tripId} />;
+}
+
+function TruckScreen({ tripId }: { tripId: string }) {
   const query = useLoadingDay();
   const writes = useLoaderWrites();
 
@@ -48,6 +54,7 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
   // The stop being loaded is the last one not on yet (rule 4): the stops come last stop first.
   const current = truck.stops.find((stop) => !stop.loaded) ?? null;
   const open = truck.issues.filter((issue) => issue.status === 'open');
+  const answered = truck.issues.filter((issue) => issue.status === 'decided');
   const flagged = new Set(truck.issues.flatMap((issue) => issue.lines.map((line) => line.lineId)));
   const busy = writes.phase !== 'idle';
   const saving = (kind: WriteKind) => writes.out === kind && writes.phase === 'saving';
@@ -95,6 +102,9 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
           ) : (
             <AllOn truck={truck} />
           )}
+          {/* The dispatcher's answers show as soon as they come (rule 7), so a "Load it all" reaches the stop it is
+              about while it is still being loaded. */}
+          {answered.map((issue) => <Answer key={issue.id} issue={issue} />)}
           {open.map((issue) => (
             <p key={issue.id} className="mt-3 rounded-[10px] bg-warn-tint px-3 py-2.5 text-[13px] leading-4 font-semibold text-warn-ink">{waitingLine(issue)}</p>
           ))}
@@ -138,23 +148,26 @@ function LineRow({ line, words, ticked, flagged, onToggle }: { line: LoadingLine
   );
 }
 
-// Every stop is on: the count on the truck and each answer from the dispatcher, with the dispatcher's picture.
+// Every stop is on: the count on the truck.
 function AllOn({ truck }: { truck: LoadingTruck }) {
-  const answered = truck.issues.filter((issue) => issue.status === 'decided');
   return (
     <>
       <Label>All stops loaded</Label>
       <h2 className="mt-[15px] text-2xl leading-8 font-bold">{allOnLine(truck)}</h2>
-      {answered.map((issue) => (
-        <div key={issue.id} className="mt-4 rounded-[12px] bg-muted px-4 pt-3 pb-4">
-          <p className="flex items-center gap-2 text-[13px] leading-5 font-semibold">
-            <img src={DISPATCHER_ICON} alt="" className="size-5 object-contain" />
-            {answeredBy(issue)}
-          </p>
-          <p className="mt-[7px] text-[15px] leading-[21px]">{answerSentence(issue)}</p>
-        </div>
-      ))}
     </>
+  );
+}
+
+// An answer from the dispatcher, with the dispatcher's picture: who and when, then what to do.
+function Answer({ issue }: { issue: Issue }) {
+  return (
+    <div className="mt-4 rounded-[12px] bg-muted px-4 pt-3 pb-4">
+      <p className="flex items-center gap-2 text-[13px] leading-5 font-semibold">
+        <img src={DISPATCHER_ICON} alt="" className="size-5 object-contain" />
+        {answeredBy(issue)}
+      </p>
+      <p className="mt-[7px] text-[15px] leading-[21px]">{answerSentence(issue)}</p>
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DecideIssueRequest, DecideIssueResponse, Issue, IssueList, LoadingDecision } from '@wayfinder/contracts';
-import { ANSWER_WITHIN_MS, worthRetrying } from '@/features/loader/loading';
+import { ANSWER_WITHIN_MS, fetchAgain, worthRetrying } from '@/features/loader/loading';
 import { reasonOf } from '@/features/store/words';
 import { api } from '@/lib/api';
 
@@ -42,10 +42,10 @@ export function useAnswer(): Answering {
       const answer = await api<DecideIssueResponse>(`/issues/${encodeURIComponent(issue.id)}/decide`, {
         method: 'POST', json: { revision: issue.revision, decision } satisfies DecideIssueRequest, signal: AbortSignal.timeout(ANSWER_WITHIN_MS),
       });
-      await qc.invalidateQueries({ queryKey: issuesKey });
+      await fetchAgain(qc, issuesKey);
       setState({ sending: null, failed: null, refused: null, sent: answer.decided });
     } catch (error) {
-      if (!worthRetrying(error)) await qc.invalidateQueries({ queryKey: issuesKey });
+      if (!worthRetrying(error)) await fetchAgain(qc, issuesKey);
       setState((held) => (worthRetrying(error) ? { ...held, sending: null, failed: issue.id } : { ...held, sending: null, refused: reasonOf(error) }));
     } finally {
       running.current = false;

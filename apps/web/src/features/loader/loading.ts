@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { LoadingDay, MarkReadyRequest, RaiseFlagRequest, StartLoadingRequest, StopLoadedRequest } from '@wayfinder/contracts';
 import { reasonOf } from '@/features/store/words';
 import { api, ApiRequestError } from '@/lib/api';
@@ -26,6 +26,13 @@ export function newWriteId(): string {
 // The signal can drop on the dock without the request ever failing, so a write that has had no answer for this long
 // is taken as not saved.
 export const ANSWER_WITHIN_MS = 15_000;
+
+// The day fetched again after a write, waited for no longer than a write is: with the signal gone just after the
+// answer, the buttons come back rather than wait for ever, and the server's revision check refuses anything sent
+// from the truck as it was.
+export function fetchAgain(qc: QueryClient, queryKey: readonly string[]) {
+  return Promise.race([qc.invalidateQueries({ queryKey }), new Promise((done) => window.setTimeout(done, ANSWER_WITHIN_MS))]);
+}
 
 // No answer, the server failed or it asked us to slow down: sending the same write again can work.
 export const worthRetrying = (error: unknown) =>
@@ -86,7 +93,7 @@ export function useLoaderWrites(): LoaderWrites {
         return;
       }
       pending.current = null;
-      await qc.invalidateQueries({ queryKey: loadingKey });
+      await fetchAgain(qc, loadingKey);
       running.current = false;
       setState({ out: null, phase: 'idle', refused: reasonOf(error) });
       return;
@@ -95,7 +102,7 @@ export function useLoaderWrites(): LoaderWrites {
     // The write answers the whole day, but the answer never goes into the query (AC-33): it can arrive after a
     // newer read, another tablet's write or a reset, and would bring back an older truck. The day is fetched again
     // instead, and the buttons wait for it, so they never offer the truck as it was before the write.
-    await qc.invalidateQueries({ queryKey: loadingKey });
+    await fetchAgain(qc, loadingKey);
     running.current = false;
     setState({ out: null, phase: 'idle', refused: null });
     if (mounted.current) write.done?.();

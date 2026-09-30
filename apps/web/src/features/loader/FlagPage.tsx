@@ -21,6 +21,12 @@ const REASON: Record<FlagReason, string> = { short: 'Short', damaged: 'Damaged',
 export function FlagPage() {
   const { tripId = '' } = useParams();
   const [params] = useSearchParams();
+  const stopId = params.get('stop') ?? '';
+  // A form and its write belong to one stop of one truck.
+  return <FlagScreen key={`${tripId}:${stopId}`} tripId={tripId} stopId={stopId} />;
+}
+
+function FlagScreen({ tripId, stopId }: { tripId: string; stopId: string }) {
   const query = useLoadingDay();
   const writes = useLoaderWrites();
 
@@ -31,7 +37,7 @@ export function FlagPage() {
   }
   const truck = query.data.trucks.find((t) => t.tripId === tripId);
   if (!truck) return <NotOnList />;
-  const stop = truck.stops.find((s) => s.id === params.get('stop'));
+  const stop = truck.stops.find((s) => s.id === stopId);
   // A flag is raised while the truck loads, on one of its stops. Anything else goes back to the truck.
   if (!stop || truck.status !== 'loading') return <Navigate to={`/loader/trucks/${truck.tripId}`} replace />;
   return <FlagForm truck={truck} stop={stop} writes={writes} />;
