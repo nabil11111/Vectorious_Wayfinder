@@ -43,23 +43,23 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
     <header className="flex flex-wrap items-center gap-x-3.5 gap-y-3 lg:gap-y-3.5">
       <h1 className="mr-px text-xl leading-6 font-bold">{planFor(board.day!.date)}</h1>
       <div role="tablist" aria-label="Board" className="order-last flex h-[26px] w-full overflow-hidden rounded-full border bg-card lg:order-none lg:w-auto">
-          {tabs.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              role="tab"
-              aria-selected={t.value === tab}
-              data-shown={t.value === tab}
-              data-working={t.value === working}
-              onClick={() => onTab(t.value)}
-              className={cn(
-                'flex-1 px-3 text-xs font-semibold whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 lg:flex-none',
-                'max-lg:data-[shown=true]:bg-secondary max-lg:data-[shown=true]:text-secondary-foreground lg:data-[working=true]:bg-secondary lg:data-[working=true]:text-secondary-foreground',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+        {tabs.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            role="tab"
+            aria-selected={t.value === tab}
+            data-shown={t.value === tab}
+            data-working={t.value === working}
+            onClick={() => onTab(t.value)}
+            className={cn(
+              'flex-1 px-3 text-xs font-semibold whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 lg:flex-none',
+              'max-lg:data-[shown=true]:bg-secondary max-lg:data-[shown=true]:text-secondary-foreground lg:data-[working=true]:bg-secondary lg:data-[working=true]:text-secondary-foreground',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
       <SaveStatus screen={screen} />
       {board.counts && <Counts counts={board.counts} />}
