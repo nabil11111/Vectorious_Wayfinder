@@ -1,12 +1,23 @@
 import { PlanBoard } from '@wayfinder/contracts';
 import request from 'supertest';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
-import { plans, orders } from '../src/db/schema';
-import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
+import { plans, orders, demoDay } from '../src/db/schema';
+import { depotInstant, initClock, realNow, setClockForTests } from '../src/lib/clock';
 import { serve, stop } from './serve';
+
+const testClock = vi.hoisted(() => ({ at: null as string | null }));
+vi.mock('../src/lib/clock', async (original) => {
+  const clock = await original<typeof import('../src/lib/clock')>();
+  return { ...clock, demoClockAt: (...args: Parameters<typeof clock.demoClockAt>) => {
+    const state = clock.demoClockAt(...args);
+    return testClock.at ? { ...state, now: testClock.at } : state;
+  } };
+});
+const freeze = (at: Date | null) => { testClock.at = at?.toISOString() ?? null; setClockForTests(at); };
 
 const server = await serve(createApp());
 const actors = new Map<string, ReturnType<typeof request.agent>>();
@@ -14,7 +25,7 @@ const reset = () => db.transaction(async (tx) => { await clearDemoDay(tx); await
 beforeAll(async () => {
   await reset();
   await initClock();
-  setClockForTests(depotInstant('2026-06-24', 960));
+  freeze(depotInstant('2026-06-24', 960));
   for (const username of ['ruwan', 'nadeesha', 'ishara', 'kasun', 'dilshan', 'admin']) {
     const agent = request.agent(server);
     const password = username === 'admin' ? process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin' : process.env.SEED_PASSWORD ?? 'wayfinder-demo';
@@ -22,7 +33,7 @@ beforeAll(async () => {
     actors.set(username, agent);
   }
 });
-afterAll(async () => { await reset(); setClockForTests(null); await stop(server); await pool.end(); });
+afterAll(async () => { await reset(); freeze(null); await stop(server); await pool.end(); });
 
 it('AC-5 protects every endpoint before reading its input', async () => {
   const paths = [['get', ''], ['get', '/2026-06-25'], ['put', '/2026-06-25/draft'],
@@ -61,10 +72,10 @@ it('AC-8 retains carried-over history and excludes the shop draft', async () => 
   ]);
   expect(board.orders.find((o) => o.outletId === 'OUT060' && o.carriedOver)!.lastDeferral!.reason).toBe('No fridge truck was left for Matara. Two were in the workshop.');
   expect(board.orders.filter((o) => o.outletId === 'OUT001')).toHaveLength(1);
-  setClockForTests(depotInstant('2026-06-24', 959));
+  freeze(depotInstant('2026-06-24', 959));
   const next = (await actors.get('nadeesha')!.get('/api/v1/store/next-order')).body;
   expect((await actors.get('nadeesha')!.post('/api/v1/store/next-order/place').send({ deliveryDate: next.deliveryDate, refs: next.draft.refs })).status).toBe(200);
-  setClockForTests(depotInstant('2026-06-24', 960));
+  freeze(depotInstant('2026-06-24', 960));
   expect(PlanBoard.parse((await actors.get('ruwan')!.get('/api/v1/plans')).body).orders).toHaveLength(104);
   await reset();
 });
@@ -85,4 +96,11 @@ it('reads dated historical plans and validates the path date', async () => {
   expect(board.plan.status).toBe('published');
   expect([board.check, board.figures, board.counts]).toEqual([null, null, null]);
   expect((await agent.get('/api/v1/plans/not-a-date')).status).toBe(400);
+});
+
+it('reads the snapshot clock row even when the process clock has not caught up', async () => {
+  freeze(null);
+  await db.update(demoDay).set({ clockBase: depotInstant('2026-06-24', 960), clockSetAt: realNow() }).where(eq(demoDay.id, 1));
+  const board = PlanBoard.parse((await actors.get('ruwan')!.get('/api/v1/plans')).body);
+  expect(board.day).toMatchObject({ date: '2026-06-25', open: true });
 });
