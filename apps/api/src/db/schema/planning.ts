@@ -1,11 +1,14 @@
-import { date, integer, pgTable, primaryKey, smallint, text, time, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { check, date, integer, pgTable, primaryKey, smallint, text, time, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { planStatusEnum } from './enums';
 import { users } from './identity';
 import { orders } from './orders';
 import { depots, outlets, vehicles } from './reference';
 
 // A plan is one depot's delivery day. Trips hang off it, stops off trips, and each order is either on a stop
-// or deferred with a reason. The planner owner may reshape these tables; talk to the team before you do.
+// or deferred with a reason. The tables hold the two-trip limit themselves. Whether an order is placed once,
+// and not also deferred, is checked by the plan validator before a plan is published, because a split order
+// may need both. The planner owner may reshape these tables; talk to the team before you do.
 
 export const plans = pgTable('plans', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -26,7 +29,7 @@ export const trips = pgTable('trips', {
   // The booklet allows at most two trips per vehicle per day.
   tripNo: smallint('trip_no').notNull(),
   departAt: time('depart_at'),
-}, (t) => [unique('trips_vehicle_trip').on(t.planId, t.vehicleId, t.tripNo)]);
+}, (t) => [unique('trips_vehicle_trip').on(t.planId, t.vehicleId, t.tripNo), check('trips_trip_no', sql`${t.tripNo} in (1, 2)`)]);
 
 export const stops = pgTable('stops', {
   id: uuid('id').primaryKey().defaultRandom(),

@@ -1,0 +1,1 @@
+ALTER TABLE "trips" ADD CONSTRAINT "trips_trip_no" CHECK ("trips"."trip_no" in (1, 2));
