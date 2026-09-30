@@ -57,27 +57,37 @@ export interface AppClock {
   time: string;
   // The clock has reached the point where it waits for someone to move it on.
   waiting: boolean;
+  // The first read of the clock failed, so there is no time to show yet, and retry asks again.
+  failed: boolean;
+  retry: () => void;
 }
 
 // The time on screen. It comes from GET /clock, runs on by itself and is drawn again every 15 seconds.
 export function useAppClock(): AppClock {
-  const { data: state } = useQuery({ queryKey: clockKey, queryFn: async () => hold(await api<ClockState>('/clock')) });
+  const query = useQuery({ queryKey: clockKey, queryFn: async () => hold(await api<ClockState>('/clock')) });
+  const state = query.data;
+  const retry = () => void query.refetch();
   const [reading, setReading] = useState(() => performance.now());
   useEffect(() => {
     const timer = window.setInterval(() => setReading(performance.now()), 15_000);
     return () => window.clearInterval(timer);
   }, []);
 
-  if (!state) return { state, at: null, time: '--:--', waiting: false };
+  // A later read that fails leaves the clock it had running on, so only a first read that failed is shown.
+  if (!state) return { state, at: null, time: '--:--', waiting: false, failed: query.isError, retry };
   // A clock that arrived after the last drawing shows the time it arrived with.
   const at = shownAt(state, Math.max(reading, state.heldAt));
-  return { state, at, time: inDepot(at).time, waiting: state.holdsAt !== null && at >= Date.parse(state.holdsAt) };
+  return { state, at, time: inDepot(at).time, waiting: state.holdsAt !== null && at >= Date.parse(state.holdsAt), failed: false, retry };
 }
 
 // Takes the clock a move or a reset answered with. "Today" changed with it, so every list is fetched again.
 async function takeClock(qc: QueryClient, clock: ClockState) {
   // A read that started before the change would answer with the clock as it was.
   await qc.cancelQueries({ queryKey: clockKey });
+  // A later clock can already be here: someone else moved it and the live stream fetched it while this answer
+  // was on its way. Every move and every reset raises the revision, so an older answer is dropped.
+  const held = qc.getQueryData<HeldClock>(clockKey);
+  if (held && held.revision > clock.revision) return;
   qc.setQueryData(clockKey, hold(clock));
   void qc.invalidateQueries({ predicate: (query) => query.queryKey[0] !== clockKey[0] });
 }

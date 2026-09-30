@@ -13,14 +13,23 @@ import { cn } from '@/lib/utils';
 // sheet from the bottom on a phone, a small panel under the chip on a desktop, one orange button.
 export function DemoClock({ clock, as, className }: { clock: AppClock; as: 'sheet' | 'panel'; className?: string }) {
   const { state, at, waiting } = clock;
-  // Demo mode off shows the time only, and nothing shows until the clock has arrived.
-  if (!state?.demo || at === null) return null;
-
   const chip = cn(
     'relative inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 text-xs font-semibold whitespace-nowrap text-foreground outline-none select-none',
     'after:absolute after:-inset-2 hover:bg-border focus-visible:ring-3 focus-visible:ring-ring/50 data-popup-open:bg-border',
     className,
   );
+  // With no time to show, the chip's place says so and asks again, rather than "--:--" looking like loading.
+  if (clock.failed) {
+    return (
+      <button type="button" className={chip} aria-label="Could not load the time. Try again." onClick={clock.retry}>
+        <span className="size-2 rounded-full bg-warn" aria-hidden="true" />
+        No time · Try again
+      </button>
+    );
+  }
+  // Demo mode off shows the time only, and nothing shows until the clock has arrived.
+  if (!state?.demo || at === null) return null;
+
   const label = (
     <>
       {waiting && <span className="size-2 rounded-full bg-warn" aria-hidden="true" />}
