@@ -23,7 +23,9 @@ export function createApp() {
   // Rate limits count by client address. Believe a forwarded address only when a proxy we run sits in front,
   // otherwise anyone could change the header on each try and never be limited.
   app.set('trust proxy', config.TRUST_PROXY);
-  app.use(helmet());
+  // docker compose serves the app over plain http on localhost, where telling the browser to upgrade every request
+  // to https would break the page. Hosted, every request is https already, so the upgrade adds nothing there.
+  app.use(helmet({ contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } } }));
   // Log the method, path, status and time only. Full headers would write session cookies into the logs. The
   // health check and the live stream are left out: one is polled all day, the other is one long request.
   app.use(pinoHttp({
