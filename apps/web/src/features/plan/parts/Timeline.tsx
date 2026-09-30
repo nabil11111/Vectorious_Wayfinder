@@ -41,7 +41,7 @@ function Line({ times }: { times: TripTimes }) {
   return (
     // The first and last labels are centred on their hours, so the line runs inside half a label's width.
     <div className="px-[15px]">
-      <div className="relative h-4">
+      <div className="relative h-4 max-xl:[&>span:nth-child(even)]:hidden">
         {hours.map((hour) => (
           <span key={hour} className="absolute top-0 -translate-x-1/2 font-mono text-[10px] leading-4 text-muted-foreground" style={{ left: `${at(hour * 60)}%` }}>{hhmm(hour * 60)}</span>
         ))}

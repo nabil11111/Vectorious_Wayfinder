@@ -4,11 +4,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 const DEPOTS = ['Peliyagoda', 'Kandy'];
 
 // The depot switch in the top bar (the Dispatcher frames). A dispatcher plans their own depot only (D-32), so the
-// switch shows it chosen and greys the others, which say why when pointed at or pressed.
+// switch shows it chosen and greys the others, which say why when pointed at or pressed. It shows from 1280 px,
+// where the top bar has room for it beside the tabs; the shell names the depot under the dispatcher's name anyway.
 export function DepotSwitch({ depot }: { depot: string }) {
   const others = [...DEPOTS.filter((name) => name !== depot), 'Both'];
   return (
-    <div role="group" aria-label="Depot" className="flex h-7 items-stretch overflow-hidden rounded-lg border bg-card text-xs leading-none font-semibold">
+    <div role="group" aria-label="Depot" className="hidden h-7 items-stretch overflow-hidden rounded-lg border bg-card text-xs leading-none font-semibold xl:flex">
       <span aria-current="true" className="flex items-center bg-secondary px-2.5 text-secondary-foreground">{depot}</span>
       {others.map((name) => (
         <Popover key={name}>
