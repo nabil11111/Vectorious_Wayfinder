@@ -23,7 +23,10 @@ export type Parking = z.infer<typeof Parking>;
 
 // ── The draft, as the screen edits it and a save sends it ──────────────────────────────────────────────────────
 
-export const DraftStop = z.object({ outletId: z.string().min(1).max(16), orderIds: z.array(z.uuid()).min(1).max(10) });
+// A stop takes every order of its shop that the plan puts there, so its cap is the plan's own order bound (the 300
+// of deferrals below): a guard against absurd input that no real day reaches, and never lower than what Find a slot
+// may offer.
+export const DraftStop = z.object({ outletId: z.string().min(1).max(16), orderIds: z.array(z.uuid()).min(1).max(300) });
 export type DraftStop = z.infer<typeof DraftStop>;
 
 export const DraftTrip = z.object({
@@ -40,6 +43,9 @@ export type DraftTrip = z.infer<typeof DraftTrip>;
 export const DraftDeferral = z.object({ orderId: z.uuid(), code: DeferralCode, reason: z.string().trim().min(1).max(200) });
 export type DraftDeferral = z.infer<typeof DraftDeferral>;
 
+// A board answers with its draft in one fixed order: trips by vehicle and trip number, a vehicle's only trip as trip
+// 1, each stop's orders and the deferrals by order id, and reasons trimmed. A screen that compares a draft it sent
+// with the board's (the save queue after a stale answer) compares them in that order.
 export const DraftPlan = z.object({
   mixBrands: z.boolean(),
   trips: z.array(DraftTrip).max(76),
@@ -165,7 +171,8 @@ export const PlanBoard = z.object({
   depot: z.string(),
   // The clock's `day`, which the first save sends back.
   demoDay: z.number().int().min(1),
-  // The day on the board, when its orders close, and whether they are still open. null when no day can be planned.
+  // The day on the board and when its orders close. open is true once they have closed, so the board can be planned
+  // (spec 010, rule 1). null when no day can be planned.
   day: z.object({ date: Day, cutoffAt: Moment, open: z.boolean() }).nullable(),
   plan: DraftPlan.extend({
     id: z.uuid().nullable(),

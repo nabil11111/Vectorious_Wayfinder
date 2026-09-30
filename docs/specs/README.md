@@ -57,9 +57,9 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | --- | --- | --- |
 | [000](000-map.md) | The map: every piece, in build order | Ready |
 | [003](003-outlet-names.md) | Outlet names | Done |
-| [004](004-admin-vehicles.md) | Admin: vehicles | Ready |
-| [005](005-admin-outlets.md) | Admin: outlets | Ready (after 004) |
-| [006](006-admin-products.md) | Admin: products | Ready (after 004) |
+| [004](004-admin-vehicles.md) | Admin: vehicles | Done |
+| [005](005-admin-outlets.md) | Admin: outlets | Building |
+| [006](006-admin-products.md) | Admin: products | Ready |
 | [007](007-plan-checker/spec.md) | Plan checker: load calculator, trip timeline and rules | Done |
 | [008](008-demo-day/spec.md) | The demo day: clock, live updates and the seeded day | Done |
 | [009](009-shop-orders/spec.md) | Shop orders | Done |

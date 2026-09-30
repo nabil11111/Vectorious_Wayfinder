@@ -31,7 +31,7 @@ export function StoreHome() {
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/new" element={<NewOrderPage />} />
         <Route path="orders/placed" element={<OrdersPlacedPage />} />
-        <Route path="deliveries" element={<ComingNext title="Deliveries" what="Confirm what arrived and report anything short or damaged. Figma: Shop · Confirm delivery." />} />
+        <Route path="deliveries" element={<ComingNext title="Deliveries" what="Confirm what arrived and report anything short or damaged." />} />
         <Route path="help" element={<HelpPage />} />
         <Route path="*" element={<Navigate to="/store" replace />} />
       </Routes>
