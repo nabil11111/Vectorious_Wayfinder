@@ -129,10 +129,11 @@ it('AC-5 leaves a truck that is out or done off the list', async () => {
 });
 
 it('AC-6 turns away no session, the other roles and an admin on all seven endpoints', async () => {
+  type Endpoint = [method: 'get' | 'post', url: string];
   const id = randomUUID();
-  const loaders = [['get', '/api/v1/loading'], ...['start', 'stop-loaded', 'flags', 'ready'].map((write) => ['post', `/api/v1/loading/trips/${id}/${write}`])] as const;
-  const dispatchers = [['get', '/api/v1/issues'], ['post', `/api/v1/issues/${id}/decide`]] as const;
-  const call = (agent: ReturnType<typeof request.agent>, [method, url]: readonly [string, string]) => method === 'get' ? agent.get(url) : agent.post(url).send({});
+  const loaders: Endpoint[] = [['get', '/api/v1/loading'], ...['start', 'stop-loaded', 'flags', 'ready'].map((write): Endpoint => ['post', `/api/v1/loading/trips/${id}/${write}`])];
+  const dispatchers: Endpoint[] = [['get', '/api/v1/issues'], ['post', `/api/v1/issues/${id}/decide`]];
+  const call = (agent: ReturnType<typeof request.agent>, [method, url]: Endpoint) => method === 'get' ? agent.get(url) : agent.post(url).send({});
   for (const path of [...loaders, ...dispatchers]) {
     expect(code(await call(request.agent(server), path))).toEqual([401, 'signed_out']);
     for (const agent of [nadeesha, dilshan]) expect(code(await call(agent, path))).toEqual([403, 'forbidden']);
