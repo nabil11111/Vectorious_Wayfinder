@@ -57,9 +57,10 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | Spec | Feature | Status |
 | --- | --- | --- |
 | [000](000-map.md) | The map: every piece, in build order | Ready |
-| [001](001-load-calculator.md) | Load calculator | Ready |
-| [002](002-plan-rules.md) | Plan rules as tests | Ready |
+| 001 | Load calculator | Replaced by 007 |
+| 002 | Plan rules as tests | Replaced by 007 |
 | [003](003-outlet-names.md) | Outlet names | Ready |
 | [004](004-admin-vehicles.md) | Admin: vehicles | Ready |
 | [005](005-admin-outlets.md) | Admin: outlets | Ready (after 004) |
 | [006](006-admin-products.md) | Admin: products | Ready (after 004) |
+| [007](007-planning-engine/spec.md) | Planning engine: load calculator, trip timeline and rule checker | Ready |
