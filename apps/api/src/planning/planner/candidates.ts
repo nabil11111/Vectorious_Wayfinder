@@ -166,7 +166,18 @@ export function chooseWhole(input: PlanInput, order: EngineOrder): CandidateSlot
   best: CandidateAttempt | null; stages: RejectionStage[]; attempts: CandidateAttempt[];
 } {
   const candidates = candidateSlots(input, order);
-  const trials = candidates.slots.map((slot) => tryCandidate(input, order, slot));
+  // Slots arrive in tuple order, so the first two passing trials that keep their usual departures are the
+  // winner and the runner-up whose comparison names the deciding rule, and any passing trial ranked above
+  // them has already been tried. Later slots cannot change the choice or its reason, so the search stops.
+  // A refused order still tries every slot, and its reason uses them all.
+  const trials: CandidateAttempt[] = [];
+  let usualPassing = 0;
+  for (const slot of candidates.slots) {
+    const trial = tryCandidate(input, order, slot);
+    trials.push(trial);
+    if (trial.stage === 'accepted' && !needsEarlierDeparture(trial)) usualPassing += 1;
+    if (usualPassing === 2) break;
+  }
   const attempts = rankAttempts(trials.filter((attempt) => attempt.stage !== 'accepted'));
   return {
     ...candidates, best: selectAttempt(input, order, trials), attempts,
