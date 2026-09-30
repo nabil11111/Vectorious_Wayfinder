@@ -6,6 +6,7 @@ import { parse } from 'csv-parse/sync';
 import { and, eq } from 'drizzle-orm';
 import { config } from '../lib/config';
 import { logger } from '../lib/logger';
+import { moveAdminOffSharedPassword } from './admin-password';
 import { db, pool } from './client';
 import { DEMO_USERS, PRODUCTS } from './fixtures';
 import * as s from './schema';
@@ -101,6 +102,8 @@ await db.insert(s.users).values(DEMO_USERS.map((u) => ({
   depotId: u.depot,
   outletId: u.role === 'store_manager' ? shop!.id : null,
 }))).onConflictDoNothing();
+
+if (await moveAdminOffSharedPassword()) logger.info('admin moved off the shared demo password');
 
 logger.info({ outlets: outletRows.length, vehicles: vehicleRows.length, users: DEMO_USERS.length }, 'seed done');
 await pool.end();
