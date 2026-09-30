@@ -16,5 +16,12 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.on(signal, () => {
     closeStreams();
     server.close(() => void pool.end().then(() => process.exit(0)));
+    // close() waits for every connection, and one that is open but has sent nothing, or a stream that opened
+    // a moment too late, would hold it for a minute or more. Requests in flight get a few seconds, then
+    // whatever is left is cut.
+    setTimeout(() => {
+      closeStreams();
+      server.closeAllConnections();
+    }, 5_000).unref();
   });
 }
