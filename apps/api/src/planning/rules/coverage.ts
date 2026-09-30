@@ -59,12 +59,11 @@ export const coverageProblems: CoverageProblems = (input) => {
   for (const { orderId, code, reason } of input.plan.deferrals) {
     const order = placeOf(orderId);
     order.deferrals += 1;
-    const missing = [
-      ...(DeferralCode.safeParse(code).success ? [] : ['a reason from the list']),
-      ...(reason.trim() === '' ? ['a written reason'] : []),
-    ];
+    const missing: string[] = [];
+    if (!DeferralCode.safeParse(code).success) missing.push('a reason from the list');
+    if (reason.trim() === '') missing.push('a written reason');
     if (missing.length > 0) {
-      report('deferral_incomplete', { orderId, outletId: order.outletId }, `An order for ${order.outletId} is deferred without ${list.format(missing)}.`);
+      report('deferral_incomplete', { orderId, outletId: order.outletId }, `An order for ${order.outletId} is deferred without ${missing.join(' or ')}.`);
     }
   }
 

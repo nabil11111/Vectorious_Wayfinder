@@ -49,7 +49,7 @@ describe('rules for every order being accounted for', () => {
     expect(deferredWith('over_capacity', '')).toEqual(incomplete('a written reason'));
     expect(deferredWith('over_capacity', '   ')).toEqual(incomplete('a written reason'));
     // A deferral with neither is still one problem.
-    expect(deferredWith('', '')).toEqual(incomplete('a reason from the list and a written reason'));
+    expect(deferredWith('', '')).toEqual(incomplete('a reason from the list or a written reason'));
 
     for (const code of DEFERRAL_CODES) expect(deferredWith(code, 'No room left on a dry truck today.')).toEqual([]);
   });
