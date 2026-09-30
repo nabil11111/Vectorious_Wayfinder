@@ -13,14 +13,13 @@ One pull request per task. The API task writes its tests from the criteria first
   with spec 010's split and join tests unchanged and green), `plans/board.ts` (the suggestion on the board),
   `plans/send.ts` (`decisions_open`), the two routes in `routes/plans.ts`, and `apps/api/tests/plan-suggest.test.ts`.
 - [ ] **T2 · The screens** (AC-14 to AC-20) · after T0. Files in `apps/web/src/features/plan/`: `PlanBoardPage.tsx`,
-  `ViewPlanPage.tsx`, `board.ts`, `draft.ts` and `words.ts`, and in `parts/`: `BoardHeader.tsx`, `TripPanel.tsx`,
-  `StopRow.tsx`, `OrderLists.tsx`, `ChecksPanel.tsx`, `lookup.ts` and `icons.ts`, with the new `BuildPanel.tsx`,
-  `Why.tsx` and `Decisions.tsx`.
+  `ViewPlanPage.tsx`, `board.ts` and `words.ts`, and in `parts/`: `TripPanel.tsx`, `StopRow.tsx`, `OrderLists.tsx`,
+  `ChecksPanel.tsx`, `lookup.ts` and `icons.ts`, with the new `BuildPanel.tsx`, `Why.tsx` and `Decisions.tsx`.
 - [ ] **T3 · Join and click through** · lead · after T1 and T2. The click-throughs of AC-14 to AC-20 in Nabil's Chrome
-  next to the frames, on a fresh reset through spec 010's first steps, and AC-20's read. AC-1's totals go into this
-  spec's walkthrough and the README's, with the departures, and the map marks B4. A second tool that did not build it
-  reviews the diff against each criterion. If Nabil answers yes to open question 1, spec 012's walkthrough steps are
-  re-pinned on VEH035 as the suggestion loads it.
+  next to the frames, on a fresh reset, with View plan reloaded before accepting for AC-18, and AC-20's read. The
+  walkthrough's numbers are read again from spec 011's merged pin. The README keeps the judge walkthrough's hand-built
+  plan and gains the planner's short walkthrough after it, with the departures, and the map marks B4. A second tool
+  that did not build it reviews the diff against each criterion.
 
 **At the same time.** Both builders branch from T0's branch. The API builder does T1. The web builder does T2 against
 the contracts, and no screen is done before T3 meets real data.
