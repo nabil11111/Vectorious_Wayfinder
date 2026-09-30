@@ -1,6 +1,6 @@
 # 010 · Plan board
 
-**Status:** Draft, with two open points at the bottom  ·  **Owner:**  ·  **Design:** Dispatcher · Edit plan, Edit plan · empty and View plan, and the in-screen states Edit plan · blank trip, leaves 03:15, stops swapped, find a slot · Mon and · Tue, View plan · ready to send and View plan · sent.
+**Status:** Done, with two open points at the bottom  ·  **Owner:**  ·  **Design:** Dispatcher · Edit plan, Edit plan · empty and View plan, and the in-screen states Edit plan · blank trip, leaves 03:15, stops swapped, find a slot · Mon and · Tue, View plan · ready to send and View plan · sent.
 
 Piece A2 of [the map](../000-map.md). The frames are exported in `tech-triathlon-ops/design/export`. Every rule a plan must
 keep is the plan checker's (spec 007), and the clock, live updates and seeded day are spec 008's.
