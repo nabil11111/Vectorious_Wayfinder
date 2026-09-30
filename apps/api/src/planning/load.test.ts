@@ -18,22 +18,32 @@ describe('load calculator', () => {
     expect(computeLoad([cartons, cartons, cartons, cartons], products)).toMatchObject({ kg: 1324.8, m3: 7.104, units: 192 });
 
     // No product on the real list has a second decimal of a kilo, so this one is made up. Three lines of 0.04 kg
-    // are 0.12 kg, which is 0.1. Rounding line by line would give 0.
+    // are 0.12 kg, which is 0.1, and four are 0.16 kg, which is 0.2. Rounding line by line would give 0 for both.
     const sachet: EngineProduct = { id: 'sachet', kgPerUnit: 0.04, m3PerUnit: 0.001, temp: 'dry', needsTailLift: false, keepUpright: false };
     const one = { productId: 'sachet', quantity: 1 };
     expect(computeLoad([one, one, one], [sachet])).toMatchObject({ kg: 0.1, m3: 0.003, units: 3 });
+    expect(computeLoad([one, one, one, one], [sachet])).toMatchObject({ kg: 0.2, m3: 0.004, units: 4 });
   });
 
   it('AC-2 sets needsReefer when any line is chilled and leaves it false otherwise', () => {
-    expect(computeLoad([{ productId: 'fresh-chilled-carton', quantity: 40 }], products).needsReefer).toBe(true);
-    expect(computeLoad([{ productId: 'fresh-dry-carton', quantity: 48 }, { productId: 'fresh-chilled-carton', quantity: 1 }], products).needsReefer).toBe(true);
-    expect(computeLoad([{ productId: 'fresh-dry-carton', quantity: 48 }], products).needsReefer).toBe(false);
+    const chilled = { productId: 'fresh-chilled-carton', quantity: 40 };
+    const dry = { productId: 'fresh-dry-carton', quantity: 48 };
+    expect(computeLoad([chilled], products).needsReefer).toBe(true);
+    // One chilled line is enough, wherever it sits among the others.
+    expect(computeLoad([chilled, dry], products).needsReefer).toBe(true);
+    expect(computeLoad([dry, chilled], products).needsReefer).toBe(true);
+    expect(computeLoad([dry], products).needsReefer).toBe(false);
   });
 
   it('AC-3 sets needsTailLift and keepUpright when any line needs them', () => {
-    expect(computeLoad([{ productId: 'style-hanging', quantity: 20 }, { productId: 'style-folded', quantity: 15 }], products)).toMatchObject({ keepUpright: true, needsTailLift: false });
-    expect(computeLoad([{ productId: 'tech-washer', quantity: 2 }, { productId: 'tech-tv', quantity: 1 }], products)).toMatchObject({ needsTailLift: true, keepUpright: false });
-    expect(computeLoad([{ productId: 'style-folded', quantity: 15 }, { productId: 'tech-tv', quantity: 1 }], products)).toMatchObject({ needsTailLift: false, keepUpright: false });
+    const rails = { productId: 'style-hanging', quantity: 20 };
+    const folded = { productId: 'style-folded', quantity: 15 };
+    const washers = { productId: 'tech-washer', quantity: 2 };
+    const television = { productId: 'tech-tv', quantity: 1 };
+    // One such line is enough, wherever it sits among the others.
+    for (const lines of [[rails, folded], [folded, rails]]) expect(computeLoad(lines, products)).toMatchObject({ keepUpright: true, needsTailLift: false });
+    for (const lines of [[washers, television], [television, washers]]) expect(computeLoad(lines, products)).toMatchObject({ needsTailLift: true, keepUpright: false });
+    expect(computeLoad([folded, television], products)).toMatchObject({ needsTailLift: false, keepUpright: false });
   });
 
   it('AC-4 returns zeros and every flag false when there are no lines', () => {
