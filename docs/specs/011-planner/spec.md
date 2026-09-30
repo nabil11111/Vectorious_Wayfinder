@@ -45,11 +45,18 @@ requires a stated override. The numbered priority above and the rules below are 
 
 ### Input, priority and decisions
 - [ ] **AC-1** When given a day's valid input, the system shall return the engine types in `plan.md`, with one
-  explanation per original order naming its rank, resulting order IDs and why it was placed, split or deferred.
+  explanation per original order naming its rank and resulting order IDs. Its dispatcher-facing sentence shall
+  explain the priority (for example, waited since Tuesday, chilled, window closes 07:30) and the rule that decided
+  the trip: joining an existing run, using a first run, or the winning capacity or efficiency preference. It shall
+  describe the actual AC-6 comparison, never claim "largest" when another earlier preference decided. A deferral
+  uses the checker's own sentence for the best-ranked refused candidate when available, naming the affected shop
+  and relevant time. Reasons use plain words, weekdays and brand goods words, with no outlet IDs, ISO dates or
+  "units"; for example, "joined VEH004's run to Gampaha" or "new run on VEH002, the largest free fridge truck".
 - [ ] **AC-2** When orders compete, the system shall apply priority steps 1 to 7. Pairwise tests isolate every key,
   including an old dry order before a new chilled one and an older district before a newer one.
-- [ ] **AC-3** When a waiting order cannot be carried whole, the system shall include a `waited_again` decision,
-  also for its deferred split remainder. When an order is deferred for a window, it shall include a `late_order`
+- [ ] **AC-3** When any of a waiting order's goods are deferred, the system shall include a `waited_again`
+  decision for that effective order, including a deferred split remainder. No such decision is needed when both
+  split parts go. When an order is deferred for a window, it shall include a `late_order`
   decision. These produce `needs_decision`, not silent acceptance of another missed delivery (D-10, D-11).
 
 ### Trips, vehicles and times
@@ -59,10 +66,12 @@ requires a stated override. The numbered priority above and the rules below are 
 - [ ] **AC-5** When selecting candidates, the system shall require a reefer for chilled and a van for van-only
   access, and exclude unavailable or other-depot vehicles. *OUT001's chilled cartons can use VEH035, not VEH008;
   marking VEH035 unavailable leaves no slot if it is the only supplied fridge van.*
-- [ ] **AC-6** When more than one whole candidate passes, the system shall choose by this tuple: no needless
-  reefer, no needless van, existing trip before new trip, greater volume capacity, greater weight capacity,
-  greater km per litre, vehicle ID, trip number. A reefer is needed for chilled and a van for van-only access.
-  This preserves special vehicles, fills an existing run and gives a new run room to collect more orders.
+- [ ] **AC-6** When more than one whole candidate passes, the system shall choose by this tuple: no departure
+  change before an earlier departure, no needless reefer, no needless van, existing trip before new trip, a first
+  trip before a second trip, greater volume capacity, greater weight capacity, greater km per litre, vehicle ID,
+  trip number. A reefer is needed for chilled and a van for van-only access. Existing trips still take precedence
+  over new first trips; between otherwise equal new runs, use an idle vehicle's first before a second run. This
+  preserves special vehicles and avoids tying up a vehicle's whole day while other suitable trucks stand idle.
 - [ ] **AC-7** When adding orders at one outlet, the system shall use one stop there per trip, with order IDs in
   priority order. It shall sort stops by effective closing minute, effective opening minute, then outlet ID, so
   deadlines decide the route. Mall hours intersect shop hours; effective closing uses priority step 3.
@@ -71,10 +80,13 @@ requires a stated override. The numbered priority above and the rules below are 
   timeline and fuel functions, so both kg and m³, waiting, unloading, return and reload count correctly.
 - [ ] **AC-9** When default timing misses a window, the system shall try the checker's numeric `leaveAt` fix, in
   trip-number order, then recheck both trips. Without a fix it rejects that candidate; it never parses the text.
-  Defaults remain unset in the output; only a changed departure is explicit. An earlier-than-default setting
-  adds an `early_leave` decision with the time and affected trip for the dispatcher to accept (D-19).
+  Prefer any passing candidate whose trips keep their usual departure times to one requiring an earlier departure;
+  suggest earlier leaving only when no candidate without it passes. Defaults remain unset in the output; only a
+  changed departure is explicit. An earlier-than-default setting adds an `early_leave` decision with the time and
+  affected trip, and its reason names the order whose insertion forced the change, for dispatcher acceptance (D-19).
   *The departure helper, given VEH044's ordered OUT110, OUT112, OUT111, OUT113 trip, uses 02:59: the fourth arrival
-  is 07:59, where 03:00 reaches it at 08:00 and blocks. `leaves_early` and the 315-minute budget warning remain.*
+  is 07:59, where 03:00 reaches it at 08:00 and blocks. `leaves_early` and the 315-minute budget warning remain. If
+  an identical idle VEH045 can carry the next order at its usual time, it is preferred to making VEH044 leave early.*
 - [ ] **AC-10** When choosing trips, the system shall keep one brand per trip with `mixBrands: false`, and allow
   mixed brands with it true. Tail-lift, time-budget and long-wait warnings do not discard an otherwise usable
   candidate. This respects the switch without treating D-09 or D-24 warnings as hard delivery constraints.
@@ -89,15 +101,19 @@ requires a stated override. The numbered priority above and the rules below are 
 ### Splits and coverage
 - [ ] **AC-13** When no whole candidate fits, the system shall try a nonempty proper part on each candidate using
   AC-14, then pick the candidate by AC-6. It shall split only an original (`splitFrom: null`), once, into exactly
-  two children. The first goes on the chosen trip and the rest is deferred `over_capacity`, because D-17 sends
-  what fits and 010 forbids splitting a child again. A part already in the input must fit whole or wait whole.
+  two children. The first goes on the chosen trip; then try the remainder whole on the updated plan before
+  considering the next original order. Defer it only if no whole candidate passes, using AC-17's exhausted stage.
+  It is never split again: D-17 sends what fits and 010 forbids splitting a child again. A part already in the input
+  must fit whole or wait whole. Both parts retain their parent's priority, so new goods cannot displace waiting goods.
   Automatic splits require at most 10 product lines, each with 1 to 999 units, to fit the split-write contract;
-  otherwise plan or defer the original whole and name that limit if it prevents a split.
+  otherwise plan or defer the original whole. Name a split limit only when a trip had room for an allowed part;
+  with no slot at all, use the ordinary stage's reason.
 - [ ] **AC-14** When choosing the first part, the system shall visit products by product ID: first keep each whole
   line that fits both remaining limits, then revisit leftover lines in that order and take the greatest integer
   quantity that fits. Reuse `computeLoad` and the checker to test limits, with binary search on units, so no
   fraction or rounding error can overload a truck. The remainder is the original minus kept units per product.
-  *180 chilled cartons for OUT001 on VEH035 yield 150 kept (1,035 kg, 5.55 m³) and 30 deferred (207 kg, 1.11 m³).*
+  *180 chilled cartons for OUT001 on VEH035 yield 150 kept (1,035 kg, 5.55 m³) and 30 remaining (207 kg, 1.11 m³).
+  With VEH036 also free the remaining cartons go there before a new OUT002 order; otherwise they wait whole.*
 - [ ] **AC-15** When proposing a split, the system shall return its original ID, `keep` in `SplitOrderRequest`
   terms and two distinct stable temporary IDs. Both children have positive units, each product appears at most
   once per child, and their quantities add up exactly. The parent appears on no stop, deferral or effective order
@@ -105,23 +121,29 @@ requires a stated override. The numbered priority above and the rules below are 
 - [ ] **AC-16** When the result is checked, every effective order shall appear exactly once at its own outlet or
   in deferrals. The result shall respect `DraftPlan` limits of 76 trips, 40 stops per trip, 300 IDs per stop and
   300 deferrals. Cap effective orders at 300, including children, so a later save can represent the suggestion;
-  when a split would exceed that cap, leave its original whole and explain the limit with `over_capacity`.
+  when a split would exceed that cap, leave its original whole and explain the limit with `over_capacity` only if
+  a trip otherwise had room for part of it. Without a slot, use the ordinary capacity reason.
 
 ### Reasons, failures and repeatability
 - [ ] **AC-17** When deferring, the system shall use the first exhausted stage below and a trimmed sentence of
-  1 to 200 characters naming the order by shop, wanted date and goods. Reasons describe this search after earlier
-  choices, never claim that no possible rearrangement exists, and never promise a new date (010 rule 7).
+  1 to 200 characters written for the shop (010 rule 7). Use its name or district, the weekday, and the time that
+  mattered when relevant. Never use an outlet ID, ISO date, "units", "tested stop order", "after earlier choices"
+  or other search jargon; never promise a new date. Say cartons for Fresh, boxes for Style and items for Tech when
+  naming quantities. The sentence must be true to the actual failure and distinguish arriving late at this shop
+  from reaching it on time but making other shops late.
 
   | Stage, in order | Code if none remain | What the sentence explains |
   | --- | --- | --- |
-  | Available depot reefers, for chilled | `no_reefer` | No working fridge vehicle is available. |
-  | Vans among compatible vehicles, for van-only | `no_van` | No compatible working van is available. |
-  | Trip slots in this district/brand, board and split-write limits, and room for the whole order or allowed part | `over_capacity` | Name the binding room or trip limit, including a full fridge fleet. |
-  | On-time candidates, including AC-9 fixes | `window` | No tested stop order meets the shop's window or mall slot. |
-  | Candidates within the remaining weekly fuel | `fuel` | The otherwise usable trips exceed their vehicles' fuel left. |
+  | Available depot reefers, for chilled | `no_reefer` | "No fridge truck was free for Gampaha on Thursday." |
+  | Vans among compatible vehicles, for van-only | `no_van` | "No van was free for Fresh Wellawatte on Thursday, which takes vans only." |
+  | Trip slots in this district/brand, board and split-write limits, and room for the whole order or allowed part | `over_capacity` | "The trucks going to Kalutara on Thursday were full." Name a split limit only when some trip had room for a part. |
+  | On-time candidates, including AC-9 fixes | `window` | "No truck could reach Fresh Kiribathgoda before its window closed at 07:30 on Thursday." If that shop can be reached on time: "The truck that could reach Fresh Kiribathgoda in time would then have been late for its other shops on Thursday." |
+  | Candidates within the remaining weekly fuel | `fuel` | "The trucks that could reach Fresh Matara on Thursday had used up this week's fuel." |
 
-  For a split remainder, name the quantities sent and left. An existing child too large names that it cannot be
-  split again. The planner never invents a `dispatcher_choice`; that code stays with the dispatcher.
+  For a deferred split remainder, name quantities sent and left in the same sentence, for example "75 of the 135
+  boxes for Colombo go on Thursday; the other 60 wait for the next plan because the truck was full." An existing
+  child too large names that it cannot be split again only when a trip could carry part of it. The planner never
+  invents a `dispatcher_choice`; that code stays with the dispatcher.
 - [ ] **AC-18** When a valid operating day has no usable vehicle, the system shall return all orders deferred
   with reasons and no blocks, with decisions as AC-3 requires. On a nonoperating day, or if the final checker
   still finds any block, it shall return `unavailable` with that check and no applicable plan. It shall never
@@ -154,5 +176,5 @@ board integration. The apply protocol in `plan.md` is its contract, not a claim 
 1. **Chilled before an earlier-closing new dry order?** Proposed and picked (D-41): yes, after waiting age, as priority step 2 says.
    Fridge trips are the seeded shortage; the window remains a hard check, and any missed-window deferral is shown.
 2. **Does a shop's new order inherit its old order's priority?** Proposed and picked (D-42): no. Protect all outstanding waiting
-   goods first and flag any remainder for a decision; new goods keep their own rank. This uses the history the
+   goods first, retry a split remainder whole before new goods and flag any deferred remainder for a decision; new goods keep their own rank. This uses the history the
    board actually supplies and does not let a new bulk order push another waiting shop back.
