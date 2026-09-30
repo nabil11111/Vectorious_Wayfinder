@@ -370,8 +370,9 @@ describe('saving the draft', () => {
     const first = StoreNextOrder.parse((await save(fresh, draftFor(WED, cartons(8, 4), {}, 'Side door.'))).body).draft!;
     const { chilled, dry } = first.refs;
 
+    // Saved again by someone else at the shop.
     setClockForTests(at(TUE, '15:04'));
-    const again = await save(fresh, draftFor(WED, cartons(9, 4), first.refs, 'Front door, please.'));
+    const again = await save(second, draftFor(WED, cartons(9, 4), first.refs, 'Front door, please.'));
     expect(again.status).toBe(200);
     // The same two orders, one revision on.
     expect(again.body.draft).toEqual({
@@ -382,10 +383,11 @@ describe('saving the draft', () => {
       summary: { kg: 89.7, m3: 0.481, units: 13, needsReefer: true, needsTailLift: false, keepUpright: false },
       tailLiftItems: [],
     });
+    // They are still the drafts of the one who started them.
     const after = await held();
-    expect(after.orders.map((o) => [o.id, o.status, o.driverNote, o.savedAt, o.revision])).toEqual([
-      [chilled!.id, 'draft', 'Front door, please.', at(TUE, '15:04'), 1],
-      [dry!.id, 'draft', 'Front door, please.', at(TUE, '15:04'), 1],
+    expect(after.orders.map((o) => [o.id, o.status, o.driverNote, o.savedAt, o.revision, o.createdBy])).toEqual([
+      [chilled!.id, 'draft', 'Front door, please.', at(TUE, '15:04'), 1, userIds['orders-test-fresh']],
+      [dry!.id, 'draft', 'Front door, please.', at(TUE, '15:04'), 1, userIds['orders-test-fresh']],
     ]);
     expect(after.lines.map((l) => [l.productId, l.quantity]).sort()).toEqual([[CHILLED.productId, 9], [DRY.productId, 4]]);
 
@@ -631,6 +633,12 @@ describe('placing', () => {
 
     expect(await held()).toEqual(before);
     expect(announce).not.toHaveBeenCalled();
+
+    // A request that names a placed order beside a draft is no retry. It is refused, and the draft stays one.
+    setClockForTests(at(TUE, '15:10'));
+    const draft = StoreNextOrder.parse((await save(fresh, draftFor(WED, cartons(2, 0)))).body).draft!.refs;
+    expect(answer(await place(fresh, { deliveryDate: WED, refs: { chilled: draft.chilled, dry: asked.refs.dry } }))).toEqual([409, 'stale']);
+    expect(await ordersOf()).toEqual([['chilled', 'placed', WED, 8], ['chilled', 'draft', WED, 2], ['dry', 'placed', WED, 4]]);
   });
 
   it('AC-21 answers 409 nothing_to_place when a place names no draft and the shop has none', async () => {
