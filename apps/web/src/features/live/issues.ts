@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DecideIssueRequest, DecideIssueResponse, Issue, IssueList, LoadingDecision } from '@wayfinder/contracts';
 import { ANSWER_WITHIN_MS, worthRetrying } from '@/features/loader/loading';
@@ -31,8 +31,12 @@ export interface Answering {
 export function useAnswer(): Answering {
   const qc = useQueryClient();
   const [state, setState] = useState<Omit<Answering, 'decide'>>({ sending: null, failed: null, refused: null, sent: null });
+  // One answer at a time: a second tap before the screen redraws must not send it again.
+  const running = useRef(false);
 
   const decide = async (issue: Issue, decision: LoadingDecision) => {
+    if (running.current) return;
+    running.current = true;
     setState((held) => ({ ...held, sending: issue.id, failed: null, refused: null }));
     try {
       const answer = await api<DecideIssueResponse>(`/issues/${encodeURIComponent(issue.id)}/decide`, {
@@ -41,12 +45,10 @@ export function useAnswer(): Answering {
       await qc.invalidateQueries({ queryKey: issuesKey });
       setState({ sending: null, failed: null, refused: null, sent: answer.decided });
     } catch (error) {
-      if (worthRetrying(error)) {
-        setState((held) => ({ ...held, sending: null, failed: issue.id }));
-        return;
-      }
-      await qc.invalidateQueries({ queryKey: issuesKey });
-      setState((held) => ({ ...held, sending: null, refused: reasonOf(error) }));
+      if (!worthRetrying(error)) await qc.invalidateQueries({ queryKey: issuesKey });
+      setState((held) => (worthRetrying(error) ? { ...held, sending: null, failed: issue.id } : { ...held, sending: null, refused: reasonOf(error) }));
+    } finally {
+      running.current = false;
     }
   };
 

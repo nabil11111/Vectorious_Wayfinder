@@ -62,6 +62,8 @@ export function useLoaderWrites(): LoaderWrites {
   const qc = useQueryClient();
   const [state, setState] = useState<Pick<LoaderWrites, 'out' | 'phase' | 'refused'>>({ out: null, phase: 'idle', refused: null });
   const pending = useRef<Write | null>(null);
+  // Set while a write is on its way, so a second tap on Try again cannot send it twice at once.
+  const running = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -70,7 +72,8 @@ export function useLoaderWrites(): LoaderWrites {
 
   const run = async () => {
     const write = pending.current;
-    if (!write) return;
+    if (!write || running.current) return;
+    running.current = true;
     setState({ out: write.kind, phase: 'saving', refused: null });
     try {
       await api<LoadingDay>(`/loading/trips/${encodeURIComponent(write.tripId)}/${PATH[write.kind]}`, {
@@ -78,11 +81,13 @@ export function useLoaderWrites(): LoaderWrites {
       });
     } catch (error) {
       if (worthRetrying(error)) {
+        running.current = false;
         setState({ out: write.kind, phase: 'unsaved', refused: null });
         return;
       }
       pending.current = null;
       await qc.invalidateQueries({ queryKey: loadingKey });
+      running.current = false;
       setState({ out: null, phase: 'idle', refused: reasonOf(error) });
       return;
     }
@@ -91,6 +96,7 @@ export function useLoaderWrites(): LoaderWrites {
     // newer read, another tablet's write or a reset, and would bring back an older truck. The day is fetched again
     // instead, and the buttons wait for it, so they never offer the truck as it was before the write.
     await qc.invalidateQueries({ queryKey: loadingKey });
+    running.current = false;
     setState({ out: null, phase: 'idle', refused: null });
     if (mounted.current) write.done?.();
   };
