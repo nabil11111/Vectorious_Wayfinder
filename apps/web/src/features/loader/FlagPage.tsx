@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { NumberField } from '@base-ui/react/number-field';
 import { FLAG_REASONS, type FlagReason, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
+import { StaleNotice } from '@/features/store/parts/LoadError';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { orangeButton } from '@/features/plan/parts/look';
@@ -40,10 +41,11 @@ function FlagScreen({ tripId, stopId }: { tripId: string; stopId: string }) {
   const stop = truck.stops.find((s) => s.id === stopId);
   // A flag is raised while the truck loads, on one of its stops. Anything else goes back to the truck.
   if (!stop || truck.status !== 'loading') return <Navigate to={`/loader/trucks/${truck.tripId}`} replace />;
-  return <FlagForm truck={truck} stop={stop} writes={writes} />;
+  const stale = query.isError ? <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : null;
+  return <FlagForm truck={truck} stop={stop} writes={writes} stale={stale} />;
 }
 
-function FlagForm({ truck, stop, writes }: { truck: LoadingTruck; stop: LoadingStop; writes: LoaderWrites }) {
+function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: LoadingStop; writes: LoaderWrites; stale: ReactNode }) {
   const navigate = useNavigate();
   const ticks = useTicks(truck.tripId);
   const brand = brandOfStop(truck, stop);
@@ -74,6 +76,7 @@ function FlagForm({ truck, stop, writes }: { truck: LoadingTruck; stop: LoadingS
     <div>
       <BackLink to={`/loader/trucks/${truck.tripId}`}>{truckName(truck)}</BackLink>
       <div className="mt-2.5 lg:mt-3.5">
+        {stale}
         {writes.refused && <Refused>{writes.refused}</Refused>}
         {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
       </div>

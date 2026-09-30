@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { LoadingDay, LoadingTruck } from '@wayfinder/contracts';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StaleNotice } from '@/features/store/parts/LoadError';
 import { useAppClock } from '@/lib/clock';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { LoadFailed } from './parts/LoadFailed';
@@ -21,7 +23,9 @@ export function TrucksPage() {
       ? <LoadFailed what="the trucks" error={query.error} busy={query.isFetching} onRetry={() => { void query.refetch(); }} />
       : <TrucksSkeleton />;
   }
-  return <Trucks day={query.data} writes={writes} />;
+  // A refresh that fails keeps the trucks on screen and says they may be out of date.
+  const stale = query.isError ? <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : null;
+  return <Trucks day={query.data} writes={writes} stale={stale} />;
 }
 
 // The day's sentences when there is no truck to load (rule 1 and rule 3).
@@ -32,7 +36,7 @@ function emptyNote(day: LoadingDay): string | null {
   return null;
 }
 
-function Trucks({ day, writes }: { day: LoadingDay; writes: LoaderWrites }) {
+function Trucks({ day, writes, stale }: { day: LoadingDay; writes: LoaderWrites; stale: ReactNode }) {
   const navigate = useNavigate();
   const { at } = useAppClock();
   // Next out is the first truck that is not ready, and the others follow it from 2 in leaving order (rule 2).
@@ -48,6 +52,7 @@ function Trucks({ day, writes }: { day: LoadingDay; writes: LoaderWrites }) {
 
   return (
     <div>
+      {stale && <div className="mb-3">{stale}</div>}
       {writes.refused && <Refused>{writes.refused}</Refused>}
       {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
 
