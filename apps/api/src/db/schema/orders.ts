@@ -39,8 +39,12 @@ export const orderLines = pgTable('order_lines', {
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
   productId: text('product_id').notNull().references(() => products.id),
   quantity: integer('quantity').notNull(),
+  // What went on the truck, written when the loader marks it ready (spec 012). Counts follow the goods: the driver
+  // and the shop add theirs beside it (A4, A5).
+  loadedQty: integer('loaded_qty'),
 }, (t) => [
   check('order_lines_quantity_positive', sql`${t.quantity} > 0`),
+  check('order_lines_loaded_qty', sql`${t.loadedQty} between 0 and ${t.quantity}`),
   // One line per item in an order.
   unique('order_lines_order_product').on(t.orderId, t.productId),
 ]);

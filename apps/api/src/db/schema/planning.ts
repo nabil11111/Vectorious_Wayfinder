@@ -40,6 +40,13 @@ export const trips = pgTable('trips', {
   // Where the trip is in its day. The loader moves it on (A3); once it is loading, its plan can no longer go back
   // to edit (D-33).
   status: tripStatusEnum('status').notNull().default('planned'),
+  // Two loaders can work on one truck, so every loader write names the revision it saw (spec 012).
+  revision: integer('revision').notNull().default(0),
+  // The id, made on the phone, of the last loader write applied to this trip. The same id again is a retry and is
+  // answered as done. An older write's retry already fails on the revision, so one id is enough.
+  lastWriteId: uuid('last_write_id'),
+  // "ready 02:36" is a time people see, so it comes from the app clock (D-18).
+  readyAt: timestamp('ready_at', { withTimezone: true }),
 }, (t) => [unique('trips_vehicle_trip').on(t.planId, t.vehicleId, t.tripNo), check('trips_trip_no', sql`${t.tripNo} in (1, 2)`)]);
 
 export const stops = pgTable('stops', {
@@ -49,6 +56,8 @@ export const stops = pgTable('stops', {
   outletId: text('outlet_id').notNull().references(() => outlets.id),
   plannedArrival: time('planned_arrival'),
   plannedDepart: time('planned_depart'),
+  // When the loader marked the stop loaded, from the app clock. A stop is loaded whole, last stop first (D-35).
+  loadedAt: timestamp('loaded_at', { withTimezone: true }),
 }, (t) => [unique('stops_trip_seq').on(t.tripId, t.seq)]);
 
 export const stopOrders = pgTable('stop_orders', {
