@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PlanInputError } from '../errors';
+import { checkPlan } from '../check';
+import { computeLoad } from '../load';
 import { outlet } from '../testing/shared';
 import type { EngineOutlet, PlannerInput, PlannerOrder } from '../types';
 import { compare, effectiveWindow, isWaiting, prepareInput } from './priority';
@@ -175,5 +177,73 @@ describe('AC-19: malformed or incomplete snapshots name their input fault', () =
     const input = plannerInput(Array.from({ length: 300 }, (_, i) => plannerOrder(`o${i}`, 'OUT001', undefined, 1000, { splitFrom: 'parent' })));
     input.vehicles.forEach((vehicle) => { vehicle.available = false; vehicle.litresUsedThisWeek = vehicle.weeklyFuelQuotaL + 1; });
     expect(prepareInput(input).orders).toHaveLength(300);
+  });
+});
+
+describe('AC-19: figures must survive the checker fixed-point arithmetic', () => {
+  const cases: [string, (input: PlannerInput) => void, RegExp][] = [
+    ['reload that makes the second trip unsafe', (x) => { x.settings.reloadMin = Number.MAX_SAFE_INTEGER; }, /timing|reload/i],
+    ['travel that overflows two bounded trips', (x) => { x.travel[0]!.outMin = Math.floor(Number.MAX_SAFE_INTEGER / 3); }, /timing|travel/i],
+    ['unloading that overflows 40 stops', (x) => { x.allowances[0]!.minutes = Math.floor(Number.MAX_SAFE_INTEGER / 40); }, /timing|allowance/i],
+    ['efficiency rounded to zero', (x) => { x.vehicles[0]!.kmPerL = 0.001; }, /kmPerL/i],
+    ['efficiency with unsupported precision', (x) => { x.vehicles[0]!.kmPerL = 4.701; }, /kmPerL/i],
+    ['product weight rounded to zero', (x) => { x.products[0]!.kgPerUnit = 0.001; }, /kgPerUnit/i],
+    ['product volume rounded to zero', (x) => { x.products[0]!.m3PerUnit = 0.0001; }, /m3PerUnit/i],
+    ['product weight silently rounded', (x) => { x.products[0]!.kgPerUnit = 6.901; }, /kgPerUnit/i],
+    ['product volume silently rounded', (x) => { x.products[0]!.m3PerUnit = 0.0371; }, /m3PerUnit/i],
+    ['vehicle weight silently rounded', (x) => { x.vehicles[0]!.weightCapKg = 100.001; }, /weightCapKg/i],
+    ['vehicle volume silently rounded', (x) => { x.vehicles[0]!.volumeCapM3 = 5.0001; }, /volumeCapM3/i],
+    ['fuel quota silently rounded', (x) => { x.vehicles[0]!.weeklyFuelQuotaL = 100.01; }, /weeklyFuelQuotaL/i],
+    ['fuel used silently rounded', (x) => { x.vehicles[0]!.litresUsedThisWeek = 0.01; }, /litresUsedThisWeek/i],
+    ['outbound distance silently rounded', (x) => { x.travel[0]!.outKm = 10.01; }, /outKm/i],
+    ['between distance silently rounded', (x) => { x.travel[0]!.betweenKm = 1.01; }, /betweenKm/i],
+    ['unsafe scaled product', (x) => { x.products[0]!.kgPerUnit = Number.MAX_SAFE_INTEGER; }, /kgPerUnit/i],
+    ['unsafe scaled vehicle capacity', (x) => { x.vehicles[0]!.volumeCapM3 = Number.MAX_SAFE_INTEGER; }, /volumeCapM3/i],
+    ['unsafe line load', (x) => { x.orders[0]!.lines[0]!.quantity = Math.floor(Number.MAX_SAFE_INTEGER / 690) + 1; }, /load|quantity/i],
+    ['safe individual orders with unsafe combined load', (x) => {
+      const quantity = Math.floor(Number.MAX_SAFE_INTEGER / 690 * 0.75);
+      x.orders = [plannerOrder('a', 'OUT001', undefined, quantity), plannerOrder('b', 'OUT001', undefined, quantity)];
+    }, /load|aggregate/i],
+    ['safe product and quantity with unsafe volume total', (x) => {
+      x.products.find((p) => p.id === 'fresh-dry-carton')!.m3PerUnit = 1000;
+      x.orders[0]!.lines[0]!.quantity = 10_000_000_000;
+    }, /load|aggregate/i],
+    ['distance numerator overflows the fuel calculation', (x) => { x.travel[0]!.outKm = 10_000_000_000_000; }, /fuel|distance/i],
+    ['fuel quota times efficiency overflows', (x) => { x.vehicles[0]!.kmPerL = 100_000_000_000; }, /fuel/i],
+    ['used plus proposed fuel overflows', (x) => {
+      x.vehicles[0]!.kmPerL = 0.01;
+      x.vehicles[0]!.weeklyFuelQuotaL = 0;
+      x.vehicles[0]!.litresUsedThisWeek = 900_719_925_474_099;
+    }, /fuel/i],
+  ];
+  it.each(cases)('%s', (_name, change, fault) => {
+    const input = plannerInput([plannerOrder('order-1', 'OUT001', undefined, 1000)]);
+    change(input);
+    expect(() => prepareInput(input)).toThrow(PlanInputError);
+    expect(() => prepareInput(input)).toThrow(fault);
+  });
+
+  it('preserves the smallest supported product and efficiency figures', () => {
+    const input = plannerInput([plannerOrder('o', 'OUT001', undefined, 1000)]);
+    const product = input.products.find((p) => p.id === 'fresh-dry-carton')!;
+    product.kgPerUnit = 0.01;
+    product.m3PerUnit = 0.001;
+    input.vehicles[0]!.kmPerL = 0.01;
+    input.vehicles[0]!.litresUsedThisWeek = 0.1;
+    const prepared = prepareInput(input);
+    expect(computeLoad(prepared.orders[0]!.lines, prepared.products)).toMatchObject({ kg: 10, m3: 1, units: 1000 });
+    const checked = checkPlan({ ...prepared, orders: [], plan: { trips: [], deferrals: [] } });
+    expect(checked.ok).toBe(true);
+    expect(checked.vehicles.every((vehicle) => Object.values(vehicle).every((value) => typeof value !== 'number' || Number.isFinite(value)))).toBe(true);
+  });
+
+  it('bounds derived timing without adding an arbitrary maximum duration', () => {
+    const input = plannerInput();
+    input.travel.forEach((row) => { row.outMin = 0; row.betweenMin = 0; });
+    input.allowances.forEach((row) => { row.minutes = 0; });
+    input.settings.reloadMin = Math.floor((Number.MAX_SAFE_INTEGER - 1439) / 2);
+    expect(() => prepareInput(input)).not.toThrow();
+    input.settings.reloadMin += 1;
+    expect(() => prepareInput(input)).toThrow(/timing|reload/i);
   });
 });
