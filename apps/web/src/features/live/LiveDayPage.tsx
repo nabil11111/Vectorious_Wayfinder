@@ -20,12 +20,15 @@ export function LiveDayPage() {
           {/* The day waits for the first load, as a grey block in the style guide's loading look. */}
           {!day && query.isPending && <span aria-hidden="true" className="ml-2 inline-block h-5 w-28 rounded-full bg-border align-middle" />}
         </h1>
-        {open > 0 && (
-          <p className="mt-1.5 text-bad">
-            <span className="font-mono text-sm leading-[18px] font-bold">{whole(open)}</span>{' '}
-            <span className="ml-0.5 text-[11px] leading-[14px]">{open === 1 ? 'needs' : 'need'} you</span>
-          </p>
-        )}
+        {/* The line keeps its height with nothing open, so the column does not jump when the last answer goes. */}
+        <p className="mt-1.5 min-h-[18px] text-bad">
+          {open > 0 && (
+            <>
+              <span className="font-mono text-sm leading-[18px] font-bold">{whole(open)}</span>{' '}
+              <span className="ml-0.5 text-[11px] leading-[14px]">{open === 1 ? 'needs' : 'need'} you</span>
+            </>
+          )}
+        </p>
       </header>
       <div className="mt-4 grid grid-cols-1 gap-5 lg:mt-[11px] lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
         <section aria-label="Trucks" className="order-2 rounded-[14px] bg-card p-5 shadow-[0_2px_6px_color-mix(in_srgb,var(--foreground)_8%,transparent)] lg:order-1">

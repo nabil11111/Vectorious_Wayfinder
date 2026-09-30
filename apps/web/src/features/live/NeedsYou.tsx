@@ -39,7 +39,7 @@ export function NeedsYou({ query, answering, className }: { query: UseQueryResul
       {query.isError && <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} />}
       {answering.refused && <p role="alert" className="rounded-[10px] bg-bad-tint px-3 py-2.5 text-xs leading-4 font-semibold text-bad">{answering.refused}</p>}
       {answering.sent && (
-        <div role="status" className="rounded-[14px] bg-good-tint px-5 pt-4 pb-[18px]">
+        <div role="status" className="rounded-[14px] bg-good-tint px-5 pt-5 pb-[18px]">
           <p className="flex items-center gap-2 text-[13px] leading-4 font-bold text-good">
             {/* The design draws a plain tick here, so it is the outline set's. */}
             <Check className="size-4 stroke-[2.5]" aria-hidden="true" />
