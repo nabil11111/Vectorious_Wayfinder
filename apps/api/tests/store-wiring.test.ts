@@ -2,11 +2,15 @@ import request from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { pool } from '../src/db/client';
+import { serve, stop } from './serve';
 
-const app = createApp();
+const app = await serve(createApp());
 const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
-afterAll(() => pool.end());
+afterAll(async () => {
+  await stop(app);
+  await pool.end();
+});
 
 // One address gets ten sign-ins in 15 minutes, so each account signs in once here and its cookie is reused.
 const signIn = async (username: string, pass = password) => {

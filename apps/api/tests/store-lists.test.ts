@@ -8,6 +8,7 @@ import { db, pool } from '../src/db/client';
 import { deferrals, orderLines, orders, outlets, plans, stopOrders, stops, trips, users } from '../src/db/schema';
 import { depotInstant, setClockForTests } from '../src/lib/clock';
 import { toMinutes } from '../src/planning/words';
+import { serve, stop } from './serve';
 
 // Spec 009: the lists of a shop's orders. Every test runs against the real database with the app's clock
 // frozen, and puts the orders and plans it needs straight into the tables.
@@ -27,10 +28,7 @@ const THU = '2026-06-04';
 const FRI = '2026-06-05';
 const at = (date: string, time: string) => depotInstant(date, toMinutes(time));
 
-// One server for the whole file, open on 127.0.0.1 only. Handed the app itself, supertest opens a server on
-// every address for each request and reaches it through 127.0.0.1. When the port it is given is one that
-// another program on the machine holds on 127.0.0.1, that program answers instead of the app.
-const server = createApp().listen(0, '127.0.0.1');
+const server = await serve(createApp());
 type Asker = ReturnType<typeof request.agent>;
 
 // One address gets ten sign-ins in 15 minutes, so each account signs in once and its cookie is reused.
@@ -76,7 +74,7 @@ afterEach(removeEverything);
 afterAll(async () => {
   setClockForTests(null);
   await removeManagers();
-  server.close();
+  await stop(server);
   await pool.end();
 });
 

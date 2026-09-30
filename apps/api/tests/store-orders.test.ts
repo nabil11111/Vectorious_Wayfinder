@@ -10,6 +10,7 @@ import { orderLines, orders, outlets, products, users } from '../src/db/schema';
 import { depotInstant, realNow, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { toMinutes } from '../src/planning/words';
+import { serve, stop } from './serve';
 
 // Spec 009: the next order, its draft and placing it. Every test runs against the real database with the
 // app's clock frozen.
@@ -42,11 +43,7 @@ vi.spyOn(db, 'transaction').mockImplementation(((work, config) => {
 }) as typeof db.transaction);
 vi.mocked(announce).mockImplementation(() => { openWhenAnnounced.push(openTransactions); });
 
-// One server for the whole file, open on 127.0.0.1 only. Handed the app itself, supertest opens a server on
-// every address for each request and reaches it through 127.0.0.1. When the port it is given is one that
-// another program on the machine holds on 127.0.0.1, that program answers instead, with a "socket hang up"
-// or a status of its own. On a laptop full of tools that is about one request in 4,000, and this file sends 150.
-const server = createApp().listen(0, '127.0.0.1');
+const server = await serve(createApp());
 type Asker = ReturnType<typeof request.agent>;
 const NEXT = '/api/v1/store/next-order';
 const save = (as: Asker, body: object) => as.put(`${NEXT}/draft`).send(body);
@@ -121,7 +118,7 @@ afterEach(async () => {
 afterAll(async () => {
   setClockForTests(null);
   await removeManagers();
-  server.close();
+  await stop(server);
   await pool.end();
 });
 
