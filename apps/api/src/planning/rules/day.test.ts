@@ -53,6 +53,12 @@ describe('rules for fuel and the day', () => {
     const twoShort = [trip('VEH012', 1, ['OUT005']), trip('VEH012', 2, ['OUT006'])];
     expect(check(twoShort, { vehicles: fleet('VEH012', { litresUsedThisWeek: 532.9 }) })).toEqual([]);
     expect(check(twoShort, { vehicles: fleet('VEH012', { litresUsedThisWeek: 533.1 }) })).toEqual(over('VEH012', '533.1', '7.1', '0.2 litres', '540'));
+    // Two 63 km trips to Gampaha on VEH010 show as 11.3 litres each, and their 126 km need exactly 22.5. With
+    // 517.5 used that ends on the quota and passes, and the vehicle's line then shows 0.0 left, never -0.1.
+    const twice63 = [trip('VEH010', 1, ['OUT026', 'OUT030']), trip('VEH010', 2, ['OUT028', 'OUT031'])];
+    expect(check(twice63, { vehicles: fleet('VEH010', { litresUsedThisWeek: 517.5 }) })).toEqual([]);
+    expect(fuelOf(inputFor('Peliyagoda', { trips: twice63, vehicles: fleet('VEH010', { litresUsedThisWeek: 517.5 }) }))[0]).toMatchObject({ litresPlan: 22.5, litresLeft: 0 });
+    expect(check(twice63, { vehicles: fleet('VEH010', { litresUsedThisWeek: 517.6 }) })).toEqual(over('VEH010', '517.6', '22.5', '0.1 litres', '540'));
 
     // The vehicles table keeps km per litre to 2 decimals, and all of it counts. No vehicle in the data uses the
     // second one, so this figure is made up: at 4.45 km per litre the 280 km are 62.92 litres.

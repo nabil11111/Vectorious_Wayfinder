@@ -70,7 +70,7 @@ describe('rules for what a vehicle carries', () => {
     const orders = [order('dry', 'OUT006', 'fresh-dry-carton', 48), order('chilled', 'OUT005', 'fresh-chilled-carton', 40)];
     expect(carried('Peliyagoda', 'VEH012', orders)).toEqual([{
       code: 'needs_reefer', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 2, outletId: 'OUT005', orderId: 'chilled',
-      message: 'VEH012 trip 1 carries a 276 kg order with chilled goods to OUT005, and VEH012 is not a fridge vehicle.',
+      message: 'VEH012 trip 1 carries the 276 kg chilled order for OUT005, and VEH012 is not a fridge vehicle.',
     }]);
 
     // A fridge vehicle carrying dry goods is fine: the same two orders on fridge truck VEH003.
@@ -108,7 +108,7 @@ describe('rules for what a vehicle carries', () => {
     // Two crates of washing machines, 420.0 kg, for OUT093 on van VEH059.
     expect(carried('Kandy', 'VEH059', [order('washers', 'OUT093', 'tech-washer', 2)])).toEqual([{
       code: 'no_tail_lift', level: 'warn', vehicleId: 'VEH059', tripNo: 1, stopSeq: 1, outletId: 'OUT093', orderId: 'washers',
-      message: 'VEH059 trip 1 carries a 420 kg order to OUT093 that needs a tail lift, and VEH059 is a van without one.',
+      message: 'VEH059 trip 1 carries the 420 kg dry order for OUT093, which needs a tail lift, and VEH059 is a van without one.',
     }]);
 
     // Trucks have a tail lift (D-24), and a van with nothing that needs one is fine.

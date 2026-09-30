@@ -20,7 +20,13 @@ describe('rules for every order being accounted for', () => {
     const trips = [trip('VEH012', 1, ['OUT004', 'a'])];
     expect(check({ orders: [a, b], trips })).toEqual([{
       code: 'order_not_planned', level: 'block', orderId: 'b', outletId: 'OUT006',
-      message: 'An order for OUT006 is on no trip and is not deferred.',
+      message: 'The 331.2 kg dry order for OUT006 is on no trip and is not deferred.',
+    }]);
+    // A Fresh shop has a chilled and a dry order most days, so the sentence says which one it is about.
+    const cold = order('cold', 'OUT004', 'fresh-chilled-carton', 40);
+    expect(check({ orders: [a, cold], trips })).toEqual([{
+      code: 'order_not_planned', level: 'block', orderId: 'cold', outletId: 'OUT004',
+      message: 'The 276 kg chilled order for OUT004 is on no trip and is not deferred.',
     }]);
 
     // On one stop or deferred once, an order is accounted for.
@@ -31,7 +37,7 @@ describe('rules for every order being accounted for', () => {
   it('AC-25 reports order_twice for an order on two stops, on a stop and deferred, or deferred twice', () => {
     const twice = (places: string) => [{
       code: 'order_twice', level: 'block', orderId: 'a', outletId: 'OUT004',
-      message: `An order for OUT004 is ${places}, and an order can be in the plan only once.`,
+      message: `The 331.2 kg dry order for OUT004 is ${places}, and an order can be in the plan only once.`,
     }];
     const onTwoStops = [trip('VEH012', 1, ['OUT004', 'a']), trip('VEH008', 1, ['OUT004', 'a'])];
     expect(check({ orders: [a], trips: onTwoStops })).toEqual(twice('on VEH012 trip 1 stop 1 and on VEH008 trip 1 stop 1'));
@@ -42,7 +48,7 @@ describe('rules for every order being accounted for', () => {
   it('AC-26 reports deferral_incomplete for a code that is not in the list or an empty reason', () => {
     const incomplete = (missing: string) => [{
       code: 'deferral_incomplete', level: 'block', orderId: 'a', outletId: 'OUT004',
-      message: `An order for OUT004 is deferred without ${missing}.`,
+      message: `The 331.2 kg dry order for OUT004 is deferred without ${missing}.`,
     }];
     const deferredWith = (code: string, reason: string) => check({ orders: [a], deferrals: [{ orderId: 'a', code, reason }] });
     expect(deferredWith('too_heavy', 'Too heavy for the van.')).toEqual(incomplete('a reason from the list'));
@@ -58,7 +64,7 @@ describe('rules for every order being accounted for', () => {
     // An order for OUT004 on the stop at OUT006.
     expect(check({ orders: [a, b], trips: [trip('VEH012', 1, ['OUT006', 'b', 'a'])] })).toEqual([{
       code: 'order_wrong_outlet', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT006', orderId: 'a',
-      message: 'VEH012 trip 1 has an order for OUT004 on its stop at OUT006.',
+      message: 'VEH012 trip 1 has the 331.2 kg dry order for OUT004 on its stop at OUT006.',
     }]);
   });
 

@@ -1,7 +1,7 @@
 import { levelOf, type Problem, type ProblemCode } from '@wayfinder/contracts';
 import { PlanInputError } from '../errors';
 import { lookup } from '../lookup';
-import { budgetMinutes, earliestLeaveFor, FRESH_DEADLINE, timeTrip } from '../timeline';
+import { budgetMinutes, earliestLeaveFor, FRESH_DEADLINE, timeTrip, tripsOf } from '../timeline';
 import type { Minutes, PlanInput, PlanTrip, TimeProblems } from '../types';
 import { toClock } from '../words';
 
@@ -38,8 +38,8 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
 
   const vehicleIds = new Set(input.plan.trips.map((trip) => vehicleOf(trip.vehicleId).id));
   for (const vehicleId of vehicleIds) {
-    // In trip-number order, the order the trips are timed in, so each one meets its own times below.
-    const trips = input.plan.trips.filter((trip) => trip.vehicleId === vehicleId).sort((a, b) => a.tripNo - b.tripNo);
+    // In the order the trips are timed in, so each one meets its own times below.
+    const trips = tripsOf(input, vehicleId);
     const numbers = trips.map((trip) => trip.tripNo);
     const odd = numbers.find((n) => n !== 1 && n !== 2);
     if (numbers.length > 2) {
