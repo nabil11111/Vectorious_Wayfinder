@@ -56,7 +56,7 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 
 | Spec | Feature | Status |
 | --- | --- | --- |
-| [000](000-map.md) | The map: every piece, in build order | Draft |
+| [000](000-map.md) | The map: every piece, in build order | Ready |
 | [001](001-load-calculator.md) | Load calculator | Ready |
 | [002](002-plan-rules.md) | Plan rules as tests | Ready |
 | [003](003-outlet-names.md) | Outlet names | Ready |

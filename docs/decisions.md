@@ -71,6 +71,8 @@ One brand and one district per trip, the 270 and 480 minute budgets and whole or
 **Why.** The Datathon is judged separately. The rules that bind the Hackathon build are capacity, temperature,
 outlet access, delivery windows and fuel quotas, and those can never be switched off.
 
+Whole orders stopped being a default on 30 Sep, see D-17.
+
 ## D-10 · 29 Sep · A shop that waited last time is protected
 
 When something has to wait, the planner defers another shop's order that frees the same space and did not
@@ -117,3 +119,57 @@ See [how a piece gets built](specs/README.md).
 **Why.** Writing every spec up front would cost a day and the later specs would be wrong once the first
 piece exists. Building without a map means the pieces do not fit. A reviewer who did not write the code
 catches what its writer cannot see.
+
+## D-17 · 30 Sep · An order can be split
+
+When an order does not fit, the part that fits goes out and the rest waits with a reason, instead of the
+whole order waiting. A split is saved as two parts of the order, and each part is planned or deferred whole.
+The dispatcher sees every split before the plan is sent.
+
+**Why.** Delivering half is better for the shop than delivering nothing. Whole orders only is a rule of
+Datathon Task 2B, which is judged separately, and the Hackathon section has no such rule. The design already
+offers a split as a fix in View plan. This replaces the whole-orders default in D-09.
+
+## D-18 · 30 Sep · The app runs on one clock, and the demo day sets it
+
+Every date and time on a screen comes from one clock inside the app, never from the device. In this build
+the clock starts on Wed 24 Jun 2026 at 15:00, an hour before orders close, for delivery on Thu 25 Jun 2026.
+A demo control moves it to the next part of the day and resets the day. Tests set the same clock.
+
+**Why.** A judge walks a whole delivery day in a few minutes, at any hour. On the real clock a 6 AM delivery
+would look hours late and ordering would already be closed. The day sits inside the booklet's calendar,
+which ends on 28 Jun 2026, and it is a payday in the monsoon, so demand is high.
+
+## D-19 · 30 Sep · Trucks leave from 03:30 for Fresh and from 07:30 for Style and Tech
+
+The planner times a trip so the truck reaches its first shop as the window opens, and by itself never
+leaves before these times. When leaving earlier would save a delivery window, it suggests that and the
+dispatcher decides. A trip where a truck would wait more than 30 minutes at a shop gets a warning.
+
+**Why.** 03:30 to 08:00 is the Fresh morning in the booklet, and 07:30 lets a truck reach a far district as
+Style and Tech shops open at 09:00. A fixed default keeps plans predictable, and the dispatcher keeps the
+last word.
+
+## D-20 · 30 Sep · The fuel quota week is the calendar week
+
+Monday to Saturday, the same weeks as the booklet's calendar. A plan shows each vehicle's litres used so far
+this week plus this plan's trips, against its quota.
+
+**Why.** It is how the supplied data counts weeks, and it makes "fuel left" mean the same thing on every
+screen.
+
+## D-21 · 30 Sep · Screens update live
+
+When something changes, the server tells the open screens that care and they fetch the new data straight
+away. The channel is a one-way stream from the server (server-sent events) on the same address as the API.
+A slow timer stays as a backup for when the stream drops.
+
+**Why.** The dispatcher should see a loader's flag or a driver's delivery as it happens. A one-way stream is
+built into every browser and needs no extra service, because the app is one process.
+
+## D-22 · 30 Sep · Proof photos are stored in the database
+
+The phone shrinks the photo before sending it.
+
+**Why.** One place to back up, and it behaves the same in Docker and on the hosted app, with no disk or
+storage service to set up.
