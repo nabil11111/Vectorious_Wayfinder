@@ -9,9 +9,9 @@ problems and its locks.
 | `issue_kind` | Values `refused` and `closed`, added with `alter type … add value` and not used in the migration, as Postgres requires. | The driver's two problems (D-36, D-48). |
 | `stop_outcome` | New enum `delivered`, `refused`, `closed`, from `STOP_OUTCOMES` in the contracts. | How a stop ended. |
 | `trips` | `left_at timestamptz` and `back_at timestamptz`, empty until the driver starts and ends the trip, and `last_event_at timestamptz`, the latest time kept on the trip, which nothing but a driver write moves. | "Left Peliyagoda 03:31", "Checked in at the depot 03:55" (D-18), and the lower bound of the time rule, which "Try again" must not move back (D-46). |
-| `stops` | `revision integer not null default 0`, `retry boolean not null default false`, and `arrived_at timestamptz`, `done_at timestamptz` and `outcome stop_outcome`, empty until then. The check `stops_done`: `outcome` and `done_at` are empty together or set together, and set only once `arrived_at` is. | The driver and the dispatcher both change a stop, so a driver write names its revision (D-45). A stop sent back by "Try again" comes after the others (spec rule 4). "Nobody at the shop · since 03:45". |
+| `stops` | `revision integer not null default 0`, `retried_at timestamptz`, the app clock's time "Try again" last sent the stop back, and `arrived_at timestamptz`, `done_at timestamptz` and `outcome stop_outcome`, all empty until then. The check `stops_done`: `outcome` and `done_at` are empty together or set together, and set only once `arrived_at` is. | The driver and the dispatcher both change a stop, so a driver write names its revision (D-45). Stops sent back come after the others, in the order they were sent back (spec rule 4). "Nobody at the shop · since 03:45". |
 | `order_lines` | `delivered_qty integer`, with the check `delivered_qty between 0 and loaded_qty`. Empty until its stop is delivered or refused, and emptied with `loaded_qty` when a closed shop's orders are brought back. | Counts follow the goods: what the shop took sits beside what went on the truck, and an order sent again starts clean. |
-| `driver_writes` | New table: `id uuid` key, made on the phone, `trip_id uuid not null` pointing at `trips` on delete cascade, `kind text not null`, and `body_hash text not null`, the SHA-256 of the write as it was applied. | Every driver write applied, bound to what it did, so the same write sent again is answered as done and an id reused for something else is refused (D-45). |
+| `driver_writes` | New table: `id uuid` key, made on the phone, `driver_id uuid not null` pointing at `users`, `trip_id uuid not null` pointing at `trips` on delete cascade, `kind text not null`, `body_hash text not null`, the SHA-256 of the write as it was applied, and `answered_at timestamptz not null default now()`, when the server applied it or last answered a repeat of it, on the real clock like `created_at` and never shown (spec 008). Index `driver_writes_driver` on `driver_id` and `answered_at`. | Every driver write applied, bound to what it did, so the same write sent again is answered as done and an id reused for something else is refused. The account's writes answered in the last 48 hours are listed in its day whatever trips it shows, so a trip that left the day never strands its last write (D-45), and a repeat answered later is listed again, so a write older than that still leaves the phone. Real time, because the demo clock is moved and reset. |
 | `photos` | New table: `id uuid` key, the write's id, `stop_id uuid not null` pointing at `stops` on delete cascade, `issue_id uuid` pointing at `issues` on delete cascade, `jpeg bytea not null` through Drizzle's `customType`, `taken_by uuid not null` pointing at `users`, and `taken_at timestamptz not null`. Unique `photos_issue` on `issue_id`, and unique `photos_proof` on `stop_id` where `issue_id` is null. | Photos live in the database (D-22, D-47). A problem's photo names its problem, so the loader's flag can use the table later. |
 
 `stop_outcome` comes from the list in the contracts, as `trip_status` does. A reset's truncate reaches `driver_writes` and
@@ -24,15 +24,15 @@ The lead writes a new `packages/contracts/src/driver.ts`, passed on by `index.ts
 | Shape | What it holds |
 | --- | --- |
 | `STOP_OUTCOMES`, `DRIVER_WRITE_KINDS` | `['delivered', 'refused', 'closed']` and `['start', 'arrive', 'deliver', 'refuse', 'closed', 'finish']`, with their Zod enums. |
-| `DriverLine` | `lineId`, `orderId`, `temp`, `productId`, `name`, `unit`, `quantity`, `loaded` (null until the truck is ready) and `delivered` (null until the stop is delivered or refused). |
-| `DriverStop` | `id`, `seq`, `revision`, `retry`, `outletId`, `shopName`, `district`, `dockType`, `windowOpen` and `windowClose` (the shop's window narrowed to its mall slot, as spec 007 times it), `note` (its orders' notes for the driver, in the order placed, or null), `arrivedAt`, `doneAt`, `outcome`, and `lines` in spec 012's order. |
+| `DriverLine` | `lineId`, `orderId`, `temp`, `productId`, `name`, `unit`, `quantity`, `loaded` (null until the truck is ready) and `delivered` (null until the stop is delivered or refused). On a closed stop, `loaded` is what its problem counted on the truck and `delivered` is null, whatever later happens to the orders (spec rule 6). |
+| `DriverStop` | `id`, `seq`, `revision`, `retriedAt` (null unless sent back), `outletId`, `shopName`, `district`, `dockType`, `windowOpen` and `windowClose` (the shop's window narrowed to its mall slot, as spec 007 times it), `note` (its orders' notes for the driver, in the order placed, or null), `arrivedAt`, `doneAt`, `outcome`, and `lines` in spec 012's order. |
 | `DriverProblem` | `id`, `kind` (`refused`, `closed`), `stopId`, `reason`, `note` (null when empty), `raisedAt`, `hasPhoto`, `lines` (`lineId` and `counted`: the cartons refused, or those left on the truck), and `decision`, `decidedBy` (a name) and `decidedAt`, null while open. |
-| `DriverTrip` | `tripId`, `revision`, `vehicleId`, `vehicleType`, `vehicleTemp`, `tripNo`, `brand` or null, `district`, `status` (`TripStatus`), `leavesAt` and `backBy` (instants from the plan's kept check), `readyAt`, `leftAt` and `backAt`, `appliedWriteIds` (every driver write the server applied to it), `stops` in plan order, and `problems`, oldest first. |
-| `DriverDay` | `depot` (its name), `driver` (the caller's name), `day` (D-44) or null, `planSent`, and `trips` in the order of spec rule 2. |
+| `DriverTrip` | `tripId`, `revision`, `vehicleId`, `vehicleType`, `vehicleTemp`, `tripNo`, `brand` or null, `district`, `status` (`TripStatus`), `leavesAt` and `backBy` (instants from the plan's kept check), `readyAt`, `leftAt` and `backAt`, `stops` in plan order, and `problems`, oldest first. |
+| `DriverDay` | `depot` (its name), `driver` (the caller's name), `day` (D-44) or null, `planSent`, `appliedWriteIds` (every driver write the account had applied in the last 48 hours, whatever trips the day shows), and `trips` in the order of spec rule 2. |
 | `DriverWrite` | A union told apart by `kind`. Each has `writeId` (a UUID made on the phone), `tripId`, `at` (the app clock on the phone) and `revision`: the trip's for `start` and `finish`, the stop's for `arrive`, `deliver`, `refuse` and `closed`, which add `stopId`. `deliver` adds `photo`. `refuse` adds `reason` (`RefusalReason`), `lines` (1 to 20 of `lineId` and `refused`, 1 to 999, each line once), `note` (trimmed, up to 200, may be empty) and `photo`, which may be left out. `closed` adds `note` and `photo`, which may be left out. A photo is a data URL of a JPEG, `data:image/jpeg;base64,…`, at most 700,000 characters. |
-| `applyDriverWrite(day, write)` | The day as the server answers once the write is applied, on plain values: what spec rules 3 to 7 set, with `at` as the time, the record's revision up by one, the write's id added to its trip's `appliedWriteIds`, and for `refuse` and `closed` the problem raised, whose id is the write's. A write whose trip or stop is not in the day changes nothing. |
-| `nextStop(trip)` | Spec rule 4: the first unfinished stop in plan order among those not sent back, else the first unfinished one sent back, else none. The server's `not_next` check and the phone both use it. |
-| `tripFigures(trip)` | The numbers of spec rules 9 and 12: stops done and stops, units ordered, loaded and delivered, per stop the units refused, not delivered and short from the depot, per stop what is still on the truck after the answers (a refusal's counted cartons, and a closed shop's counted cartons unless it was tried again), and the next stop. A closed stop's figures come from its problem's lines, which a bring-back leaves as they were, so the counts still add up once its orders' own counts are cleared. |
+| `applyDriverWrite(day, write)` | The day as the server answers once the write is applied, on plain values: what spec rules 3 to 7 set, with `at` as the time, the record's revision up by one, the write's id added to the day's `appliedWriteIds`, and for `refuse` and `closed` the problem raised, whose id is the write's. A write whose trip or stop is not in the day changes nothing. |
+| `nextStop(trip)` | Spec rule 4: the first unfinished stop in plan order among those with no `retriedAt`, else the unfinished stop sent back earliest, by `retriedAt` and then plan order, else none. The server's `not_next` check and the phone both use it. |
+| `tripFigures(trip)` | The numbers of spec rules 9 and 12, from the stops' lines: stops done and stops, units ordered, loaded and delivered, per stop the units refused, not delivered and short from the depot, per stop what is still on the truck after the answers (a refusal's counted cartons, and a closed shop's loaded cartons unless it was tried again), and the next stop. A closed stop's lines already carry that attempt's counts, so the counts add up after a bring-back too. |
 | `phoneView(day, writes)` | The writes the day does not list as applied, in order, and the day with them applied by `applyDriverWrite`: what the phone shows and what it still has to send (D-50). |
 
 In `issues.ts` and `loading.ts`:
@@ -40,7 +40,7 @@ In `issues.ts` and `loading.ts`:
 | Shape | Change |
 | --- | --- |
 | Kinds, reasons, answers | `ISSUE_KINDS` gains `refused` and `closed`. `REFUSAL_REASONS` (`damaged`, `expired`, `not_ordered`) and `CLOSED_REASONS` (`nobody_there`) join `FLAG_REASONS` in `IssueReason`. `REFUSAL_DECISIONS` (`bring_back`) and `CLOSED_DECISIONS` (`try_again`, `bring_back`) join `LOADING_DECISIONS` in `IssueDecision`, and `DECISIONS_BY_KIND` says which answers fit which kind. |
-| `Issue` | Gains `hasPhoto`; on `trip` `status`, `driver` (a name, or null) and `stopsLeft`; on `stop` `arrivedAt`, `doneAt`, `loadedAt` and `flaggedAtDock`; and on each line `loaded`. A line's `counted` is, by kind, the good units at the dock, the cartons refused, or the cartons left on the truck, and `short` is the units short at the dock, refused, or not delivered. |
+| `Issue` | Gains `hasPhoto`; on `trip` `status`, `driver` (a name, or null) and `stopsLeft`; on `stop` `arrivedAt`, `doneAt`, `loadedAt` and `flaggedAtDock`; and on each line `loaded` and `delivered`. A line's `counted` is, by kind, the good units at the dock, the cartons refused, or the cartons left on the truck, and `short` is the units short at the dock, refused, or not delivered. A closed shop's lines read that attempt, as on the phone: `loaded` from the problem's own lines and `delivered` null. |
 | `LoadingIssue` | `Issue` narrowed to kind `loading`, its `FlagReason` and its `LoadingDecision`. `LoadingTruck.issues` holds these, so the loader's screens keep their types. |
 | `DecideIssueRequest` | Unchanged: `revision` and `decision`. |
 
@@ -83,12 +83,14 @@ problem."), `no_depot` 403, and `not_found` 404 ("This problem has no photo.").
 table's lock first):
 1. The driver's day from the app clock and the operating days: spec 012's `loaderDay`. None gives `day: null`.
 2. The caller's trips: those of the depot's `published` plan for that day whose driver is the caller, and any other trip
-   of theirs that is `out`, each with its vehicle and the ids in `driver_writes` for it.
-3. Each trip's stops with their `retry` marks, the shop, its window narrowed to its mall slot, its orders' notes and its
+   of theirs that is `out`, each with its vehicle.
+3. Each trip's stops with their `retried_at`, the shop, its window narrowed to its mall slot, its orders' notes and its
    lines with their products and counts, and the trip's problems of kinds `refused` and `closed` with their lines and the
-   names of who answered them.
+   names of who answered them. A closed stop's lines take `loaded` from its problem's own lines and `delivered` as null.
 4. `leavesAt` and `backBy` from the plan's `sent_check`: `times.leaveAt` and `times.backAt` of the trip's vehicle and
    number, as instants on the plan's day.
+5. `appliedWriteIds`: the ids in `driver_writes` of the caller's writes answered in the last 48 hours of real time,
+   whatever trips steps 2 to 4 found.
 
 **Every driver write**, `POST /driver/writes`, in one transaction:
 1. `lockDay(tx)` (spec 012): in demo mode the `demo_day` row for share. A start takes `lockDepotDay(tx, depotId)`
@@ -99,22 +101,24 @@ table's lock first):
 3. Only now read the clock instant `now` from the locked `demo_day` row, so a write that waited behind another is judged
    at the moment it got the trip.
 4. The write's id: one in `driver_writes` with the same trip, kind and body hash is a repeat, answered with the day as it
-   is and nothing changed; with anything else it is `write_reused`. The hash is the SHA-256 of the parsed write as JSON
-   with its keys sorted, photo included. Two copies sent at once queue on the trip's lock, so the second finds the first's
-   row.
+   is and nothing changed but the row's `answered_at`; with anything else it is `write_reused`. The hash is the SHA-256
+   of the parsed write as JSON with its keys sorted, photo included. Two copies sent at once queue on the trip's lock, so
+   the second finds the first's row.
 5. The revision, the trip's for a start and an end and the stop's otherwise, must be the one named (`stale`). Then the
    kind's own checks below.
 6. The time kept is `keptTime(at, last, now)`, `last` being the trip's `last_event_at`, or its `ready_at` before the first
    write.
 7. The kind's work, its record's revision up by one, `last_event_at` set to the time kept, the `driver_writes` row with the
-   trip, kind and hash, and the audit row with the phone's time and the time kept. Answer `driverDayOf` from inside the
-   transaction, and announce after the commit.
+   caller, trip, kind and hash, and the audit row with the phone's time and the time kept. Answer `driverDayOf` from
+   inside the transaction, and announce after the commit.
 
+A kind's checks run in the order written, so a write at a stop already done gets `stop_done`, never `not_next`: a done
+stop is never the next one.
 - **start.** The trip must be `ready` (`trip_not_ready`), and no other trip of its vehicle `out` (`other_trip_out`). It
   becomes `out` with `left_at`. Audit `trip.started`. Announce `driver` and `loading` to the depot.
-- **arrive.** The trip must be `out` (`trip_not_out`), the stop the trip's next one by `nextStop` (`not_next`), and neither
-  arrived nor done (`stop_done`). It gets `arrived_at`. Audit `stop.arrived`. Announce `driver`.
-- **deliver.** The trip `out`, the stop the next one (`not_next`), arrived (`not_arrived`) and not done (`stop_done`), and
+- **arrive.** The trip must be `out` (`trip_not_out`), the stop neither arrived nor done (`stop_done`), and the trip's next
+  stop by `nextStop` (`not_next`). It gets `arrived_at`. Audit `stop.arrived`. Announce `driver`.
+- **deliver.** The trip `out`, the stop not done (`stop_done`), the next one (`not_next`) and arrived (`not_arrived`), and
   the photo whole (`invalid_input`, below). Each line's `delivered_qty` is its `loaded_qty`, the stop is `delivered` with
   `done_at`, the photo is stored with no problem, and each order at the stop becomes `delivered` with its revision up.
   Audit `stop.delivered`. Announce `driver` to the depot and `orders` to each shop on the stop and the depot.
@@ -123,7 +127,7 @@ table's lock first):
   stop is `refused`, and its orders `delivered`. The problem: kind `refused`, the write's id, the reason, the note or
   null, raised by the caller at the time kept, its named lines counted at the cartons refused, and the photo with the
   problem's id. Audit `stop.refused`. Announce `driver`, `issues` and `orders`.
-- **closed.** The trip `out`, the stop the next one, arrived and not done. The stop is `closed` with `done_at`, nothing is
+- **closed.** The trip `out`, the stop not done, the next one and arrived. The stop is `closed` with `done_at`, nothing is
   delivered and its orders stay `loaded`. The problem: kind `closed`, reason `nobody_there`, every line of the stop
   counted at what stays on the truck, its loaded count, and the photo when there is one. Audit `stop.closed`. Announce
   `driver` and `issues`.
@@ -133,6 +137,7 @@ table's lock first):
 **The photo check**, `jpegOf`: the data URL's base64 decodes to at most 512,000 bytes (500 KB) that start `FF D8` and end
 `FF D9`, and the markers after the start lead to a frame header (`SOF0` to `SOF15`, other than `C4`, `C8` and `CC`) whose
 height and width are each from 1 to 2000. Anything else is `invalid_input`. The phone's 1280 px pictures pass with room.
+The check reads the file's structure and never decodes the picture, a known limit the spec records.
 
 **A write that arrives late**, after the trip moved on without it, meets the trip as it is. A write the server already
 applied is answered as done, and an id used for something else is `write_reused` (step 4). A stop or trip that another
@@ -150,7 +155,8 @@ fetches the day again (spec rule 10).
 3. A revision not the problem's, or a problem not open, is `stale`. An answer not in `DECISIONS_BY_KIND` for its kind is
    `invalid_input`. `try_again` on a trip that is not `out` is `trip_not_out`.
 4. Write the decision, `decided_by`, `decided_at` and the revision up. `try_again` empties the stop's `arrived_at`,
-   `done_at` and `outcome`, sets `retry`, and raises its revision; the trip's `last_event_at` stays. `bring_back` on a
+   `done_at` and `outcome`, sets `retried_at` to the answer's clock instant, and raises its revision; the trip's
+   `last_event_at` stays. `bring_back` on a
    closed shop makes the stop's orders `placed` with their revisions up and their lines' `loaded_qty` and `delivered_qty`
    emptied, and the stop stays `closed`. `bring_back` on a refusal writes the decision alone. Audit `issue.decided`, and
    for a closed shop brought back the lines' loaded and delivered counts of that attempt in its `before`.
@@ -173,23 +179,28 @@ A loader's flag is answered as spec 012 has it, with no trip lock.
   time, and the revision of its record in the trip on screen. The write goes into the database, and only then does the
   screen move on. A save that fails shows "Could not save on this phone. Try again.", the screen stays, and nothing is
   sent. With no clock known yet, the buttons wait.
-- **The day.** The query `['driver']` fetches `GET /driver`. Each answer is kept in the database, in one database
-  transaction with taking off the queue every write whose id it lists as applied, before the screen shows it or the
-  sender sends anything. A new fetch cancels one still running, so an older answer never lands after a newer one. The
-  live stream fetches it again on `driver`, and a `clock` or `demo` message fetches everything (spec 008).
+- **One tab owns the driver's app.** The driver's area asks for `navigator.locks.request('wayfinder-driver', …)` when it
+  opens and holds the lock until the tab closes. Only the tab holding it runs the sync loop below and the query
+  `['driver']`. Any other tab shows "Wayfinder is open in another tab.", waits for the lock and does nothing until it gets
+  it, so no two tabs ever fetch, keep or send. Where a browser lacks Web Locks the tab runs as the owner, and the server's
+  ids still keep a write from counting twice.
+- **The sync loop**, in the owning tab, one step at a time: fetch the day, `GET /driver`, within 15 seconds; keep it, in one
+  database transaction with taking off the queue every write whose id it lists as applied; then send the oldest waiting
+  write within 15 seconds, and start again from the fetch. A write's answer is never put in the view, so the day is
+  fetched again after each write, and a write leaves the queue only when a fetched day lists it: a fetch that fails leaves
+  it waiting, not sent again, until a later fetch lists it. No answer, a 5xx or a 429, to a fetch or a send, waits for the
+  retry schedule and starts again from the fetch, with the same write, id and body. A 401 stops the loop, with the write
+  still waiting and not refused, until the same account signs in again. Any other refusal marks the write refused with
+  its code and sentence, and the loop goes on. The live stream's `driver` message, a `clock` or `demo` message (spec 008)
+  and the minute's refetch start the loop's fetch, and a new fetch cancels one still running, so an older answer never
+  lands after a newer one.
 - **What the screen shows.** `phoneView` of the kept day and the waiting writes, and every number from `tripFigures`
   (D-50). Refused writes are left out, and a write's answer is never shown.
-- **Sending.** Inside `navigator.locks.request('wayfinder-driver-sender', …)`, so one tab sends and another tab only
-  saves and shows. One write at a time, the oldest waiting. A send with no answer within 15 seconds is aborted. An answer
-  is not put in the view: the sender fetches the day again and waits for it, and the write leaves the queue when that day
-  lists it, so a fetch that fails leaves it to be sent again and answered as done. No answer, a 5xx or a 429 keeps the
-  write for the retry schedule, with the same id and body. A 401 stops the sending until the same account signs in again.
-  Any other refusal marks the write refused with its code and sentence, fetches the day again, and the next one goes.
 - **The signal.** No signal while `navigator.onLine` is false, or from a request that got no answer within 15 seconds,
   until a request gets any answer. With no signal a probe asks `GET /api/v1/health`, also limited to 15 seconds, after 2,
   4 and 8 seconds and then every 15, whatever `navigator.onLine` says, and at once on the browser's `online` event, the
   app coming back to the front, the app opening, and "Retry sync". An answer to the probe brings the signal back, and
-  the sender carries on. The chip, the bar, "Saved on this phone" and "Back online" follow it (spec rule 12).
+  the loop carries on. The chip, the bar, "Saved on this phone" and "Back online" follow it (spec rule 12).
 - **The photo.** The file input takes `accept="image/*"` and `capture="environment"`. `createImageBitmap` turns the picture
   upright, a canvas draws it at most 1280 px on its long side, and `toBlob` makes a JPEG at quality 0.7, then at 0.5 and
   960 px if it is still over 500 KB. It is kept as a data URL, which is also the preview, because the app's content policy
@@ -245,8 +256,10 @@ A loader's flag is answered as spec 012 has it, with no trip lock.
 - A phone's `performance.now()` can stop while it sleeps, so its clock may lag. D-46 keeps times in order, and the audit
   row keeps the phone's own.
 - Base64 adds a third: a 500 KB photo is under 700 KB of JSON, inside the API's 1 MB body limit. Hashing it is quick.
-- Web Locks are in every current browser. Where one lacks them the phone still sends, and the server's ids keep a write
-  from counting twice.
+- Web Locks are in every current browser. Where one lacks them each tab runs as the owner, and the server's ids keep a
+  write from counting twice.
+- The 48 hours of listed ids are real time. A phone offline for longer sends its oldest write again, the server answers it
+  as done and lists it again, and the queue moves on.
 - A browser can clear the phone's storage. `persist()` asks it not to, and the waiting count shows what is still at risk.
 
 ## Test plan
@@ -260,7 +273,7 @@ A loader's flag is answered as spec 012 has it, with no trip lock.
 | AC-6, AC-11 to AC-21 | Integration | `apps/api/tests/driver-writes.test.ts` |
 | AC-22 to AC-29 | Integration | `apps/api/tests/driver-sync.test.ts` |
 | AC-30 to AC-37 | Integration | `apps/api/tests/driver-answers.test.ts` |
-| AC-38 to AC-49 | Click-through in Nabil's Chrome on the built app, at 390 wide as `dilshan` with the network turned off in DevTools and at 1440 × 900 as `ruwan`, two browsers for AC-41 to AC-43, two tabs for AC-48, DevTools' storage quota for AC-44, request blocking for AC-45, a latency profile for AC-47, and the hosted app for AC-46 | The lead, on the joined branch |
+| AC-38 to AC-49 | Click-through in Nabil's Chrome on the built app, at 390 wide as `dilshan` with the network turned off in DevTools and at 1440 × 900 as `ruwan`, two browsers for AC-41 to AC-43, two tabs for AC-48, DevTools' storage quota for AC-44, the session cookie deleted and request blocking for AC-45, a latency profile and the day's own address blocked for AC-47, and the hosted app for AC-46 | The lead, on the joined branch |
 | AC-50, AC-51 | A read of `features/driver` and the service worker's settings, with the network tab | The lead and the reviewer |
 
 Integration tests run in the builder's own seeded database (AGENTS.md) and assert the seeded day's numbers. Each file
@@ -268,5 +281,7 @@ starts from the seeded day, puts it back at its end with spec 008's `clearDemoDa
 and lets the clock go. `apps/api/tests/driver-plan.ts` runs spec 012's `loading-plan.ts` and its walkthrough's loader
 writes, to VEH035 ready at Thu 02:36 with 1 dry carton short for Fresh Nugegoda, and sets the clock to Thu 03:30. AC-27's
 test holds the trip's row in a transaction of its own and moves its last event time a second ahead before letting go.
-AC-35's plans Friday through spec 010's endpoints and loads it through spec 012's. A file signs in once per account,
-because one address gets ten sign-ins in 15 minutes.
+AC-25's test moves the clock past 16:00 and sets one `answered_at` back 49 hours. AC-35's plans Friday through spec 010's
+endpoints, loads it through spec 012's and delivers it through this piece's, then reads Thursday's day with the clock set
+back to Thursday and the problem through `issuesOf`. A file signs in once per account, because one address gets ten
+sign-ins in 15 minutes.
