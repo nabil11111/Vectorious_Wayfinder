@@ -6,9 +6,9 @@ import { orders } from './orders';
 import { depots, outlets, vehicles } from './reference';
 
 // A plan is one depot's delivery day. Trips hang off it, stops off trips, and each order is either on a stop
-// or deferred with a reason. The tables hold the two-trip limit themselves. Whether an order is placed once,
-// and not also deferred, is checked by the plan validator before a plan is published, because a split order
-// may need both. The planner owner may reshape these tables; talk to the team before you do.
+// or deferred with a reason. The tables hold the two-trip limit themselves. That an order is on exactly one
+// stop or deferred, never both, is checked by the rule checker before a plan is sent (spec 007). A split
+// order is two orders, so the rule holds for each part. Talk to the team before reshaping these tables.
 
 export const plans = pgTable('plans', {
   id: uuid('id').primaryKey().defaultRandom(),
