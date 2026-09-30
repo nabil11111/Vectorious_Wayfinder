@@ -1,10 +1,12 @@
-import { PlanBoard, type DraftPlan, type DraftTrip } from '@wayfinder/contracts';
-import { eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { LoadingDay, PlanBoard, type DraftPlan, type DraftTrip, type LoadingDecision, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
+import { eq, sql } from 'drizzle-orm';
 import type request from 'supertest';
 import { expect } from 'vitest';
 import { db } from '../src/db/client';
 import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
-import { auditLog, issueLines, issues, orderLines, orders, plans, stops, trips, users } from '../src/db/schema';
+import { auditLog, issueLines, issues, orderLines, orders, plans, stopOrders, stops, trips, users } from '../src/db/schema';
+import { depotInstant } from '../src/lib/clock';
 
 // The day every loading test starts from (spec 012, plan.md "Test plan"). Nadeesha places her draft, and Ruwan sends
 // Thursday's plan through the endpoints of specs 009 and 010. Each test file mocks the clock itself, because a mock
@@ -57,6 +59,61 @@ export async function sendWalkthroughPlan(walk: Walkthrough, { withVeh004 = fals
   expect(sent.status).toBe(200);
   walk.freeze(THU, 2 * 60 + 30);
   return PlanBoard.parse(sent.body);
+}
+
+export function truckOf(day: LoadingDay, vehicleId: string): LoadingTruck {
+  const truck = day.trucks.find((t) => t.vehicleId === vehicleId);
+  if (!truck) throw new Error(`${vehicleId} is not on the loading day.`);
+  return truck;
+}
+export function stopOf(truck: LoadingTruck, seq: number): LoadingStop {
+  const stop = truck.stops.find((s) => s.seq === seq);
+  if (!stop) throw new Error(`${truck.vehicleId} has no stop ${seq}.`);
+  return stop;
+}
+// The walkthrough's flagged line: Fresh Nugegoda's 4 dry cartons on VEH035's stop 1.
+export const dryLine = (truck: LoadingTruck) => stopOf(truck, 1).lines.find((line) => line.temp === 'dry')!;
+
+// The loader's screen: the loading day, and the four writes as the phone sends them, each naming the trip's revision
+// the screen saw and carrying a new id, unless a retry passes the same one. A body may override any field.
+export function loaderScreen(agent: Agent) {
+  const post = (truck: LoadingTruck, action: string, body: object = {}, writeId: string = randomUUID()) =>
+    agent.post(`/api/v1/loading/trips/${truck.tripId}/${action}`).send({ writeId, revision: truck.revision, ...body });
+  return {
+    post,
+    async read(): Promise<LoadingDay> {
+      const res = await agent.get('/api/v1/loading');
+      expect(res.status).toBe(200);
+      return LoadingDay.parse(res.body);
+    },
+    start: (truck: LoadingTruck, plan: { id: string; revision: number }, writeId?: string) => post(truck, 'start', { plan }, writeId),
+    stopLoaded: (truck: LoadingTruck, seq: number, writeId?: string) => post(truck, 'stop-loaded', { stopId: stopOf(truck, seq).id }, writeId),
+    flag: (truck: LoadingTruck, seq: number, lines: { lineId: string; counted: number }[], more: object = {}, writeId?: string) =>
+      post(truck, 'flags', { stopId: stopOf(truck, seq).id, reason: 'short', note: '', lines, ...more }, writeId),
+    ready: (truck: LoadingTruck, writeId?: string) => post(truck, 'ready', {}, writeId),
+  };
+}
+// A write's answer, and one truck in it.
+export const answeredTruck = (res: request.Response, vehicleId: string) => {
+  expect(res.status).toBe(200);
+  return truckOf(LoadingDay.parse(res.body), vehicleId);
+};
+
+// The dispatcher's answer to a flag, written as spec 012's answer writes it: decided by Ruwan at the app clock's time.
+export async function answerFlag(issueId: string, decision: LoadingDecision, at: Date): Promise<void> {
+  const [ruwan] = await db.select({ id: users.id }).from(users).where(eq(users.username, 'ruwan'));
+  await db.update(issues).set({ status: 'decided', decision, decidedBy: ruwan!.id, decidedAt: at, revision: sql`${issues.revision} + 1` }).where(eq(issues.id, issueId));
+}
+
+// A Kandy plan with one loading trip, written straight into the tables: a truck, stop and line of another depot.
+export async function kandyTrip() {
+  const [order] = await db.insert(orders).values({ outletId: 'OUT076', deliveryDate: THU, temp: 'dry', status: 'planned', placedAt: depotInstant(WED, 9 * 60) }).returning();
+  const [line] = await db.insert(orderLines).values({ orderId: order!.id, productId: 'fresh-dry-carton', quantity: 10 }).returning();
+  const [plan] = await db.insert(plans).values({ depotId: 'Kandy', date: THU, status: 'published', publishedAt: depotInstant(WED, 17 * 60) }).returning();
+  const [trip] = await db.insert(trips).values({ planId: plan!.id, vehicleId: 'VEH044', tripNo: 1, status: 'loading' }).returning();
+  const [stop] = await db.insert(stops).values({ tripId: trip!.id, seq: 1, outletId: 'OUT076' }).returning();
+  await db.insert(stopOrders).values({ stopId: stop!.id, orderId: order!.id });
+  return { plan: plan!, trip: trip!, stop: stop!, line: line! };
 }
 
 // Every row a loader write or an answer could change, so a test can show that a refused one changed none.
