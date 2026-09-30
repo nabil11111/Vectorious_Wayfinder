@@ -22,7 +22,7 @@ day, as in `PlanCheck`. Days are `YYYY-MM-DD`, moments ISO strings. A write's da
 
 | Shape | What it holds |
 | --- | --- |
-| `DraftStop`, `DraftTrip`, `DraftDeferral`, `DraftPlan` | A stop: `outletId` and `orderIds` (1 to 10). A trip: `vehicleId`, `tripNo` (1 or 2), `leaveAt` (0 to 1439, or null for the usual time), `driverId` or null, and `stops` (up to 40). A deferral: `orderId`, `code` (`DeferralCode`) and `reason` (trimmed, 1 to 200). The plan: `mixBrands`, `trips` (up to 76) and `deferrals` (up to 300). |
+| `DraftStop`, `DraftTrip`, `DraftDeferral`, `DraftPlan` | A stop: `outletId` and `orderIds` (1 to 300, the plan's own order bound, so Find a slot never offers what a save refuses). A trip: `vehicleId`, `tripNo` (1 or 2), `leaveAt` (0 to 1439, or null for the usual time), `driverId` or null, and `stops` (up to 40). A deferral: `orderId`, `code` (`DeferralCode`) and `reason` (trimmed, 1 to 200). The plan: `mixBrands`, `trips` (up to 76) and `deferrals` (up to 300). |
 | `PlanRef` | `{ planId, revision }`, or `{ planId: null, demoDay }` before the first save, `demoDay` being the clock's `day` the board was read under. |
 | `SavePlanRequest`, `SplitOrderRequest`, `JoinOrderRequest`, `SendPlanRequest`, `UnsendPlanRequest` | Each is a `PlanRef`. The save adds a `DraftPlan`. The split adds `orderId` and `keep`, the first part's lines (`productId`, quantity 0 to 999, up to 10 lines). The join adds the original's `orderId`. |
 | `BoardOrder` | `id`, `outletId`, `temp`, `deliveryDate` (the day the shop wanted), `lines` (`OrderLine`), `load` (`Load`), `carriedOver`, `timesDeferred`, `lastDeferral` (`code`, `reason`) or null, and `splitFrom` and `originalUnits`, or null. |

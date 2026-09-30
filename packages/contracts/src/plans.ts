@@ -23,7 +23,10 @@ export type Parking = z.infer<typeof Parking>;
 
 // ── The draft, as the screen edits it and a save sends it ──────────────────────────────────────────────────────
 
-export const DraftStop = z.object({ outletId: z.string().min(1).max(16), orderIds: z.array(z.uuid()).min(1).max(10) });
+// A stop takes every order of its shop that the plan puts there, so its cap is the plan's own order bound (the 300
+// of deferrals below): a guard against absurd input that no real day reaches, and never lower than what Find a slot
+// may offer.
+export const DraftStop = z.object({ outletId: z.string().min(1).max(16), orderIds: z.array(z.uuid()).min(1).max(300) });
 export type DraftStop = z.infer<typeof DraftStop>;
 
 export const DraftTrip = z.object({
