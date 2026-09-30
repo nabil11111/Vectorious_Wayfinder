@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkPlan } from '../check';
-import { inputFor, order, outlet, vehicle } from '../testing/shared';
+import { inputFor, order, vehicle } from '../testing/shared';
 import type { EngineOrder, EngineVehicle, PlanInput, PlanTrip } from '../types';
 import { candidateSlots, chooseWhole, fixDepartures, tryCandidate } from './candidates';
 
@@ -152,7 +152,7 @@ describe('whole-order planner candidates', () => {
     const near = dry('near');
     const second = day([near], [trip('VEH012', 1, [near])], [{ ...vehicle('VEH012'), weeklyFuelQuotaL: 7, litresUsedThisWeek: 0 }]);
     // Two 24 km routes need 7.058... litres: the displayed 7.1 is not the quota predicate.
-    expect(tryCandidate(second, dry('other', 'OUT026'), { vehicleId: 'VEH012', tripNo: 2, existing: false }).stage).toBe('fuel');
+    expect(tryCandidate(second, dry('other', 'OUT004'), { vehicleId: 'VEH012', tripNo: 2, existing: false }).stage).toBe('fuel');
     const rounded = day([], [], [{ ...vehicle('VEH012'), weeklyFuelQuotaL: 3.5, litresUsedThisWeek: 0 }]);
     expect(chooseWhole(rounded, dry('rounded')).stages).toEqual(['fuel']); // 24/6.8 >3.5 while display is 3.5.
   });
@@ -169,4 +169,3 @@ describe('whole-order planner candidates', () => {
     expect(timed.stops[2]!.arriveAt).toBe(697);
   });
 });
-
