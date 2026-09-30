@@ -399,9 +399,10 @@ describe('the seeded day on an empty database', () => {
     // order it writes them, so the seed stops at its first insert, in the middle and at its last. A row that
     // needs an order or a plan to hang off gets one of its own, dated far from the seeded day.
     const elsewhere = '2099-01-03';
-    const anOrder = async (tx: Tx) => (await tx.insert(orders).values({ outletId: 'OUT060', deliveryDate: elsewhere, temp: 'chilled' }).returning())[0]!.id;
+    const placed = { temp: 'chilled', status: 'placed' } as const;
+    const anOrder = async (tx: Tx) => (await tx.insert(orders).values({ outletId: 'OUT060', deliveryDate: elsewhere, ...placed }).returning())[0]!.id;
     const clashes: [table: string, plant: (tx: Tx) => Promise<unknown>][] = [
-      ['orders', (tx) => tx.insert(orders).values({ id: demoId('order', `${THU}:OUT002:chilled`), outletId: 'OUT002', deliveryDate: THU, temp: 'chilled' })],
+      ['orders', (tx) => tx.insert(orders).values({ id: demoId('order', `${THU}:OUT002:chilled`), outletId: 'OUT002', deliveryDate: THU, ...placed })],
       ['order_lines', async (tx) => tx.insert(orderLines).values({
         id: demoId('line', `${THU}:OUT002:chilled:fresh-chilled-carton`), orderId: await anOrder(tx), productId: 'fresh-chilled-carton', quantity: 1,
       })],
