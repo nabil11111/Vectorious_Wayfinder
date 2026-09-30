@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
-import { CutoffPassedDetails, type DraftRefs, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
+import { z } from 'zod';
+import { CutoffPassedDetails, StoreOrder, type DraftRefs, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
 import { ApiRequestError } from '@/lib/api';
 import { fetchNextOrder, nextOrderKey, placeOrders, saveDraft } from './next-order';
 import { reasonOf } from './words';
@@ -11,6 +12,11 @@ const SAVE_AFTER_MS = 600;
 
 // The next order while a delivery day is open. The form only exists then.
 export type OpenOrder = StoreNextOrder & { deliveryDate: string };
+
+// What the form hands the confirmation it opens: the orders its place answered with. A retry that got its
+// answer after the cut-off has them for a day that has closed, which the next order no longer lists.
+export const PlacedNow = z.object({ placedOrders: z.array(StoreOrder).min(1) });
+export type PlacedNow = z.infer<typeof PlacedNow>;
 
 // What the manager has on the form: a quantity per item and the note.
 export interface FormValues { quantities: Record<string, number>; note: string }
@@ -74,9 +80,9 @@ class DraftForm {
   private onScreen = true;
   private qc: QueryClient;
   private show: (patch: Partial<Screen>) => void;
-  private placed: () => void;
+  private placed: (orders: StoreOrder[]) => void;
 
-  constructor(next: OpenOrder, qc: QueryClient, show: (patch: Partial<Screen>) => void, placed: () => void) {
+  constructor(next: OpenOrder, qc: QueryClient, show: (patch: Partial<Screen>) => void, placed: (orders: StoreOrder[]) => void) {
     this.values = valuesOf(next);
     this.base = { deliveryDate: next.deliveryDate, refs: next.draft?.refs ?? {} };
     this.products = next.products;
@@ -223,7 +229,7 @@ class DraftForm {
       this.qc.setQueryData<StoreNextOrder>(nextOrderKey, answer);
       // The open list and Today now hold the placed orders.
       void this.qc.invalidateQueries({ queryKey: ['orders', 'store'] });
-      this.placed();
+      this.placed(answer.placedOrders);
     } catch (error) {
       if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
         // Nothing was placed. The manager sees the new day and decides again.
@@ -267,7 +273,10 @@ export function useDraftForm(next: OpenOrder) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [screen, setScreen] = useState<Screen>(() => ({ values: valuesOf(next), saving: 'saved', placing: false, changedElsewhere: false, closedDay: null, refused: null }));
-  const [form] = useState(() => new DraftForm(next, qc, (patch) => setScreen((now) => ({ ...now, ...patch })), () => navigate('/store/orders/placed')));
+  const [form] = useState(() => new DraftForm(
+    next, qc, (patch) => setScreen((now) => ({ ...now, ...patch })),
+    (placedOrders) => navigate('/store/orders/placed', { state: { placedOrders } satisfies PlacedNow }),
+  ));
 
   useEffect(() => { form.incoming(next); }, [form, next]);
   useEffect(() => {
