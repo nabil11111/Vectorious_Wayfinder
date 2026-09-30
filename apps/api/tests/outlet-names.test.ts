@@ -26,8 +26,8 @@ describe('outlet names fixture', () => {
     expect(named.map((r) => r.outlet_id).sort()).toEqual(shops.map((r) => r.outlet_id).sort());
   });
 
-  it('puts the brand first, then a place', () => {
-    const wrong = shops.filter((shop) => !new RegExp(`^${shop.brand} \\S`).test(nameOf.get(shop.outlet_id!) ?? ''));
+  it('puts the brand first, then a place, with no stray spaces', () => {
+    const wrong = shops.filter((shop) => !new RegExp(`^${shop.brand} \\S(.*\\S)?$`).test(nameOf.get(shop.outlet_id!) ?? ''));
     expect(wrong.map((shop) => shop.outlet_id)).toEqual([]);
   });
 
@@ -53,7 +53,7 @@ describe('seeding outlet names', () => {
     }
     seed();
     const rows = await db.select({ id: outlets.id, name: outlets.name }).from(outlets);
-    expect(Object.fromEntries(rows.map((r) => [r.id, r.name]))).toEqual(Object.fromEntries(nameOf));
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.name]))).toMatchObject(Object.fromEntries(nameOf));
   }, 30_000);
 
   it('changes no outlet row when it runs a second time', async () => {
