@@ -79,7 +79,7 @@ it('AC-19 keeps the original and its metadata, writes two exact parts and replac
   expect(board.plan.trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds))).not.toContain(second.id);
   expect(board.check!.trips[0]!.load.m3).toBe(37.5);
   expect(board.figures![0]!.m3Pct).toBe(99);
-  expect(board.check!.problems.filter((p) => p.severity === 'block' && p.vehicleId === 'VEH023')).toEqual([]);
+  expect(board.check!.problems.filter((p) => p.level === 'block' && p.vehicleId === 'VEH023')).toEqual([]);
   expect(board.check!.problems).toContainEqual(expect.objectContaining({ message: 'The 765 kg dry order for Style Liberty Plaza is on no trip and is not deferred.' }));
   expect((await db.select().from(orders).where(eq(orders.id, originalId)))[0]).toEqual({ ...original, status: 'split', revision: original.revision + 1 });
   expect(await db.select().from(orderLines).where(eq(orderLines.orderId, originalId)).orderBy(orderLines.productId)).toEqual(lines);
@@ -194,7 +194,10 @@ it('AC-22 checks exact product sums, child count and nonempty parts', async () =
   await db.insert(orderLines).values({ orderId: child.id, productId: 'fresh-dry-carton', quantity: 1 });
   expect(await addsUp()).toBe(false);
   await db.delete(orderLines).where(and(eq(orderLines.orderId, child.id), eq(orderLines.productId, 'fresh-dry-carton')));
-  await db.insert(orders).values({ outletId: 'OUT017', temp: 'dry', deliveryDate: DATE, status: 'placed', splitFrom: originalId });
+  const [extra] = await db.insert(orders).values({ outletId: 'OUT017', temp: 'dry', deliveryDate: DATE, status: 'placed', splitFrom: originalId }).returning();
+  expect(await addsUp()).toBe(false);
+  await db.delete(orders).where(eq(orders.id, extra!.id));
+  await db.update(orderLines).set({ orderId: parts().find((p) => p.id !== child.id)!.id }).where(eq(orderLines.orderId, child.id));
   expect(await addsUp()).toBe(false);
 });
 
