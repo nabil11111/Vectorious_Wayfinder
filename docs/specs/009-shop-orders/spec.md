@@ -178,8 +178,9 @@ the rows of the table above. Screens get a written click-through at 390 and 1440
 ## Out of scope
 - Confirming a delivery, short or damaged reports, the receipt states and what arrived on a past order. A5.
 - On a delivery card: the expected time, "Running late", the vehicle and driver, "Delivery help". A2 to A4.
-- The new date on a "Date changed" card, "… works for me", Shop · Deferred date accepted, "plan updated 16:10"
-  and the dispatcher's view of orders. A2.
+- The new date on a "Date changed" card, "… works for me", Shop · Deferred date accepted and "plan updated 16:10":
+  A5 may add them. A deferred order gets no new date; it waits for the next plan, where it comes first (spec 010).
+  The dispatcher's view of orders: A8.
 - Changing or withdrawing a placed order (open point 1), and drafts with no signal.
 - Ordering further ahead than the next open day, or a fixed weekly day for Style. The data has no schedule.
 

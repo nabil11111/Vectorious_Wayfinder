@@ -92,3 +92,25 @@ one.
 
 **D-27 · 30 Sep · A store manager for each brand.** One Fresh, one Style and one Tech shop have an account,
 so a judge can see all three order forms.
+
+**D-28 · 1 Oct · The plan board shows today until 03:30, then the next operating day.** 03:30 is when the first
+trucks leave (D-19), so a plan can be sent, or taken back to edit, until its trucks leave.
+
+**D-29 · 1 Oct · The plan's draft is saved whole after every change.** Each save names the plan by its id and
+revision and comes back with the checker's result. A depot's planning writes queue one behind the other. It is the
+shop's draft pattern (spec 009), and the planner will use the same path.
+
+**D-30 · 1 Oct · A split keeps the shop's order and makes two new orders from it.** The original becomes `split`,
+each part points to it and their lines add up to it. What the shop asked for stays on record, and each part is
+planned or deferred whole (D-17).
+
+**D-31 · 1 Oct · A driver is chosen per vehicle for the day, and may be left out.** It is the account that sees
+that vehicle's trips on its phone. The booklet gives every vehicle a driver and makes driver availability no
+constraint.
+
+**D-32 · 1 Oct · A dispatcher plans their own depot only.** Every plan route checks the record belongs to the
+caller's depot, so the depot switch in the top bar shows the depot and changes nothing.
+
+**D-33 · 1 Oct · A sent plan can go back to edit until loading starts** (Nabil). The booklet says printed loading
+lists go out of date when plans change and wants the dispatcher's decisions to reach the loader. Once a trip is
+loading, changes go through the loader's flag and the dispatcher's answer (A3) and Live day (A7).
