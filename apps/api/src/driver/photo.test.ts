@@ -104,7 +104,7 @@ describe('driver proof JPEGs', () => {
     for (const invalid of [
       '', value.replace('image/jpeg', 'image/png'), value.replace(';base64', ''), value.replace('data:', ''),
       `${value}!`, `${value}\n`, value.replace(',', ', '), value.replace('base64,', 'base64,='),
-      'data:image/jpeg;base64,/9j/2R==', 'data:image/jpeg;base64,/9j/2Q',
+      `${value.slice(0, -2)}l=`, value.replace(/=+$/, ''),
     ]) rejectPhoto(invalid);
   });
 });
