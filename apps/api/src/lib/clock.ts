@@ -21,9 +21,10 @@ export function realNow(): Date {
 
 type StoredClock = Pick<typeof demoDay.$inferSelect, 'clockBase' | 'clockSetAt' | 'revision' | 'day'>;
 
-// The row, kept in memory so that now() needs no database call. Only this process changes the row, so the
-// copy cannot go stale. It is empty until initClock() has read the row, which it never does with demo mode
-// off, and while it is empty the clock is the real time.
+// The row, kept in memory so that now() needs no database call. Only this process changes the row, and a
+// move takes the copy afresh from the row it locks, so the copy does not stay behind. It is empty until
+// initClock() has read the row, which it never does with demo mode off, and while it is empty the clock is
+// the real time.
 let stored: StoredClock | null = null;
 
 const NOT_SEEDED = 'The demo clock has no row in demo_day. Run the seed first (npm run db:seed).';
@@ -95,6 +96,9 @@ export async function moveToNextPart(user: Me, revision: number): Promise<ClockS
     // revision and is refused, so nobody skips a part by accident.
     const [row] = await tx.select().from(demoDay).for('update');
     if (!row) throw new Error(NOT_SEEDED);
+    // What is read under the lock is the clock. Keeping it puts right a copy in memory that fell behind, as
+    // after a commit whose answer was lost, even when this move is then refused.
+    stored = row;
     const real = realNow();
     const before = demoClockAt(row, real);
     if (revision !== row.revision) throw new HttpError(409, 'stale_clock', 'The clock was already moved.', before);
