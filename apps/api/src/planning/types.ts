@@ -20,7 +20,8 @@ export interface EngineProduct { id: string; kgPerUnit: number; m3PerUnit: numbe
 export interface OrderLineQty { productId: string; quantity: number }
 export interface EngineOrder { id: string; outletId: string; lines: OrderLineQty[] }
 export interface EngineOutlet {
-  id: string; brand: Brand; district: string; depotId: string; dockType: DockType;
+  // The name is what the checker's messages call the shop, so a dispatcher reads "Fresh Nugegoda", not OUT001.
+  id: string; name: string; brand: Brand; district: string; depotId: string; dockType: DockType;
   parking: 'normal' | 'van_only' | 'mall_dock';
   windowOpen: Minutes; windowClose: Minutes;
   // Only mall shops have a slot. The window used is the later opening and the earlier closing of the two.

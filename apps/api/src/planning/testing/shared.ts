@@ -25,7 +25,8 @@ export const products: EngineProduct[] = PRODUCTS.map((p) => ({
 export const outlets: EngineOutlet[] = read('outlets.csv').map((r) => {
   const slot = r.mall_window ? r.mall_window.split('-') : null;
   return {
-    id: r.outlet_id!, brand: r.brand as Brand, district: r.district!, depotId: r.depot!, dockType: r.dock_type as DockType,
+    // outlets.csv has no names, so in tests a shop is called by its id.
+    id: r.outlet_id!, name: r.outlet_id!, brand: r.brand as Brand, district: r.district!, depotId: r.depot!, dockType: r.dock_type as DockType,
     parking: r.parking_constraint as EngineOutlet['parking'],
     windowOpen: toMinutes(r.window_open_time!), windowClose: toMinutes(r.window_close_time!),
     ...(slot ? { mallOpen: toMinutes(slot[0]!), mallClose: toMinutes(slot[1]!) } : {}),

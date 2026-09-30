@@ -1,5 +1,5 @@
 import { DeferralCode, levelOf, type Problem, type ProblemCode } from '@wayfinder/contracts';
-import { PlanInputError } from '../errors';
+import { lookup } from '../lookup';
 import type { CoverageProblems } from '../types';
 
 // Every order accounted for (spec 007, AC-24 to AC-28 and AC-48): each of the day's orders is on one stop or
@@ -7,23 +7,13 @@ import type { CoverageProblems } from '../types';
 
 type About = Pick<Problem, 'vehicleId' | 'tripNo' | 'stopSeq' | 'outletId' | 'orderId'>;
 
-// An id the input does not hold is a programming mistake, not a problem with the plan, so it throws.
-const lookup = <T extends { id: string }>(rows: T[], what: string) => {
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  return (id: string): T => {
-    const row = byId.get(id);
-    if (!row) throw new PlanInputError(`No ${what} ${id} in the input`);
-    return row;
-  };
-};
-
 const list = new Intl.ListFormat('en-GB');
 
 export const coverageProblems: CoverageProblems = (input) => {
   const vehicleOf = lookup(input.vehicles, 'vehicle');
   const outletOf = lookup(input.outlets, 'shop');
   // Where the plan puts each of the day's orders: the stops it is on, and how many times it is deferred.
-  const places = input.orders.map((order) => ({ id: order.id, outletId: order.outletId, stops: [] as string[], deferrals: 0 }));
+  const places = input.orders.map((order) => ({ id: order.id, outletId: order.outletId, shop: outletOf(order.outletId).name, stops: [] as string[], deferrals: 0 }));
   const placeOf = lookup(places, 'order');
   const problems: Problem[] = [];
   const report = (code: ProblemCode, about: About, message: string) => {
@@ -43,13 +33,13 @@ export const coverageProblems: CoverageProblems = (input) => {
       const here = { ...about, stopSeq, outletId: outlet.id };
       const first = firstStopAt.get(outlet.id);
       if (first === undefined) firstStopAt.set(outlet.id, stopSeq);
-      else report('stop_repeated', here, `${name} has ${outlet.id} as stop ${first} and again as stop ${stopSeq}.`);
-      if (stop.orderIds.length === 0) report('empty_trip', here, `${name} has a stop at ${outlet.id} with no orders.`);
+      else report('stop_repeated', here, `${name} has ${outlet.name} as stop ${first} and again as stop ${stopSeq}.`);
+      if (stop.orderIds.length === 0) report('empty_trip', here, `${name} has a stop at ${outlet.name} with no orders.`);
 
       for (const orderId of stop.orderIds) {
         const order = placeOf(orderId);
         if (order.outletId !== outlet.id) {
-          report('order_wrong_outlet', { ...here, orderId }, `${name} has an order for ${order.outletId} on its stop at ${outlet.id}.`);
+          report('order_wrong_outlet', { ...here, orderId }, `${name} has an order for ${order.shop} on its stop at ${outlet.name}.`);
         }
         order.stops.push(`on ${name} stop ${stopSeq}`);
       }
@@ -63,17 +53,17 @@ export const coverageProblems: CoverageProblems = (input) => {
     if (!DeferralCode.safeParse(code).success) missing.push('a reason from the list');
     if (reason.trim() === '') missing.push('a written reason');
     if (missing.length > 0) {
-      report('deferral_incomplete', { orderId, outletId: order.outletId }, `An order for ${order.outletId} is deferred without ${missing.join(' or ')}.`);
+      report('deferral_incomplete', { orderId, outletId: order.outletId }, `An order for ${order.shop} is deferred without ${missing.join(' or ')}.`);
     }
   }
 
-  for (const { id, outletId, stops, deferrals } of places) {
+  for (const { id, outletId, shop, stops, deferrals } of places) {
     const about = { orderId: id, outletId };
     const times = stops.length + deferrals;
-    if (times === 0) report('order_not_planned', about, `An order for ${outletId} is on no trip and is not deferred.`);
+    if (times === 0) report('order_not_planned', about, `An order for ${shop} is on no trip and is not deferred.`);
     if (times > 1) {
       const where = deferrals === 0 ? stops : [...stops, deferrals === 1 ? 'deferred' : `deferred ${deferrals} times`];
-      report('order_twice', about, `An order for ${outletId} is ${list.format(where)}, and an order can be in the plan only once.`);
+      report('order_twice', about, `An order for ${shop} is ${list.format(where)}, and an order can be in the plan only once.`);
     }
   }
 
