@@ -72,6 +72,8 @@ Password for the demo accounts: `wayfinder-demo` (`SEED_PASSWORD`). Admin has it
 | Role | Username | Where |
 | --- | --- | --- |
 | Store manager | `nadeesha` | Fresh Nugegoda (OUT001) |
+| Store manager | `ishara` | Style Liberty Plaza (OUT017) |
+| Store manager | `tharindu` | Tech Matara (OUT064) |
 | Dispatcher | `ruwan` | Peliyagoda depot |
 | Loader | `kasun` | Peliyagoda depot |
 | Driver | `dilshan` | Peliyagoda depot |
@@ -93,6 +95,19 @@ Anything we built differently from our Designathon submission, and why.
 - **The demo clock and its control are ours.** The design shows the time of day. The app keeps its own clock so
   a judge can walk a whole delivery day in minutes, and the control that moves it (and resets the day) exists
   only in demo mode.
+- **A placed order cannot be edited.** The confirmation says "Orders for Thursday close at 16:00 today" where
+  the frame says "Edits close at 16:00 today". A shop that needs more places another order for the same day.
+- **Shop cards show only what exists so far.** Arrival times, the vehicle and driver, "Running late",
+  "Delivery help", "Tuesday works for me", "All 6 received" and "plan updated" come with the dispatcher's,
+  driver's and receipt pieces.
+- **The shop's order form.** The number between − and + can also be typed. The tail-lift line names every item
+  that needs one, where the frame names only the fridge crate. Tech's form has the note for the driver, which the
+  Tech frame leaves out. The note uses 16 px text on phones, so iOS does not zoom in.
+- **Shop states the design does not draw:** nothing started, empty lists, could not load, not saved, day
+  closed, no open day, and "Could not update. This may be out of date." when a background refresh fails. The
+  desktop Style and Tech forms, confirmation and Help have no frames, so they follow the desktop Fresh form.
+- **Today after placing** keeps the date and the shop's name as its header, where the frame has the title "Today".
+- **OUT001** has a street entrance and van-only parking in the booklet's data, where the design shows a rear dock.
 
 ## Docs
 

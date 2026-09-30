@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hash } from '@node-rs/argon2';
 import { parse } from 'csv-parse/sync';
-import { and, eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { config } from '../lib/config';
 import { logger } from '../lib/logger';
 import { moveAdminOffSharedPassword } from './admin-password';
@@ -95,8 +95,6 @@ await db.insert(s.serviceAllowance).values(read('service_allowance.csv').map((r)
 
 await db.insert(s.products).values(PRODUCTS.map((p) => ({ ...p }))).onConflictDoNothing();
 
-// The store manager gets the first Fresh outlet in Colombo, which matches Nadeesha's shop in the design.
-const [shop] = await db.select().from(s.outlets).where(and(eq(s.outlets.brand, 'Fresh'), eq(s.outlets.district, 'Colombo'))).orderBy(s.outlets.id).limit(1);
 // Admin can do everything, so it does not share the password the demo accounts are handed out with.
 const passwordHash = await hash(config.SEED_PASSWORD);
 const adminPasswordHash = await hash(config.SEED_ADMIN_PASSWORD);
@@ -106,7 +104,7 @@ await db.insert(s.users).values(DEMO_USERS.map((u) => ({
   role: u.role,
   passwordHash: u.role === 'admin' ? adminPasswordHash : passwordHash,
   depotId: u.depot,
-  outletId: u.role === 'store_manager' ? shop!.id : null,
+  outletId: u.outlet,
 }))).onConflictDoNothing();
 
 if (await moveAdminOffSharedPassword()) logger.info('admin moved off the shared demo password');

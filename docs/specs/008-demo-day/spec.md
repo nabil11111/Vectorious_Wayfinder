@@ -183,7 +183,8 @@ gets `available` from `vehicle_days_off` and `litresUsedThisWeek` from `fuel_log
   seed the day again, set the clock to Wed 24 Jun 15:00, raise the day number by one and return the clock.
 - [ ] **AC-40** When the day has been reset, every table except the users, the sessions and the audit log shall
   hold exactly what it held after the first seed. *Place the draft, add a plan with a trip, move the clock twice,
-  reset. The 104 orders and 142 order lines are back and nothing else is left.*
+  reset. The 129 orders and 167 order lines are back and nothing else is left (104 and 142 before spec 009's
+  history for OUT001).*
 - [ ] **AC-41** When two resets come at once, the system shall answer both and leave one seeded day, not two.
 - [ ] **AC-42** A reset on screen. With two browsers, a reset in one shows the fresh day in the other within a
   second, with the one-line message. A form that was open shows the seeded values again.
