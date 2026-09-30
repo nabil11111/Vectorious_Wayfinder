@@ -114,10 +114,11 @@ describe('planner splits and coverage limits', () => {
     const proposal = chosen(source, { products }).proposal!;
     expect(proposal.split.keep).toEqual([{ productId: 'heavy', quantity: 0 }, { productId: 'light', quantity: 2 }]);
     expect(proposal.kept.lines).toEqual([{ productId: 'light', quantity: 2 }]);
+    expect(SplitOrderRequest.safeParse({ planId: null, demoDay: 1, orderId: '00000000-0000-4000-8000-000000000001', keep: proposal.split.keep }).success).toBe(true);
     expect(chosen({ ...source, lines: [{ productId: 'heavy', quantity: 1 }] }, { products })).toMatchObject({ best: null, proposal: null, code: 'over_capacity' });
   });
 
-  it('AC-15 returns keep in the existing split request contract, including zero products', () => {
+  it('AC-15 returns keep in the existing split request contract', () => {
     const original = plannerOrder('00000000-0000-4000-8000-000000000001', 'OUT001', 'fresh-chilled-carton', 180);
     const result = chosen(original).proposal!;
     expect(SplitOrderRequest.safeParse({ planId: null, demoDay: 1, orderId: original.id, keep: result.split.keep }).success).toBe(true);

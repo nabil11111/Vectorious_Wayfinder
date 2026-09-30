@@ -37,10 +37,10 @@ describe('the complete suggested plan', () => {
     expect(result.choices.every((c) => c.reason.trim().length > 0)).toBe(true);
     expect(result.splits).toHaveLength(1);
     expect(result.input.orders.map((o) => o.id)).toEqual(['split:old:keep', 'split:old:rest', 'new']);
-    expect(result.input.plan.deferrals).toMatchObject([{ orderId: 'split:old:rest', code: 'over_capacity' }]);
-    expect(result.status).toBe('needs_decision');
-    expect(result.decisions).toMatchObject([{ kind: 'waited_again', orderId: 'split:old:rest' }]);
-    expect(result.input.plan.deferrals[0]!.reason).toMatch(/150 sent.*30 left/);
+    expect(result.input.plan.deferrals).toEqual([]);
+    expect(result.status).toBe('suggested');
+    expect(result.decisions).toEqual([]);
+    expect(result.input.plan.trips.find((trip) => trip.vehicleId === 'VEH035' && trip.tripNo === 2)?.stops[0]!.orderIds).toEqual(['split:old:rest']);
   });
 
   it('AC-3 reports window deferrals and repeated waiting without giving new orders their shop\'s old priority', () => {
@@ -76,6 +76,62 @@ describe('the complete suggested plan', () => {
     const result = success(buildSuggestedPlan(input));
     expect(result.input.plan.trips).toHaveLength(1);
     expect(result.decisions).toEqual([{ kind: 'early_leave', vehicleId: 'VEH044', tripNo: 1, leaveAt: 179, reason: expect.stringContaining('02:59') }]);
+  });
+
+  it('AC-9 gives the fourth Badulla order an idle truck before asking to leave early', () => {
+    const input = plannerInput(['OUT110', 'OUT112', 'OUT111', 'OUT113'].map((s, i) => plannerOrder(`order-${i}`, s)), {
+      depotId: 'Kandy', vehicles: [vehicle('VEH044'), { ...vehicle('VEH044'), id: 'VEH045' }],
+    });
+    const result = success(buildSuggestedPlan(input));
+    expect(result.input.plan.trips.map((t) => [t.vehicleId, t.tripNo])).toEqual([['VEH044', 1], ['VEH045', 1]]);
+    expect(result.decisions.filter((d) => d.kind === 'early_leave')).toEqual([]);
+    expect(result.choices[3]!.reason).toMatch(/usual|earlier departure/);
+  });
+
+  it('AC-9 names the insertion that forced the final early departure', () => {
+    const input = plannerInput(['OUT110', 'OUT112', 'OUT111', 'OUT113'].map((s, i) => plannerOrder(`order-${i}`, s)), {
+      depotId: 'Kandy', vehicles: [vehicle('VEH044')],
+    });
+    const result = success(buildSuggestedPlan(input));
+    expect(result.decisions).toHaveLength(1);
+    expect(result.decisions[0]!.reason).toMatch(/rank 4.*Badulla/i);
+    expect(result.decisions[0]!.reason).toContain('02:59');
+  });
+
+  it('AC-13 carries a waiting remainder whole on the idle van before considering new goods', () => {
+    const input = plannerInput([
+      plannerOrder('new', 'OUT002', 'fresh-chilled-carton', 30),
+      plannerOrder('waiting', 'OUT001', 'fresh-chilled-carton', 180, { deliveryDate: '2026-06-24', timesDeferred: 1 }),
+    ], { vehicles: [vehicle('VEH035'), vehicle('VEH036')] });
+    const result = success(buildSuggestedPlan(input));
+    expect(result.splits).toHaveLength(1);
+    expect(result.input.plan.trips.find((t) => t.vehicleId === 'VEH036')!.stops[0]!.orderIds).toContain('split:waiting:rest');
+    expect(result.input.plan.deferrals.some((d) => d.orderId === 'split:waiting:rest')).toBe(false);
+    expect(result.decisions.some((d) => d.kind === 'waited_again')).toBe(false);
+    expect(result.choices[0]!.reason).toMatch(/waited since Wed/);
+    expect(result.choices[0]!.reason).toContain('VEH036');
+  });
+
+  it('AC-12 builds the mall run through the public planner', () => {
+    const input = plannerInput(['OUT019', 'OUT017', 'OUT015'].map((s) => plannerOrder(s, s, 'style-folded')), {
+      vehicles: [vehicle('VEH023')],
+    });
+    const result = success(buildSuggestedPlan(input));
+    expect(result.input.plan.trips).toHaveLength(1);
+    expect(result.input.plan.trips[0]!.stops.map((s) => s.outletId)).toEqual(['OUT015', 'OUT017', 'OUT019']);
+    const timed = result.check.trips[0]!.times!;
+    expect(timed.leaveAt).toBe(516);
+    expect(timed.stops[1]).toMatchObject({ arriveAt: 607, waitMin: 23, startAt: 630 });
+    expect(timed.stops[2]!.arriveAt).toBe(697);
+  });
+
+  it('AC-20 orders a kept part early decision before its waiting remainder', () => {
+    const input = plannerInput([plannerOrder('old', 'OUT001', 'fresh-chilled-carton', 180, {
+      deliveryDate: '2026-06-24', timesDeferred: 1,
+    })], { vehicles: [vehicle('VEH035')] });
+    Object.assign(input.outlets.find((s) => s.id === 'OUT001')!, { windowOpen: 600, windowClose: 800 });
+    const result = success(buildSuggestedPlan(input));
+    expect(result.decisions.map((d) => d.kind)).toEqual(['early_leave', 'waited_again', 'late_order']);
   });
 
   it('AC-16 covers each effective order once and fits the board after temporary IDs are resolved', () => {

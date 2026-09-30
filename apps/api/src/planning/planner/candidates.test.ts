@@ -72,8 +72,12 @@ describe('whole-order planner candidates', () => {
   it('AC-6 uses a smaller vehicle first trip before a larger vehicle second trip', () => {
     const old = order('old-style', 'OUT019', 'style-folded', 1);
     const input = day([old], [trip('VEH001', 1, [old])], [vehicle('VEH001'), vehicle('VEH002')]);
-    expect(chooseWhole(input, order('cold', 'OUT026', 'fresh-chilled-carton', 1)).best?.slot)
-      .toEqual({ vehicleId: 'VEH002', tripNo: 1, existing: false });
+    const next = order('style', 'OUT037', 'style-folded', 1);
+    expect(tryCandidate(input, next, { vehicleId: 'VEH001', tripNo: 2, existing: false }).stage).toBe('accepted');
+    expect(tryCandidate(input, next, { vehicleId: 'VEH002', tripNo: 1, existing: false }).stage).toBe('accepted');
+    const best = chooseWhole(input, next).best;
+    expect(best?.slot).toEqual({ vehicleId: 'VEH002', tripNo: 1, existing: false });
+    expect(best?.selectionReason).toBe('uses a first run before a second');
   });
 
   it('AC-7 caps Fresh closing at 07:59 before comparing opening times', () => {

@@ -55,6 +55,17 @@ export function proposePart(input: PlanInput, order: PlannerOrder, slot: Candida
   return { split: { orderId: order.id, keep, keptOrderId, remainderOrderId }, kept, remainder };
 }
 
+export function splitLimitDetail(
+  input: PlanInput, order: PlannerOrder, effectiveCount: number, slots: readonly CandidateSlot[], code: PlannerDeferralCode,
+): string | undefined {
+  const limit = splitLimit(order, effectiveCount);
+  // This is evidence for the explanation, never another split proposal. One positive piece proves
+  // whether a split restriction is binding; an empty slot list or a completely full fleet does not.
+  const hadRoom = limit && code === 'over_capacity' && slots.some((slot) => order.lines.some((line) =>
+    capacityFits(candidateInput(input, { ...order, lines: [{ ...line, quantity: 1 }] }, slot), slot.tripNo)));
+  return hadRoom ? limit : undefined;
+}
+
 export function chooseAllocation(input: PlanInput, order: PlannerOrder, effectiveCount: number): Allocation {
   const whole = chooseWhole(input, order);
   if (whole.best) return { best: whole.best, proposal: null, attempts: whole.attempts };
@@ -79,8 +90,6 @@ export function chooseAllocation(input: PlanInput, order: PlannerOrder, effectiv
     ...partial.filter((part) => part.attempt.slot === slot).map((part) => part.attempt),
   ]));
   const code = furthestRejection(attempts.map((attempt) => attempt.stage as Exclude<typeof attempt.stage, 'accepted'>));
-  // A split-write restriction only explains the refusal if at least one positive piece had room.
-  const hadRoom = limit && code === 'over_capacity' && whole.slots.some((slot) => order.lines.some((line) =>
-    capacityFits(candidateInput(input, { ...order, lines: [{ ...line, quantity: 1 }] }, slot), slot.tripNo)));
-  return { best: null, proposal: null, code, attempts, ...(hadRoom ? { detail: limit } : {}) };
+  const detail = splitLimitDetail(input, order, effectiveCount, whole.slots, code);
+  return { best: null, proposal: null, code, attempts, ...(detail ? { detail } : {}) };
 }
