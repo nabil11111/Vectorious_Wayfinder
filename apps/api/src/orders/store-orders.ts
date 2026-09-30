@@ -184,7 +184,7 @@ function requireCurrent(drafts: Draft[], refs: DraftRefs): void {
 // there is no honest time to show in its place.
 function latest(moments: (string | null)[], what: string): string {
   return moments.reduce<string>((last, moment) => {
-    if (!moment) throw new Error(`${what} has no time.`);
+    if (!moment) throw new Error(`An order of this shop has no ${what}.`);
     return moment > last ? moment : last;
   }, '');
 }
@@ -213,7 +213,7 @@ async function nextOrder(on: Reader, shop: Shop, open: OpenDay | null): Promise<
       // The form has one note, which a save writes onto each of the draft's orders.
       driverNote: drafts.find((draft) => draft.driverNote)?.driverNote ?? '',
       refs,
-      savedAt: latest(drafts.map((draft) => draft.savedAt?.toISOString() ?? null), 'A draft'),
+      savedAt: latest(drafts.map((draft) => draft.savedAt?.toISOString() ?? null), 'saved time'),
       // The screen never multiplies: every number of the summary comes from the load calculator.
       summary: computeLoad(draftLines, shop.items),
       tailLiftItems: shop.items.filter((item) => item.needsTailLift && draftLines.some((line) => line.productId === item.id)).map((item) => item.name),
@@ -221,17 +221,14 @@ async function nextOrder(on: Reader, shop: Shop, open: OpenDay | null): Promise<
     placed: placed.length ? {
       orders: placed,
       lines: placedLines,
-      lastPlacedAt: latest(placed.map((order) => order.placedAt), 'A placed order'),
+      lastPlacedAt: latest(placed.map((order) => order.placedAt), 'placed time'),
       summary: computeLoad(placedLines, shop.items),
     } : null,
   };
 }
 
 export function getNextOrder(caller: Caller): Promise<StoreNextOrder> {
-  return snapshot(async (tx) => {
-    const at = now();
-    return nextOrder(tx, await readShop(tx, caller.outletId), await openDayAt(tx, at));
-  });
+  return snapshot(async (tx) => nextOrder(tx, await readShop(tx, caller.outletId), await openDayAt(tx, now())));
 }
 
 // Saves the whole draft, so it replaces what was there, and answers as the GET does.
