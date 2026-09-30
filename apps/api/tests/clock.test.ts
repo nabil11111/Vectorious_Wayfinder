@@ -1,5 +1,8 @@
+import { once } from 'node:events';
+import type { Server } from 'node:http';
 import { ClockState, ROLES, type Role } from '@wayfinder/contracts';
-import { desc, eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
+import type { Express } from 'express';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
@@ -8,7 +11,17 @@ import { auditLog, demoDay } from '../src/db/schema';
 import { demoClockAt, depotDate, depotMinutes, initClock, now, realNow, restartClock, setClockForTests } from '../src/lib/clock';
 import * as live from '../src/lib/live';
 
-const app = createApp();
+// Each app gets one server of its own, on the loopback address. Left to itself supertest starts a server for
+// every request, on every address and whatever port is free there. When another program on the machine has
+// that port on 127.0.0.1, the request reaches that program and fails with "socket hang up".
+async function listen(app: Express) {
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  return server;
+}
+const stop = (server: Server) => new Promise((done) => server.close(done));
+
+const app = await listen(createApp());
 const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 
@@ -20,23 +33,24 @@ const on = (date: string) => (time: string) => new Date(`${date}T${time.padEnd(8
 const wed = on('2026-06-24');
 const thu = on('2026-06-25');
 
-// The audit rows of clock moves, newest first, each with how long ago the database says it was written.
+// The audit rows of clock moves, each with how long ago the database says it was written.
 const moves = () => db
   .select({ id: auditLog.id, actorId: auditLog.actorId, entity: auditLog.entity, entityId: auditLog.entityId, before: auditLog.before, after: auditLog.after,
     secondsAgo: sql`extract(epoch from now() - ${auditLog.at})`.mapWith(Number) })
-  .from(auditLog).where(eq(auditLog.action, 'demo.clock_moved')).orderBy(desc(auditLog.at));
+  .from(auditLog).where(eq(auditLog.action, 'demo.clock_moved'));
 
 // Test files share one database and this one moves the clock. So it keeps the clock row it found and writes
 // it back when it ends, and takes out the audit rows it wrote.
 const [clockFound] = await db.select().from(demoDay);
 const movesFound = new Set((await moves()).map((move) => move.id));
-const started: { end: () => Promise<void> }[] = [];
+// What a test started and must end, last one first: the servers and database pools of startAgain().
+const started: (() => Promise<unknown>)[] = [];
 
 afterEach(async () => {
   setClockForTests(null);
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  for (const itsPool of started.splice(0)) await itsPool.end();
+  for (const end of started.splice(0).reverse()) await end();
 });
 
 afterAll(async () => {
@@ -44,6 +58,7 @@ afterAll(async () => {
   if (clockFound) await db.insert(demoDay).values(clockFound);
   const written = (await moves()).map((move) => move.id).filter((id) => !movesFound.has(id));
   if (written.length) await db.delete(auditLog).where(inArray(auditLog.id, written));
+  await stop(app);
   await pool.end();
 });
 
@@ -88,9 +103,11 @@ async function expectRunning(clock: { clockBase: Date; clockSetAt: Date }, read:
 async function startAgain() {
   vi.resetModules();
   const fresh = { app: await import('../src/app'), clock: await import('../src/lib/clock'), client: await import('../src/db/client') };
-  started.push(fresh.client.pool);
+  started.push(() => fresh.client.pool.end());
   await fresh.clock.initClock();
-  return { app: fresh.app.createApp(), clock: fresh.clock };
+  const server = await listen(fresh.app.createApp());
+  started.push(() => stop(server));
+  return { app: server, clock: fresh.clock };
 }
 
 describe('the demo clock, worked out from the stored row and the real time', () => {
@@ -314,7 +331,17 @@ describe('POST /demo/clock/next', () => {
   it('AC-5 moves the clock once when two people press Next at the same moment, so nobody skips a part', async () => {
     await setClock(wed('16:00'), 0, 3);
     const audited = (await moves()).length;
-    const answers = await Promise.all([pressNext('dispatcher', 3), pressNext('loader', 3)]);
+    const waiting = async () => (await db.execute<{ waiting: number }>(
+      sql`select count(*)::int as waiting from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`)).rows[0]?.waiting ?? 0;
+    // The test holds the clock row until both requests are waiting for it, so neither can be done before the
+    // other has begun.
+    const { both } = await db.transaction(async (tx) => {
+      await tx.select().from(demoDay).for('update');
+      const both = Promise.all([pressNext('dispatcher', 3), pressNext('loader', 3)]);
+      await vi.waitUntil(async () => (await waiting()) >= 2, { timeout: 3000, interval: 10 });
+      return { both };
+    });
+    const answers = await both;
     expect(answers.map((res) => res.status).sort()).toEqual([200, 409]);
     expect(answers.find((res) => res.status === 409)?.body.error).toMatchObject({ code: 'stale_clock', details: { part: 'loading', revision: 4 } });
     expect(await clockRow()).toMatchObject({ clockBase: new Date(thu('02:30')), revision: 4 });
@@ -340,10 +367,10 @@ describe('POST /demo/clock/next', () => {
 
   it('AC-8 writes one audit row for a move, with the person and the clock before and after', async () => {
     await setClock(wed('15:00'), 20 * MINUTE);
-    const audited = (await moves()).length;
+    const had = new Set((await moves()).map((move) => move.id));
     const res = await pressNext('dispatcher', 0);
-    const written = await moves();
-    expect(written).toHaveLength(audited + 1);
+    const written = (await moves()).filter((move) => !had.has(move.id));
+    expect(written).toHaveLength(1);
 
     const move = written[0]!;
     expect(move).toMatchObject({ actorId: people.dispatcher.id, entity: 'demo_day', entityId: '1', after: res.body });
