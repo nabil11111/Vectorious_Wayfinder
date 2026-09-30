@@ -34,7 +34,7 @@ erDiagram
 | Reference (from the booklet CSVs) | `depots`, `outlets`, `vehicles`, `calendar_days`, `district_travel`, `service_allowance` | Loaded by the seed. Outlets keep dock type, parking rule (normal, van only, mall dock), mall window and delivery window. |
 | Products (ours) | `products` | The fixed list in `product-list.md`. Weight and volume are per unit, so a load is always quantity times these. |
 | People | `users`, `sessions` | One role per user. A store manager belongs to an outlet, the others to a depot. |
-| Demand | `orders`, `order_lines` | One order per temperature, because chilled and dry go on different trucks. Lines store only a quantity. |
+| Demand | `orders`, `order_lines` | One order per temperature, because chilled and dry go on different trucks. An order starts as a draft, and a shop has one draft per temperature at most. Lines store only a quantity, one line per item. |
 | Planning | `plans`, `trips`, `stops`, `stop_orders`, `deferrals` | One plan per depot per day. At most two trips per vehicle. Every order is on a stop or deferred with a reason. |
 | Fleet days | `vehicle_days_off`, `fuel_log` | A vehicle that cannot be used on a date, with the reason. Litres a vehicle used on a date: one history row a day, and one row for each sent trip. The plan checker reads both. |
 | The demo day | `demo_day` | One row: the app's clock, stored as the app's time and the real time it was set, and whether the seeded day has been written. |
