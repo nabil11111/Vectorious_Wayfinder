@@ -1,11 +1,12 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import { HttpError } from '../lib/errors';
 import { requireRole } from '../middleware/auth';
-import { JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SplitOrderRequest, UnsendPlanRequest } from '@wayfinder/contracts';
+import { JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, UnsendPlanRequest } from '@wayfinder/contracts';
 import { getBoard } from '../plans/board';
 import { saveDraft } from '../plans/draft';
 import { joinOrder, splitOrder } from '../plans/split';
 import { sendPlan, unsendPlan } from '../plans/send';
+import { findSlots } from '../plans/slots';
 
 // The dispatcher's plan board (spec 010): the board of a day, saving its draft, splitting and joining an order,
 // sending the plan and taking it back to edit, and finding a slot. Every route works on the caller's own depot.
@@ -32,3 +33,4 @@ plansRouter.post('/:date/split', async (req, res) => { res.json(await splitOrder
 plansRouter.post('/:date/join', async (req, res) => { res.json(await joinOrder(plannerOf(req), dateOf(req), JoinOrderRequest.parse(req.body))); });
 plansRouter.post('/:date/send', async (req, res) => { res.json(await sendPlan(plannerOf(req), dateOf(req), SendPlanRequest.parse(req.body))); });
 plansRouter.post('/:date/unsend', async (req, res) => { res.json(await unsendPlan(plannerOf(req), dateOf(req), UnsendPlanRequest.parse(req.body))); });
+plansRouter.get('/:date/slots', async (req, res) => { res.json(await findSlots(plannerOf(req), dateOf(req), SlotQuery.parse(req.query))); });
