@@ -55,6 +55,10 @@ describe('trip timeline', () => {
     expect(leaves(['OUT006'], later)).toBe('04:00');
     expect(leaves(['OUT057'], later)).toBe('07:30');
     expect(leaves(['OUT058'], later)).toBe('07:20');
+    // A trip with a Fresh stop goes by the Fresh time even when that is the later one.
+    const freshLast = { earliestLeave: { Fresh: toMinutes('07:25'), Style: toMinutes('07:00'), Tech: toMinutes('07:00') } };
+    expect(leaves(['OUT057'], freshLast)).toBe('07:17');
+    expect(leaves(['OUT057', 'OUT051'], freshLast)).toBe('07:25');
   });
 
   it('AC-7 uses the leaving time a trip is given, unchanged', () => {
