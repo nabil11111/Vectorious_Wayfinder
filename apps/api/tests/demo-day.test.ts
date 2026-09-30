@@ -4,8 +4,8 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { db, pool, type Tx } from '../src/db/client';
 import { clearDemoDay, demoId, seedDemoDay } from '../src/db/demo-day';
 import {
-  auditLog, deferrals, demoDay, districtTravel, fuelLog, orderLines, orders, outlets, plans, products, sessions, stopOrders, stops, trips, users,
-  vehicleDaysOff, vehicles,
+  auditLog, calendarDays, deferrals, demoDay, districtTravel, fuelLog, orderLines, orders, outlets, plans, products, sessions, stopOrders, stops, trips,
+  users, vehicleDaysOff, vehicles,
 } from '../src/db/schema';
 import { depotDate, depotInstant, depotMinutes, realNow } from '../src/lib/clock';
 
@@ -362,8 +362,9 @@ describe('the seeded day on an empty database', () => {
   it('AC-36 gives every row the same id and content each time it writes the day', async () => {
     await seeded(async (tx) => {
       const first = await everyRow(tx, { realTime: false });
+      // 104 orders and 142 lines from spec 008, and the 25 orders of one line each that spec 009 adds for OUT001.
       expect(await rowCounts(tx)).toEqual({
-        ...NOTHING, demo_day: 1, orders: 104, order_lines: 142, plans: 2, deferrals: 5, vehicle_days_off: 6, fuel_log: 111,
+        ...NOTHING, demo_day: 1, orders: 129, order_lines: 167, plans: 2, deferrals: 5, vehicle_days_off: 6, fuel_log: 111,
       });
 
       // What a reset does: the day is removed and written again.
@@ -415,6 +416,8 @@ describe('the seeded day on an empty database', () => {
       }],
       ['vehicle_days_off', (tx) => tx.insert(vehicleDaysOff).values({ vehicleId: 'VEH003', date: TUE, reason: 'Already there' })],
       ['fuel_log', (tx) => tx.insert(fuelLog).values({ vehicleId: 'VEH002', date: TUE, litres: '5' })],
+      // Spec 009's block comes after all of those: OUT001's dry order for Wednesday is one of its rows.
+      ['orders', (tx) => tx.insert(orders).values({ id: demoId('order', `${WED}:OUT001:dry`), outletId: 'OUT001', deliveryDate: WED, ...placed, temp: 'dry' })],
     ];
     for (const [table, plant] of clashes) {
       await onEmptyDatabase(async (tx) => {
@@ -506,6 +509,69 @@ describe('the seeded day on an empty database', () => {
       const litresFor = (district: string) => (2 * districts.find((d) => d.district === district)!.depotToDistrictKm) / Number(truck!.kmPerL);
       expect(litresFor('Kurunegala').toFixed(1)).toBe('40.4');
       expect(districts.map((d) => d.district).filter((district) => litresFor(district) <= left).sort()).toEqual(['Colombo', 'Gampaha', 'Kalutara']);
+    });
+  });
+});
+
+// What spec 009 adds for the shop's own screens: a history for OUT001, and what the draft's form shows.
+describe('the seeded day of a shop with an account', () => {
+  it('gives OUT001 a dry order for Wednesday that has arrived: 6 cartons, delivered, placed by nadeesha and on no plan', async () => {
+    await seeded(async (tx) => {
+      const nadeesha = await userId(tx, 'nadeesha');
+      // Beside the chilled order that waited, which is the one from spec 008.
+      const wednesday = (await ordersWithLoads(tx)).filter((o) => o.outletId === 'OUT001' && o.date === WED);
+      expect(wednesday.map((o) => [o.temp, o.status, o.units])).toEqual([['chilled', 'deferred', 12], ['dry', 'delivered', 6]]);
+
+      const [dry] = await tx.select().from(orders).where(eq(orders.id, demoId('order', `${WED}:OUT001:dry`)));
+      expect(dry).toMatchObject({
+        outletId: 'OUT001', deliveryDate: WED, temp: 'dry', status: 'delivered', revision: 0, savedAt: null,
+        createdBy: nadeesha, placedBy: nadeesha, placedAt: depotInstant(TUE, 8 * 60 + 5),
+      });
+      expect(await linesOf(tx, dry!.id)).toEqual({ 'fresh-dry-carton': 6 });
+      // No plan of the seed has a trip, so the order counts for the day the shop wanted: today.
+      expect(await tx.select().from(stopOrders)).toEqual([]);
+    });
+  });
+
+  it('gives OUT001 24 received orders, a chilled and a dry one for each of the twelve operating days before Wednesday', async () => {
+    await seeded(async (tx) => {
+      const nadeesha = await userId(tx, 'nadeesha');
+      const received = (await ordersWithLoads(tx)).filter((o) => o.status === 'received');
+      expect([...new Set(received.map((o) => o.outletId))]).toEqual(['OUT001']);
+      // A page of the Past list is 20, so there is a second one to load.
+      expect(total(received)).toEqual({ orders: 24, units: 199, kg: 1373.1, m3: 7.363 });
+      expect(received.filter((o) => o.strays > 0 || o.createdBy !== nadeesha || o.revision !== 0)).toEqual([]);
+
+      // Each day with its chilled and its dry cartons: 8 + (d mod 6) and 4 + (d mod 5), d being the day of the
+      // month. Tue 23 Jun: 8 + 5 = 13 chilled and 4 + 3 = 7 dry. No Sunday is among them.
+      const cartons = (date: string, temp: string) => received.filter((o) => o.date === date && o.temp === temp).map((o) => o.units);
+      const days = [...new Set(received.map((o) => o.date))].sort().reverse();
+      expect(days.map((date) => [date, cartons(date, 'chilled'), cartons(date, 'dry')])).toEqual([
+        ['2026-06-23', [13], [7]], ['2026-06-22', [12], [6]], ['2026-06-20', [10], [4]], ['2026-06-19', [9], [8]],
+        ['2026-06-18', [8], [7]], ['2026-06-17', [13], [6]], ['2026-06-16', [12], [5]], ['2026-06-15', [11], [4]],
+        ['2026-06-13', [9], [7]], ['2026-06-12', [8], [6]], ['2026-06-11', [13], [5]], ['2026-06-10', [12], [4]],
+      ]);
+
+      // Every one was placed by nadeesha at 08:05 on the operating day before it was wanted, which is the last
+      // day its orders were open. So Monday's were placed on Saturday, not on the Sunday in between.
+      const operating = (await tx.select().from(calendarDays).where(eq(calendarDays.isOperating, true)).orderBy(calendarDays.date)).map((day) => day.date);
+      for (const o of received) {
+        expect([o.date, depotDate(o.placedAt!), depotMinutes(o.placedAt!)]).toEqual([o.date, operating[operating.indexOf(o.date) - 1], 8 * 60 + 5]);
+      }
+      expect(depotDate(received.find((o) => o.date === MON)!.placedAt!)).toBe('2026-06-20');
+      const placedBy = await tx.select({ placedBy: orders.placedBy }).from(orders).where(eq(orders.status, 'received'));
+      expect([...new Set(placedBy.map((o) => o.placedBy))]).toEqual([nadeesha]);
+    });
+  });
+
+  it('leaves nadeesha\'s draft saved on Wednesday at 14:40, before the clock starts, with a note for the driver', async () => {
+    await seeded(async (tx) => {
+      const drafts = await tx.select().from(orders).where(eq(orders.status, 'draft')).orderBy(orders.temp);
+      expect(drafts.map((o) => [o.outletId, o.temp, o.savedAt, o.driverNote])).toEqual([
+        ['OUT001', 'chilled', depotInstant(WED, 14 * 60 + 40), 'Ring the bell at the side door.'],
+        ['OUT001', 'dry', depotInstant(WED, 14 * 60 + 40), 'Ring the bell at the side door.'],
+      ]);
+      expect(drafts[0]!.savedAt!.getTime()).toBeLessThan(new Date(DEMO_DAY.parts[0].at).getTime());
     });
   });
 });
