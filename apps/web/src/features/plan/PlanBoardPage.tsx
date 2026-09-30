@@ -40,8 +40,13 @@ export function PlanBoardPage() {
   if (!board.day.open) {
     return <Message title={planFor(board.day.date)} icon={ICON.cutoff} line={`Orders for ${shortDay(board.day.date)} close at ${clockTime(board.day.cutoffAt)}. The board opens then.`} />;
   }
-  // A sent plan is read on View plan, whose address keeps the day through a reload or a clock move.
-  if (board.plan.status === 'published') return <Navigate to={`/dispatcher/plan/${board.day.date}`} replace />;
+  // A sent plan is read on View plan, whose address keeps the day through a reload or a clock move. The board held
+  // from an earlier visit can be out of date (the day may have moved on, or the plan gone back to edit), so only a
+  // read that has just answered sends the page there.
+  if (board.plan.status === 'published') {
+    const fresh = query.isFetching ? undefined : query.data;
+    return fresh?.day && fresh.plan.status === 'published' ? <Navigate to={`/dispatcher/plan/${fresh.day.date}`} replace /> : <BoardSkeleton />;
+  }
   return <Board screen={screen} saver={saver} stale={query.isError} refreshing={query.isFetching} onRefresh={() => { void query.refetch(); }} />;
 }
 

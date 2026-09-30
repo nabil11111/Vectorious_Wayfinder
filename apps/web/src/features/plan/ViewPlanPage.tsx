@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
 import type { BoardCounts, Brand, DraftTrip, PlanBoard } from '@wayfinder/contracts';
@@ -44,6 +44,8 @@ function ViewPlan({ date, board }: { date: string; board: PlanBoard }) {
   const sent = board.plan.status === 'published';
   const items = checkItems(board.check?.problems ?? []);
   const blocked = board.check?.ok !== true;
+  // The board's queue keeps up with the plan this page shows, so a send names the revision on screen.
+  useEffect(() => { saver.sync(board); }, [saver, board]);
 
   // A send and a back to edit wait for the board's save on its way and answer with the board. The board's queue
   // runs them when this is its day; any other day's plan goes on its own.
@@ -53,6 +55,7 @@ function ViewPlan({ date, board }: { date: string; board: PlanBoard }) {
     const call = kind === 'send' ? sendPlan : unsendPlan;
     let problem: string | null = null;
     if (saver.date === date) {
+      saver.sync(board);
       problem = await saver.act((day, ref) => call(day, ref));
     } else {
       try {

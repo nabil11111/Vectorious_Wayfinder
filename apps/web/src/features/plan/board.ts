@@ -224,11 +224,13 @@ class PlanSaver {
     for (const waiter of waiters) waiter(saved);
   }
 
-  // Drops the changes on their way: the board on screen is another plan, day or demo day now.
+  // Drops the changes on their way: the board on screen is another plan, day or demo day now. An "Undo" of the plan
+  // that is gone goes with them.
   private forget() {
     window.clearTimeout(this.retryTimer);
     this.unanswered = [];
     this.savedSeq = this.sentSeq = this.seq;
+    this.show({ undo: null });
     this.settle(false);
   }
 
@@ -249,10 +251,15 @@ class PlanSaver {
     this.show({ saving: 'saved', refused: null });
   };
 
-  // A change on the board. It shows at once and is saved behind any save on its way.
+  // A change on the board. It shows at once and is saved behind any save on its way. While a split, join or send
+  // is out the board holds still, and says so.
   change = (next: DraftPlan, undo?: Undo) => {
     const held = this.screen;
-    if (!held || this.acting || !editable(held.board)) return;
+    if (!held || !editable(held.board)) return;
+    if (this.acting) {
+      tell('One moment: the board is still saving.');
+      return;
+    }
     this.seq += 1;
     window.clearTimeout(this.retryTimer);
     this.show({ draft: next, saving: 'saving', refused: null, undo: undo ? { ...undo, seq: this.seq, revision: null } : null });
@@ -278,6 +285,8 @@ class PlanSaver {
     const held = this.screen;
     if (!held || this.running || this.acting) return;
     if (this.seq === this.savedSeq) {
+      // Nothing waits, so the board is saved, whatever the line said while something did.
+      if (held.saving === 'saving' || held.saving === 'retrying') this.show({ saving: 'saved' });
       this.settle(true);
       return;
     }
@@ -301,7 +310,7 @@ class PlanSaver {
         // The board moved on while this save was out (a reset, a new day), so its answer is for a plan that is
         // gone and the changes went with it. An answer that is simply not newer is read as the plan having moved
         // on elsewhere.
-        if (now.board.demoDay === before.demoDay && now.board.day?.date === before.day?.date) await this.reload('stale', null, before);
+        if (now.board.demoDay === before.demoDay && now.board.day?.date === before.day?.date) await this.reloadHeld('stale', null, before);
         else void this.flush();
         return;
       }
@@ -318,6 +327,11 @@ class PlanSaver {
     } catch (error) {
       this.running = false;
       if (!this.stillMine()) return;
+      // The changes this save carried were dropped while it was out (a reset, a new day): nothing is left to send.
+      if (this.seq === this.savedSeq) {
+        void this.flush();
+        return;
+      }
       if (worthRetrying(error)) {
         this.unanswered.push(sent);
         this.show({ saving: 'retrying' });
@@ -329,7 +343,7 @@ class PlanSaver {
       this.tries = 0;
       const code = codeOf(error);
       if (code !== null && RELOAD.has(code)) {
-        await this.reload(code, error, before);
+        await this.reloadHeld(code, error, before);
       } else {
         this.show({ saving: 'refused', refused: reasonOf(error) });
         this.settle(false);
@@ -337,38 +351,50 @@ class PlanSaver {
     }
   };
 
+  // Loads the board again with the queue held, so a change made meanwhile waits for the read instead of cancelling
+  // it, and goes out after it when the plan is still this screen's.
+  private async reloadHeld(code: string, error: unknown, before: PlanBoard) {
+    this.running = true;
+    let failed: unknown = null;
+    try {
+      failed = await this.reload(code, error, before);
+    } finally {
+      this.running = false;
+    }
+    if (failed === null) {
+      void this.flush();
+    } else {
+      this.show({ saving: 'refused', refused: reasonOf(failed) });
+      this.settle(false);
+    }
+  }
+
   // A refusal that trying again cannot fix: load the board again. When the server's draft is one this screen sent
   // without hearing back, the change was this screen's own, so it carries on from there with what is still
-  // waiting. Otherwise the changes are dropped and one line says why.
-  private async reload(code: string, error: unknown, before: PlanBoard) {
+  // waiting. Otherwise the changes are dropped and one line says why. It answers the error when the board could
+  // not be read, or null.
+  private async reload(code: string, error: unknown, before: PlanBoard): Promise<unknown> {
     let latest: PlanBoard;
     try {
       latest = await this.qc.fetchQuery({ queryKey: boardKey, queryFn: fetchBoard, staleTime: 0 });
     } catch (loadError) {
-      this.show({ saving: 'refused', refused: reasonOf(loadError) });
-      this.settle(false);
-      return;
+      return loadError;
     }
-    if (!this.stillMine()) return;
+    if (!this.stillMine()) return null;
     const held = planOf(latest);
     const samePlan = latest.demoDay === before.demoDay && latest.day?.date === before.day?.date && latest.plan.status === 'draft';
     if (code === 'stale' && samePlan && this.unanswered.some((sent) => sameDraft(sent, held))) {
       this.unanswered = [];
       this.answered(latest, false);
-      if (sameDraft(held, this.screen!.draft)) {
-        this.savedSeq = this.sentSeq = this.seq;
-        this.show({ saving: 'saved' });
-        this.settle(true);
-      } else {
-        void this.flush();
-      }
-      return;
+      if (sameDraft(held, this.screen!.draft)) this.savedSeq = this.sentSeq = this.seq;
+      return null;
     }
     this.forget();
     this.answered(latest, true);
     this.show({ saving: 'saved', refused: null, undo: null });
     const reset = latest.demoDay !== before.demoDay;
     tell(refusedLine(code, error, before, latest), reset ? 'demo-clock' : 'plan-board');
+    return null;
   }
 
   // Resolves once nothing is waiting to be saved: true when saved, false when a save was refused.
@@ -378,35 +404,45 @@ class PlanSaver {
     return new Promise((resolve) => this.waiters.push(resolve));
   };
 
-  // A split, join, send or back to edit (rule 8, rule 11). Each waits until the draft is saved, and the board
-  // holds still until it answers. It says why when it was refused, or null.
+  // A split, join, send or back to edit (rule 8, rule 11). Each waits until the draft is saved and any other of
+  // them has answered, and the board holds still until this one answers. It says why when it was refused, or null.
   act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>): Promise<string | null> => {
-    if (!(await this.idle())) return 'The plan has changes that are not saved yet. Save them first.';
+    do {
+      if (!(await this.idle())) return 'The plan has changes that are not saved yet. Save them first.';
+    } while (this.acting || this.running);
     const held = this.screen;
     const date = held?.board.day?.date;
-    if (!held || !date || this.acting) return null;
+    if (!held || !date) return null;
     const before = held.board;
     this.acting = true;
     this.show({ acting: true });
     try {
       await this.cancelReads(date);
       const answer = await run(date, refOf(before));
-      this.acting = false;
       if (!this.stillMine()) return null;
       this.answered(answer, true);
-      this.show({ acting: false, saving: 'saved', refused: null, undo: null });
+      this.show({ saving: 'saved', refused: null, undo: null });
       return null;
     } catch (error) {
-      this.acting = false;
-      this.show({ acting: false });
       if (!this.stillMine()) return null;
       const code = codeOf(error);
       if (code !== null && RELOAD.has(code)) {
-        await this.reload(code, error, before);
-        return null;
+        // The board holds still through the read too, so no change lands on the plan as it was.
+        const failed = await this.reload(code, error, before);
+        return failed === null ? null : reasonOf(failed);
       }
       return reasonOf(error);
+    } finally {
+      this.acting = false;
+      this.show({ acting: false });
+      // Whatever waited for this to answer goes on.
+      void this.flush();
     }
+  };
+
+  // A board a read outside the board page brought, such as View plan's. It is taken as a refetch would be.
+  sync = (board: PlanBoard) => {
+    if (this.screen && board.day?.date === this.date) this.incoming(board);
   };
 
   stop() {

@@ -193,7 +193,12 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
                   <Row
                     title={titleOf(order, index)}
                     line={deferral.reason}
-                    actions={<button type="button" className="text-[11px] font-semibold underline underline-offset-2" onClick={() => change(undefer(draft, order.id))}>Undo</button>}
+                    actions={(
+                      <>
+                        <button type="button" className="text-[11px] font-semibold underline underline-offset-2" onClick={() => change(undefer(draft, order.id))}>Undo</button>
+                        {order.splitFrom !== null && <RowMenu label={titleOf(order, index)} items={[{ label: 'Join back', onClick: () => onJoin(order) }]} />}
+                      </>
+                    )}
                   />
                 </li>
               ))}
