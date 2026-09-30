@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as checker from '../check';
 import { checkPlan } from '../check';
 import { computeLoad } from '../load';
 import type { EngineOrder, PlannerInput, PlannerResult } from '../types';
@@ -128,6 +129,27 @@ describe('the exact seeded planner day without a database', () => {
     const chilled = result.input.plan.deferrals.filter((d) => computeLoad(orderOf.get(d.orderId)!.lines, input.products).needsReefer);
     expect(chilled).toHaveLength(6);
     for (const deferral of chilled) expect(deferral.reason).toContain('fridge truck');
+  });
+
+  it('AC-1/21 pins every seeded explanation', async () => {
+    const { input } = await demoFixture();
+    const result = buildSuggestedPlan(input);
+    if (result.status === 'unavailable') throw new Error('Expected a checked seeded-day suggestion');
+    expect(result.choices.map((choice) => choice.reason)).toMatchSnapshot();
+  });
+
+  it('AC-22 bounds the checker runs of the seeded search', async () => {
+    // Each placed order needs only its winner and the runner-up that names the deciding rule. Trying every
+    // candidate took 2,471 checker runs here and stopping after those two takes 305; the bound leaves room
+    // for small changes but fails if the search goes back to trying every candidate.
+    const { input } = await demoFixture();
+    const runs = vi.spyOn(checker, 'checkPlan');
+    try {
+      buildSuggestedPlan(input);
+      expect(runs.mock.calls.length).toBeLessThanOrEqual(400);
+    } finally {
+      runs.mockRestore();
+    }
   });
 
   it('AC-20/21 repeats the exact result with frozen inputs and shuffled seed rows and lines', async () => {
