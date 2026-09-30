@@ -82,8 +82,30 @@ describe('reviewed explanations through the complete planner', () => {
     expect(noFridge.input.plan.deferrals).toMatchObject([{ code: 'no_reefer', reason: 'No fridge truck was free for Colombo on Thursday.' }]);
     clearReasons(noFridge);
     const fuel = success(buildSuggestedPlan(plannerInput([plannerOrder('far', 'OUT060', 'fresh-chilled-carton')], { vehicles: [{ ...vehicle('VEH001'), litresUsedThisWeek: 340 }] })));
-    expect(fuel.input.plan.deferrals).toMatchObject([{ code: 'fuel', reason: "The trucks that could reach Matara on Thursday did not have enough of this week's fuel left." }]);
+    expect(fuel.input.plan.deferrals).toMatchObject([{ code: 'fuel', reason: "The fridge trucks that could reach Matara on Thursday did not have enough of this week's fuel left." }]);
     clearReasons(fuel);
+  });
+
+  it('AC-17 says van for a van-only shop, and fridge van for its chilled goods, through the builder', () => {
+    const empty = (id: string) => ({ ...vehicle(id), litresUsedThisWeek: vehicle(id).weeklyFuelQuotaL });
+    const dry = success(buildSuggestedPlan(plannerInput([plannerOrder('dry', 'OUT002')], { vehicles: [empty('VEH037')] })));
+    expect(dry.input.plan.deferrals).toMatchObject([{ code: 'fuel', reason: "The vans that could reach Colombo on Thursday did not have enough of this week's fuel left." }]);
+    clearReasons(dry);
+    const cold = success(buildSuggestedPlan(plannerInput([plannerOrder('cold', 'OUT002', 'fresh-chilled-carton')], { vehicles: [empty('VEH035')] })));
+    expect(cold.input.plan.deferrals).toMatchObject([{ code: 'fuel', reason: "The fridge vans that could reach Colombo on Thursday did not have enough of this week's fuel left." }]);
+    clearReasons(cold);
+  });
+
+  it('AC-17 says fridge truck when a chilled insertion would make other shops late', () => {
+    const day = plannerInput([
+      ...['OUT026', 'OUT028', 'OUT030'].map((shop) => plannerOrder(shop, shop, 'fresh-chilled-carton', 1, { deliveryDate: '2026-06-22', timesDeferred: 3 })),
+      plannerOrder('deadline', 'OUT010', 'fresh-chilled-carton', 1, { deliveryDate: '2026-06-23', timesDeferred: 2 }),
+      plannerOrder('added', 'OUT027', 'fresh-chilled-carton'),
+    ], { vehicles: [vehicle('VEH001')] });
+    day.outlets.find((shop) => shop.id === 'OUT027')!.windowOpen = 420;
+    const result = success(buildSuggestedPlan(day));
+    expect(result.input.plan.deferrals).toMatchObject([{ orderId: 'added', code: 'window', reason: 'The fridge truck that could reach Gampaha in time would then have been late for its other shops on Thursday.' }]);
+    clearReasons(result);
   });
 
   it('does not call 40 litres remaining an exhausted weekly allowance', () => {

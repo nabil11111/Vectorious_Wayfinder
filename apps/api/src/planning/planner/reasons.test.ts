@@ -25,9 +25,9 @@ describe('shop-facing deferrals and dispatcher explanations', () => {
   it.each<[PlannerDeferralCode, string]>([
     ['no_reefer', 'No fridge truck was free for Colombo on Thursday.'],
     ['no_van', 'No van was free for Colombo on Thursday, which takes vans only.'],
-    ['over_capacity', 'The trucks going to Colombo on Thursday were full.'],
-    ['window', 'No truck could reach Colombo before its window closed at 07:30 on Thursday.'],
-    ['fuel', "The trucks that could reach Colombo on Thursday did not have enough of this week's fuel left."],
+    ['over_capacity', 'The fridge vans going to Colombo on Thursday were full.'],
+    ['window', 'No fridge van could reach Colombo before its window closed at 07:30 on Thursday.'],
+    ['fuel', "The fridge vans that could reach Colombo on Thursday did not have enough of this week's fuel left."],
   ])('AC-17 %s is a plain shop sentence with a weekday', (code, sentence) => {
     const deferred = deferralFor(input(), source, code);
     expect(deferred).toMatchObject({ orderId: 'waiting', code, reason: sentence });
@@ -35,20 +35,43 @@ describe('shop-facing deferrals and dispatcher explanations', () => {
     expect(deferred.reason.length).toBeLessThanOrEqual(200);
   });
 
+  // Chilled goods were only ever tried on fridge vehicles and a van-only shop only on vans, so the sentence
+  // names those. "No truck" would be untrue on a day when a dry truck reached the same shop.
+  it.each([
+    ['a dry order at an ordinary shop', 'OUT008', 'fresh-dry-carton', 'truck'],
+    ['a chilled order at an ordinary shop', 'OUT008', 'fresh-chilled-carton', 'fridge truck'],
+    ['a dry order at a van-only shop', 'OUT001', 'fresh-dry-carton', 'van'],
+    ['a chilled order at a van-only shop', 'OUT001', 'fresh-chilled-carton', 'fridge van'],
+  ])('AC-17 names the vehicles the search could use for %s', (_kind, shop, product, vehicle) => {
+    const order = plannerOrder('late', shop, product, 10);
+    const day = plannerInput([order]);
+    const reasons = [
+      [deferralFor(day, order, 'window').reason, `No ${vehicle} could reach Colombo before its window closed at 07:30 on Thursday.`],
+      [deferralFor(day, order, 'over_capacity').reason, `The ${vehicle}s going to Colombo on Thursday were full.`],
+      [deferralFor(day, order, 'fuel').reason, `The ${vehicle}s that could reach Colombo on Thursday did not have enough of this week's fuel left.`],
+      [deferralFor(day, order, 'over_capacity', { split: { keptUnits: 6, remainingUnits: 4 } }).reason,
+        `6 of the 10 cartons for Colombo go on Thursday; the other 4 wait for the next plan because the ${vehicle} was full.`],
+    ];
+    for (const [reason, sentence] of reasons) {
+      expect(reason).toBe(sentence);
+      plain(reason!);
+    }
+  });
+
   it('uses a shop name when supplied and the district when the name is an ID or too long', () => {
     const day = input();
     day.outlets.find((o) => o.id === source.outletId)!.name = 'Fresh Wellawatte';
     expect(deferralFor(day, source, 'no_van').reason).toBe('No van was free for Fresh Wellawatte on Thursday, which takes vans only.');
     day.outlets.find((o) => o.id === source.outletId)!.name = 'A long shop name '.repeat(30);
-    expect(deferralFor(day, source, 'window').reason).toBe('No truck could reach Colombo before its window closed at 07:30 on Thursday.');
+    expect(deferralFor(day, source, 'window').reason).toBe('No fridge van could reach Colombo before its window closed at 07:30 on Thursday.');
   });
 
   it('AC-17 a deferred split is one sentence naming sent/left counts and brand packaging', () => {
-    for (const [shop, product, noun] of [['OUT001', 'fresh-chilled-carton', 'cartons'], ['OUT019', 'style-folded', 'boxes'], ['OUT024', 'tech-tv', 'items']]) {
+    for (const [shop, product, noun, vehicle] of [['OUT001', 'fresh-chilled-carton', 'cartons', 'fridge van'], ['OUT019', 'style-folded', 'boxes', 'truck'], ['OUT024', 'tech-tv', 'items', 'truck']]) {
       const order = plannerOrder('rest', shop!, product!, 60, { splitFrom: 'parent' });
       const day = plannerInput([order]);
       const deferred = deferralFor(day, order, 'over_capacity', { split: { keptUnits: 75, remainingUnits: 60 } });
-      expect(deferred.reason).toBe(`75 of the 135 ${noun} for Colombo go on Thursday; the other 60 wait for the next plan because the truck was full.`);
+      expect(deferred.reason).toBe(`75 of the 135 ${noun} for Colombo go on Thursday; the other 60 wait for the next plan because the ${vehicle} was full.`);
       plain(deferred.reason);
       expect(deferred.reason.length).toBeLessThanOrEqual(200);
       expect(quantityWord(day, order)).toBe(noun);

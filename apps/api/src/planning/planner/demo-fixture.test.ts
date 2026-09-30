@@ -118,6 +118,18 @@ describe('the exact seeded planner day without a database', () => {
     }
   });
 
+  it('AC-17 says fridge truck in every seeded chilled deferral', async () => {
+    // Each of these shops also gets its dry cartons from a truck before 08:00 on this plan, so only the
+    // fridge vehicles the search tried make the sentence true.
+    const { input } = await demoFixture();
+    const result = buildSuggestedPlan(input);
+    if (result.status === 'unavailable') throw new Error('Expected a checked seeded-day suggestion');
+    const orderOf = new Map(result.input.orders.map((order) => [order.id, order]));
+    const chilled = result.input.plan.deferrals.filter((d) => computeLoad(orderOf.get(d.orderId)!.lines, input.products).needsReefer);
+    expect(chilled).toHaveLength(6);
+    for (const deferral of chilled) expect(deferral.reason).toContain('fridge truck');
+  });
+
   it('AC-20/21 repeats the exact result with frozen inputs and shuffled seed rows and lines', async () => {
     const { input } = await demoFixture();
     const before = structuredClone(input);
