@@ -82,8 +82,31 @@ Password for the demo accounts: `wayfinder-demo` (`SEED_PASSWORD`). Admin has it
 
 ## Judge walkthrough
 
-A numbered walk through all four roles, from planning to a completed delivery. To be written against the
-seeded delivery day.
+One order's journey through the seeded day. Start clean with `docker compose up` and http://localhost:3000, or
+press **Reset the demo day** in the demo clock. Two browsers (or one normal and one private window) let you watch
+one role's change reach another's screen within a second. Times depend on your pace, so the clock times below
+are what the demo clock shows.
+
+1. **The shop orders.** Sign in as `nadeesha` at Wed 24 Jun 15:00. Today shows her draft for Thu 25 Jun: 8
+   chilled and 4 dry cartons. Continue it, change a number if you like, and place both orders. The confirmation
+   says orders for Thursday close at 16:00.
+2. **Orders close.** Open the demo clock in the top bar and move it to "Orders closed, 16:00".
+3. **The dispatcher plans.** Sign in as `ruwan` and open the Plan board: "Plan for Thu 25 Jun", 104 unplanned
+   orders, 4 of them carried over from earlier plans (Fresh Dickwella, deferred twice, first), and 35 working
+   trucks with 3 in the workshop. The seeded day is short of fridge trucks on purpose.
+4. **A trip.** On the Fresh · Colombo group press **Start a trip** and choose VEH035, the fridge van (Nugegoda
+   and Wellawatte take vans only). Add Nugegoda's two new orders from the group, its 12 carried-over chilled
+   cartons from Carried over, and Wellawatte. The trip leaves 04:36, reaches Fresh Nugegoda at 05:00 and Fresh
+   Wellawatte at 05:24, and is back at 06:10. Every change is saved and checked at once. Pick Dilshan as the
+   driver.
+5. **Everything else waits, with a reason.** Defer each other group from its ⋮ menu with a reason the shop will
+   read, such as "No fridge truck was left for Colombo.", until nothing is unplanned.
+6. **Send.** Mark the trip done and open **View plan**: 5 of 104 orders on 1 trip, 99 deferred, checks all
+   clear. Send the plan to loaders and drivers.
+7. **The shop sees it.** As `nadeesha`, Orders shows her three orders "Planned · Thu 25 Jun". **Back to edit**
+   on View plan turns the plan into a draft again until loading starts, and her cards follow within a second.
+
+Loading, driving and the shop's receipt come with the next pieces.
 
 ## Departures from the design
 
@@ -108,6 +131,26 @@ Anything we built differently from our Designathon submission, and why.
   desktop Style and Tech forms, confirmation and Help have no frames, so they follow the desktop Fresh form.
 - **Today after placing** keeps the date and the shop's name as its header, where the frame has the title "Today".
 - **OUT001** has a street entrance and van-only parking in the booklet's data, where the design shows a rear dock.
+- **Below 1024 wide the nav is bottom tabs** for every role, and the name beside the avatar waits until 1280, so
+  the dispatcher's six tabs fit the top bar.
+
+**The plan board and View plan**
+- **The suggested plan is not built yet.** "Build the suggested plan", "Changes", the "suggested" hints and the
+  why chips come with the planner (spec 011).
+- **Orders are named by shop, amount and wanted day.** The design's order numbers (WF-2402) do not exist here.
+- **The depot switch** shows the dispatcher's own depot and greys the others (D-32), from 1280 wide.
+- **Drivers** are picked from the depot's driver accounts, and a vehicle may have none (D-31).
+- **Moving stops** shows no "12 km shorter" or "35 min earlier", and a late stop says "late": the checker's
+  kilometres depend only on the number of stops, and its sentence under the timeline gives the minutes.
+- **More actions than the frames draw:** a stop's ⋮ menu has Take off, Split and Defer for each order, group and
+  shop rows have ⋮ menus, a trip has Remove trip in its footer, Pick a truck has Close, and split orders carry a
+  "split" chip.
+- **A deferred order gets no new date,** so the shop's "Tuesday works for me" is not built.
+- **Below 1024 wide** the board's three columns become three tabs, and between 1024 and 1280 the side columns are
+  narrower and View plan's rows stack.
+- **Problems** show as lines under the trip's timeline, and failures as short notices.
+- **View plan** says "h on the road" where the design says "h driving", because the figure includes unloading.
+- **States the design lacks:** orders still open, no day left, deferring, splitting, saving, not saved and refused.
 
 ## Docs
 
