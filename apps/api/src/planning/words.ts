@@ -24,3 +24,8 @@ export const kg = (n: number) => `${trim(n, 1)} kg`;
 export const m3 = (n: number) => `${trim(n, 3)} m³`;
 // 63.6 to '63.6 litres'.
 export const litres = (n: number) => `${trim(n, 1)} litres`;
+
+// What a sentence calls an order: '276 kg chilled order for Fresh Nugegoda'. A Fresh shop has a chilled and a
+// dry order most days, and a split order leaves two for one shop (D-17), so the shop alone does not say which.
+// It comes with no "a" or "an", because 800 kg would need the other one. The sentence puts "the" in front.
+export const orderCalled = (kilos: number, chilled: boolean, shop: string) => `${kg(kilos)} ${chilled ? 'chilled' : 'dry'} order for ${shop}`;

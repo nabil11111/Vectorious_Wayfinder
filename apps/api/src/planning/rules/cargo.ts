@@ -3,7 +3,7 @@ import { PlanInputError } from '../errors';
 import { computeLoad } from '../load';
 import { lookup } from '../lookup';
 import type { CargoProblems } from '../types';
-import { kg, m3 } from '../words';
+import { kg, m3, orderCalled } from '../words';
 
 // What each vehicle carries (spec 007, AC-17 to AC-23): weight, volume, chilled goods, van-only shops, depots,
 // tail-lift items and mixed brands.
@@ -64,12 +64,13 @@ export const cargoProblems: CargoProblems = (input, tripLoads) => {
 
       for (const orderId of stop.orderIds) {
         const load = computeLoad(orderOf(orderId).lines, input.products);
+        const order = orderCalled(load.kg, load.needsReefer, outlet.name);
         if (load.needsReefer && vehicle.temp !== 'reefer') {
-          report('needs_reefer', { ...here, orderId }, `${name} carries a ${kg(load.kg)} order with chilled goods to ${outlet.name}, and ${vehicle.id} is not a fridge vehicle.`);
+          report('needs_reefer', { ...here, orderId }, `${name} carries the ${order}, and ${vehicle.id} is not a fridge vehicle.`);
         }
         // Trucks have a tail lift and vans do not (D-24).
         if (load.needsTailLift && vehicle.type === 'van') {
-          report('no_tail_lift', { ...here, orderId }, `${name} carries a ${kg(load.kg)} order to ${outlet.name} that needs a tail lift, and ${vehicle.id} is a van without one.`);
+          report('no_tail_lift', { ...here, orderId }, `${name} carries the ${order}, which needs a tail lift, and ${vehicle.id} is a van without one.`);
         }
       }
     }
