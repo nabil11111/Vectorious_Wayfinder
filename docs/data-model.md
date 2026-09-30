@@ -22,6 +22,9 @@ erDiagram
     orders ||--o| stop_orders : "is on"
     plans ||--o{ deferrals : "defers"
     orders ||--o{ deferrals : "deferred in"
+    vehicles ||--o{ vehicle_days_off : "off on"
+    vehicles ||--o{ fuel_log : "used fuel"
+    trips ||--o| fuel_log : "costs"
 ```
 
 ## Groups
@@ -33,6 +36,8 @@ erDiagram
 | People | `users`, `sessions` | One role per user. A store manager belongs to an outlet, the others to a depot. |
 | Demand | `orders`, `order_lines` | One order per temperature, because chilled and dry go on different trucks. Lines store only a quantity. |
 | Planning | `plans`, `trips`, `stops`, `stop_orders`, `deferrals` | One plan per depot per day. At most two trips per vehicle. Every order is on a stop or deferred with a reason. |
+| Fleet days | `vehicle_days_off`, `fuel_log` | A vehicle that cannot be used on a date, with the reason. Litres a vehicle used on a date: one history row a day, and one row for each sent trip. The plan checker reads both. |
+| The demo day | `demo_day` | One row: the app's clock, stored as the app's time and the real time it was set, and whether the seeded day has been written. |
 | History | `audit_log` | Who changed what and when, with before and after. |
 
 Execution (deliveries, proof, receipts, loading checks) and notifications are added with the features that

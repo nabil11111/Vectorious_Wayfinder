@@ -7,3 +7,5 @@ import * as schema from './schema';
 export const pool = new pg.Pool({ connectionString: config.DATABASE_URL, max: 10 });
 export const db = drizzle(pool, { schema });
 export type Db = typeof db;
+// What a function takes when it must run inside its caller's transaction.
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
