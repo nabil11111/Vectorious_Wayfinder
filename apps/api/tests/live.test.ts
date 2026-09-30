@@ -198,6 +198,15 @@ describe('the live stream', () => {
     await soon(() => listen('dilshan'));
   });
 
+  it('keeps no place for a stream whose screen was gone before it opened', async () => {
+    // The session is looked up before the stream opens, and a screen can leave in that moment. Here the
+    // connection is closed as soon as the request is in.
+    server.once('request', (_req, res) => res.destroy());
+    await expect(events(cookies.ruwan)).rejects.toThrow();
+    // Had it been put on the list it would stay there for good, and the fifth stream would be refused.
+    for (const person of ['nadeesha', 'ruwan', 'kasun', 'prasanna', 'admin'] as const) await listen(person);
+  });
+
   it('AC-26 ends every open stream when the server is told to stop, so that it can close', async () => {
     // A server of its own, stopped the way server.ts stops on SIGTERM: the streams first, then the server.
     const stopping = createApp().listen(0);
