@@ -27,12 +27,15 @@ const THU = '2026-06-04';
 const FRI = '2026-06-05';
 const at = (date: string, time: string) => depotInstant(date, toMinutes(time));
 
-const app = createApp();
+// One server for the whole file, open on 127.0.0.1 only. Handed the app itself, supertest opens a server on
+// every address for each request and reaches it through 127.0.0.1. When the port it is given is one that
+// another program on the machine holds on 127.0.0.1, that program answers instead of the app.
+const server = createApp().listen(0, '127.0.0.1');
 type Asker = ReturnType<typeof request.agent>;
 
 // One address gets ten sign-ins in 15 minutes, so each account signs in once and its cookie is reused.
 const signIn = async (username: string, password: string) => {
-  const as = request.agent(app);
+  const as = request.agent(server);
   const res = await as.post('/api/v1/auth/login').send({ username, password });
   if (res.status !== 200) throw new Error(`Could not sign in as ${username}: ${res.status}`);
   return as;
@@ -73,6 +76,7 @@ afterEach(removeEverything);
 afterAll(async () => {
   setClockForTests(null);
   await removeManagers();
+  server.close();
   await pool.end();
 });
 

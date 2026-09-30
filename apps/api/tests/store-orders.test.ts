@@ -42,7 +42,11 @@ vi.spyOn(db, 'transaction').mockImplementation(((work, config) => {
 }) as typeof db.transaction);
 vi.mocked(announce).mockImplementation(() => { openWhenAnnounced.push(openTransactions); });
 
-const app = createApp();
+// One server for the whole file, open on 127.0.0.1 only. Handed the app itself, supertest opens a server on
+// every address for each request and reaches it through 127.0.0.1. When the port it is given is one that
+// another program on the machine holds on 127.0.0.1, that program answers instead, with a "socket hang up"
+// or a status of its own. On a laptop full of tools that is about one request in 4,000, and this file sends 150.
+const server = createApp().listen(0, '127.0.0.1');
 type Asker = ReturnType<typeof request.agent>;
 const NEXT = '/api/v1/store/next-order';
 const save = (as: Asker, body: object) => as.put(`${NEXT}/draft`).send(body);
@@ -51,7 +55,7 @@ const answer = (res: request.Response) => [res.status, res.body.error?.code];
 
 // One address gets ten sign-ins in 15 minutes, so each account signs in once and its cookie is reused.
 const signIn = async (username: string, password: string) => {
-  const as = request.agent(app);
+  const as = request.agent(server);
   const res = await as.post('/api/v1/auth/login').send({ username, password });
   if (res.status !== 200) throw new Error(`Could not sign in as ${username}: ${res.status}`);
   return as;
@@ -117,6 +121,7 @@ afterEach(async () => {
 afterAll(async () => {
   setClockForTests(null);
   await removeManagers();
+  server.close();
   await pool.end();
 });
 
@@ -169,9 +174,13 @@ async function queuedOnTheShop(outletId: string, requests: request.Test[], meanw
     const answers: Promise<request.Response>[] = [];
     try {
       for (const next of requests) {
-        answers.push(next.then((res) => res));
+        let answered = false;
+        answers.push(next.then((res) => {
+          answered = true;
+          return res;
+        }));
         for (let tries = 0; (await waiting()) < answers.length; tries++) {
-          if (tries === 200) throw new Error(`Request ${answers.length} never waited for the shop's lock.`);
+          if (answered || tries === 200) throw new Error(`Request ${answers.length} did not wait for the shop's lock.`);
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
       }
@@ -194,7 +203,7 @@ describe('who may call the store endpoints', () => {
   ];
 
   it('AC-6 answers 401 signed_out on every endpoint when there is no session', async () => {
-    expect(await askAll(request.agent(app))).toEqual(Array(4).fill([401, 'signed_out']));
+    expect(await askAll(request.agent(server))).toEqual(Array(4).fill([401, 'signed_out']));
   });
 
   it('AC-7 answers 403 forbidden to a dispatcher, a loader and a driver', async () => {
