@@ -73,6 +73,9 @@ describe('trip and vehicle fuel', () => {
     // A trip that cannot be timed is not driven: OUT026 is in Gampaha and OUT006 in Colombo.
     expect(fuelOf('VEH012', [trip('VEH012', 1, ['OUT026', 'OUT006']), colombo])).toEqual({ vehicleId: 'VEH012', litresBefore: 0, litresPlan: 5.3, litresLeft: 534.7, quotaL: 540, kmPlan: 36 });
     expect(fuelOf('VEH012', [], 120.5)).toEqual({ vehicleId: 'VEH012', litresBefore: 120.5, litresPlan: 0, litresLeft: 419.5, quotaL: 540, kmPlan: 0 });
+    // The litres used are kept to 1 decimal like the rest, so the three figures always add up to the quota. Added
+    // up in plain JavaScript, 0.1 + 0.2 litres would arrive as 0.30000000000000004.
+    expect(fuelOf('VEH012', [], 0.1 + 0.2)).toEqual({ vehicleId: 'VEH012', litresBefore: 0.3, litresPlan: 0, litresLeft: 539.7, quotaL: 540, kmPlan: 0 });
   });
 
   it('throws an error that names a vehicle the input does not hold', () => {

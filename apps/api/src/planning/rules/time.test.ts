@@ -32,9 +32,12 @@ const check = (depotId: string, trips: PlanTrip[], parts: Parts = {}) => {
   return timeProblems(input, timesOf(input));
 };
 const only = (problems: Problem[], ...codes: ProblemCode[]) => problems.filter((problem) => codes.includes(problem.code));
-// OUT017 sits in a mall that lets deliveries in from 10:30 to 12:30. Every mall shop in the data has a window
-// equal to its slot, so a test about the two being different gives OUT017 another window.
-const out017Open = (open: string, close: string) => outlets.map((o) => (o.id === 'OUT017' ? { ...o, windowOpen: toMinutes(open), windowClose: toMinutes(close) } : o));
+// The shops with one of them changed, for what no shop in the data has. OUT017 sits in a mall that lets deliveries
+// in from 10:30 to 12:30, and every mall shop in the data has a window equal to its slot, so a test about the two
+// being different gives OUT017 another window.
+const changed = (outletId: string, change: Partial<EngineOutlet>) => outlets.map((o) => (o.id === outletId ? { ...o, ...change } : o));
+const hours = (open: string, close: string) => ({ windowOpen: toMinutes(open), windowClose: toMinutes(close) });
+const out017Open = (open: string, close: string) => changed('OUT017', hours(open, close));
 
 describe('rules for time', () => {
   it('finds nothing wrong with the chained day or the Style trip', () => {
@@ -153,14 +156,34 @@ describe('rules for time', () => {
     // Reaching it just as the slot closes is on time: leaving at 10:36 the usual way round, OUT015 is reached at 11:00.
     expect(check('Peliyagoda', [trip('VEH012', 1, styleShops, '10:36')])).toEqual([]);
 
-    // A window of 09:00 to 10:00 never meets the slot of 10:30 to 12:30, so whenever the shop is reached it is late.
+    // It is the mall's hours that are named and counted from, not the shop's own. OUT017 reached at 12:45, 15
+    // minutes after its slot, first with a window that is still open and then with one that closed at 11:30.
+    const afterSlot = (leaveBy: string) => [{
+      code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
+      message: 'VEH012 trip 1 reaches OUT017 at 12:45, 15 minutes after its mall\'s delivery hours of 10:30 to 12:30 end.',
+      fix: `Leave by ${leaveBy} to reach every stop in time.`,
+    }];
+    expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '12:21')], { outlets: out017Open('09:00', '17:00') })).toEqual(afterSlot('12:06'));
+    expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '12:21')], { outlets: out017Open('10:00', '11:30') })).toEqual(afterSlot('11:06'));
+
+    // A window of 09:00 to 10:00 never meets the slot of 10:30 to 12:30, so whenever the shop is reached it is
+    // late. Reached at 09:30 the vehicle would wait an hour for nothing, and that is not reported as a wait.
     const never = [{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
       message: 'VEH012 trip 1 stops at OUT017, which takes deliveries from 09:00 to 10:00 while its mall lets them in only from 10:30 to 12:30, so it can never be reached in time.',
     }];
     const apart = { outlets: out017Open('09:00', '10:00') };
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'])], apart)).toEqual(never);
-    expect(only(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '09:06')], apart), 'mall_slot_missed', 'window_missed')).toEqual(never);
+    expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '09:06')], apart)).toEqual(never);
+
+    // No Fresh shop in the data is in a mall. One that were, reached after its slot and after 08:00, is told both:
+    // OUT017 as a Fresh shop with a slot of 06:00 to 10:00, reached at 10:10.
+    const freshInMall = { outlets: changed('OUT017', { brand: 'Fresh', mallOpen: toMinutes('06:00'), mallClose: toMinutes('10:00'), ...hours('06:00', '10:00') }) };
+    expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '09:46')], freshInMall)).toEqual([{
+      code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
+      message: 'VEH012 trip 1 reaches OUT017 at 10:10, 10 minutes after its mall\'s delivery hours of 06:00 to 10:00 end, and Fresh shops must be reached before 08:00.',
+      fix: 'Leave by 07:35 to reach every stop in time.',
+    }]);
   });
 
   it('AC-37 warns with over_time_budget when a vehicle\'s Fresh trips pass 270 trip minutes or its Style and Tech trips 480', () => {
@@ -271,6 +294,16 @@ describe('rules for time', () => {
       fix: fix('06:23'),
     }]);
 
+    // Never before midnight. No shop in the data needs it, so OUT110 in Badulla, 186 minutes from Kandy, is given
+    // a window that closes at 03:00. Leaving at 00:00 reaches it at 03:06, so there is no fix.
+    const beforeDawn = (close: string) => check('Kandy', [trip('VEH044', 1, ['OUT110'])], { outlets: changed('OUT110', hours('00:00', close)) });
+    expect(beforeDawn('03:00')).toEqual([{
+      code: 'window_missed', level: 'block', vehicleId: 'VEH044', tripNo: 1, stopSeq: 1, outletId: 'OUT110',
+      message: 'VEH044 trip 1 reaches OUT110 at 06:36, 216 minutes after its delivery window closes at 03:00.',
+    }]);
+    // Midnight itself is not too early: with the window closing at 03:06 the fix says 00:00.
+    expect(beforeDawn('03:06')).toMatchObject([{ code: 'window_missed', outletId: 'OUT110', fix: fix('00:00') }]);
+
     // A missed mall slot carries the fix too: set to 10:40 the Style trip reaches OUT015 at 11:04.
     expect(check('Peliyagoda', [trip('VEH012', 1, styleShops, '10:40')])).toEqual([{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT015',
@@ -281,6 +314,14 @@ describe('rules for time', () => {
 
   it('leaves a trip with no stops to the rule for empty trips', () => {
     expect(check('Peliyagoda', [trip('VEH012', 1, [])])).toEqual([]);
+  });
+
+  it('says what is wrong with a shop whose own window opens after it closes', () => {
+    // No shop in the data is like this. A stop there can never be in time, and the sentence gives the two times.
+    expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT019'])], { outlets: changed('OUT019', hours('10:00', '09:00')) })).toEqual([{
+      code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT019',
+      message: 'VEH012 trip 1 stops at OUT019, whose delivery window opens at 10:00 and closes at 09:00, so it can never be reached in time.',
+    }]);
   });
 
   it('leaves the input as it came and says the same thing twice', () => {

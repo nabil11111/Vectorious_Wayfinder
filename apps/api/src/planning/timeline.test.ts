@@ -123,8 +123,9 @@ describe('trip timeline', () => {
     expect(at17('09:00', '17:00', '09:06')).toEqual([{ window: '10:30 to 12:30', arrives: '09:30', waits: 60, late: false }]);
     expect(at17('09:00', '17:00', '12:06')).toEqual([{ window: '10:30 to 12:30', arrives: '12:30', waits: 0, late: false }]);
     expect(at17('09:00', '17:00', '12:07')).toEqual([{ window: '10:30 to 12:30', arrives: '12:31', waits: 0, late: true }]);
-    // The shop's own closing time counts when it is the earlier one.
+    // The shop's own closing time counts when it is the earlier one, and its own opening when it is the later one.
     expect(at17('10:00', '11:30', '11:07')).toEqual([{ window: '10:30 to 11:30', arrives: '11:31', waits: 0, late: true }]);
+    expect(at17('11:00', '12:00')).toEqual([{ window: '11:00 to 12:00', arrives: '11:00', waits: 0, late: false }]);
 
     // 09:00 to 10:00 never overlaps the slot, so a stop there is late whenever it is reached.
     expect(at17('09:00', '10:00', '09:06')).toMatchObject([{ arrives: '09:30', late: true }]);
