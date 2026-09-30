@@ -15,6 +15,8 @@ export function AdminHome() {
       <Routes>
         <Route index element={<ComingNext title="Users" what="Add, edit and archive accounts. Vehicles, outlets and products follow the same list-and-form pattern." />} />
         <Route path="vehicles" element={<VehiclesPage />} />
+        {/* The tabs not built yet say so, instead of showing an empty page. */}
+        <Route path="*" element={<ComingNext title="Coming next" what="This admin page is not built yet. It follows the same list-and-form pattern as Vehicles." />} />
       </Routes>
     </AppShell>
   );
