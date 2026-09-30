@@ -9,6 +9,7 @@ import { config } from './lib/config';
 import { logger } from './lib/logger';
 import { jsonOnlyWrites, loadUser } from './middleware/auth';
 import { errorHandler, notFound } from './middleware/errors';
+import { adminRouter } from './routes/admin';
 import { authRouter } from './routes/auth';
 import { healthRouter } from './routes/health';
 
@@ -35,6 +36,7 @@ export function createApp() {
   api.use(loadUser);
   api.use('/health', healthRouter);
   api.use('/auth', authRouter);
+  api.use('/admin', adminRouter);
   api.use(notFound);
   app.use('/api/v1', api);
 
