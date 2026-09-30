@@ -173,6 +173,7 @@ column of the trip: a ready reads the problems under the trip's lock, so it sees
 Integration tests run in the builder's own seeded database (AGENTS.md) and assert the seeded day's numbers. Each file
 starts from the seeded day, puts it back at its end with spec 008's `clearDemoDay` and `seedDemoDay` in one transaction,
 and lets the clock go. `apps/api/tests/loading-plan.ts` places Nadeesha's draft at Wed 15:30, sends the walkthrough's
-plan at Wed 16:00 through the endpoints of specs 009 and 010, deferring every other order of the day with
+plan at Wed 16:00 through the endpoints of specs 009 and 010 (VEH035 with OUT001's three orders on stop 1 and OUT002's
+two on stop 2, driver `dilshan`), deferring every other order of the day with
 `dispatcher_choice`, adds VEH004's trip when asked, and sets the clock to Thu 25 Jun 02:30. A file signs in once per
 account.
