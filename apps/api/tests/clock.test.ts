@@ -356,6 +356,18 @@ describe('POST /demo/clock/next', () => {
     expect(res.body.error.details).toMatchObject({ part: 'delivered', next: null, revision: 8 });
   });
 
+  it('takes the clock from the database when it refuses a move, so a copy in memory that fell behind is right again', async () => {
+    await setClock(wed('15:00'), 0, 3);
+    // The row moves on and this process does not hear of it, as when a commit lands and its answer is lost.
+    await db.update(demoDay).set({ clockBase: new Date(wed('16:00')), clockSetAt: realNow(), revision: 4 });
+    expect((await getClock('loader')).body).toMatchObject({ part: 'ordering', revision: 3 });
+
+    const res = await pressNext('loader', 3);
+    expect([res.status, res.body.error.code]).toEqual([409, 'stale_clock']);
+    expect(res.body.error.details).toMatchObject({ part: 'planning', revision: 4 });
+    expect((await getClock('loader')).body).toMatchObject({ part: 'planning', revision: 4 });
+  });
+
   it('AC-6 answers 409 no_next_part in the last part and changes nothing', async () => {
     await setClock(thu('08:30'), 5 * MINUTE, 4);
     const [before, audited] = [await clockRow(), (await moves()).length];
