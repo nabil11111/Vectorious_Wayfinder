@@ -44,6 +44,12 @@ const routeOf = (input: PlanInput, trip: PlanTrip) => {
   return travel ? { shops, first, travel } : null;
 };
 
+// A vehicle's trips in the order they are driven and timed: by trip number, and as the plan lists them when
+// two share a number. Whatever pairs a trip with its times goes through this, so the pairing cannot drift.
+export const tripsOf = (input: PlanInput, vehicleId: string): PlanTrip[] =>
+  // filter makes a new list, so sorting it leaves the plan as it came.
+  input.plan.trips.filter((trip) => trip.vehicleId === vehicleId).sort((a, b) => a.tripNo - b.tripNo);
+
 export const defaultLeaveAt: DefaultLeaveAt = (input, trip, readyAt) => {
   const route = routeOf(input, trip);
   // A trip that cannot be timed has no first stop to aim at, so all it waits for is the vehicle.
@@ -85,8 +91,7 @@ export const timeTrip: TimeTrip = (input, trip, leaveAt) => {
 
 export const timeVehicleDay: TimeVehicleDay = (input, vehicleId) => {
   const vehicle = lookup(input.vehicles, 'vehicle')(vehicleId);
-  // filter makes a new list, so sorting it leaves the plan as it came.
-  const trips = input.plan.trips.filter((trip) => trip.vehicleId === vehicle.id).sort((a, b) => a.tripNo - b.tripNo);
+  const trips = tripsOf(input, vehicle.id);
   const timed: VehicleTimes['trips'] = [];
   // When the vehicle is ready again after the trip before. A trip that cannot be timed holds nothing up.
   let readyAt: Minutes | null = null;
