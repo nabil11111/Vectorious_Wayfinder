@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { DEMO_DAY, type Brand, type Temp } from '@wayfinder/contracts';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { depotInstant, realNow } from '../lib/clock';
 import { config } from '../lib/config';
 import { db, type Db, type Tx } from './client';
 import type { PRODUCTS } from './fixtures';
-import { deferrals, demoDay, fuelLog, orderLines, orders, outlets, plans, users, vehicleDaysOff, vehicles } from './schema';
+import { calendarDays, deferrals, demoDay, fuelLog, orderLines, orders, outlets, plans, users, vehicleDaysOff, vehicles } from './schema';
 
 // The seeded delivery day (spec 008): Thu 25 Jun 2026 from Peliyagoda, written once in demo mode. Each later
 // piece adds its own block of records to seedDemoDay, so a reset brings them back too.
@@ -102,6 +102,20 @@ const litresADay = (weeklyQuota: number, v: number) => Math.floor((weeklyQuota *
 const FIXED_LITRES_A_DAY: Record<string, number> = { VEH001: 100 };
 const FUEL_NOTE = 'Seeded history';
 
+// ── Spec 009 · shop orders ──────────────────────────────────────────────────────────────────────────────
+// What Nadeesha's own screens need on top of her draft: a history for her shop. Wednesday's dry order has
+// arrived and she has not confirmed it yet, so it shows on Today. The orders of the twelve operating days
+// before Wednesday, a chilled and a dry one for each, are all received: 24 of them, which is a page of the
+// Past list and four more to load. She placed each one at 08:05, her shop's time in the rule for placedAt
+// above, on the operating day before it was wanted. None is on a plan, so each counts for the day she wanted.
+const OWN_HISTORY = { outletId: DRAFT.outletId, by: DRAFT.by, wednesdayDryCartons: 6, daysBefore: 12 };
+// d is the day of the month. Tue 23 Jun: 8 + (23 mod 6) = 13 chilled cartons and 4 + (23 mod 5) = 7 dry ones.
+const pastChilledCartons = (d: number) => 8 + (d % 6);
+const pastDryCartons = (d: number) => 4 + (d % 5);
+// The form shows when the draft was last saved and its note for the driver. It was saved on Wednesday at
+// 14:40, before the clock starts.
+const DRAFT_SAVED = { atMinutes: 14 * 60 + 40, driverNote: 'Ring the bell at the side door.' };
+
 // The same id for the same seeded row on every machine and after every reset, so a test or a later seed can
 // point at "OUT002's chilled order for Thursday": demoId('order', '2026-06-25:OUT002:chilled'). It is a
 // SHA-1 of "kind:key" shaped as a UUID.
@@ -117,7 +131,7 @@ interface SeedOrder {
   outletId: string;
   wantedFor: string;
   temp: Temp;
-  status: 'placed' | 'draft' | 'deferred';
+  status: 'placed' | 'draft' | 'deferred' | 'delivered' | 'received';
   lines: Line[];
 }
 
@@ -231,6 +245,44 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
       litres: String(FIXED_LITRES_A_DAY[v.id] ?? litresADay(v.weeklyFuelQuotaL, numberOf(v.id))),
       note: FUEL_NOTE,
     }))));
+
+    // ── Spec 009 · shop orders ──────────────────────────────────────────────────────────────────────────
+    // The operating days up to Wednesday, newest first, and one more: an order is placed on the operating
+    // day before the one it is for, so Monday's was placed on Saturday.
+    const days = (await tx.select({ date: calendarDays.date }).from(calendarDays)
+      .where(and(eq(calendarDays.isOperating, true), lte(calendarDays.date, WED)))
+      .orderBy(desc(calendarDays.date)).limit(OWN_HISTORY.daysBefore + 2)).map((day) => day.date);
+    const ownOrder = (wantedFor: string, temp: Temp, status: 'delivered' | 'received', cartons: number): SeedOrder => (
+      { outletId: OWN_HISTORY.outletId, wantedFor, temp, status, lines: [[`fresh-${temp}-carton`, cartons]] }
+    );
+    const ownOrders = days.slice(0, -1).flatMap((day, i) => {
+      const d = Number(day.slice(8));
+      const history = day === WED
+        ? [ownOrder(day, 'dry', 'delivered', OWN_HISTORY.wednesdayDryCartons)]
+        : [ownOrder(day, 'chilled', 'received', pastChilledCartons(d)), ownOrder(day, 'dry', 'received', pastDryCartons(d))];
+      return history.map((order) => ({ order, placedOn: days[i + 1]! }));
+    });
+    await tx.insert(orders).values(ownOrders.map(({ order, placedOn }) => ({
+      id: orderId(order),
+      outletId: order.outletId,
+      deliveryDate: order.wantedFor,
+      temp: order.temp,
+      status: order.status,
+      // The shop has an account, so its orders name who made and who placed them.
+      createdBy: userId(OWN_HISTORY.by),
+      placedBy: userId(OWN_HISTORY.by),
+      placedAt: depotInstant(placedOn, 8 * 60 + 5 * numberOf(order.outletId)),
+    })));
+    await tx.insert(orderLines).values(ownOrders.flatMap(({ order }) => order.lines.map(([productId, quantity]) => ({
+      id: demoId('line', `${orderKey(order)}:${productId}`),
+      orderId: orderId(order),
+      productId,
+      quantity,
+    }))));
+    // The two orders of the draft, written above, get the time they were saved and the note.
+    await tx.update(orders)
+      .set({ savedAt: depotInstant(WED, DRAFT_SAVED.atMinutes), driverNote: DRAFT_SAVED.driverNote })
+      .where(inArray(orders.id, DRAFT_ORDERS.map(orderId)));
 
     await tx.update(demoDay).set({ seededAt: realNow() });
     return true;
