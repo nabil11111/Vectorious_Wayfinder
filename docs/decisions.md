@@ -139,3 +139,11 @@ truck needs the dispatcher to see the flag and answer it, and the rest of Live d
 
 **D-40 · 1 Oct · The loader's screens show what the data holds: one list in leaving order, with no waves, dock numbers
 or call buttons.** Every trip has its own leaving time (D-19), and the data has no docks and no phone numbers.
+
+**D-41 · 1 Oct · The planner serves chilled orders before dry ones of the same waiting age, even when a dry one
+closes earlier** (the lead's pick, until Nabil answers). Fridge trips are what the seeded day is short of, and a
+window stays a hard check, so a dry order that misses its window is still deferred with its reason.
+
+**D-42 · 1 Oct · A shop's new order keeps its own place in the queue and does not take its older order's
+priority** (the lead's pick, until Nabil answers). The waiting goods are protected first, and a new bulk order
+cannot push another shop's waiting order back.
