@@ -19,6 +19,9 @@ Open http://localhost:3000. The first start builds the image, creates the databa
 loads the seed data (the booklet's 120 outlets, 60 vehicles, calendar, travel times and service allowances, plus
 our product list and demo accounts). Later starts keep whatever you changed.
 
+The outlet names are ours, because the booklet's data has only ids: each outlet is named after a real town or
+mall in its district (`data/fixtures/outlet-names.csv`).
+
 To start again from an empty database: `docker compose down -v && docker compose up`.
 
 ### Working on the code
@@ -56,7 +59,7 @@ Password for the demo accounts: `wayfinder-demo` (`SEED_PASSWORD`). Admin has it
 
 | Role | Username | Where |
 | --- | --- | --- |
-| Store manager | `nadeesha` | Fresh Colombo 1 (OUT001) |
+| Store manager | `nadeesha` | Fresh Nugegoda (OUT001) |
 | Dispatcher | `ruwan` | Peliyagoda depot |
 | Loader | `kasun` | Peliyagoda depot |
 | Driver | `dilshan` | Peliyagoda depot |

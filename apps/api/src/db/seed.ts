@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hash } from '@node-rs/argon2';
 import { parse } from 'csv-parse/sync';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { config } from '../lib/config';
 import { logger } from '../lib/logger';
 import { moveAdminOffSharedPassword } from './admin-password';
@@ -16,8 +16,10 @@ import * as s from './schema';
 // touches orders or plans people have made, so it is safe on every start.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DATA_DIR ?? path.resolve(here, '../../../../data/shared');
+// Our own CSVs sit beside the booklet's and ship with the code, so they are found from here whatever DATA_DIR says.
+const fixtureDir = path.resolve(here, '../../../../data/fixtures');
 type Row = Record<string, string>;
-const read = (file: string): Row[] => parse(readFileSync(path.join(dataDir, file)), { columns: true, skip_empty_lines: true });
+const read = (file: string, dir = dataDir): Row[] => parse(readFileSync(path.join(dir, file)), { columns: true, skip_empty_lines: true });
 const bool = (v: string | undefined) => v === '1';
 
 const outletRows = read('outlets.csv');
@@ -26,14 +28,17 @@ const vehicleRows = read('vehicles.csv');
 const depotIds = [...new Set([...outletRows, ...vehicleRows].map((r) => r.depot!))];
 await db.insert(s.depots).values(depotIds.map((id) => ({ id, name: id }))).onConflictDoNothing();
 
-// outlets.csv has no names. Number them per brand and district so screens can say "Fresh Colombo 3".
+// outlets.csv has no names. Ours are in outlet-names.csv: the brand, then a real town or mall in the district.
+// An outlet that file leaves out is numbered per brand and district, like "Fresh Colombo 3". One that is already
+// in the database only gets its name brought up to date, and a row that is already right is not written again.
+const nameOf = new Map(read('outlet-names.csv', fixtureDir).map((r) => [r.outlet_id!, r.name!]));
 const counter = new Map<string, number>();
 await db.insert(s.outlets).values(outletRows.map((r) => {
   const key = `${r.brand} ${r.district}`;
   counter.set(key, (counter.get(key) ?? 0) + 1);
   return {
     id: r.outlet_id!,
-    name: `${key} ${counter.get(key)}`,
+    name: nameOf.get(r.outlet_id!) || `${key} ${counter.get(key)}`,
     brand: r.brand as (typeof s.brandEnum.enumValues)[number],
     district: r.district!,
     depotId: r.depot!,
@@ -43,7 +48,7 @@ await db.insert(s.outlets).values(outletRows.map((r) => {
     windowOpen: r.window_open_time!,
     windowClose: r.window_close_time!,
   };
-})).onConflictDoNothing();
+})).onConflictDoUpdate({ target: s.outlets.id, set: { name: sql`excluded.name` }, setWhere: sql`${s.outlets.name} <> excluded.name` });
 
 await db.insert(s.vehicles).values(vehicleRows.map((r) => ({
   id: r.vehicle_id!,

@@ -39,8 +39,7 @@ A builder can be a teammate or a coding agent working from the spec. The rules a
 - Someone who did not write it has reviewed it.
 - Loader and driver screens work at phone size.
 - No sample data in components and no silent fallbacks. If a request fails, the screen says so.
-- The README walkthrough, the departures from the design and the AI disclosure are updated when the piece
-  touches them.
+- The README walkthrough and the departures from the design are updated when the piece touches them.
 - The person who opened the pull request can explain every line of it.
 
 ## Spec files
@@ -57,7 +56,7 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | Spec | Feature | Status |
 | --- | --- | --- |
 | [000](000-map.md) | The map: every piece, in build order | Ready |
-| [003](003-outlet-names.md) | Outlet names | Ready |
+| [003](003-outlet-names.md) | Outlet names | Done |
 | [004](004-admin-vehicles.md) | Admin: vehicles | Ready |
 | [005](005-admin-outlets.md) | Admin: outlets | Ready (after 004) |
 | [006](006-admin-products.md) | Admin: products | Ready (after 004) |
