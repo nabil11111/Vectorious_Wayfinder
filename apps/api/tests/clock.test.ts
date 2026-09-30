@@ -349,7 +349,9 @@ describe('POST /demo/clock/next', () => {
     const { both } = await db.transaction(async (tx) => {
       await tx.select().from(demoDay).for('update');
       const both = Promise.all([pressNext('dispatcher', 3), pressNext('loader', 3)]);
-      await vi.waitUntil(async () => (await waiting()) >= 2, { timeout: 3000, interval: 10 });
+      // A busy machine can take seconds to get both requests to the lock, so this waits long enough not to
+      // mistake a slow start for a failure.
+      await vi.waitUntil(async () => (await waiting()) >= 2, { timeout: 15_000, interval: 10 });
       return { both };
     });
     const answers = await both;
