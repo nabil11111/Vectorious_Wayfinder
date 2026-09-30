@@ -5,6 +5,7 @@ import { pool } from '../src/db/client';
 
 const app = createApp();
 const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
+const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 afterAll(() => pool.end());
 
 describe('health', () => {
@@ -38,6 +39,18 @@ describe('sign in', () => {
     expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
   });
 
+  it('gives the Peliyagoda depot its own driver, so one delivery can be followed end to end', async () => {
+    const res = await request(app).post('/api/v1/auth/login').send({ username: 'dilshan', password });
+    expect(res.body).toMatchObject({ role: 'driver', depotId: 'Peliyagoda' });
+  });
+
+  it('keeps the admin account off the shared demo password', async () => {
+    const demo = await request(app).post('/api/v1/auth/login').send({ username: 'admin', password });
+    expect(demo.status).toBe(401);
+    const own = await request(app).post('/api/v1/auth/login').send({ username: 'admin', password: adminPassword });
+    expect(own.body).toMatchObject({ role: 'admin' });
+  });
+
   it('refuses a missing field with the shared error shape', async () => {
     const res = await request(app).post('/api/v1/auth/login').send({ username: 'ruwan' });
     expect(res.status).toBe(400);
@@ -51,14 +64,21 @@ describe('security basics', () => {
     expect(res.status).toBe(415);
   });
 
-  it('blocks rapid password guessing', async () => {
-    const tries = [];
-    for (let i = 0; i < 12; i++) tries.push(await request(app).post('/api/v1/auth/login').set('X-Forwarded-For', '203.0.113.9').send({ username: 'kasun', password: 'guess' + i }));
-    expect(tries.at(-1)!.status).toBe(429);
+  it('answers a broken JSON body with 400, not a server error', async () => {
+    const res = await request(app).post('/api/v1/auth/login').set('Content-Type', 'application/json').send('{"username":"ruwan","password":"hunter2"');
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('invalid_json');
   });
 
   it('sends security headers', async () => {
     const res = await request(app).get('/api/v1/health');
     expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  // Keep this one last: it uses up the sign-in allowance for this test file.
+  it('blocks rapid password guessing, even when each try claims a different address', async () => {
+    const tries = [];
+    for (let i = 0; i < 12; i++) tries.push(await request(app).post('/api/v1/auth/login').set('X-Forwarded-For', `203.0.113.${i}`).send({ username: 'kasun', password: 'guess' + i }));
+    expect(tries.at(-1)!.status).toBe(429);
   });
 });

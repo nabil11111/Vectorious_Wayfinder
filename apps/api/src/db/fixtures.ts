@@ -14,11 +14,13 @@ export const PRODUCTS = [
   { id: 'tech-small', brand: 'Tech', name: 'Small appliances', unit: 'pallet', kgPerUnit: '190', m3PerUnit: '0.62', temp: 'dry', needsTailLift: false, keepUpright: false },
 ] as const;
 
-// One account per role, named after the personas in the design. The outlet and depot are picked in seed.ts.
+// One account per role, named after the personas in the design, plus a Peliyagoda driver so the shop, dispatcher,
+// loader and a driver all belong to the same depot. The outlet and depot are picked in seed.ts.
 export const DEMO_USERS = [
   { username: 'nadeesha', displayName: 'Nadeesha', role: 'store_manager', depot: 'Peliyagoda' },
   { username: 'ruwan', displayName: 'Ruwan', role: 'dispatcher', depot: 'Peliyagoda' },
   { username: 'kasun', displayName: 'Kasun', role: 'loader', depot: 'Peliyagoda' },
+  { username: 'dilshan', displayName: 'Dilshan', role: 'driver', depot: 'Peliyagoda' },
   { username: 'prasanna', displayName: 'Prasanna', role: 'driver', depot: 'Kandy' },
   { username: 'admin', displayName: 'Admin', role: 'admin', depot: null },
 ] as const;

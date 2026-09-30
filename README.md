@@ -42,18 +42,22 @@ Every setting is in `.env.example`, and `docker compose up` works without a `.en
 | Variable | What it does |
 | --- | --- |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Database login used by compose |
-| `SEED_PASSWORD` | Password for every seeded account |
+| `SEED_PASSWORD` | Password for the seeded demo accounts |
+| `SEED_ADMIN_PASSWORD` | Password for the seeded admin account |
+| `TRUST_PROXY` | Proxies in front of the app: `0` when reached directly, `1` on Railway |
 | `DATABASE_URL` | Only for running the API outside Docker |
 
 ## Seeded accounts
 
-Password for all of them: `wayfinder-demo` (or whatever `SEED_PASSWORD` is set to).
+Password for the demo accounts: `wayfinder-demo` (`SEED_PASSWORD`). Admin has its own: `wayfinder-admin`
+(`SEED_ADMIN_PASSWORD`).
 
 | Role | Username | Where |
 | --- | --- | --- |
 | Store manager | `nadeesha` | Fresh Colombo 1 (OUT001) |
 | Dispatcher | `ruwan` | Peliyagoda depot |
 | Loader | `kasun` | Peliyagoda depot |
+| Driver | `dilshan` | Peliyagoda depot |
 | Driver | `prasanna` | Kandy depot |
 | Admin | `admin` | Everything |
 

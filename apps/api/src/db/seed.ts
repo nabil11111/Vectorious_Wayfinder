@@ -90,12 +90,14 @@ await db.insert(s.products).values(PRODUCTS.map((p) => ({ ...p }))).onConflictDo
 
 // The store manager gets the first Fresh outlet in Colombo, which matches Nadeesha's shop in the design.
 const [shop] = await db.select().from(s.outlets).where(and(eq(s.outlets.brand, 'Fresh'), eq(s.outlets.district, 'Colombo'))).orderBy(s.outlets.id).limit(1);
+// Admin can do everything, so it does not share the password the demo accounts are handed out with.
 const passwordHash = await hash(config.SEED_PASSWORD);
+const adminPasswordHash = await hash(config.SEED_ADMIN_PASSWORD);
 await db.insert(s.users).values(DEMO_USERS.map((u) => ({
   username: u.username,
   displayName: u.displayName,
   role: u.role,
-  passwordHash,
+  passwordHash: u.role === 'admin' ? adminPasswordHash : passwordHash,
   depotId: u.depot,
   outletId: u.role === 'store_manager' ? shop!.id : null,
 }))).onConflictDoNothing();

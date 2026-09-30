@@ -15,7 +15,9 @@ import { healthRouter } from './routes/health';
 // Builds the app without listening, so tests can drive it directly.
 export function createApp() {
   const app = express();
-  app.set('trust proxy', 1); // Railway sits in front; this makes rate limits see the real client address.
+  // Rate limits count by client address. Believe a forwarded address only when a proxy we run sits in front,
+  // otherwise anyone could change the header on each try and never be limited.
+  app.set('trust proxy', config.TRUST_PROXY);
   app.use(helmet());
   // Log the method, path, status and time only. Full headers would write session cookies into the logs.
   app.use(pinoHttp({
@@ -27,7 +29,7 @@ export function createApp() {
   app.use(cookieParser());
 
   const api = express.Router();
-  api.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false,
+  api.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false, validate: { xForwardedForHeader: false },
     message: { error: { code: 'rate_limited', message: 'Too many requests. Slow down a little.' } } }));
   api.use(jsonOnlyWrites);
   api.use(loadUser);

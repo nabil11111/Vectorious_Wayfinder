@@ -13,7 +13,7 @@ import { SESSION_COOKIE, hashToken, requireRole } from '../middleware/auth';
 export const authRouter = Router();
 
 // Ten tries per 15 minutes per address, so nobody can guess passwords at speed.
-const loginLimit = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false,
+const loginLimit = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, validate: { xForwardedForHeader: false },
   message: { error: { code: 'too_many_attempts', message: 'Too many sign-in attempts. Try again in a few minutes.' } } });
 
 authRouter.post('/login', loginLimit, async (req, res) => {

@@ -26,6 +26,8 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER:-wayfinder}:${POSTGRES_PASSWORD:-wayfinder}@db:5432/${POSTGRES_DB:-wayfinder}
       SEED_PASSWORD: ${SEED_PASSWORD:-wayfinder-demo}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-wayfinder-admin}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
     ports:
       - "3000:3000"
 
