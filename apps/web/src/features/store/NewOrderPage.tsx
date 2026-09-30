@@ -73,10 +73,11 @@ function OrderForm({ next }: { next: OpenOrder }) {
           )}
           {form.changedElsewhere && <Notice>This order was changed somewhere else. These are the latest numbers.</Notice>}
 
+          {/* From the tap on Place until it settles, nothing on the form can change (see draft-form.ts). */}
           {fresh ? (
             <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-3.5">
               {products.map((product) => (
-                <FreshItem key={product.id} product={product} quantity={form.values.quantities[product.id] ?? 0} onChange={(quantity) => form.setQuantity(product.id, quantity)} />
+                <FreshItem key={product.id} product={product} quantity={form.values.quantities[product.id] ?? 0} disabled={form.placing} onChange={(quantity) => form.setQuantity(product.id, quantity)} />
               ))}
             </div>
           ) : (
@@ -87,7 +88,7 @@ function OrderForm({ next }: { next: OpenOrder }) {
                 <p className="ml-auto text-[11px] leading-[14px] text-muted-foreground/65">{[...new Set(products.map((p) => p.temp))].join(' and ')} · per unit</p>
               </div>
               {products.map((product) => (
-                <ListItem key={product.id} product={product} quantity={form.values.quantities[product.id] ?? 0} onChange={(quantity) => form.setQuantity(product.id, quantity)} />
+                <ListItem key={product.id} product={product} quantity={form.values.quantities[product.id] ?? 0} disabled={form.placing} onChange={(quantity) => form.setQuantity(product.id, quantity)} />
               ))}
             </Panel>
           )}
@@ -114,8 +115,9 @@ function OrderForm({ next }: { next: OpenOrder }) {
               rows={1}
               maxLength={200}
               value={form.values.note}
+              disabled={form.placing}
               onChange={(event) => form.setNote(event.target.value)}
-              className="mt-2 block field-sizing-content min-h-[47px] w-full resize-none rounded-[10px] border border-input bg-card px-3 py-[11px] text-[13px] leading-4 outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground pointer-coarse:text-base"
+              className="mt-2 block field-sizing-content min-h-[47px] w-full resize-none rounded-[10px] border border-input bg-card px-3 py-[11px] text-[13px] leading-4 outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:text-muted-foreground/65 pointer-coarse:text-base"
             />
           </Panel>
         </div>
@@ -147,7 +149,7 @@ function OrderForm({ next }: { next: OpenOrder }) {
 }
 
 // The Fresh form: a card for each of its two items, named by temperature.
-function FreshItem({ product, quantity, onChange }: { product: StoreProduct; quantity: number; onChange: (quantity: number) => void }) {
+function FreshItem({ product, quantity, disabled, onChange }: { product: StoreProduct; quantity: number; disabled: boolean; onChange: (quantity: number) => void }) {
   const name = TEMP_NAME[product.temp];
   return (
     <Panel className="flex items-center gap-3">
@@ -156,14 +158,14 @@ function FreshItem({ product, quantity, onChange }: { product: StoreProduct; qua
         <h2 className={cn('text-lg leading-[25px] font-bold', quantity === 0 && 'text-muted-foreground')}>{name}</h2>
         <p className="text-xs leading-[15px] text-muted-foreground">{plural(product.unit)}</p>
       </div>
-      <QuantityStepper size="lg" name={`${name} ${plural(product.unit)}`} value={quantity} onChange={onChange} />
+      <QuantityStepper size="lg" name={`${name} ${plural(product.unit)}`} value={quantity} disabled={disabled} onChange={onChange} />
     </Panel>
   );
 }
 
 // A row of the Style and Tech lists: the item, its unit with kilos and cubic metres, and the stepper. An item
 // at 0 is greyed.
-function ListItem({ product, quantity, onChange }: { product: StoreProduct; quantity: number; onChange: (quantity: number) => void }) {
+function ListItem({ product, quantity, disabled, onChange }: { product: StoreProduct; quantity: number; disabled: boolean; onChange: (quantity: number) => void }) {
   return (
     <div className="flex min-h-14 items-center gap-1.5 border-t py-2">
       {/* The longest line of the product list fits a 390 px phone to the pixel, so it may use 4 px of the gap. */}
@@ -171,7 +173,7 @@ function ListItem({ product, quantity, onChange }: { product: StoreProduct; quan
         <h3 className={cn('font-sans text-sm leading-[17px] font-semibold', quantity === 0 && 'text-muted-foreground')}>{product.name}</h3>
         <p className="mt-1 font-mono text-[11px] leading-[14px] text-muted-foreground/65">{itemFigures(product)}</p>
       </div>
-      <QuantityStepper size="md" name={product.name} value={quantity} onChange={onChange} />
+      <QuantityStepper size="md" name={product.name} value={quantity} disabled={disabled} onChange={onChange} />
     </div>
   );
 }

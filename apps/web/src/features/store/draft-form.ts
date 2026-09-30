@@ -201,7 +201,10 @@ class DraftForm {
     }
   };
 
+  // From the tap on Place until the place settles, the form holds still. A change made then would be saved
+  // behind the place, and once the drafts are placed, as a new draft nobody asked for.
   private change(values: FormValues) {
+    if (this.placing) return;
     this.values = values;
     this.seq += 1;
     this.tell({ values, saving: 'saving', changedElsewhere: false, refused: null });
