@@ -103,7 +103,7 @@ function FlagForm({ truck, stop, writes }: { truck: LoadingTruck; stop: LoadingS
           </ul>
         </Card>
 
-        <Card className="flex flex-col px-4 pt-4 pb-5 lg:min-h-[calc(100dvh-162px)] lg:px-5 lg:pt-[19px]">
+        <Card className="flex flex-col px-4 pt-4 pb-5 lg:min-h-[calc(100dvh-149px)] lg:px-5 lg:pt-[19px]">
           <h2 className="text-[22px] leading-7 font-bold">What’s wrong?</h2>
           <Reasons value={reason} onChange={setReason} disabled={busy} />
           {line ? (

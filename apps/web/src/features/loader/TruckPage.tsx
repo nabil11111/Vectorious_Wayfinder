@@ -89,7 +89,7 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
       </div>
       <div className="grid grid-cols-1 gap-y-3 lg:grid-cols-[minmax(0,680fr)_minmax(0,420fr)] lg:grid-rows-[auto_1fr] lg:gap-x-6">
         <LoadCard truck={truck} at={at} className="lg:col-start-1 lg:row-start-1" />
-        <Card className="flex flex-col px-4 pt-4 pb-5 lg:sticky lg:top-[77px] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:min-h-[calc(100dvh-162px)] lg:self-start lg:px-5 lg:pt-[18px]">
+        <Card className="flex flex-col px-4 pt-4 pb-5 lg:sticky lg:top-[77px] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:min-h-[calc(100dvh-149px)] lg:self-start lg:px-5 lg:pt-[18px]">
           {current ? (
             <NowLoading truck={truck} stop={current} started={loading} ticks={ticks} flagged={flagged} />
           ) : (
@@ -144,14 +144,14 @@ function AllOn({ truck }: { truck: LoadingTruck }) {
   return (
     <>
       <Label>All stops loaded</Label>
-      <h2 className="mt-2.5 text-2xl leading-8 font-bold">{allOnLine(truck)}</h2>
+      <h2 className="mt-[15px] text-2xl leading-8 font-bold">{allOnLine(truck)}</h2>
       {answered.map((issue) => (
-        <div key={issue.id} className="mt-4 rounded-[12px] bg-muted px-4 pt-3.5 pb-4">
-          <p className="flex items-center gap-2 text-[13px] leading-4 font-semibold">
-            <img src={DISPATCHER_ICON} alt="" className="size-6 object-contain" />
+        <div key={issue.id} className="mt-4 rounded-[12px] bg-muted px-4 pt-3 pb-4">
+          <p className="flex items-center gap-2 text-[13px] leading-5 font-semibold">
+            <img src={DISPATCHER_ICON} alt="" className="size-5 object-contain" />
             {answeredBy(issue)}
           </p>
-          <p className="mt-2.5 text-[15px] leading-[21px]">{answerSentence(issue)}</p>
+          <p className="mt-[7px] text-[15px] leading-[21px]">{answerSentence(issue)}</p>
         </div>
       ))}
     </>
@@ -168,7 +168,7 @@ function ReadyTruck({ day, truck, stale }: { day: LoadingDay; truck: LoadingTruc
     <div className="lg:pt-1">
       {stale && <div className="mb-3">{stale}</div>}
       <div className="grid grid-cols-1 gap-y-4 lg:grid-cols-[minmax(0,680fr)_minmax(0,420fr)] lg:gap-x-6">
-        <Card className="px-5 pt-5 pb-6 lg:self-start lg:px-7 lg:pt-7 lg:pb-8">
+        <Card className="px-5 pt-5 pb-6 lg:self-start lg:px-7 lg:pt-[22px] lg:pb-8">
           <div className="flex items-center gap-3.5">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-good text-card lg:size-12">
               {/* The design draws a plain tick here, so it is the outline set's. */}
@@ -176,11 +176,11 @@ function ReadyTruck({ day, truck, stale }: { day: LoadingDay; truck: LoadingTruc
             </span>
             <h1 className="text-2xl leading-8 font-bold lg:text-[30px] lg:leading-9">{truckName(truck)} is ready</h1>
           </div>
-          <p className="mt-4 text-[15px] leading-5 text-muted-foreground lg:mt-5">{readyLine(truck)}</p>
+          <p className="mt-4 text-[15px] leading-5 text-muted-foreground lg:mt-3">{readyLine(truck)}</p>
           {note && <p className="mt-3 text-[15px] leading-5">{note}</p>}
         </Card>
-        <div className="flex flex-col gap-y-4 lg:min-h-[calc(100dvh-120px)]">
-          <NextList trucks={others} from={2} className="order-2 lg:order-1" />
+        <div className="flex flex-col gap-y-4 lg:min-h-[calc(100dvh-115px)]">
+          <NextList trucks={others} from={2} className="order-2 lg:order-1 lg:-mt-1.5" />
           <Button className={orangeButton(cn(BIG, 'order-1 lg:order-2 lg:mt-auto'))} onClick={() => navigate('/loader')}>Back to trucks</Button>
         </div>
       </div>
