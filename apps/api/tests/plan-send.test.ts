@@ -76,7 +76,8 @@ it('AC-26 sends atomically, saves the check and times, revises orders and announ
 });
 
 it('AC-27 assigns exact vehicle litres across both trips', async () => {
-  const b = await save(ready([{ ...trip(['OUT027', 'OUT034'], 'VEH010'), driverId: null }, { ...trip(['OUT025', 'OUT029'], 'VEH010', 2), driverId: null }]));
+  const dryTrips = [trip(['OUT027', 'OUT034'], 'VEH010'), trip(['OUT025', 'OUT029'], 'VEH010', 2)].map((t) => ({ ...t, driverId: null, stops: t.stops.map((s) => ({ ...s, orderIds: s.orderIds.filter((id) => board.orders.find((o) => o.id === id)!.temp === 'dry') })) }));
+  const b = await save(ready(dryTrips));
   expect(b.check!.ok).toBe(true); expect((await send(b)).status).toBe(200);
   const fuel = await db.select({ litres: fuelLog.litres, tripNo: trips.tripNo }).from(fuelLog).innerJoin(trips, eq(trips.id, fuelLog.tripId)).where(eq(trips.planId, b.plan.id!)).orderBy(trips.tripNo);
   expect(fuel).toEqual([{ litres: '11.3', tripNo: 1 }, { litres: '11.2', tripNo: 2 }]);
