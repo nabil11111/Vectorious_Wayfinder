@@ -69,8 +69,14 @@ const notOnTheList = (shop: Shop, productId: string) => {
 const lockShop = (tx: Tx, outletId: string) => tx.select({ id: outlets.id }).from(outlets).where(eq(outlets.id, outletId)).for('no key update');
 
 // One snapshot for a whole answer, so a place that commits halfway through a read is seen whole or not at
-// all. It is read only: reading never writes.
-export const snapshot = <T>(read: (tx: Tx) => Promise<T>) => db.transaction(read, { isolationLevel: 'repeatable read', accessMode: 'read only' });
+// all. It is read only: reading never writes. A demo reset truncates orders first and then the rest of the
+// day's tables, and a read keeps every table it touched until it ends. So the read takes orders before anything
+// else, which makes a read and a reset take turns: one that held plans and then asked for orders would
+// deadlock with the reset. Taken first, the lock also comes before the snapshot.
+export const snapshot = <T>(read: (tx: Tx) => Promise<T>) => db.transaction(async (tx) => {
+  await tx.execute(sql`lock table ${orders} in access share mode`);
+  return read(tx);
+}, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 
 interface OpenDay { deliveryDate: string; cutoffAt: Date; cutoffIsToday: boolean }
 
