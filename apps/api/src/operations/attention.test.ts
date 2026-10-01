@@ -25,6 +25,18 @@ it('AC-16 attention names missing reports and retries without predictions', () =
   expect(outRowOf(done, arrivals, [issue], at(500)).status).toMatchObject({ kind: 'open_problem', issueId: issue.id, summary: 'Nobody there' });
 });
 
+it('Q-20 names an open flag of a truck that cannot take it all "Won\'t fit", and keeps the words of every other reason', () => {
+  const summaryOf = (kind: Issue['kind'], reason: Issue['reason']) => {
+    const issue = { id: randomUUID(), kind, reason, status: 'open', raisedAt: at(150) } as Issue;
+    const row = outRowOf(trip, arrivals, [issue], at(200)).status;
+    return row.kind === 'open_problem' ? row.summary : null;
+  };
+  expect(summaryOf('loading', 'wont_fit')).toBe('Won\'t fit');
+  expect([summaryOf('loading', 'short'), summaryOf('loading', 'damaged'), summaryOf('loading', 'wrong_item')]).toEqual(['Short', 'Damaged', 'Wrong item']);
+  expect([summaryOf('refused', 'expired'), summaryOf('refused', 'not_ordered'), summaryOf('closed', 'nobody_there')]).toEqual(['Expired', 'Not ordered', 'Nobody there']);
+  expect([summaryOf('receipt', 'missing'), summaryOf('receipt', 'not_cold')]).toEqual(['Missing', 'Not cold']);
+});
+
 it('AC-16 out trucks sort open problems then watching then scheduled leave', () => {
   const base = { date: '2026-06-25', vehicleId: 'VEH035', tripNo: 1, detailRecorded: true, schedule: { leavesAt: at(276), backAt: at(370) } };
   const row = (tripId: string, status: object) => ({ ...base, tripId, outRow: { status } }) as OperationsTrip;

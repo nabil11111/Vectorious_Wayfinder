@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ClockState, LoadingDay, LoadingStop, LoadingTruck } from '@wayfinder/contracts';
+import type { ClockState, Issue, LoadingDay, LoadingStop, LoadingTruck } from '@wayfinder/contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -9,7 +9,7 @@ import { Counter, FlagPage } from './FlagPage';
 import { loadingKey } from './loading';
 import { lastLoaded } from './stops';
 import { TruckPage } from './TruckPage';
-import { countLine, undoFirstWords, undoStopWords } from './words';
+import { answerSentence, countHint, countLine, countWhere, undoFirstWords, undoStopWords } from './words';
 
 // The loader's screens as the live QA run found them (phase 3, Q-16 to Q-23). The pages are drawn as the server would
 // draw them, from a loading day in the query and the app clock at Thu 25 Jun 02:35. These fixtures live in the test only.
@@ -106,7 +106,7 @@ describe('Q-16 a stop marked loaded by mistake, and a flag on a loaded stop', ()
 
 // Kotahena's 57 dry cartons on VEH038's stop 2, as the counter shows them.
 const kotahena = () => veh038([3]).stops[1]!.lines[0]!;
-const counter = (text?: string, value = 57) => renderToStaticMarkup(<Counter line={kotahena()} kind="Dry" value={value} text={text} disabled={false} onStep={() => {}} onType={() => {}} onLeave={() => {}} />);
+const counter = (text?: string, value = 57, where = 'at the dock') => renderToStaticMarkup(<Counter line={kotahena()} kind="Dry" where={where} value={value} text={text} disabled={false} onStep={() => {}} onType={() => {}} onLeave={() => {}} />);
 const stepButtons = (html: string) => [...html.matchAll(/<button[^>]*>/g)].map(([tag]) => tag);
 
 describe('Q-17 the flag\'s count box', () => {
@@ -164,5 +164,44 @@ describe('Q-17 the flag\'s count box', () => {
   it('lists a line whose box holds a wrong number with what was typed, in red', () => {
     expect(flagCounts(veh038([3]).stops[0]!.lines, new Set(), {}, { 'w-2': '-3' }).shownOf(veh038([3]).stops[0]!.lines[1]!)).toEqual({ count: '-3', wrong: true });
     expect(flagCounts(veh038([3]).stops[0]!.lines, new Set(), { 'w-2': 1 }, {}).shownOf(veh038([3]).stops[0]!.lines[1]!)).toEqual({ count: '1', wrong: false });
+  });
+});
+
+// A flag of VEH038's stop 2 as the dispatcher answered it: Kotahena's 57 dry cartons, 54 counted.
+function flagOn(truck: LoadingTruck, reason: Issue['reason'], decision: Issue['decision'] = null): Issue {
+  const stop = truck.stops[1]!;
+  const line = stop.lines[0]!;
+  return {
+    id: '7c000000-0000-4000-8000-000000000002', revision: 1, kind: 'loading', reason, status: decision ? 'decided' : 'open', raisedBy: 'Kasun', raisedAt: '2026-06-24T21:03:00.000Z',
+    note: null, decision, decidedBy: decision ? 'Ruwan' : null, decidedAt: decision ? '2026-06-24T21:05:00.000Z' : null, hasPhoto: false, short: 3, cold: null, replacement: null,
+    trip: { id: truck.tripId, vehicleId: truck.vehicleId, tripNo: 1, leavesAt: truck.leavesAt, status: 'loading', driver: 'Dilshan', stopsLeft: 3 },
+    stop: { id: stop.id, seq: stop.seq, outletId: stop.outletId, shopName: stop.shopName, arrivedAt: null, doneAt: null, loadedAt: null, flaggedAtDock: true },
+    lines: [{ lineId: line.lineId, orderId: line.orderId, temp: 'dry', productId: line.productId, name: line.name, unit: 'carton', quantity: 57, counted: 54, loaded: null, delivered: null, received: null }],
+  };
+}
+
+describe('Q-20 a truck that cannot take it all', () => {
+  it('offers "Won\'t fit" beside Short, Damaged and Wrong item', () => {
+    const html = page(`/loader/trucks/${TRIP}/flag?stop=stop-2`, dayOf(veh038([3]))).replaceAll('&#x27;', '\'');
+    const reasons = [...html.matchAll(/<button[^>]*role="radio"[^>]*>([^<]*)<\/button>/g)].map(([, words]) => words);
+    expect(reasons).toEqual(['Short', 'Damaged', 'Wrong item', 'Won\'t fit']);
+  });
+
+  it('counts what fits on the truck where the others count what is at the dock', () => {
+    expect(countWhere('wont_fit')).toBe('fit on the truck');
+    for (const reason of ['short', 'damaged', 'wrong_item'] as const) expect(countWhere(reason)).toBe('at the dock');
+    expect(countHint('wont_fit')).toBe('Tap the line that will not all fit, then count what fits on the truck.');
+    expect(countHint('short')).toBe('Tap the line that is not right, then count what is at the dock.');
+    const html = counter(undefined, 54, countWhere('wont_fit'));
+    expect(html).toContain('>fit on the truck<');
+    expect(html).toMatch(/<input[^>]*aria-label="Dry fit on the truck"/);
+  });
+
+  it('tells the loader the answer in words about room, not stock', () => {
+    const truck = veh038([3]);
+    expect(answerSentence(flagOn(truck, 'wont_fit', 'go_short'))).toBe('Go without the 3 dry cartons that won\'t fit for Fresh Kotahena.');
+    expect(answerSentence(flagOn(truck, 'wont_fit', 'load_all'))).toBe('Load it all for Fresh Kotahena. Make room for the rest.');
+    expect(answerSentence(flagOn(truck, 'short', 'go_short'))).toBe('Go with 3 dry cartons short for Fresh Kotahena.');
+    expect(answerSentence(flagOn(truck, 'short', 'load_all'))).toBe('Load it all for Fresh Kotahena. The rest comes from stock.');
   });
 });

@@ -19,6 +19,11 @@ const ANSWER: Record<LoadingDecision, { title: string; line: string }> = {
   go_short: { title: 'Go short', line: 'The truck leaves with what is at the dock.' },
   load_all: { title: 'Load it all', line: 'The rest comes from stock and goes on.' },
 };
+// A truck that cannot take it all (Q-20) gets the same two answers, said about room on the truck and not about stock.
+const ROOM_ANSWER: Record<LoadingDecision, { title: string; line: string }> = {
+  go_short: { title: 'Go short', line: 'The truck leaves with what fits.' },
+  load_all: { title: 'Load it all', line: 'Make room on the truck for the rest.' },
+};
 
 // When a problem was raised, "02:33", in a grey chip. The first problem's sits on the column's heading row, as in
 // the frame, and every later one's beside its title.
@@ -44,9 +49,12 @@ export function IssueCard({ issue, answering, time, className }: { issue: Issue;
 }
 
 // A loader's flag (spec 012): the count at the dock and the note, then "Go short" or "Load it all", and "Send to loader".
+// A truck that cannot take it all (Q-20) counts what fits instead, and its answers say so.
 function FlagCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
   const [choice, setChoice] = useState<LoadingDecision>('go_short');
   const brand = brandOfShop(issue.stop.shopName);
+  const room = issue.reason === 'wont_fit';
+  const answers = room ? ROOM_ANSWER : ANSWER;
   return (
     <article aria-label={issueTitle(issue)} className={className}>
       <Heading title={issueTitle(issue)} issue={issue} time={time} />
@@ -54,11 +62,11 @@ function FlagCard({ issue, answering, time, className }: { issue: Issue; answeri
 
       <dl className="mt-[9px] space-y-1 text-[11px] leading-[14px]">
         <Row label="Loader" value={raisedLine(issue)} first />
-        <Row label="At the dock" value={issue.lines.map((line) => countedLine(line, brand)).join(', ')} />
+        <Row label={room ? 'Fits' : 'At the dock'} value={issue.lines.map((line) => countedLine(line, brand)).join(', ')} />
         {issue.note && <Row label="Note" value={issue.note} />}
       </dl>
 
-      <Answers issue={issue} question="What should the loader do?" options={LOADING_DECISIONS.map((decision) => ({ decision, ...ANSWER[decision] }))} choice={choice} onChoose={(decision) => setChoice(decision as LoadingDecision)} busy={answering.sending !== null} />
+      <Answers issue={issue} question="What should the loader do?" options={LOADING_DECISIONS.map((decision) => ({ decision, ...answers[decision] }))} choice={choice} onChoose={(decision) => setChoice(decision as LoadingDecision)} busy={answering.sending !== null} />
       <Send issue={issue} answering={answering} choice={choice} label="Send to loader" />
     </article>
   );

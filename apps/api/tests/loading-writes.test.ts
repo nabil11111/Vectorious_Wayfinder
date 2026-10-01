@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { LoadingDay, StoreOrderList, type LoadingTruck } from '@wayfinder/contracts';
+import { IssueList, LoadingDay, StoreOrderList, type LoadingTruck } from '@wayfinder/contracts';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
@@ -364,6 +364,38 @@ it('Q-16 answers an undo sent twice in a row with the day as it is, and writes o
   expect(again.body).toEqual(first.body);
   expect(LoadingDay.parse(again.body)).toEqual(await loader.read());
   expect(await auditsOf(stopOf(truck, 2).id, 'stop.load_undone')).toHaveLength(1);
+});
+
+// Q-20: a truck that cannot take all of a line is flagged as "won't fit", with the count that fits, and gets the same
+// two answers as a short line.
+it('Q-20 flags a line that will not all fit on the truck as wont_fit, with the count that fits, and the dispatcher reads it as such', async () => {
+  const truck = await loading('VEH035');
+  const line = dryLine(truck);
+  freeze(THU, 2 * 60 + 33);
+  const flagged = answeredTruck(await loader.flag(truck, 1, [{ lineId: line.lineId, counted: 3 }], { reason: 'wont_fit', note: 'The van is full' }), 'VEH035');
+  expect((await db.select().from(issues))[0]).toMatchObject({ kind: 'loading', reason: 'wont_fit', status: 'open', note: 'The van is full' });
+  expect(dryLine(flagged)).toMatchObject({ quantity: 4, going: 3, short: 1 });
+  expect(flagged.issues.map((issue) => [issue.reason, issue.status, issue.short])).toEqual([['wont_fit', 'open', 1]]);
+  const open = IssueList.parse((await ruwan.get('/api/v1/issues')).body).issues;
+  expect(open.map((issue) => [issue.kind, issue.reason, issue.short, issue.lines.map((l) => [l.quantity, l.counted])])).toEqual([['loading', 'wont_fit', 1, [[4, 3]]]]);
+});
+
+// A won't fit flag answered as a short one is, and the line goes out at that count.
+async function answeredWontFit(decision: 'go_short' | 'load_all') {
+  const truck = await loading('VEH035');
+  const flagged = answeredTruck(await loader.flag(truck, 1, [{ lineId: dryLine(truck).lineId, counted: 3 }], { reason: 'wont_fit' }), 'VEH035');
+  freeze(THU, 2 * 60 + 35);
+  const answer = await answerFlag(ruwan, flagged.issues[0]!.id, decision);
+  expect(answer.decided).toMatchObject({ reason: 'wont_fit', status: 'decided', decision });
+  return dryLine(truckOf(await loader.read(), 'VEH035'));
+}
+
+it('Q-20 answers a won\'t fit flag with "Go short" as a short one: the cartons that do not fit stay behind', async () => {
+  expect(await answeredWontFit('go_short')).toMatchObject({ going: 3, short: 1 });
+});
+
+it('Q-20 answers a won\'t fit flag with "Load it all" as a short one: the whole line goes on', async () => {
+  expect(await answeredWontFit('load_all')).toMatchObject({ going: 4, short: 0 });
 });
 
 it('driver AC-7 allows a line flagged on an earlier trip to be flagged on this trip', async () => {

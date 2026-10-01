@@ -13,9 +13,10 @@ import { BackLink } from './parts/LoadCard';
 import { LoadFailed, NotOnList } from './parts/LoadFailed';
 import { ActionBar, Card, NotSaved, Refused, TickBox } from './parts/ui';
 import { useTicks } from './ticks';
-import { brandOfStop, countLine, leaves, lineKind, lineWords, truckName, whole } from './words';
+import { brandOfStop, countHint, countLine, countWhere, leaves, lineKind, lineWords, truckName, whole } from './words';
 
-const REASON: Record<FlagReason, string> = { short: 'Short', damaged: 'Damaged', wrong_item: 'Wrong item' };
+// "Won't fit" is a truck that cannot take all of a line (Q-20).
+const REASON: Record<FlagReason, string> = { short: 'Short', damaged: 'Damaged', wrong_item: 'Wrong item', wont_fit: 'Won\'t fit' };
 
 // Flag a problem at /loader/trucks/:tripId/flag?stop= (spec 012, Loader · Flag a problem and · phone): the stop's
 // lines with their count at the dock, what is wrong, the picked line's counter and a note, sent to the dispatcher.
@@ -141,6 +142,7 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
               key={line.lineId}
               line={line}
               kind={lineKind(line, brand)}
+              where={countWhere(reason)}
               value={tally.countAt(line)}
               text={typed[line.lineId]}
               disabled={busy}
@@ -149,7 +151,7 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
               onLeave={() => box.leave(line)}
             />
           ) : (
-            <p className="mt-3.5 rounded-[12px] bg-muted px-4 py-[18px] text-[15px] leading-5 text-muted-foreground">Tap the line that is not right, then count what is at the dock.</p>
+            <p className="mt-3.5 rounded-[12px] bg-muted px-4 py-[18px] text-[15px] leading-5 text-muted-foreground">{countHint(reason)}</p>
           )}
           <label className="mt-3.5 block">
             <span className="sr-only">What happened?</span>
@@ -171,7 +173,7 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
   );
 }
 
-// "Short", "Damaged" and "Wrong item", one of them chosen, as the design's joined switch.
+// "Short", "Damaged", "Wrong item" and "Won't fit" (Q-20), one of them chosen, as the design's joined switch.
 function Reasons({ value, onChange, disabled }: { value: FlagReason; onChange: (reason: FlagReason) => void; disabled: boolean }) {
   return (
     <div role="radiogroup" aria-label="What’s wrong?" className="mt-4 inline-flex self-start overflow-hidden rounded-full border bg-card">
@@ -197,13 +199,14 @@ function Reasons({ value, onChange, disabled }: { value: FlagReason; onChange: (
 
 const STEP = 'flex size-[42px] shrink-0 items-center justify-center rounded-[10px] border bg-card text-[22px] leading-none font-semibold outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:text-muted-foreground/65 lg:size-[46px]';
 
-// The picked line's counter: its picture and name, "at the dock", and − the count /quantity +. The count runs from 0 to
-// the line's quantity, and can be typed as well. The box keeps what is typed as it is: a minus, a fraction or more than
-// the line holds is never turned into another number. It is marked red with the fix under it, as the shop's quantity
-// box is, and Send, − and + wait until it is a whole number from 0 to the line's count (Q-17). The fix is the card's last
-// child, so it takes a row of its own under the counter.
-export function Counter({ line, kind, value, text, disabled, onStep, onType, onLeave }: {
-  line: LoadingLine; kind: string; value: number; text: string | undefined; disabled: boolean;
+// The picked line's counter: its picture and name, where it counts ("at the dock", or "fit on the truck" for a truck
+// that cannot take it all, Q-20), and − the count /quantity +. The count runs from 0 to the line's quantity, and can be
+// typed as well. The box keeps what is typed as it is: a minus, a fraction or more than the line holds is never turned
+// into another number. It is marked red with the fix under it, as the shop's quantity box is, and Send, − and + wait
+// until it is a whole number from 0 to the line's count (Q-17). The fix is the card's last child, so it takes a row of
+// its own under the counter.
+export function Counter({ line, kind, where, value, text, disabled, onStep, onType, onLeave }: {
+  line: LoadingLine; kind: string; where: string; value: number; text: string | undefined; disabled: boolean;
   onStep: (value: number) => void; onType: (text: string) => void; onLeave: () => void;
 }) {
   const fix = useId();
@@ -216,7 +219,7 @@ export function Counter({ line, kind, value, text, disabled, onStep, onType, onL
       <img src={GOODS_ICON[line.temp]} alt="" className="size-10 shrink-0 object-contain" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-lg leading-6 font-semibold">{kind}</p>
-        <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">at the dock</p>
+        <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">{where}</p>
       </div>
       <div role="group" className="flex items-center">
         <button type="button" aria-label={`One less: ${kind}`} disabled={off || value <= 0} className={STEP} onClick={() => step(-1)}>−</button>
@@ -225,7 +228,7 @@ export function Counter({ line, kind, value, text, disabled, onStep, onType, onL
             type="text"
             inputMode="numeric"
             autoComplete="off"
-            aria-label={`${kind} at the dock`}
+            aria-label={`${kind} ${where}`}
             aria-invalid={wrong || undefined}
             aria-describedby={wrong ? fix : undefined}
             value={shown}

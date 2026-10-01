@@ -1,4 +1,4 @@
-import { BRANDS, type Brand, type Issue, type IssueLine, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
+import { BRANDS, type Brand, type FlagReason, type Issue, type IssueLine, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
 import { clockTime, countOf, shortDay, unitsOf, vehicleKind } from '@/features/plan/words';
 import { countOf as amountOf, plural, TEMP_NAME } from '@/features/store/words';
 
@@ -69,6 +69,13 @@ export const lineKind = (line: Pick<LoadingLine, 'temp' | 'name'>, brand: Brand 
 // its quantity box (Q-01): "Whole numbers from 0 to 57."
 export const countLine = (most: number) => `Whole numbers from 0 to ${whole(most)}.`;
 
+// What the flag's counter counts: the good units at the dock, or for a truck that cannot take it all what fits on it
+// (Q-20). And the line in the counter's place before a line is picked.
+export const countWhere = (reason: FlagReason) => (reason === 'wont_fit' ? 'fit on the truck' : 'at the dock');
+export const countHint = (reason: FlagReason) => (reason === 'wont_fit'
+  ? 'Tap the line that will not all fit, then count what fits on the truck.'
+  : 'Tap the line that is not right, then count what is at the dock.');
+
 // A stop on a list, by what the API sent: "94 cartons" to load, "23 of 24" with a flag lowering a count, "✓ 94 on"
 // once loaded, and "23 on · 1 short" when it went on short.
 export const stopUnits = (truck: LoadingTruck, stop: LoadingStop) => unitsWords(brandOfStop(truck, stop), stop.units);
@@ -105,11 +112,12 @@ export function shortGoods(issue: IssueWords) {
 }
 
 // A problem's title by its reason: "1 dry carton short", "2 chilled cartons damaged", "1 dry carton was the wrong
-// item", and "3 items short" when its lines differ.
+// item", "4 chilled cartons won't fit" when the truck cannot take them (Q-20), and "3 items short" when its lines differ.
 export function issueTitle(issue: IssueWords & Pick<Issue, 'reason'>) {
   const goods = shortGoods(issue);
   if (issue.reason === 'short') return `${goods} short`;
   if (issue.reason === 'damaged') return `${goods} damaged`;
+  if (issue.reason === 'wont_fit') return `${goods} won't fit`;
   return `${goods} ${issue.short === 1 ? 'was' : 'were'} the wrong item`;
 }
 
@@ -130,15 +138,23 @@ export const raisedLine = (issue: Pick<Issue, 'raisedBy' | 'raisedAt'>) => `${is
 export const answeredBy = (issue: Pick<Issue, 'decidedBy' | 'decidedAt'>) =>
   [issue.decidedBy && `${issue.decidedBy}, dispatcher`, issue.decidedAt && clockTime(issue.decidedAt)].filter(Boolean).join(' · ');
 
+// The answer's sentence: "Go with 1 dry carton short for Fresh Nugegoda." or "Load it all for Fresh Nugegoda. The rest
+// comes from stock.", and for a truck that cannot take it all (Q-20) "Go without the 4 chilled cartons that won't fit
+// for Fresh Mahaiyawa." or "Load it all for Fresh Mahaiyawa. Make room for the rest."
 export function answerSentence(issue: Issue) {
-  if (issue.decision === 'load_all') return `Load it all for ${issue.stop.shopName}. The rest comes from stock.`;
-  return `Go with ${shortGoods(issue)} short for ${issue.stop.shopName}.`;
+  const room = issue.reason === 'wont_fit';
+  if (issue.decision === 'load_all') return `Load it all for ${issue.stop.shopName}. ${room ? 'Make room for the rest.' : 'The rest comes from stock.'}`;
+  return room ? `Go without the ${shortGoods(issue)} that won't fit for ${issue.stop.shopName}.` : `Go with ${shortGoods(issue)} short for ${issue.stop.shopName}.`;
 }
 
-// The dispatcher's line once an answer is sent: "VEH035 goes 1 dry carton short, Kasun told".
+// The dispatcher's line once an answer is sent: "VEH035 goes 1 dry carton short, Kasun told", and "VEH057 goes without
+// the 4 chilled cartons that won't fit, Sarath told" (Q-20).
 export function sentLine(issue: Issue) {
   const truck = truckName(issue.trip);
-  return issue.decision === 'load_all' ? `${truck} loads it all, ${issue.raisedBy} told` : `${truck} goes ${shortGoods(issue)} short, ${issue.raisedBy} told`;
+  if (issue.decision === 'load_all') return `${truck} loads it all, ${issue.raisedBy} told`;
+  return issue.reason === 'wont_fit'
+    ? `${truck} goes without the ${shortGoods(issue)} that won't fit, ${issue.raisedBy} told`
+    : `${truck} goes ${shortGoods(issue)} short, ${issue.raisedBy} told`;
 }
 
 // "Waiting for the dispatcher · flagged 02:33"
