@@ -87,6 +87,8 @@ const worthRetrying = (error: unknown) =>
 // render, so this lives outside React and tells the screen what to show.
 export class DraftForm {
   private values: FormValues;
+  // What the server holds, as the last answer had it: what a sign-out or a place checks it saved (Q-04, Q-08).
+  private saved: FormValues;
   private typed: Record<string, string> = {};
   private base: Base;
   private products: StoreProduct[];
@@ -97,8 +99,9 @@ export class DraftForm {
   private running = false;
   // The save on its way, from its request until its answer is taken in, so a sign-out or a place can wait for it.
   private current: Promise<void> | null = null;
-  // The last save failed, or found the session gone. Waiting for the form stops there (Q-04).
+  // The last save failed, or found the session gone, and why. Waiting for the form stops there (Q-04, Q-08).
   private failed = false;
+  private failure: unknown = null;
   private placing = false;
   // The drafts the last place from this form named, so a place whose answer was lost is known as its own (Q-07).
   private tried: DraftRefs | null = null;
@@ -119,6 +122,7 @@ export class DraftForm {
 
   constructor(next: OpenOrder, qc: QueryClient, show: (patch: Partial<Screen>) => void, placed: (orders: StoreOrder[]) => void) {
     this.values = valuesOf(next);
+    this.saved = this.values;
     this.base = { deliveryDate: next.deliveryDate, refs: next.draft?.refs ?? {} };
     this.products = next.products;
     this.qc = qc;
@@ -167,6 +171,7 @@ export class DraftForm {
   private showLatest(latest: StoreNextOrder) {
     this.takeOver(latest);
     this.values = valuesOf(latest);
+    this.saved = this.values;
     this.typed = {};
     this.savedSeq = this.sentSeq = this.seq;
     this.tell({ values: this.values, typed: this.typed, saving: 'saved' });
@@ -191,7 +196,10 @@ export class DraftForm {
     try {
       latest = await this.qc.fetchQuery({ queryKey: nextOrderKey, queryFn: fetchNextOrder, staleTime: 0 });
     } catch (loadError) {
-      if (!whilePlacing) this.failed = true;
+      if (!whilePlacing) {
+        this.failed = true;
+        this.failure = loadError;
+      }
       this.tell({ saving: whilePlacing ? 'saved' : 'refused', refused: reasonOf(loadError) });
       return;
     }
@@ -202,12 +210,14 @@ export class DraftForm {
       // The "somewhere else" was this form: an earlier save arrived and its answer did not. Carry on from it.
       this.unanswered = [];
       this.takeOver(latest);
+      this.saved = held;
       if (sameValues(held, shown)) this.savedSeq = this.sentSeq = this.seq;
       void this.flush();
     } else if (code === 'unknown_product' && !this.retriedWithoutItem) {
       // An item left the list. Save once more with the items that are still on it.
       this.retriedWithoutItem = true;
       this.takeOver(latest);
+      this.saved = held;
       this.seq += 1;
       this.tell({ refused: reasonOf(error) });
       void this.flush();
@@ -255,6 +265,7 @@ export class DraftForm {
       this.unanswered = [];
       this.retriedWithoutItem = false;
       this.savedSeq = this.sentSeq;
+      this.saved = valuesOf(answer);
       this.takeOver(answer);
       this.qc.setQueryData<StoreNextOrder>(nextOrderKey, answer);
       // A change made while this save ran goes next, unless its own timer is still counting.
@@ -265,11 +276,13 @@ export class DraftForm {
         // Signed out, here or in another tab. The change cannot be saved, and the person is told on the screen
         // that comes next (Q-04).
         this.failed = true;
+        this.failure = error;
         notKept();
       } else if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
         void this.flush();
       } else if (worthRetrying(error)) {
         this.failed = true;
+        this.failure = error;
         this.unanswered.push(sent);
         // Off the screen there is no reason to keep trying. Whoever waits for the form says it was not kept.
         if (!this.onScreen) return;
@@ -284,15 +297,15 @@ export class DraftForm {
 
   // Every change saved now: the change waiting for its timer goes at once, a retry goes at once, and a save on its
   // way is waited for. True when the server then holds what the form showed when this began. False when a save
-  // failed, the session is gone, a box holds something that is not a whole number, or the draft was changed
-  // somewhere else and the form now shows that instead.
+  // failed, the session is gone, a box holds something that is not a whole number, an item had left the list, or
+  // the draft was changed somewhere else and the form now shows that instead.
   private async settle(): Promise<boolean> {
     const wanted = this.values;
     this.failed = false;
     for (;;) {
       if (this.current) { await this.current; continue; }
       if (this.invalid() || this.failed || !this.stillMine()) return false;
-      if (this.seq === this.savedSeq) return sameValues(this.values, wanted);
+      if (this.seq === this.savedSeq) return sameValues(this.saved, wanted);
       await this.flush();
     }
   }
@@ -348,10 +361,22 @@ export class DraftForm {
     if (this.values.note !== note) this.change({ ...this.values, note });
   };
 
+  // A press while a change is still saving is taken: the change goes at once, the place waits for its answer and
+  // then places what it saved (Q-08). The form holds still from the press, so what is placed is what the form
+  // showed. A save that fails, a day that closes or a draft changed or placed somewhere else places nothing, and
+  // the form says why. A box that holds something that is not a whole number has its own line, and Place is off.
   place = async () => {
-    if (this.placing || this.running || this.seq !== this.savedSeq) return;
+    if (this.placing || this.invalid()) return;
     this.placing = true;
     this.tell({ placing: true, refused: null });
+    const day = this.base.deliveryDate;
+    const saved = await this.settle();
+    const drafts = Boolean(this.base.refs.chilled || this.base.refs.dry);
+    if (!saved || this.base.deliveryDate !== day || !drafts) {
+      this.placing = false;
+      this.tell(!saved && this.failed ? { placing: false, refused: reasonOf(this.failure) } : { placing: false });
+      return;
+    }
     try {
       await this.qc.cancelQueries({ queryKey: nextOrderKey });
       this.tried = this.base.refs;

@@ -34,6 +34,8 @@ const answerOf = (own: Own | Promise<Own> | (() => Own) | undefined) => (typeof 
 // The shop's next order as the API keeps it: the draft's quantities, note and refs, and what is placed for Thursday.
 // A save or a place can be answered otherwise, or held until the test lets it go.
 class Server {
+  // The day an order placed now is for.
+  day = THU;
   quantities: Record<string, number> = {};
   note = '';
   refs: DraftRefs = {};
@@ -68,7 +70,7 @@ class Server {
   // Someone at another screen places the draft as it is.
   placeHere(at = PLACED_AT): StoreOrder[] {
     const orders = PRODUCTS.filter((p) => this.quantities[p.id]).map((p): StoreOrder => ({
-      id: this.refs[p.temp]!.id, deliveryDate: THU, scheduledDate: null, temp: p.temp, status: 'placed',
+      id: this.refs[p.temp]!.id, deliveryDate: this.day, scheduledDate: null, temp: p.temp, status: 'placed',
       lines: [{ productId: p.id, name: p.name, unit: p.unit, quantity: this.quantities[p.id]! }], units: this.quantities[p.id]!,
       placedAt: at, deferralReason: null, delivery: null, receipt: null, problems: [], replacementFor: null,
     }));
@@ -86,7 +88,7 @@ class Server {
     const placedUnits = placedLines.reduce((sum, line) => sum + line.quantity, 0);
     return {
       outlet: { id: 'OUT001', name: 'Fresh Nugegoda', brand: 'Fresh', windowOpen: '05:00', windowClose: '07:30', dockType: 'street' },
-      products: PRODUCTS, deliveryDate: THU, cutoffAt: '2026-06-24T10:30:00.000Z', cutoffIsToday: true, movedFrom: null,
+      products: PRODUCTS, deliveryDate: this.day, cutoffAt: '2026-06-24T10:30:00.000Z', cutoffIsToday: true, movedFrom: null,
       draft: lines.length ? { lines, driverNote: this.note, refs: this.refs, savedAt: SAVED_AT, summary: load, tailLiftItems: [] } : null,
       placed: this.placed.length ? {
         orders: this.placed, lines: placedLines, lastPlacedAt: this.placed.at(-1)!.placedAt!,
@@ -387,7 +389,7 @@ describe('Q-07 a draft placed from another tab', () => {
     expect(screen.placedElsewhere).toBeNull();
   });
 
-  it('opens the confirmation when it was this form\'s own place whose answer was lost', async () => {
+  it('opens the confirmation when it was this form’s own place whose answer was lost', async () => {
     server = new Server({ [CHILLED.id]: 3, [DRY.id]: 1 });
     const { form, screen, placed } = openForm(server);
     server.placeAnswers.push(() => { server.placeHere(); return 'no signal'; });
@@ -396,5 +398,99 @@ describe('Q-07 a draft placed from another tab', () => {
     form.incoming(server.next());
     expect(placed.map((orders) => orders.map((order) => order.temp))).toEqual([['chilled', 'dry']]);
     expect(screen.placedElsewhere).toBeFalsy();
+  });
+});
+
+describe('Q-08 Place pressed while the draft is still saving', () => {
+  // What the server placed: each order's lines as item and quantity.
+  const placedLines = () => server.placed.map((order) => order.lines.map((line) => [line.productId, line.quantity]));
+
+  it('waits for the change typed just before, saves it, then places it', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { form, screen, placed } = openForm(server);
+    form.typeQuantity(CHILLED.id, '9');
+    const placing = form.place();
+    expect(screen.placing).toBe(true);
+    await placing;
+    expect(server.log).toEqual(['PUT draft', 'POST place']);
+    expect(placedLines()).toEqual([[[CHILLED.id, 9]]]);
+    expect(placed).toHaveLength(1);
+  });
+
+  it('waits for the answer of a save already on its way', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { form, placed } = openForm(server);
+    const save = held();
+    server.saveAnswers.push(save.answer);
+    form.typeQuantity(CHILLED.id, '9');
+    await after(600);
+    const placing = form.place();
+    await after(5000);
+    expect(server.log).toEqual(['PUT draft']);
+    save.release('usual');
+    await placing;
+    expect(server.log).toEqual(['PUT draft', 'POST place']);
+    expect(placedLines()).toEqual([[[CHILLED.id, 9]]]);
+    expect(placed).toHaveLength(1);
+  });
+
+  it('takes no change made after the press, so what is placed is what the form showed', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { form } = openForm(server);
+    const save = held();
+    server.saveAnswers.push(save.answer);
+    form.typeQuantity(CHILLED.id, '9');
+    const placing = form.place();
+    form.setQuantity(DRY.id, 5);
+    save.release('usual');
+    await placing;
+    expect(placedLines()).toEqual([[[CHILLED.id, 9]]]);
+  });
+
+  it('places nothing when that save fails, and says why', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { form, screen, placed } = openForm(server);
+    server.saveAnswers.push('no signal');
+    form.typeQuantity(CHILLED.id, '9');
+    await form.place();
+    expect(server.log).toEqual(['PUT draft']);
+    expect(server.placed).toEqual([]);
+    expect(placed).toEqual([]);
+    expect(screen.placing).toBe(false);
+    expect(screen.refused).toBe('Could not reach Wayfinder. Check the connection and try again.');
+  });
+
+  it('places nothing when the day closed while it saved, so the manager decides again', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { form, screen } = openForm(server);
+    const closed = { error: { code: 'cutoff_passed', message: 'Orders for Thu 25 Jun closed at 16:00.', details: { deliveryDate: '2026-06-26', cutoffAt: '2026-06-25T10:30:00.000Z' } } };
+    // 16:00 passes as the save arrives: Friday is the open day from then on.
+    server.saveAnswers.push(() => { server.day = '2026-06-26'; return { status: 409, body: closed }; });
+    form.typeQuantity(CHILLED.id, '9');
+    await form.place();
+    expect(server.log).toEqual(['PUT draft', 'PUT draft']);
+    expect(server.saves.map((save) => save.deliveryDate)).toEqual([THU, '2026-06-26']);
+    expect(server.placed).toEqual([]);
+    expect(screen.closedDay).toBe(THU);
+    expect(screen.placing).toBe(false);
+  });
+
+  it('places nothing while a box holds something that is not a whole number', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { form, screen } = openForm(server);
+    form.typeQuantity(CHILLED.id, '9.5');
+    await form.place();
+    expect(server.log).toEqual([]);
+    expect(screen.placing).toBeFalsy();
+  });
+
+  it('places nothing when the change took every item out', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { form, screen } = openForm(server);
+    form.typeQuantity(CHILLED.id, '0');
+    await form.place();
+    expect(server.log).toEqual(['PUT draft']);
+    expect(screen.placing).toBe(false);
+    expect(screen.refused).toBeFalsy();
   });
 });

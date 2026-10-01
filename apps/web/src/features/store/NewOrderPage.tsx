@@ -208,22 +208,25 @@ const SAVE_WORDS: Record<Exclude<Saving, 'saved'>, ReactNode> = {
 };
 
 // The foot of the form: what the last save came to, whether it is saved, and the button that places it. The
-// totals are the server's, from the last save (AC-37). The button is off until the form is saved, so what is
-// placed is always what was saved. It shows twice: in the bar on a phone, in "Your order" on a desktop.
-function Checkout({ next, saving, placing, refused, onPlace }: { next: StoreNextOrder; saving: Saving; placing: boolean; refused: string | null; onPlace: () => void }) {
+// totals are the server's, from the last save (AC-37). A press while a change is still saving is taken: the place
+// waits for that save and places what it saved (Q-08), so what is placed is always what was saved. The button is
+// off only with nothing added, while a box holds something that is not a whole number, and while placing. It
+// shows twice: in the bar on a phone, in "Your order" on a desktop.
+export function Checkout({ next, saving, placing, refused, onPlace }: { next: StoreNextOrder; saving: Saving; placing: boolean; refused: string | null; onPlace: () => void }) {
   const { draft } = next;
   const { brand } = next.outlet;
   const totals = draft && [brandUnits(brand, draft.summary.units), ...(brand === 'Fresh' ? [] : [kilos(draft.summary.kg), cubic(draft.summary.m3)])];
   const saved = saving === 'saved' ? (draft ? `draft saved ${clockTime(draft.savedAt)}` : 'Nothing added yet') : SAVE_WORDS[saving];
   // One order per temperature (D-05), so a draft with both is two orders.
   const two = Boolean(draft?.refs.chilled && draft.refs.dry);
+  const nothingAdded = !draft && saving === 'saved';
   return (
     <>
       <p className="text-xs leading-[15px] text-muted-foreground" aria-live="polite">{totals && `${totals.join(' · ')} · `}{saved}</p>
       {refused && <p role="alert" className="mt-2 text-xs leading-[15px] font-semibold text-bad">{refused}</p>}
       <Button
         className={cn(ORANGE, 'mt-2.5 h-14 w-full text-[17px] lg:mt-3', placing && 'disabled:bg-primary disabled:text-primary-foreground')}
-        disabled={!draft || saving !== 'saved' || placing}
+        disabled={nothingAdded || saving === 'held' || placing}
         focusableWhenDisabled={placing}
         onClick={onPlace}
       >
