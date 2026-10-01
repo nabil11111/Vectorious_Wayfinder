@@ -228,4 +228,24 @@ describe('the driver\'s phone', () => {
     await until(() => phone.store.readKept().ready && phone.queue().length === 0);
     expect(server.posted).toEqual([older.writeId]);
   });
+
+  it('marks a write refused only once the phone has kept the refusal, and says when it could not', async () => {
+    const doomed = arrive();
+    keptBefore(db, DILSHAN, doomed);
+    db.failRefusals = true;
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set([doomed.writeId]), posted: [] };
+    serve(server);
+    const phone = await open(DILSHAN);
+
+    await until(() => phone.sync().notSaved);
+    expect(phone.queue()).toEqual([[doomed.writeId, 'waiting']]);
+    expect(db.states()).toEqual(['waiting']);
+
+    // It goes again on the retry schedule, is refused again, and the refusal is kept once the phone can keep it.
+    db.failRefusals = false;
+    await until(() => phone.queue()[0]?.[1] === 'refused');
+    expect(db.states()).toEqual(['refused']);
+    expect(phone.sync().notSaved).toBe(false);
+    expect(server.posted.length).toBeGreaterThanOrEqual(2);
+  });
 });

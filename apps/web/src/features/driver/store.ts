@@ -177,15 +177,13 @@ export async function keepDay(userId: string, day: DriverDay) {
   if (kept.userId === userId) set({ ...kept, day, queue: kept.queue.filter((entry) => !done(entry)) });
 }
 
-// A write the server refused is never sent again. It stays under "Not accepted" with the server's sentence.
+// A write the server refused is never sent again. It stays under "Not accepted" with the server's sentence. The
+// database keeps the refusal first and the screen shows it after, so a reload never finds the write waiting and sends
+// it again. It throws when the database could not keep it, and the write stays waiting, here and there.
 export async function refuseWrite(entry: Queued, refusal: Refusal) {
   const next: Queued = { ...entry, state: 'refused', refusal };
-  try {
-    const db = await database();
-    await db.put('writes', next);
-  } catch (error) {
-    console.warn('Could not mark the write as not accepted on this phone.', error);
-  }
+  const db = await database();
+  await db.put('writes', next);
   if (kept.userId === entry.userId) set({ ...kept, queue: kept.queue.map((held) => (held.seq === entry.seq ? next : held)) });
 }
 

@@ -31,9 +31,12 @@ export interface SyncState {
   failure: string | null;
   // The places whose records reached the depot once the signal came back, for the green line, until it is closed.
   backOnline: string[] | null;
+  // The phone could not keep a refusal the server gave: the write still waits and goes again on the retry schedule,
+  // and the screens say "Could not save on this phone. Try again." until a refusal is kept.
+  notSaved: boolean;
 }
 
-let sync: SyncState = { signedOut: false, fetched: false, failure: null, backOnline: null };
+let sync: SyncState = { signedOut: false, fetched: false, failure: null, backOnline: null, notSaved: false };
 const listeners = new Set<() => void>();
 function update(change: Partial<SyncState>) {
   sync = { ...sync, ...change };
@@ -227,8 +230,18 @@ async function sendWrite(entry: Queued, turn: number) {
       if (turn !== generation) return;
       if (session === 'other') { update({ signedOut: true }); return; }
       if (session === 'unknown') { later(); return; }
+      try {
+        await refuseWrite(entry, { code: outcome.code, message: outcome.message });
+      } catch (error) {
+        // Still waiting on the phone: it goes again on the retry schedule and is refused again, until the phone can
+        // keep the refusal.
+        console.warn('Could not keep the refusal on this phone.', error);
+        update({ notSaved: true });
+        later();
+        return;
+      }
       through();
-      await refuseWrite(entry, { code: outcome.code, message: outcome.message });
+      update({ notSaved: false });
       ring();
       return;
     }
@@ -333,7 +346,7 @@ export function setAccount(me: { id: string }) {
     generation += 1;
     fetching?.abort();
     held.clear();
-    update({ signedOut: false, fetched: false, failure: null, backOnline: null });
+    update({ signedOut: false, fetched: false, failure: null, backOnline: null, notSaved: false });
     void openAccount(me.id).then(() => {
       hold();
       ring();

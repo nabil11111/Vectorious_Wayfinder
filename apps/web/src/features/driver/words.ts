@@ -182,6 +182,8 @@ export function backOnlineLines(names: string[]) {
 
 export const signInLine = (n: number) => (n > 0 ? `Sign in again to send ${whole(n)} waiting ${n === 1 ? 'record' : 'records'}.` : 'Sign in again.');
 export const NOT_SAVED = 'Could not save on this phone. Try again.';
+// The same, as the top band says it when the sync loop could not keep a refusal: its "Try again" is a button.
+export const NOT_SAVED_BAND = 'Could not save on this phone.';
 export const COULD_NOT_READ = 'Could not read what this phone kept.';
 export const NOTHING_SENT_UNTIL_READ = 'Nothing is sent or saved until it is read.';
 export const OTHER_TAB = 'Wayfinder is open in another tab.';
