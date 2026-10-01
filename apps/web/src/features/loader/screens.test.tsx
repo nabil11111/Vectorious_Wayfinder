@@ -9,7 +9,7 @@ import { Counter, FlagPage } from './FlagPage';
 import { loadingKey } from './loading';
 import { lastLoaded } from './stops';
 import { TruckPage } from './TruckPage';
-import { answerSentence, countHint, countLine, countWhere, undoFirstWords, undoStopWords } from './words';
+import { answerSentence, countHint, countLine, countWhere, loadFigure, undoFirstWords, undoStopWords } from './words';
 
 // The loader's screens as the live QA run found them (phase 3, Q-16 to Q-23). The pages are drawn as the server would
 // draw them, from a loading day in the query and the app clock at Thu 25 Jun 02:35. These fixtures live in the test only.
@@ -203,5 +203,40 @@ describe('Q-20 a truck that cannot take it all', () => {
     expect(answerSentence(flagOn(truck, 'wont_fit', 'load_all'))).toBe('Load it all for Fresh Kotahena. Make room for the rest.');
     expect(answerSentence(flagOn(truck, 'short', 'go_short'))).toBe('Go with 3 dry cartons short for Fresh Kotahena.');
     expect(answerSentence(flagOn(truck, 'short', 'load_all'))).toBe('Load it all for Fresh Kotahena. The rest comes from stock.');
+  });
+});
+
+// A truck's load over its limits, as the card writes it.
+const figure = (weightCapKg: number, kg: number, m3 = 0, volumeCapM3 = 7) => loadFigure(veh038([], { weightCapKg, volumeCapM3, on: { units: 0, kg, m3 } }));
+
+describe('Q-21 the load\'s weight never rounds up to look full', () => {
+  it('writes a vehicle under 2 t in kilos, rounded down, so a van with room never reads full', () => {
+    expect(figure(1040, 959, 5.1)).toBe('959 / 1,040 kg · 5.1 / 7.0 m³');
+    expect(figure(1000, 919)).toBe('919 / 1,000 kg · 0.0 / 7.0 m³');
+    expect(figure(1040, 1039.6)).toBe('1,039 / 1,040 kg · 0.0 / 7.0 m³');
+    expect(figure(1040, 1040)).toBe('1,040 / 1,040 kg · 0.0 / 7.0 m³');
+    expect(figure(1040, 0)).toBe('0 / 1,040 kg · 0.0 / 7.0 m³');
+    // The walkthrough's VEH035 with 117 of its 118 cartons on.
+    expect(figure(1040, 807.3, 4.329)).toBe('807 / 1,040 kg · 4.3 / 7.0 m³');
+  });
+
+  it('writes a truck in tonnes to one place, rounded down, and never as its limit while weight is free', () => {
+    expect(figure(6800, 4530, 21, 33.4)).toBe('4.5 / 6.8 t · 21.0 / 33.4 m³');
+    expect(figure(6800, 6790, 0, 33.4)).toBe('6.7 / 6.8 t · 0.0 / 33.4 m³');
+    expect(figure(6800, 6800, 0, 33.4)).toBe('6.8 / 6.8 t · 0.0 / 33.4 m³');
+    // A limit that its one place rounds down: 6,840 kg reads 6.8 t, so 6,810 kg on must read below it.
+    expect(figure(6840, 6810, 0, 33.4)).toBe('6.7 / 6.8 t · 0.0 / 33.4 m³');
+    expect(figure(6840, 6840, 0, 33.4)).toBe('6.8 / 6.8 t · 0.0 / 33.4 m³');
+    expect(figure(3990, 3950, 0, 22)).toBe('3.9 / 4.0 t · 0.0 / 22.0 m³');
+    expect(figure(2000, 1999.9, 0, 9)).toBe('1.9 / 2.0 t · 0.0 / 9.0 m³');
+  });
+
+  it('keeps the cubic metres to the nearest tenth, as the walkthrough reads them', () => {
+    // The walkthrough's VEH035 with stop 2 on: 94 cartons, 648.6 kg and 3.478 m³.
+    expect(figure(1040, 648.6, 3.478)).toBe('648 / 1,040 kg · 3.5 / 7.0 m³');
+  });
+
+  it('shows the figure on the truck\'s card', () => {
+    expect(truckPage(veh038([3]))).toContain('336 / 1,200 kg · 1.9 / 9.0 m³');
   });
 });
