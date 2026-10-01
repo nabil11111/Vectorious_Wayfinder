@@ -5,8 +5,8 @@ import {
 } from '@dnd-kit/core';
 import type { DraftPlan } from '@wayfinder/contracts';
 import { editable, type BoardScreen, type Undo } from '../board';
-import { canLand, dropOf, type Dragged, type DragData, type DropData, type Landing } from './drops';
-import type { Pick } from './PickTruck';
+import { canLand, dropOf, type Called, type Dragged, type DragData, type DropData, type Landing } from './drops';
+import type { Pick } from './crews';
 
 // How the plan board's drag and drop runs with dnd-kit (spec 023, D-98): what can move, how a finished drag becomes
 // its change, the keyboard's moves, the words a screen reader hears, and how a place to land shows. What each drop
@@ -44,14 +44,15 @@ export const keysOf = (listeners: DraggableSyntheticListeners) => (event: Keyboa
 };
 export const landingOf = (over: Over | null) => (over?.data.current as DropData | undefined)?.landing;
 
-// A finished drag: its change of the draft with its Undo, or the truck picker. Put back, or dropped where it cannot go
+// A finished drag: its change of the draft with its Undo, or the crew picker. Put back, or dropped where it cannot go
 // or where it changes nothing, it does nothing.
 export function landDrop(plan: DraftPlan, dragged: Dragged | undefined, landing: Landing | undefined, apply: {
   change: (next: DraftPlan, undo: Undo) => void;
   start: (pick: Pick) => void;
+  called: Called;
 }) {
   if (!dragged || !landing) return;
-  const drop = dropOf(plan, dragged, landing);
+  const drop = dropOf(plan, dragged, landing, apply.called);
   if (drop?.kind === 'change') apply.change(drop.plan, drop.undo);
   else if (drop?.kind === 'start') apply.start(drop.pick);
 }

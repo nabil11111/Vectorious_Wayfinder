@@ -410,12 +410,22 @@ either depot are answered from it, each going to its own depot. A plan and its s
 board and View plan ask which depot to plan, and a plan write on Both is refused (Nabil, 1 Oct, spec 021).
 
 **D-97 · 1 Oct · The suggested plan names a driver for every vehicle.** The suggestion keeps a vehicle's earlier
-driver and gives the others the depot's free drivers in staff ID order, as the frames show a driver on every trip.
-Choosing a driver who is on another vehicle swaps the two. A dispatcher can still leave a vehicle with no driver
-(D-31) (Nabil, 1 Oct, spec 022).
+driver, gives each other vehicle its usual driver while no other vehicle of the plan has them, and the rest the depot's
+first free drivers in staff ID order, as the frames show a driver on every trip. The usual driver is the one who drove
+the vehicle on the depot's latest sent plan, or else a fixed pairing of the drivers in staff ID order with the vehicles
+in id order, and the planner's reasons name each truck by its driver. Choosing a driver who is on another vehicle moves
+them, and that vehicle is left with none. A dispatcher can still leave a vehicle with no driver (D-31) (Nabil, 1 Oct,
+specs 022 and 026).
 
 **D-98 · 1 Oct · The plan board plans by drag and drop too.** Orders and stops can be dragged where the board's buttons
 and menus would put them, with the pointer or the keyboard, and each drop is the same draft change the button
 makes, checked by the same checker. The empty middle offers "Build the suggested plan" and a drop area in place of
 "Start a blank trip". Drag and drop uses `@dnd-kit`, which handles the pointer, the keyboard and announcements (Nabil,
 1 Oct, spec 023).
+
+**D-100 · 1 Oct · Trucks are picked as crews and named by their drivers.** A dispatcher remembers drivers, not truck
+numbers, and the same driver mostly drives the same truck on the same roads. So the plan board picks a truck and its
+driver together from one list sorted by fit, district last run and fuel. The "Unassigned trucks" panel goes, giving
+Unplanned orders the column. Sentences call a truck "Chaminda's dry truck". The plan board's and View plan's cards
+read "Chaminda · dry truck" with no vehicle number, which stays only where someone must find the actual truck (the
+loader, the driver, Fleet) (Nabil, 1 Oct, spec 026).

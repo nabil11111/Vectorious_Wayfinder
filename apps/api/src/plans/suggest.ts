@@ -1,16 +1,17 @@
 import { AcceptDecisionsRequest, Suggestion, SuggestPlanRequest, type PlanBoard, type Problem } from '@wayfinder/contracts';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db, type Tx } from '../db/client';
-import { auditLog, orders, plans, users } from '../db/schema';
+import { auditLog, orders, plans } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import { announce } from '../lib/live';
 import { buildSuggestedPlan, type PlanInput, type PlannerInput } from '../planning';
 import type { Planner } from '../routes/plans';
 import { boardOf, readBoard } from './board';
 import { dayLabel } from './board-day';
+import { crewsOf } from './crews';
 import { finishPlan, openPlan, replaceDraft, validateDraft } from './draft';
 import { joinableParts, joinParts, makeParts } from './split';
-import { driversFor, suggestionOf } from './suggestion';
+import { driversFor, namedDrivers, suggestionOf, type Planned } from './suggestion';
 
 // The suggested plan on the board (spec 014): building it in one write (D-51, D-52), and accepting the planner's
 // decisions (D-54). Both are planning writes, so each takes the depot's locks first and answers with the board.
@@ -32,6 +33,25 @@ export function plannerInputOf(board: PlanBoard, input: PlanInput): PlannerInput
     })),
   };
 }
+
+// The planner's input with each vehicle named by its driver (spec 026), which the planner gives every trip it builds on
+// the vehicle, so its sentences call the truck "Chaminda's dry truck". A vehicle with no driver goes by its kind and id.
+function withDrivers(input: PlannerInput, drivers: ReadonlyMap<string, string | null>, staff: readonly { id: string; name: string }[]): PlannerInput {
+  return {
+    ...input,
+    vehicles: input.vehicles.map(({ driverName: _driverName, ...vehicle }) => {
+      const name = staff.find((d) => d.id === drivers.get(vehicle.id))?.name;
+      return name === undefined ? vehicle : { ...vehicle, driverName: name };
+    }),
+  };
+}
+
+// The plan a planner's result makes, without its words: its trips and stops, deferrals and splits.
+const planOf = (result: Planned) => JSON.stringify({
+  trips: result.input.plan.trips.map(({ driverName: _driverName, ...trip }) => trip),
+  deferrals: result.input.plan.deferrals.map((d) => [d.orderId, d.code]),
+  splits: result.splits,
+});
 
 const plannerUnavailable = (message: string, blocks: Problem[]) => new HttpError(409, 'planner_unavailable', message, { blocks });
 
@@ -81,10 +101,23 @@ export async function suggestPlan(caller: Planner, date: string, body: SuggestPl
     if (board.orders.length > MOST_ORDERS) {
       throw plannerUnavailable(`The planner plans at most ${MOST_ORDERS} orders, and ${dayLabel(date)} has ${board.orders.length}.`, []);
     }
-    // 6. The planner. When it finds no plan that passes every check, the transaction takes back steps 1 to 4.
-    const planned = buildSuggestedPlan(plannerInputOf(board, input));
+    // 6. The planner, each vehicle named by its driver (spec 026): first the one the draft gave it or its usual driver,
+    // and once the plan's vehicles have their drivers (D-97), by those. The names never change what the planner chooses,
+    // so a second run with the plan's own drivers plans the same. When it finds no plan that passes every check, the
+    // transaction takes back steps 1 to 4.
+    const crews = await crewsOf(tx, caller.depotId, date);
+    const day = plannerInputOf(board, input);
+    const initial = driversFor(day.vehicles.map((v) => v.id), earlier, crews.usual, []);
+    let planned = buildSuggestedPlan(withDrivers(day, initial, crews.staff));
     if (planned.status === 'unavailable') {
       throw plannerUnavailable('The planner could not build a plan that passes every check, so the draft is as it was.', planned.check.problems.filter((p) => p.level === 'block'));
+    }
+    const drivers = driversFor(planned.input.plan.trips.map((t) => t.vehicleId), earlier, crews.usual, crews.staff.map((d) => d.id));
+    const named = namedDrivers(initial, drivers);
+    if ([...named].some(([vehicleId, driverId]) => initial.get(vehicleId) !== driverId)) {
+      const again = buildSuggestedPlan(withDrivers(day, named, crews.staff));
+      if (again.status === 'unavailable' || planOf(again) !== planOf(planned)) throw new Error('The planner chose another plan once its trucks were named by their drivers.');
+      planned = again;
     }
     // 7. The planner's splits, made as a hand split makes them, in its order.
     const parts = new Map<string, string>();
@@ -97,11 +130,8 @@ export async function suggestPlan(caller: Planner, date: string, body: SuggestPl
       parts.set(proposal.remainderOrderId, second.id);
       split.push(original);
     }
-    // 8. The planner's plan as a draft, with a driver of the depot for every vehicle it uses (D-97), checked as a save
-    // would be against the day with its new parts. The drivers are the board's own list, in staff ID order.
-    const staff = await tx.select({ id: users.id }).from(users)
-      .where(and(eq(users.depotId, caller.depotId), eq(users.role, 'driver'), eq(users.active, true))).orderBy(users.staffId, users.id);
-    const drivers = driversFor(planned.input.plan.trips.map((t) => t.vehicleId), earlier, staff.map((d) => d.id));
+    // 8. The planner's plan as a draft, with a driver of the depot for every vehicle it uses (D-97, spec 026), checked as
+    // a save would be against the day with its new parts.
     const { draft, suggestion } = suggestionOf(planned, parts, drivers, opened.moment.at.toISOString());
     const withParts = await boardOf(tx, caller.depotId, date, opened.moment);
     try {

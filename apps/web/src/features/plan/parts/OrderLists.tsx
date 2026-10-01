@@ -3,13 +3,15 @@ import type { BoardOrder, BoardShop, Brand, DraftDeferral, DraftPlan, DraftTrip 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardScreen, Undo } from '../board';
-import { addOrders, defer, keyOf, undefer, type Place } from '../draft';
+import { addOrders, defer, keyOf, undefer, type CrewRef, type Place } from '../draft';
 import { carriedLine, countOf, decisionTitle, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, shopLine, TO_DECIDE, whole } from '../words';
+import { CrewMenu } from './CrewMenu';
+import type { Pick } from './crews';
 import { DeferForm } from './DeferForm';
 import { movable, useLanding } from './dragging';
 import type { Dragged } from './drops';
 import { BRAND_ICON, ICON } from './icons';
-import { decisionShop, groupKey, listed, type BoardIndex } from './lookup';
+import { decisionShop, decisionTruck, groupKey, listed, type BoardIndex } from './lookup';
 import { plainButton } from './look';
 import { DragRow } from './PlanDnd';
 import { Column, ColumnHead, MenuItem, MenuPopup, MenuRoot, MenuTrigger, Pills, Tag } from './ui';
@@ -19,6 +21,8 @@ const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 
 interface ShopOrders { shop: BoardShop; orders: BoardOrder[] }
 interface Group { key: string; brand: Brand; district: string; shops: ShopOrders[]; count: number }
+// A group's "Start a trip": its orders give the crews read, and the trip starts empty (spec 026).
+const startOf = (group: Group): Pick => ({ kind: 'start', group: { brand: group.brand, district: group.district }, orders: group.shops.flatMap((row) => row.orders), startWith: [] });
 
 // The unplanned orders by brand and district, most orders first, each group's shops in id order.
 function groupsOf(orders: BoardOrder[], index: BoardIndex): Group[] {
@@ -56,14 +60,15 @@ function orderDragged(order: BoardOrder, index: BoardIndex): Dragged | null {
 // The left column's upper card (Edit plan): the day's unplanned orders by brand and district, or as one list,
 // with the carried-over ones first and the deferred ones last, each deferred one with the planner's "why?". An order,
 // a shop's orders or a whole group can be dragged onto a trip, and a stop dropped here comes off its trip (spec 023).
-export function OrderLists({ screen, index, places, open, outlined, change, onStartTrip, onFindSlot, onJoin }: {
+export function OrderLists({ screen, index, places, open, outlined, change, onCrew, onFindSlot, onJoin }: {
   screen: BoardScreen;
   index: BoardIndex;
   places: Map<string, Place>;
   open: DraftTrip | null;
   outlined: string | null;
   change: (next: DraftPlan, undo?: Undo) => void;
-  onStartTrip: (group: { brand: Brand; district: string }, orders: BoardOrder[]) => void;
+  // A crew picked from a group's "Start a trip" (spec 026).
+  onCrew: (pick: Pick, crew: CrewRef) => void;
   onFindSlot: (orderId: string) => void;
   onJoin: (order: BoardOrder) => void;
 }) {
@@ -157,7 +162,15 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
                       <img src={BRAND_ICON[group.brand]} alt="" className="size-[22px] shrink-0 object-contain" />
                       <h3 className="min-w-0 flex-1 truncate text-xs leading-[15px] font-semibold">{group.brand} · {group.district} · {whole(group.count)}</h3>
                       <RowMenu label={`${group.brand} · ${group.district}`} items={[{ label: `Defer all ${whole(group.count)}`, onClick: () => deferOrders(group.key, group.shops.flatMap((row) => row.orders)) }]} />
-                      <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => onStartTrip({ brand: group.brand, district: group.district }, group.shops.flatMap((row) => row.orders))}>Start a trip</Button>
+                      <CrewMenu
+                        screen={screen}
+                        index={index}
+                        pick={startOf(group)}
+                        title={`Start a trip · ${group.brand} · ${group.district}`}
+                        trigger="Start a trip"
+                        triggerClassName={plainButton('h-[26px] px-3 text-[11px]')}
+                        onPick={(crew) => onCrew(startOf(group), crew)}
+                      />
                     </div>
                   </DragRow>
                   {form(group.key)}
@@ -239,7 +252,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
                               align="start"
                               title={title}
                               reasons={[{ key: order.id, reason: choice.reason }]}
-                              decisions={decisions.map((decision) => ({ key: decision.key, title: decisionTitle(decision, decisionShop(index, decision)), acceptedAt: decision.acceptedAt }))}
+                              decisions={decisions.map((decision) => ({ key: decision.key, title: decisionTitle(decision, decisionShop(index, decision), decisionTruck(index, draft, decision)), acceptedAt: decision.acceptedAt }))}
                             />
                           )}
                         </div>

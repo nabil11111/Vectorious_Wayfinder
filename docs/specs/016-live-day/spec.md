@@ -273,9 +273,9 @@ become eligible carry-over under rule 3; Back to edit removes them from this cou
 1. Continue after the README's Ready step (step 11 on this branch): Kasun has VEH035 ready at about 02:36, 117 of 118 cartons on and one dry short.
    As Ruwan open Dashboard. It reads Thu 25 Jun, 0 need you, 0 / 2 stops delivered, 0 / 38 trucks out, 99 orders for
    Fri 26 Jun, 37% fuel recorded and committed (6,947.7 / 18,600 litres) and 99 deferred on this plan. Next run's
-   orders close Thu 16:00. Live day has Fresh → Colombo → VEH035 trip 1, Dilshan, ready; planned leave 04:36,
+   orders close Thu 16:00. Live day has Fresh → Colombo → VEH035 trip 1, Wasantha, ready; planned leave 04:36,
    Nugegoda 05:00, Wellawatte 05:24 and back 06:10. The loading flag and Go short decision are already in events.
-2. Move to Trucks leave, Thu 03:30. As Dilshan start at 03:31, arrive Nugegoda at 03:34 and save its photo delivery
+2. Move to Trucks leave, Thu 03:30. As Wasantha start at 03:31, arrive Nugegoda at 03:34 and save its photo delivery
    at 03:38 as 013 says. Without refreshing, Ruwan sees 1 / 38 out, 1 / 2 delivered and 23 cartons delivered.
    Open the truck: actual arrival 03:34 sits beside planned 05:00; its event says "· photo" without a link. There is no revised ETA.
 3. In the driver's tab only, turn the network off, arrive Wellawatte and refuse two of its 48 chilled cartons,
@@ -284,7 +284,7 @@ become eligible carry-over under rule 3; Back to edit removes them from this cou
    115 cartons delivered, two refused, one depot short, and one needs you. The event appears once at 03:48.
 4. From the dashboard's issue summary press Decide. Live day focuses the existing refusal card. Bring them back
    and Send to driver at 03:52 gives its green line, the trip row's Decided state, no open issue and no Undo. The trip still records a refusal.
-   Dilshan returns at 03:55. Dashboard is 0 / 38 out; Live day keeps the done trip and its 2 / 2 stops.
+   Wasantha returns at 03:55. Dashboard is 0 / 38 out; Live day keeps the done trip and its 2 / 2 stops.
 5. For the alternative on a fresh walkthrough, close Wellawatte instead: 1 / 2 delivered · 1 closed with a half-filled
    delivery bar (the trip's 2 / 2 finished progress is full), 23 delivered,
    94 not delivered and one short. Bring them back changes next-run demand from 99 to 101 orders. Its old stop

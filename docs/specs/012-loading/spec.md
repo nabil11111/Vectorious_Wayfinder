@@ -298,7 +298,7 @@ Nabil's Chrome at 390 wide and 1180 × 820 as `kasun`, and at 1440 × 900 as `ru
 
 ## Walkthrough
 It follows spec 010's: Nadeesha has placed her draft, and Ruwan has sent Thursday's plan with OUT001's three orders and
-OUT002's two on VEH035, Dilshan driving, leaving at 04:36. After the clock moves the times depend on the judge's pace, so the ones below
+OUT002's two on VEH035, Wasantha driving, leaving at 04:36. After the clock moves the times depend on the judge's pace, so the ones below
 are examples.
 
 1. Move the clock on to "Loading, Thu 02:30".
@@ -320,7 +320,7 @@ are examples.
    Kasun told". The bell clears.
 7. Back on the phone, without a reload: "Ruwan, dispatcher · 02:35" and "Go with 1 dry carton short for Fresh
    Nugegoda.", and "Mark ready" is orange. Tap it: "VEH035 is ready", "117 of 118 on · 1 short, dispatcher told 02:35 ·
-   leaves 04:36" and "Dilshan sees the short carton on stop 1 before driving." "Back to trucks" shows "Every truck is
+   leaves 04:36" and "Wasantha sees the short carton on stop 1 before driving." "Back to trucks" shows "Every truck is
    loaded" and VEH035 "ready 02:36 · 117 of 118 on".
 8. As `nadeesha`, Orders shows her three Thursday orders "Loaded". As `ruwan`, View plan for Thu 25 Jun no longer offers
    "Back to edit".

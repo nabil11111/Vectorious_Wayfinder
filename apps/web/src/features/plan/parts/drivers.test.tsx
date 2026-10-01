@@ -7,11 +7,13 @@ import { DoneList } from './DoneList';
 import { driverChange, driverRows } from './drivers';
 import { indexOf } from './lookup';
 import { TripPanel } from './TripPanel';
+import { VehicleRow } from './VehicleRow';
+import { decisionTitle } from '../words';
 
 // Spec 022's drivers on the plan board, drawn as the page draws them: Done's cards and the open trip's header name the
-// driver after the vehicle, or say "no driver" in the warning colour (AC-4). The board is made up: VEH004 with
+// truck by its driver (spec 026, AC-3), or by its kind and number with "no driver" in the warning colour (AC-4). The board is made up: VEH004 with
 // Chaminda to a Colombo shop, and VEH002 with nobody to a Galle shop. The driver menu offers a driver who drives
-// another vehicle as a swap, made as one change of the draft (AC-5).
+// another vehicle as a move, which leaves that vehicle with no driver, made as one change of the draft (spec 026, rule 2).
 
 vi.mock('sonner', () => ({ toast: vi.fn() }));
 
@@ -47,28 +49,57 @@ const doneList = (board: PlanBoard) => renderToStaticMarkup(<DoneList screen={sc
 const tripPanel = (board: PlanBoard, vehicleId: string) => renderToStaticMarkup(
   <TripPanel
     screen={screenOf(board)} index={indexOf(board)} trip={board.plan.trips.find((t) => t.vehicleId === vehicleId)!} group={null}
-    change={() => undefined} act={async () => null} onSwap={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+    change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
   />,
 );
 
-it('AC-4 Done\'s cards name the driver after the vehicle, as the frame does: "VEH004 · Chaminda · Fresh · Colombo"', () => {
-  expect(doneList(BOARD)).toContain('<span class="block">VEH004 · Chaminda ·</span><span class="block">Fresh · Colombo</span>');
+it('spec 026 AC-3 Done\'s cards name the truck by its driver, with no number: "Chaminda · reefer truck · Fresh · Colombo"', () => {
+  expect(doneList(BOARD)).toContain('<span class="block">Chaminda · reefer truck ·</span><span class="block">Fresh · Colombo</span>');
+  // A second trip says so.
+  const second = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
+  expect(doneList(second)).toContain('<span class="block">Chaminda · reefer truck · trip 2 ·</span><span class="block">Fresh · Galle</span>');
+  expect(doneList(BOARD)).not.toContain('VEH004');
 });
 
-it('AC-4 a trip with no driver reads "VEH002 · no driver" on its card, in the warning colour', () => {
+it('spec 026 AC-3 a truck with no driver reads by its kind and number on its card, "no driver" in the warning colour (spec 022)', () => {
   const markup = doneList(BOARD);
-  expect(markup).toContain('<span class="block">VEH002 · <span class="text-warn-ink">no driver</span> ·</span><span class="block">Fresh · Galle</span>');
+  expect(markup).toContain('<span class="block">reefer truck VEH002 · <span class="text-warn-ink">no driver</span> ·</span><span class="block">Fresh · Galle</span>');
   // The button that opens a card's stops says whose they are.
-  expect(markup).toContain('aria-label="Show the stops of VEH002 · no driver · Fresh · Galle"');
-  expect(markup).toContain('aria-label="Show the stops of VEH004 · Chaminda · Fresh · Colombo"');
+  expect(markup).toContain('aria-label="Show the stops of reefer truck VEH002 · no driver · Fresh · Galle"');
+  expect(markup).toContain('aria-label="Show the stops of Chaminda · reefer truck · Fresh · Colombo"');
 });
 
-it('AC-4 the open trip\'s header names its driver after the vehicle the same way', () => {
-  expect(tripPanel(BOARD, 'VEH004')).toMatch(/<h2 class="[^"]*">Planning · VEH004 · <button[^>]*>Chaminda<\/button><\/h2>/);
-  expect(tripPanel(BOARD, 'VEH002')).toMatch(/<h2 class="[^"]*">Planning · VEH002 · <button[^>]*class="[^"]*text-warn-ink[^"]*"[^>]*>no driver<\/button><\/h2>/);
+it('spec 026 AC-3 the open trip\'s header names the truck by its driver, whose name is the driver menu', () => {
+  expect(tripPanel(BOARD, 'VEH004')).toMatch(/<h2 class="[^"]*">Planning · <button[^>]*>Chaminda<\/button> · reefer truck<\/h2>/);
+  expect(tripPanel(BOARD, 'VEH002')).toMatch(/<h2 class="[^"]*">Planning · reefer truck VEH002 · <button[^>]*class="[^"]*text-warn-ink[^"]*"[^>]*>no driver<\/button><\/h2>/);
+  const second = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
+  const markup = renderToStaticMarkup(
+    <TripPanel
+      screen={screenOf(second)} index={indexOf(second)} trip={second.plan.trips[1]!} group={null}
+      change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+    />,
+  );
+  expect(markup).toMatch(/<h2 class="[^"]*">Planning · <button[^>]*>Chaminda<\/button> · reefer truck · trip 2<\/h2>/);
+  expect(markup).toContain('6.8 t · 33.4 m³ · trip 2 of 2');
 });
 
-// The walkthrough's swap (rule 2): Dilshan drives VEH001 on both its trips, Sanjeewa VEH035 and Chaminda VEH004.
+it('spec 026 AC-3 View plan\'s rows name the truck by its driver, and by its kind and number with none', () => {
+  const row = (vehicleId: string, driverName: string | null) => renderToStaticMarkup(
+    <VehicleRow vehicleId={vehicleId} trips={BOARD.plan.trips.filter((t) => t.vehicleId === vehicleId)} driverName={driverName} index={indexOf(BOARD)} />,
+  );
+  expect(row('VEH004', 'Chaminda')).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
+  expect(row('VEH004', 'Chaminda')).not.toContain('VEH004');
+  expect(row('VEH002', null)).toMatch(/<p class="[^"]*">reefer truck VEH002<\/p>/);
+});
+
+it('spec 026 AC-3 an early departure\'s title names its truck by its driver', () => {
+  const early = { kind: 'early_leave' as const, leaveAt: 187 };
+  expect(decisionTitle(early, null, 'Chaminda\'s dry truck')).toBe('Chaminda\'s dry truck leaves early, at 03:07');
+  expect(decisionTitle(early, null, 'the second trip of the dry truck VEH044')).toBe('The second trip of the dry truck VEH044 leaves early, at 03:07');
+  expect(decisionTitle({ kind: 'waited_again', leaveAt: null }, 'Fresh Dickwella', null)).toBe('Fresh Dickwella waits again');
+});
+
+// Spec 026's move (rule 2): Dilshan drives VEH001 on both its trips, Sanjeewa VEH035 and Chaminda VEH004.
 const DAY: DraftPlan = {
   mixBrands: false, deferrals: [],
   trips: [
@@ -77,31 +108,30 @@ const DAY: DraftPlan = {
   ],
 };
 const driversIn = (plan: DraftPlan) => plan.trips.map((t) => [t.vehicleId, t.tripNo, t.driverId]);
+const dilshan = BOARD.drivers.find((d) => d.id === DILSHAN)!;
+const chaminda = BOARD.drivers.find((d) => d.id === CHAMINDA)!;
 
-it('AC-5 choosing a driver who drives another vehicle swaps the two vehicles\' drivers, on every trip of each', () => {
-  expect(driversIn(setDriver(DAY, 'VEH035', DILSHAN))).toEqual([['VEH001', 1, SANJEEWA], ['VEH001', 2, SANJEEWA], ['VEH035', 1, DILSHAN], ['VEH004', 1, CHAMINDA]]);
-  // Chosen for a vehicle with no driver, he leaves the other vehicle with none.
-  const none = { ...DAY, trips: DAY.trips.map((t) => (t.vehicleId === 'VEH035' ? { ...t, driverId: null } : t)) };
-  expect(driversIn(setDriver(none, 'VEH035', DILSHAN))).toEqual([['VEH001', 1, null], ['VEH001', 2, null], ['VEH035', 1, DILSHAN], ['VEH004', 1, CHAMINDA]]);
+it('spec 026 rule 2 choosing a driver who drives another vehicle moves him, and that vehicle is left with no driver', () => {
+  expect(driversIn(setDriver(DAY, 'VEH035', DILSHAN))).toEqual([['VEH001', 1, null], ['VEH001', 2, null], ['VEH035', 1, DILSHAN], ['VEH004', 1, CHAMINDA]]);
   // A free driver, or none, changes only the vehicle chosen for.
   const free = setDriver({ ...DAY, trips: DAY.trips.filter((t) => t.vehicleId !== 'VEH004') }, 'VEH035', CHAMINDA);
   expect(driversIn(free)).toEqual([['VEH001', 1, DILSHAN], ['VEH001', 2, DILSHAN], ['VEH035', 1, CHAMINDA]]);
   expect(driversIn(setDriver(DAY, 'VEH001', null))).toEqual([['VEH001', 1, null], ['VEH001', 2, null], ['VEH035', 1, SANJEEWA], ['VEH004', 1, CHAMINDA]]);
 });
 
-it('AC-5 the menu lets every driver be chosen and marks one on another vehicle "on VEH001 · swap"', () => {
+it('spec 026 rule 2 the menu lets every driver be chosen and says before the press who moves: "drives VEH001 now; it will have no driver"', () => {
   expect(driverRows(DAY, 'VEH035', BOARD.drivers, SANJEEWA)).toEqual([
-    { id: CHAMINDA, name: 'Chaminda', chosen: false, swapWith: 'VEH004', note: 'on VEH004 · swap' },
-    { id: DILSHAN, name: 'Dilshan', chosen: false, swapWith: 'VEH001', note: 'on VEH001 · swap' },
-    { id: SANJEEWA, name: 'Sanjeewa', chosen: true, swapWith: null, note: null },
+    { id: CHAMINDA, name: 'Chaminda', chosen: false, movesFrom: 'VEH004', note: 'drives VEH004 now; it will have no driver' },
+    { id: DILSHAN, name: 'Dilshan', chosen: false, movesFrom: 'VEH001', note: 'drives VEH001 now; it will have no driver' },
+    { id: SANJEEWA, name: 'Sanjeewa', chosen: true, movesFrom: null, note: null },
   ]);
 });
 
-it('AC-5 a swap is one change of the draft, with Undo putting both vehicles\' drivers back', () => {
-  const swap = driverChange(DAY, 'VEH035-1', 'VEH035', DILSHAN);
-  expect(swap.plan).toEqual(setDriver(DAY, 'VEH035', DILSHAN));
-  expect(swap.undo).toEqual({ before: DAY, line: 'Drivers of VEH035 and VEH001 swapped', tripKey: 'VEH035-1' });
+it('spec 026 rule 2 a move is one change of the draft, with Undo putting the driver back on his truck', () => {
+  const move = driverChange(DAY, 'VEH035-1', 'VEH035', dilshan);
+  expect(move.plan).toEqual(setDriver(DAY, 'VEH035', DILSHAN));
+  expect(move.undo).toEqual({ before: DAY, line: 'Dilshan moved from VEH001, which has no driver now', tripKey: 'VEH035-1' });
   // Choosing a free driver, or none, touches one vehicle, so there is nothing to undo.
-  expect(driverChange({ ...DAY, trips: DAY.trips.filter((t) => t.vehicleId !== 'VEH004') }, 'VEH035-1', 'VEH035', CHAMINDA).undo).toBeUndefined();
+  expect(driverChange({ ...DAY, trips: DAY.trips.filter((t) => t.vehicleId !== 'VEH004') }, 'VEH035-1', 'VEH035', chaminda).undo).toBeUndefined();
   expect(driverChange(DAY, 'VEH035-1', 'VEH035', null)).toEqual({ plan: setDriver(DAY, 'VEH035', null) });
 });

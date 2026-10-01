@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type {
-  AcceptDecisionsRequest, DraftPlan, JoinOrderRequest, Me, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
+  AcceptDecisionsRequest, CrewList, DraftPlan, JoinOrderRequest, Me, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
 } from '@wayfinder/contracts';
 import { meKey, workingFor } from '@/features/auth/api';
 import { reasonOf } from '@/features/store/words';
@@ -16,6 +16,7 @@ export const plansKey = ['plans'] as const;
 export const boardKey = ['plans', 'board'] as const;
 export const dayKey = (date: string) => ['plans', date] as const;
 export const slotsKey = (date: string, orderId: string) => ['plans', date, 'slots', orderId] as const;
+export const crewsKey = (date: string, orderIds: string[]) => ['plans', date, 'crews', orderIds.join(',')] as const;
 
 // The write that is running. Writes go one after the other, and a read waits for the one on its way, so an
 // older answer never lands on top of a newer one.
@@ -66,6 +67,12 @@ export const fetchSlots = async (date: string, orderId: string) => {
   return api<SlotSearch>(`/plans/${date}/slots?orderId=${encodeURIComponent(orderId)}`);
 };
 
+// The crews of the board's depot for a trip's orders (spec 026), read once the saves on their way have answered.
+export const fetchCrews = async (date: string, orderIds: string[]) => {
+  await writing;
+  return api<CrewList>(`/plans/${date}/crews?orders=${orderIds.map(encodeURIComponent).join(',')}`);
+};
+
 // Every write answers with the whole board, as the GET does.
 export const saveDraft = (date: string, body: SavePlanRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/draft`, { method: 'PUT', json: body, depot }));
 export const splitOrder = (date: string, body: SplitOrderRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/split`, { method: 'POST', json: body, depot }));
@@ -95,6 +102,11 @@ export function useDayBoard(date: string) {
 // A slot search is worked out on the saved draft, so it is asked for only once the draft is saved.
 export function useSlots(date: string, orderId: string, saved: boolean) {
   return useQuery({ queryKey: slotsKey(date, orderId), queryFn: () => fetchSlots(date, orderId), enabled: saved, refetchInterval: false });
+}
+
+// The crew picker's list, read each time it opens, while it is open.
+export function useCrews(date: string, orderIds: string[], open: boolean) {
+  return useQuery({ queryKey: crewsKey(date, orderIds), queryFn: () => fetchCrews(date, orderIds), enabled: open, staleTime: 0, refetchInterval: false });
 }
 
 // lib/live.ts refetches the queries of a message's topic, and the board's are under 'plans'. The depot's orders

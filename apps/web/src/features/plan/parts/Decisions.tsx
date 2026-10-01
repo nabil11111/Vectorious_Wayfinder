@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { acceptAll, acceptedLine, decisionsTitle, decisionTitle, openCount } from '../words';
 import { ICON } from './icons';
-import { decisionShop, decisionsOf, type BoardIndex } from './lookup';
+import { decisionShop, decisionsOf, decisionTruck, type BoardIndex } from './lookup';
 import { inkButton, orangeButton, plainButton } from './look';
 import { Column, Tag } from './ui';
 
@@ -38,7 +38,7 @@ export function Decisions({ board, index, canAccept, accepting, onAccept, classN
       <ul className="mt-1.5">
         {decisions.map((decision) => (
           <li key={decision.key} className="border-t py-[11px]">
-            <p className="text-xs leading-4 font-semibold">{decisionTitle(decision, decisionShop(index, decision))}</p>
+            <p className="text-xs leading-4 font-semibold">{decisionTitle(decision, decisionShop(index, decision), decisionTruck(index, board.plan, decision))}</p>
             <p className="mt-1 text-[11px] leading-[15px] text-muted-foreground">{decision.reason}</p>
             {decision.acceptedAt ? (
               <p className="mt-2 text-[11px] leading-[15px] font-semibold text-good">{acceptedLine(decision.acceptedAt)}</p>

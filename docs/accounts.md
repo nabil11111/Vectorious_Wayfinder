@@ -136,7 +136,8 @@ shops in outlet order, so OUT002 is `S-004` and OUT120 is `S-120`. A store manag
 ## Peliyagoda depot
 
 The dispatcher, the loader and a driver for each of the 35 vehicles that are not in the workshop on Thursday.
-Ruwan, the dispatcher, can switch to Kandy and back.
+Ruwan, the dispatcher, can switch to Kandy and back. Each truck's usual driver pairs the drivers in staff ID order with
+the trucks in id order (spec 026), so `D-036` Wasantha drives VEH035, the fridge van, and is the walkthrough's driver.
 
 | Staff ID | Name | Role | Shop or depot |
 | --- | --- | --- | --- |

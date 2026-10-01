@@ -82,7 +82,7 @@ PIN for the demo accounts: `1234` (`SEED_PIN`). Admin has its own: `9024` (`SEED
 | Store manager | `S-003` | Tharindu | Tech Matara (OUT064) |
 | Dispatcher | `P-001` | Ruwan | Peliyagoda depot |
 | Loader | `L-001` | Kasun | Peliyagoda depot |
-| Driver | `D-001` | Dilshan | Peliyagoda depot. 34 more drivers there, one per working vehicle (`D-003` Chaminda, `D-004` Lasantha and so on to `D-036` Wasantha), for the plan board |
+| Driver | `D-036` | Wasantha | Peliyagoda depot, the usual driver of VEH035, the fridge van. 34 more drivers there, one per working vehicle (`D-001` Dilshan, `D-003` Chaminda and so on to `D-035`), for the plan board |
 | Driver | `D-002` | Prasanna | Kandy depot |
 | Admin | `A-001` | Admin | Everything |
 
@@ -104,11 +104,15 @@ are what the demo clock shows.
 3. **The dispatcher plans.** Sign in as Ruwan (`P-001`) and open the Plan board: "Plan for Thu 25 Jun", 104 unplanned
    orders, 4 of them carried over from earlier plans (Fresh Dickwella, deferred twice, first), and 35 working
    trucks with 3 in the workshop. The seeded day is short of fridge trucks on purpose.
-4. **A trip.** On the Fresh · Colombo group press **Start a trip** and choose VEH035, the fridge van (Nugegoda
-   and Wellawatte take vans only). Add Nugegoda's two new orders from the group, its 12 carried-over chilled
-   cartons from Carried over, and Wellawatte. The trip leaves 04:36, reaches Fresh Nugegoda at 05:00 and Fresh
-   Wellawatte at 05:24, and is back at 06:10. Every change is saved and checked at once. Pick Dilshan as the
-   driver.
+4. **A trip.** Drag Fresh Nugegoda's row from the Fresh · Colombo group into the empty middle. The crew picker opens
+   there: a truck and its driver on each row, "Wasantha · reefer van · 1.0 t · 7 m³" first with "fits · fuel 53% left",
+   the only crew that fits (Nugegoda and Wellawatte take vans only, and the chilled cartons need a fridge). The
+   trucks after it say why they may not fit, such as "cannot reach Fresh Nugegoda: van only", and the three in the
+   workshop come last, greyed. Pick Wasantha: the trip opens as "Planning · Wasantha · reefer van" with Nugegoda's two
+   new orders, and "Fresh Nugegoda added to Wasantha's reefer van" with **Undo**. (The group's **Start a trip** opens
+   the same picker for all of Colombo's orders.) Add Nugegoda's 12 carried-over chilled cartons from Carried over,
+   and Wellawatte. The trip leaves 04:36, reaches Fresh Nugegoda at 05:00 and Fresh Wellawatte at 05:24, and is back
+   at 06:10. Every change is saved and checked at once.
 5. **Everything else waits, with a reason.** Defer each other group from its ⋮ menu with a reason the shop will
    read, such as "No fridge truck was left for Colombo.", until nothing is unplanned.
 6. **Send.** Mark the trip done and open **View plan**: 5 of 104 orders on 1 trip, 99 deferred, checks all
@@ -129,7 +133,7 @@ are what the demo clock shows.
     says "Loading has started, so this plan cannot go back to edit." where Back to edit was.
 
 12. **The driver's trip.** Move the demo clock on to "Trucks leave, Thu 03:30". On a phone, or Chrome at 390 wide,
-    sign in as Dilshan (`D-001`). Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda",
+    sign in as Wasantha (`D-036`). Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda",
     then "1 · Fresh Nugegoda · 23 of 24 cartons" and "2 · Fresh Wellawatte · 94 cartons". Press **Start trip**.
 13. **A delivery.** Next stop: "Stop 1 of 2 · Fresh Nugegoda", "Unload 23 cartons · 20 chilled · 3 dry" and the shop's
     note. Press **I've arrived**, count 12 and 8 chilled and 3 dry ("Loader flagged 1 carton short at the depot" sits
@@ -144,16 +148,16 @@ are what the demo clock shows.
 15. **Back online.** Turn the network back on: within seconds "Back online · 1 stop sent · Wellawatte reached the depot",
     and the chip turns "Online".
 16. **The dispatcher answers.** As Ruwan (`P-001`), the bell shows 1. Live day's card: "2 chilled cartons refused", "Fresh
-    Wellawatte · stop 2 · VEH035 · Dilshan · damaged, the shop took 46 of 48 chilled", with **Bring them back to
-    Peliyagoda** chosen. Press **Send to driver**: "✓ Sent · VEH035 · 2 cartons back to Peliyagoda, Dilshan told".
-17. **Back at the depot.** On Dilshan's phone, without a reload: "Ruwan, dispatcher · Bring the 2 chilled cartons back to
+    Wellawatte · stop 2 · VEH035 · Wasantha · damaged, the shop took 46 of 48 chilled", with **Bring them back to
+    Peliyagoda** chosen. Press **Send to driver**: "✓ Sent · VEH035 · 2 cartons back to Peliyagoda, Wasantha told".
+17. **Back at the depot.** On Wasantha's phone, without a reload: "Ruwan, dispatcher · Bring the 2 chilled cartons back to
     Peliyagoda." Press **I'm back at the depot**: "✓ Trip closed · 2 of 2 stops · all records sent". Nadeesha's three
     Thursday orders now read "Delivered".
 
 18. **Watching the day.** Ruwan's **Dashboard** and **Live day** follow every step from 12 on without a reload. Before
     the trucks leave the Dashboard reads 0 need you, "0 / 2 stops delivered", "0 / 38 trucks out", 99 orders for Friday,
     37% of the week's fuel and 99 deferred, and Live day lists VEH035 ready with its planned times (leave 04:36,
-    Nugegoda 05:00, Wellawatte 05:24, back 06:10) and the loading events. Once Dilshan delivers, Live day shows "23
+    Nugegoda 05:00, Wellawatte 05:24, back 06:10) and the loading events. Once Wasantha delivers, Live day shows "23
     delivered · photo" in its events, and after the refusal the Dashboard's **Decide** opens the problem's card on Live
     day, where "Send to driver" turns the truck's row to "Decided".
 
@@ -173,11 +177,11 @@ are what the demo clock shows.
     All 8 received" and "4 dry cartons · 3 received · 1 short". Open: "1 chilled carton · Waiting for the delivery plan ·
     Replacement for Thu 25 Jun".
 
-At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements on Fri 26 Jun**: Dilshan still brings the
+At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements on Fri 26 Jun**: Wasantha still brings the
 2 cartons back, and Wellawatte gets a placed order of 2 chilled cartons for Friday's plan.
 
 **A closed shop.** At step 14 choose "Shop closed" instead and press **Save attempt and move on**: Ruwan's card reads
-"Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Dilshan's next stop again, and delivering it ends
+"Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Wasantha's next stop again, and delivering it ends
 at 117 of 118. **Bring them back** ends with "Hand them in; they go on the next run.", and Wellawatte's two orders are
 placed again for Friday's plan.
 
@@ -210,20 +214,22 @@ Press **Reset the demo day** first if you walked the one above.
 3. **Build it.** Press it: "Building the plan · 102 orders · 35 trucks", then View plan opens for the day with
    "Suggested plan · 16:00", "96 / 102 orders placed", "6 deferred", "26 / 35 trucks · 27 trips", "96 / 96 windows
    met", the trucks by brand and district, "Decisions · 6" and a greyed "Send plan · 6 decisions open". Press **← Back
-   to edit**: "Unplanned · 0", "Done · 27 trips" with each truck's driver on its card, given in staff ID order
-   ("VEH004 · Lasantha · Fresh · Matara"), "26 / 35 trucks", "96 / 102 orders", "41% fuel this week" and
+   to edit**: "Unplanned · 0", "Done · 27 trips", each card naming its truck by its usual driver ("Priyantha · reefer
+   truck · Fresh · Matara"), "26 / 35 trucks", "96 / 102 orders", "41% fuel this week" and
    "57.02 / 140.7 m³ fridge space". "Deferred · 6" holds
    the chilled orders of four Kurunegala shops (Pannala, Polgahawela, Wariyapola, Mawathagama) and two Puttalam shops
    (Wennappuwa, Puttalam), each with the sentence the shop will read, such as "No fridge truck could reach Fresh
    Pannala before its window closed at 07:45 on Thursday." The middle says "Suggested plan · 16:00 · 6 decisions to
    make".
-4. **Ask why.** Under Done, open VEH004's Fresh · Matara trip. Its timeline runs from "Peliyagoda 03:30" to "back
+4. **Ask why.** Under Done, open Priyantha's reefer truck, the Fresh · Matara trip. Its timeline runs from "Peliyagoda 03:30" to "back
    09:34", and pointing at Fresh Dickwella's dot shows "Stop 3 · Fresh Dickwella", "arrives 06:37 · leaves 06:52",
    "window 03:00 to 08:00" and "39 cartons chilled". Press **why?** on Fresh Dickwella: "Rank 1: waited since Tuesday;
    chilled; …". Press **why?** on a deferred order: its rank, why no truck could take it, and "to decide".
-5. **An ordinary edit.** Open VEH035's trip, the fridge van with Fresh Nugegoda's carried-over cartons, which the
-   planner gave Kelum. Choose Dilshan as its driver: the menu marks him "on VEH001 · swap", so VEH001 takes Kelum and
-   "Drivers of VEH035 and VEH001 swapped" shows with **Undo**. It is one change, saved and checked like any other.
+5. **An ordinary edit.** Open Wasantha's reefer van, the trip with Fresh Nugegoda's carried-over cartons. His name in
+   the header is the driver menu: Dilshan's row says "drives VEH001 now; it will have no driver". Choose him: the
+   header reads "Planning · Dilshan · reefer van", VEH001's card "reefer truck VEH001 · no driver", and "Dilshan moved
+   from VEH001, which has no driver now" shows with **Undo**. It is one change, saved and checked like any other.
+   Press **Undo**: Wasantha drives the van again and Dilshan VEH001.
 6. **Decide and send.** Open **View plan**: "Suggested plan · 16:00", "Decisions · 6" and a greyed "Send plan · 6
    decisions open". Press **Accept all 6**: "Decisions · all made", and "Checks · 3" keeps the two long waits and the
    Fresh workload listed with "Ready, with warnings". Press **Send plan to loaders and drivers**: "✓ Sent 16:06 ·
@@ -268,8 +274,8 @@ Anything we built differently from our Designathon submission, and why.
   suggested, with no switch between the suggested and the edited plan.
 - **A build opens View plan,** where the suggested plan's trips, decisions and checks are laid out. The design stays
   on the board.
-- **The empty middle takes a drop** in place of "Start a blank trip": "or drag an order here to start a trip" picks a
-  truck for the order's group and starts the trip with it. Orders, shops and whole groups also drag onto the open
+- **The empty middle takes a drop** in place of "Start a blank trip": "or drag an order here to start a trip" opens
+  the crew picker there and starts the trip with the order. Orders, shops and whole groups also drag onto the open
   trip's stops or a trip's card in Done, and stops drag along their list, back to Unplanned orders or onto another
   trip's card, by pointer or keyboard (D-98). Every button and menu stays, so the walkthrough runs on them alone.
 - **Orders are named by shop, amount and wanted day.** The design's order numbers (WF-2402) do not exist here.
@@ -277,11 +283,20 @@ Anything we built differently from our Designathon submission, and why.
   depots together: the dashboard adds them up and marks each row with its depot, and Live day, Orders, History and
   Fleet show Peliyagoda's part and then Kandy's. No frame draws a Both screen, so each page keeps its own layout. A plan
   belongs to one depot, so on Both the plan board and View plan ask which depot to plan and switch to it.
-- **Drivers** are picked from the depot's driver accounts, and a vehicle may have none (D-31).
+- **No "Unassigned trucks" panel.** A dispatcher remembers drivers, not truck numbers, so a truck and its driver are
+  picked as one crew from a dropdown at "Start a trip", "Swap truck" or a drop, which says for the trip's orders
+  whether each truck fits, the district it ran last time and its fuel (D-100). Unplanned orders takes the panel's
+  place, so more of them show.
+- **Trucks are named by their drivers** on the plan board's and View plan's cards and headers, "Chaminda · dry truck",
+  where the frames show the vehicle number. The number stays where someone must find the truck: the loader's and
+  driver's screens, and Fleet.
+- **Drivers** are picked from the depot's driver accounts, and a vehicle may have none (D-31). Each truck has a usual
+  driver, from the latest sent plan, and the suggested plan gives it them. The driver menu in a trip's header changes
+  the driver alone, and a driver taken from another truck leaves it with none.
 - **Moving stops** shows no "12 km shorter" or "35 min earlier", and a late stop says "late": the checker's
   kilometres depend only on the number of stops, and its sentence under the timeline gives the minutes.
 - **More actions than the frames draw:** a stop's ⋮ menu has Take off, Split and Defer for each order, group and
-  shop rows have ⋮ menus, a trip has Remove trip in its footer, Pick a truck has Close, and split orders carry a
+  shop rows have ⋮ menus, a trip has Remove trip in its footer, and split orders carry a
   "split" chip.
 - **A deferred order gets no new date,** so the shop's "Tuesday works for me" is not built.
 - **Below 1024 wide** the board's three columns become three tabs, and between 1024 and 1280 the side columns are

@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { useDndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import type { BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
+import type { BoardDriver, BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { splitOrder, type BoardScreen, type Undo } from '../board';
-import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeOff, tripOf } from '../draft';
-import { countOf, figure, hhmm, litres, orderAmount, ordersAmount, vehicleSize } from '../words';
+import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeOff, tripOf, type CrewRef } from '../draft';
+import { countOf, cubic, figure, hhmm, litres, orderAmount, ordersAmount, tonnes, truckKind } from '../words';
+import { CrewMenu } from './CrewMenu';
+import type { Pick } from './crews';
 import { DeferForm } from './DeferForm';
 import { DepotRow } from './DepotRow';
 import { draggedOf, landingLook, movable, useLanding } from './dragging';
 import { DriverMenu } from './DriverMenu';
 import { driverChange } from './drivers';
-import { tripLabel } from './drops';
 import { vehicleIcon } from './icons';
 import { LeaveField } from './LeaveField';
 import type { BoardIndex } from './lookup';
@@ -28,14 +29,15 @@ type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>) => Promise<
 // The open trip (Edit plan): its vehicle, driver, brand, district and leaving time, the checker's figures, the
 // timeline with the trip's problems and their fixes, the stops in order, "+ Add a stop" and "Mark trip done".
 // The numbers are the last answer's, shown only while they are for the trip on screen.
-export function TripPanel({ screen, index, trip, group, change, act, onSwap, onRemoved, onDone, onAddStop, onJoin }: {
+export function TripPanel({ screen, index, trip, group, change, act, onCrew, onRemoved, onDone, onAddStop, onJoin }: {
   screen: BoardScreen;
   index: BoardIndex;
   trip: DraftTrip;
   group: { brand: Brand; district: string } | null;
   change: (next: DraftPlan, undo?: Undo) => void;
   act: Act;
-  onSwap: () => void;
+  // A crew picked from "Swap truck" (spec 026).
+  onCrew: (pick: Pick, crew: CrewRef) => void;
   onRemoved: () => void;
   onDone: () => void;
   onAddStop: () => void;
@@ -68,29 +70,35 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
     change(defer(draft, deferrals));
     setForm(null);
   };
-  // One change of the draft, with Undo when the driver came from another vehicle and the two swapped (spec 022).
-  const chooseDriver = (driverId: string | null) => {
-    const chosen = driverChange(draft, key, trip.vehicleId, driverId);
+  // One change of the draft, with Undo when the driver came from another vehicle, which he leaves with none (spec 026).
+  const chooseDriver = (driver: BoardDriver | null) => {
+    const chosen = driverChange(draft, key, trip.vehicleId, driver);
     change(chosen.plan, chosen.undo);
   };
+  const driver = index.driver(trip.driverId);
+  const kind = vehicle ? truckKind(vehicle) : 'truck';
+  const menu = <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={chooseDriver} />;
   // Drag and drop (spec 023): the stops as a sortable list, outlined as one place while something that can land there is
   // dragged, and its end as a place to land.
   const canMove = movable(screen);
   const stopIds = trip.stops.map((stop) => `stop:${key}:${stop.outletId}`);
   const dragging = draggedOf(useDndContext().active);
   const listLook = dragging ? landingLook(dragging, { kind: 'stops', tripKey: key, at: trip.stops.length }, false) : '';
-  const { setNodeRef: endRef, look: endLook } = useLanding(`stops-end:${key}`, { kind: 'stops', tripKey: key, at: trip.stops.length }, `the end of ${tripLabel(trip)}'s stops`);
+  const { setNodeRef: endRef, look: endLook } = useLanding(`stops-end:${key}`, { kind: 'stops', tripKey: key, at: trip.stops.length }, `the end of the stops of ${index.called(trip)}`);
 
   return (
     <div className="flex min-h-full flex-col">
       <div className="flex flex-wrap items-start gap-x-2.5 gap-y-2 px-3.5 pt-3.5">
         {vehicle && <img src={vehicleIcon(vehicle)} alt="" className="mt-0.5 size-8 shrink-0 object-contain" />}
         <div className="min-w-0 flex-1 basis-56">
+          {/* The truck named by its driver, whose name is the driver menu: "Planning · Chaminda · dry truck", or by its kind and
+              number while it has none, "Planning · dry truck VEH044 · no driver" (spec 026). */}
           <h2 className="text-base leading-5 font-bold">
-            Planning · {trip.vehicleId} ·{' '}
-            <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={chooseDriver} />
+            Planning ·{' '}
+            {driver ? <>{menu} · {kind}</> : <>{kind} {trip.vehicleId} · {menu}</>}
+            {trip.tripNo === 2 && ' · trip 2'}
           </h2>
-          <p className="mt-1 text-xs leading-[15px] text-muted-foreground">{vehicle ? `${vehicleSize(vehicle)} · ` : ''}trip {trip.tripNo} of 2</p>
+          <p className="mt-1 text-xs leading-[15px] text-muted-foreground">{vehicle ? `${tonnes(vehicle.weightCapKg)} · ${cubic(vehicle.volumeCapM3)} · ` : ''}trip {trip.tripNo} of 2</p>
         </div>
         <div className="flex flex-wrap items-start justify-end gap-1.5">
           {group && <Tag tone={group.brand === 'Fresh' ? 'good' : 'plain'} className="h-[23px]">{group.brand}</Tag>}
@@ -113,7 +121,12 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
             back {hhmm(times.backAt)} · {countOf(trip.stops.length, 'stop')} · {figure(times.km)} km
           </span>
         )}
-        <Button variant="outline" className={plainButton('ml-auto h-7 px-3 text-xs')} onClick={onSwap}>Swap truck</Button>
+        <span className="ml-auto">
+          <CrewMenu
+            screen={screen} index={index} pick={{ kind: 'swap', key }} title={`Swap truck · ${index.crew(trip)}`}
+            trigger="Swap truck" triggerClassName={plainButton('h-7 px-3 text-xs')} onPick={(crew) => onCrew({ kind: 'swap', key }, crew)}
+          />
+        </span>
       </div>
 
       <div className="px-3.5 pt-3">
@@ -153,7 +166,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
                 first={i === 0}
                 last={i === trip.stops.length - 1}
                 drag={{
-                  id: stopIds[i]!, movable: canMove, name: `stop ${i + 1} of ${tripLabel(trip)}`,
+                  id: stopIds[i]!, movable: canMove, name: `stop ${i + 1} of ${index.called(trip)}`,
                   dragged: { kind: 'stop', tripKey: key, index: i, label: shop.name, brand: shop.brand }, landing: { kind: 'stops', tripKey: key, at: i },
                 }}
                 onMove={(by) => change(moveStop(draft, key, i, by), { before: draft, line: `Stops ${Math.min(i, i + by) + 1} and ${Math.max(i, i + by) + 1} swapped`, tripKey: key })}

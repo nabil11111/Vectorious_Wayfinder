@@ -82,7 +82,7 @@ it('spec 022 "Stops in order" puts the depot before stop 1 and the return after 
   const panel = (vehicleId: string) => renderToStaticMarkup(
     <TripPanel
       screen={SCREEN} index={INDEX} trip={tripOf(vehicleId)} group={null}
-      change={() => undefined} act={async () => null} onSwap={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+      change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
     />,
   );
   const stops = (markup: string) => markup.slice(markup.indexOf('Stops in order'), markup.indexOf('Add a stop'));

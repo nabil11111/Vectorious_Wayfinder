@@ -434,14 +434,14 @@ network turned off in DevTools where a criterion says so.
   view.
 
 ## Walkthrough
-It follows spec 013's: Dilshan handed Fresh Nugegoda's 23 cartons over at 03:38, 1 dry carton short from the depot, and
+It follows spec 013's: Wasantha handed Fresh Nugegoda's 23 cartons over at 03:38, 1 dry carton short from the depot, and
 closed the trip at 03:55. The times below are examples.
 
 1. Move the clock on to "Morning deliveries done, Thu 08:30".
 2. On a phone, or Chrome at 390 wide, sign in as `nadeesha`. Today: "Thu 25 Jun · Fresh Nugegoda", and under Coming today
    "12 chilled cartons", "8 chilled cartons" and "4 dry cartons", each "Delivered" with "Delivered 03:38 · VEH035 ·
-   Dilshan", and the dry one "3 of 4 delivered · 1 short from the depot".
-3. Tap Deliveries: "Confirm delivery", "Arrived 03:34 · VEH035 · Dilshan", "Chilled cartons · 12 expected · Received 12",
+   Wasantha", and the dry one "3 of 4 delivered · 1 short from the depot".
+3. Tap Deliveries: "Confirm delivery", "Arrived 03:34 · VEH035 · Wasantha", "Chilled cartons · 12 expected · Received 12",
    "Chilled cartons · 8 expected · Received 8", "Dry cartons · 3 expected · Received 3" with "1 short from the depot",
    and "Still cold on arrival?" with Yes chosen.
 4. On the first card tap − once: "11" and "1 carton missing". "What's wrong?" shows with Missing chosen, and "Add a photo
@@ -454,7 +454,7 @@ closed the trip at 03:55. The times below are examples.
    "Awaiting depot review" with "The depot has your receipt and shortage report. The missing carton still needs a
    resolution. Reporting it does not mark it as replaced.", "View past orders" and "Sent at 08:33 · shortage unresolved".
 7. In a desktop browser, sign in as `ruwan`. The bell shows 1. Live day: "1 chilled carton missing", "Fresh Nugegoda · stop 1
-   · VEH035 · Dilshan · delivered 03:38", "Shop · Nadeesha · 08:31", "Received · 11 of 12 chilled cartons", "Cold on
+   · VEH035 · Wasantha · delivered 03:38", "Shop · Nadeesha · 08:31", "Received · 11 of 12 chilled cartons", "Cold on
    arrival · yes", and "Send 1 replacement on Fri 26 Jun" chosen. Tap "Send to shop": "✓ Sent 08:35" and "Fresh Nugegoda ·
    1 replacement on Fri 26 Jun, Nadeesha told". The bell clears.
 8. On the phone, without a reload: "Replacement on Fri 26 Jun", "The depot is sending 1 chilled carton on Fri 26 Jun." and
@@ -465,7 +465,7 @@ closed the trip at 03:55. The times below are examples.
 9. Today shows the three cards "Received 08:31", with "11 received · 1 short", "All 8 received" and "3 received · 1 short".
 
 **Other paths.** "Damaged" in place of Missing, "No" to the cold check, and "No replacement" in place of the replacement.
-At spec 013's step 8 Ruwan can answer Wellawatte's refusal "Send 2 replacements on Fri 26 Jun": Dilshan still brings the 2
+At spec 013's step 8 Ruwan can answer Wellawatte's refusal "Send 2 replacements on Fri 26 Jun": Wasantha still brings the 2
 cartons back, and OUT002 gets a placed order of 2 chilled cartons for Friday's plan. After a reset, Nadeesha's Today at Wed
 15:00 shows "6 dry cartons · Received 07:42 · All 6 received", as the design's Today does.
 

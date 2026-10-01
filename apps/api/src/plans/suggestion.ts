@@ -10,16 +10,45 @@ export type Planned = Exclude<PlannerResult, { status: 'unavailable' }>;
 const keyOf = (decision: PlannerDecision) =>
   (decision.kind === 'early_leave' ? `early_leave:${decision.vehicleId}:${decision.tripNo}` : `${decision.kind}:${decision.orderId}`);
 
-// The driver of each vehicle the suggestion uses (D-97): the one the draft before gave it, else the depot's first free
-// driver in staff ID order, the vehicles taking theirs in id order. staff is the depot's drivers in that order, and
-// earlier each vehicle's driver in the draft before. A driver kept by a vehicle is free for no other, and the driver of
-// a vehicle the suggestion leaves out is free again. A driver is chosen per vehicle, so both its trips have them (D-31).
-// A vehicle has none only once every driver of the depot is taken.
-export function driversFor(vehicleIds: readonly string[], earlier: ReadonlyMap<string, string>, staff: readonly string[]): Map<string, string | null> {
+// Each vehicle's usual driver (spec 026): the driver who drove it on the depot's latest sent plan (history), else a
+// fixed pairing of the depot's drivers in staff ID order with its vehicles in id order, skipping the drivers history
+// already pairs. vehicleIds are the depot's vehicles in id order and staff its drivers in staff ID order. A vehicle
+// past the last driver has none.
+export function usualPairing(vehicleIds: readonly string[], history: ReadonlyMap<string, string>, staff: readonly string[]): Map<string, string | null> {
+  const paired = new Set(history.values());
+  const free = staff.filter((driverId) => !paired.has(driverId));
+  return new Map(vehicleIds.map((vehicleId) => [vehicleId, history.get(vehicleId) ?? free.shift() ?? null]));
+}
+
+// The driver of each vehicle the suggestion uses (D-97, spec 026), in id order: the one the draft before gave it, as
+// the dispatcher's choice wins; else its usual driver, while no other vehicle of the plan has them; else the depot's
+// first free driver in staff ID order. Vehicles take their usual drivers before any takes a free one, so none takes
+// another's usual driver ahead of it. The driver of a vehicle the suggestion leaves out is free again. A driver is
+// chosen per vehicle, so both its trips have them (D-31). A vehicle has none only once every driver is taken.
+export function driversFor(vehicleIds: readonly string[], earlier: ReadonlyMap<string, string>, usual: ReadonlyMap<string, string | null>, staff: readonly string[]): Map<string, string | null> {
   const used = [...new Set(vehicleIds)].sort();
-  const kept = new Set(used.flatMap((vehicleId) => earlier.get(vehicleId) ?? []));
-  const free = staff.filter((driverId) => !kept.has(driverId));
-  return new Map(used.map((vehicleId) => [vehicleId, earlier.get(vehicleId) ?? free.shift() ?? null]));
+  const drivers = new Map<string, string | null>();
+  const taken = new Set<string>();
+  const give = (vehicleId: string, driverId: string | null | undefined) => {
+    if (!driverId || taken.has(driverId)) return;
+    drivers.set(vehicleId, driverId);
+    taken.add(driverId);
+  };
+  for (const vehicleId of used) give(vehicleId, earlier.get(vehicleId));
+  for (const vehicleId of used) if (!drivers.has(vehicleId)) give(vehicleId, usual.get(vehicleId));
+  const free = staff.filter((driverId) => !taken.has(driverId));
+  return new Map(used.map((vehicleId) => [vehicleId, drivers.get(vehicleId) ?? free.shift() ?? null]));
+}
+
+// The driver each vehicle is named by in the planner's sentences (spec 026), once drivers has given the vehicles of the
+// plan theirs (driversFor): a vehicle of the plan by its own, and any other by the one first gave it before the build,
+// unless the plan gave that driver to a vehicle of its own, so no two vehicles are named by one driver.
+export function namedDrivers(first: ReadonlyMap<string, string | null>, drivers: ReadonlyMap<string, string | null>): Map<string, string | null> {
+  const taken = new Set([...drivers.values()].filter((driverId) => driverId !== null));
+  return new Map([...first].map(([vehicleId, driverId]) => {
+    if (drivers.has(vehicleId)) return [vehicleId, drivers.get(vehicleId) ?? null] as const;
+    return [vehicleId, driverId !== null && taken.has(driverId) ? null : driverId] as const;
+  }));
 }
 
 // The planner names a split's two parts split:<id>:keep and split:<id>:rest until the build has made them. parts maps

@@ -9,25 +9,24 @@ import { useScope } from '@/features/dispatcher/scope';
 import { reasonOf } from '@/features/store/words';
 import { cn } from '@/lib/utils';
 import { joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
-import { keyOf, placesOf, startTrip, swapTruck, tripOf, type TripKey } from './draft';
+import { keyOf, placesOf, tripOf, type CrewRef, type TripKey } from './draft';
 import { BoardHeader, type Tab } from './parts/BoardHeader';
 import { BuildPanel } from './parts/BuildPanel';
+import { crewChange, type Pick } from './parts/crews';
 import { DoneList } from './parts/DoneList';
-import { startUndo } from './parts/drops';
 import { FindSlot } from './parts/FindSlot';
 import { ICON } from './parts/icons';
 import { groupKey, indexOf } from './parts/lookup';
 import { OrderLists } from './parts/OrderLists';
-import { PickTruck, type Pick } from './parts/PickTruck';
 import { PlanDnd } from './parts/PlanDnd';
 import { TripPanel } from './parts/TripPanel';
-import { TruckList } from './parts/TruckList';
 import { plainButton } from './parts/look';
 import { Column } from './parts/ui';
 import { clockTime, planFor, shortDay } from './words';
 
 // The plan board (spec 010, Dispatcher · Edit plan and its states). The dispatcher builds the board's day by
-// hand: trips from the orders and trucks on the left, the open trip in the middle, the other trips on the right.
+// hand: trips from the orders on the left, each on a crew the crew picker gives it (spec 026), the open trip in the
+// middle, the other trips on the right.
 // With no trip open, the middle builds the suggested plan instead (spec 014). Every number on it comes from the
 // board the API sent. On both depots together a plan belongs to one depot (spec 021, D-96): the page reads no board and
 // asks which depot to plan.
@@ -61,8 +60,8 @@ function OneDepotBoard() {
   return <Board screen={screen} saver={saver} stale={query.isError} refreshing={query.isFetching} onRefresh={() => { void query.refetch(); }} />;
 }
 
-// What the middle column shows besides the open trip: picking a truck, or finding a slot for an order.
-type Middle = { kind: 'trip' } | { kind: 'pick'; pick: Pick } | { kind: 'slot'; orderId: string };
+// What the middle column shows besides the open trip: finding a slot for an order.
+type Middle = { kind: 'trip' } | { kind: 'slot'; orderId: string };
 
 function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardScreen; saver: Saver; stale: boolean; refreshing: boolean; onRefresh: () => void }) {
   const { board, draft } = screen;
@@ -76,6 +75,8 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
   const [startedFrom, setStartedFrom] = useState<Record<TripKey, { brand: Brand; district: string }>>({});
   // The group "+ Add a stop" pointed at, outlined until the next one.
   const [outlined, setOutlined] = useState<string | null>(null);
+  // An order dropped in the empty middle, for which the crew picker is open there (spec 026).
+  const [dropped, setDropped] = useState<Pick | null>(null);
 
   const index = useMemo(() => indexOf(board), [board]);
   const places = useMemo(() => placesOf(draft), [draft]);
@@ -106,22 +107,16 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
     return shop ? { brand: shop.brand, district: shop.district } : startedFrom[key] ?? null;
   };
 
-  const chooseTruck = (pick: Pick, vehicleId: string) => {
-    if (pick.kind === 'swap') {
-      const moved = swapTruck(draft, pick.key, vehicleId);
-      if (!moved) return;
-      change(moved.plan);
-      const group = startedFrom[pick.key];
-      if (group) setStartedFrom({ ...startedFrom, [moved.key]: group });
-      openTrip(moved.key);
-      return;
-    }
-    const started = startTrip(draft, vehicleId, pick.startWith);
-    if (!started) return;
-    change(started.plan, startUndo(pick, draft, started));
-    const group = pick.group;
-    if (group) setStartedFrom({ ...startedFrom, [started.key]: group });
-    openTrip(started.key);
+  // A crew picked: the trip started on its truck, or moved there, with its driver, as one change with one Undo (spec 026,
+  // rule 1). The trip opens.
+  const chooseCrew = (pick: Pick, crew: CrewRef) => {
+    setDropped(null);
+    const made = crewChange(pick, draft, crew, index);
+    if (!made) return;
+    change(made.plan, made.undo);
+    const group = pick.kind === 'swap' ? startedFrom[pick.key] : pick.group;
+    if (group) setStartedFrom({ ...startedFrom, [made.key]: group });
+    openTrip(made.key);
   };
 
   // "+ Add a stop" points at the trip's brand and district in the list and outlines that group.
@@ -144,9 +139,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
   };
 
   let inMiddle: ReactNode;
-  if (middle.kind === 'pick') {
-    inMiddle = <PickTruck board={board} draft={draft} index={index} pick={middle.pick} onChoose={(vehicleId) => chooseTruck(middle.pick, vehicleId)} onClose={() => setMiddle({ kind: 'trip' })} />;
-  } else if (middle.kind === 'slot') {
+  if (middle.kind === 'slot') {
     inMiddle = (
       <FindSlot
         key={middle.orderId}
@@ -155,7 +148,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         orderId={middle.orderId}
         change={change}
         onPut={openTrip}
-        onStartTrip={(pick) => show({ kind: 'pick', pick })}
+        onCrew={chooseCrew}
         onClose={() => setMiddle({ kind: 'trip' })}
       />
     );
@@ -170,7 +163,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         group={groupOfTrip(key)}
         change={change}
         act={saver.act}
-        onSwap={() => show({ kind: 'pick', pick: { kind: 'swap', key } })}
+        onCrew={chooseCrew}
         onRemoved={() => openTrip(null)}
         onDone={() => openTrip(null)}
         onAddStop={addStop}
@@ -183,6 +176,10 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         screen={screen}
         act={saver.act}
         onBuilding={() => setTab('planning')}
+        index={index}
+        dropped={dropped}
+        onCrew={chooseCrew}
+        onDropClose={() => setDropped(null)}
       />
     );
   }
@@ -207,7 +204,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         onRefresh={onRefresh}
         refreshing={refreshing}
       />
-      <PlanDnd screen={screen} change={change} onStartTrip={(pick) => show({ kind: 'pick', pick })}>
+      <PlanDnd screen={screen} index={index} change={change} onStartTrip={setDropped}>
       <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[300px_minmax(0,1fr)_270px] xl:grid-cols-[360px_minmax(0,1fr)_330px]">
         <div className={cn('min-h-0 flex-col gap-4', tab === 'unplanned' ? 'flex' : 'hidden lg:flex')}>
           <OrderLists
@@ -217,11 +214,10 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
             open={open}
             outlined={outlined}
             change={change}
-            onStartTrip={(group, orders) => { show({ kind: 'pick', pick: { kind: 'start', group, orders, startWith: [] } }); setOutlined(groupKey(group.brand, group.district)); }}
+            onCrew={chooseCrew}
             onFindSlot={(orderId) => show({ kind: 'slot', orderId })}
             onJoin={(order) => { void join(order); }}
           />
-          <TruckList board={board} draft={draft} />
         </div>
         <Column aria-label="Planning" className={cn('min-h-[420px] overflow-x-hidden overflow-y-auto lg:min-h-0', tab === 'planning' ? 'flex' : 'hidden lg:flex')}>{inMiddle}</Column>
         <Column aria-label="Done" className={cn('overflow-x-hidden overflow-y-auto', tab === 'done' ? 'flex' : 'hidden lg:flex')}>

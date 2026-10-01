@@ -8,14 +8,16 @@ import {
   announcements, BoardChange, boardKeyboardCoordinates, draggedOf, dropLocked, keysOf, landDrop, landingCollision, landingOf, pressOf, putBack, screenReaderInstructions,
 } from './dragging';
 import type { Dragged, DragData } from './drops';
-import type { Pick } from './PickTruck';
+import type { BoardIndex } from './lookup';
+import type { Pick } from './crews';
 
 // The plan board's drag and drop (spec 023): the board's columns inside one drag context. The pointer picks a row up
 // once it has moved a few pixels, so a click and the rows' menus work as before, and the keyboard picks it up from its
 // handle with Space or Enter. A finished drag is the change its button makes, sent through the board's own change
-// with its Undo, and an order dropped in the empty middle opens the truck picker.
-export function PlanDnd({ screen, change, onStartTrip, children }: {
+// with its Undo, and an order dropped in the empty middle opens the crew picker.
+export function PlanDnd({ screen, index, change, onStartTrip, children }: {
   screen: BoardScreen;
+  index: BoardIndex;
   change: (next: DraftPlan, undo?: Undo) => void;
   onStartTrip: (pick: Pick) => void;
   children: ReactNode;
@@ -43,7 +45,7 @@ export function PlanDnd({ screen, change, onStartTrip, children }: {
         onDragEnd={({ active, over }) => {
           setDragged(null);
           if (dropLocked(screen)) return;
-          landDrop(screen.draft, draggedOf(active), landingOf(over), { change, start: onStartTrip });
+          landDrop(screen.draft, draggedOf(active), landingOf(over), { change, start: onStartTrip, called: index.called });
         }}
       >
         {children}

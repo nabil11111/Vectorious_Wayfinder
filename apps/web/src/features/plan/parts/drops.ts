@@ -1,7 +1,7 @@
-import type { BoardOrder, Brand, DraftPlan } from '@wayfinder/contracts';
+import type { BoardOrder, Brand, DraftPlan, DraftTrip } from '@wayfinder/contracts';
 import type { Undo } from '../board';
 import { addOrders, moveStop, takeOff, tripOf, type TripKey } from '../draft';
-import type { Pick } from './PickTruck';
+import type { Pick } from './crews';
 
 // Drag and drop on the plan board (spec 023, D-98). What can be dragged, where it can land, and the change each drop
 // is: always the change the board's button or menu for it makes, from draft.ts, as one change of the draft with a line
@@ -21,7 +21,7 @@ export type Landing =
   | { kind: 'unplanned' }
   | { kind: 'middle' };
 
-// A drop: a change of the draft with its Undo, or the truck picker for orders dropped in the empty middle.
+// A drop: a change of the draft with its Undo, or the crew picker for orders dropped in the empty middle (spec 026).
 export type Drop = { kind: 'change'; plan: DraftPlan; undo: Undo } | { kind: 'start'; pick: Pick };
 
 // What a draggable carries, and what a place to land carries: its landing, and its name for the announcements.
@@ -35,22 +35,15 @@ export function canLand(dragged: Dragged, landing: Landing): boolean {
   return landing.kind === 'unplanned' || landing.kind === 'card' || (landing.kind === 'stops' && landing.tripKey === dragged.tripKey);
 }
 
-// A trip as its card names it: "VEH035", or "VEH011 trip 2".
-export const tripLabel = (trip: { vehicleId: string; tripNo: number }) => (trip.tripNo === 2 ? `${trip.vehicleId} trip 2` : trip.vehicleId);
-
-// The Undo of a trip an order dropped in the empty middle started, once the picker has given it a truck: the drop is
-// one change of the draft, undone in one (rule 1). A trip started from a button has none, as before.
-export function startUndo(pick: Pick, before: DraftPlan, started: { plan: DraftPlan; key: TripKey }): Undo | undefined {
-  if (pick.kind !== 'start' || pick.dropped === undefined) return undefined;
-  const trip = tripOf(started.plan, started.key);
-  return trip ? { before, line: `${pick.dropped} added to ${tripLabel(trip)}`, tripKey: started.key } : undefined;
-}
+// A trip's truck in a sentence, named by its driver: "Chaminda's dry truck", "the second trip of Chaminda's dry truck"
+// (spec 026). The board index's called gives it.
+export type Called = (trip: DraftTrip) => string;
 
 // The drop as a change of the draft, or null when it lands where it cannot or changes nothing.
-export function dropOf(plan: DraftPlan, dragged: Dragged, landing: Landing): Drop | null {
+export function dropOf(plan: DraftPlan, dragged: Dragged, landing: Landing, called: Called): Drop | null {
   if (!canLand(dragged, landing)) return null;
   if (dragged.kind === 'orders') {
-    // In the empty middle, its group's "Start a trip": pick a truck, and the trip starts with these orders.
+    // In the empty middle, its group's "Start a trip": pick a crew, and the trip starts with these orders.
     if (landing.kind === 'middle') {
       return { kind: 'start', pick: { kind: 'start', group: dragged.group, orders: dragged.orders, startWith: dragged.orders, dropped: dragged.label } };
     }
@@ -59,7 +52,7 @@ export function dropOf(plan: DraftPlan, dragged: Dragged, landing: Landing): Dro
     if (!trip) return null;
     // "Add": on the stop at the order's shop, or a new stop where it landed, at the end on a card.
     const next = addOrders(plan, landing.tripKey, dragged.orders, landing.kind === 'stops' ? landing.at : undefined);
-    return { kind: 'change', plan: next, undo: { before: plan, line: `${dragged.label} added to ${tripLabel(trip)}`, tripKey: landing.tripKey } };
+    return { kind: 'change', plan: next, undo: { before: plan, line: `${dragged.label} added to ${called(trip)}`, tripKey: landing.tripKey } };
   }
 
   const trip = tripOf(plan, dragged.tripKey);
@@ -74,13 +67,13 @@ export function dropOf(plan: DraftPlan, dragged: Dragged, landing: Landing): Dro
     return change(moveStop(plan, dragged.tripKey, dragged.index, to - dragged.index), `Stops ${first} and ${last} ${last - first === 1 ? 'swapped' : 'moved'}`);
   }
   // "Take off" for each of the stop's orders.
-  if (landing.kind === 'unplanned') return change(takeOff(plan, stop.orderIds), `${dragged.label} taken off ${tripLabel(trip)}`);
+  if (landing.kind === 'unplanned') return change(takeOff(plan, stop.orderIds), `${dragged.label} taken off ${called(trip)}`);
   if (landing.kind === 'card') {
     const target = tripOf(plan, landing.tripKey);
     if (!target) return null;
     // Its orders put on that trip, which takes them off this one first.
     const moved = addOrders(plan, landing.tripKey, stop.orderIds.map((id) => ({ id, outletId: stop.outletId })));
-    return change(moved, `${dragged.label} moved to ${tripLabel(target)}`);
+    return change(moved, `${dragged.label} moved to ${called(target)}`);
   }
   return null;
 }
