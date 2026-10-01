@@ -10,7 +10,7 @@ import { inDepot } from '@/lib/clock';
 import { cn } from '@/lib/utils';
 
 // What the next run's tile says when the depots shown run their next days apart; each has its own line in Next run.
-export const NEXT_RUNS_DIFFER = 'next runs differ by depot';
+const NEXT_RUNS_DIFFER = 'next runs differ by depot';
 
 // The delivered tile's words: "stops delivered · 1 partial", "· no plan out" when no depot has a plan out, and on both
 // depots together the depot that has none.

@@ -36,7 +36,7 @@ export function DashboardPage() {
   const days = ops.map((query) => query.data);
   const shown = days.filter((day): day is OperationsDay => day !== undefined);
   // Every depot's day, once each is read: only then is there anything to add up.
-  const all = shown.length === depots.length ? shown : null;
+  const all = depots.length > 0 && shown.length === depots.length ? shown : null;
   const failed = depots.flatMap((depot, i) => (!ops[i]!.data && ops[i]!.isError ? [{ depot, query: ops[i]! }] : []));
   const watched = agreed(shown.map((day) => day.day));
   // A failed refresh keeps the last read, so the card keeps drawing it; a first read that failed shows the error above.

@@ -49,7 +49,7 @@ export function FleetPage() {
   // chosen from.
   const reads = queries.map((query) => currentRead(query.data, clockDay));
   const loaded = reads.filter((read): read is LookupFleet => read !== undefined);
-  const all = loaded.length === reads.length ? loaded : null;
+  const all = reads.length > 0 && loaded.length === reads.length ? loaded : null;
   const today = agreed(loaded.map((read) => read.today));
   const [filters, setFilters] = useState<VehicleFilters>(NO_VEHICLE_FILTERS);
   const loading = queries.some((query, i) => readState({ ...query, data: reads[i] }, online) === 'loading');

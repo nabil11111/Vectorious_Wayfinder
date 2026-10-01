@@ -59,7 +59,7 @@ export function OrdersPage() {
   // What the page draws: each depot's read of these parameters and of the reset the clock shows. A date that is not a
   // calendar date draws nothing a cached read holds, and a read from another reset is not drawn or chosen from.
   const reads = queries.map((query) => (params === null ? undefined : currentRead(query.data, clockDay)));
-  const all = reads.every((read) => read !== undefined) ? reads as LookupOrders[] : null;
+  const all = reads.length > 0 && reads.every((read) => read !== undefined) ? reads as LookupOrders[] : null;
   const [filters, setFilters] = useState<OrderFilters>(NO_ORDER_FILTERS);
   // The days the reads are of, when every depot's is read and they are the same.
   const titled = all && all.every((read) => read.date === all[0]!.date && read.from === all[0]!.from && read.range === all[0]!.range) ? all[0]! : null;

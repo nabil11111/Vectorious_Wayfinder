@@ -23,10 +23,10 @@ export const depotSwitchKey = ['depot-switch'] as const;
 // What a press does: it switches to a depot other than the one on show, and not while a switch is on its way.
 export const switchTo = (pressed: string, chosen: string, switching: boolean) => (switching || pressed === chosen ? null : pressed);
 
-// A switch on this screen, whichever tab made it. Every read on screen was for the depot before, and some keys (the
-// plan board's, the problems') do not name it, so no read stays or lands: each is cancelled, the account's too, so an
-// older answer cannot land on the new one, and all but the account and the clock (the same for both depots) are
-// dropped. Each page then shows its loading state until the new depot's read arrives, and the new account opens the
+// A switch on this screen, whichever tab made it. Every read on screen was for the depot before, some keys (the plan
+// board's) do not name it, and a depot read on Both is read again under the new session, so no read stays or lands:
+// each is cancelled, the account's too, so an older answer cannot land on the new one, and all but the account and the
+// clock (the same for both depots) are dropped. Each page then shows its loading state until the new depot's read arrives, and the new account opens the
 // live stream again (lib/live.ts), since a stream carries the depot it opened with.
 // It answers whether the plan board held changes the server had not saved, which went with it.
 export async function takeSwitch(qc: QueryClient, me: Me) {

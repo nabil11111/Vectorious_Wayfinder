@@ -22,10 +22,6 @@ export const issuesOptions = (depot: string | null) => queryOptions({
   enabled: depot !== null,
 });
 
-export function useIssues(depot: string | null) {
-  return useQuery(issuesOptions(depot));
-}
-
 // Every depot's open problems the pages show: the session's depot, or Peliyagoda's and Kandy's in that order.
 export function useIssueLists(depots: readonly string[]) {
   return useQueries({ queries: depots.map((depot) => issuesOptions(depot)) });

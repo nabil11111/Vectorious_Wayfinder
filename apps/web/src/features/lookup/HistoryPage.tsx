@@ -65,7 +65,7 @@ export function HistoryPage() {
   // date draws nothing a cached read holds, and a read from another reset is not drawn or chosen from.
   const reads = queries.map((query) => (params === null ? undefined : currentRead(query.data, clockDay)));
   const loaded = reads.filter((read): read is LookupHistory => read !== undefined);
-  const all = loaded.length === reads.length ? loaded : null;
+  const all = reads.length > 0 && loaded.length === reads.length ? loaded : null;
   const [filters, setFilters] = useState<TripFilters>(NO_TRIP_FILTERS);
 
   // The sent-plan dates the reads are of. A depot with no sent plan yet has none.
@@ -82,7 +82,7 @@ export function HistoryPage() {
   // shows. It is gone once every depot's read says it holds no such trip.
   const selections = reads.map((read) => historySelection(read, search.get('trip'), clockDay));
   const selected = selections.find((selection) => selection.trip !== null)?.trip ?? null;
-  const gone = selections.every((selection) => selection.gone);
+  const gone = selections.length > 0 && selections.every((selection) => selection.gone);
   const counted = all && dates.length <= 1 ? all.flatMap((read) => (read.counts ? [read.counts] : [])) : [];
   const counts = counted.length ? sumHistory(counted) : null;
   const published = [...new Set(loaded.flatMap((read) => read.publishedDates))].sort().reverse().slice(0, 3);

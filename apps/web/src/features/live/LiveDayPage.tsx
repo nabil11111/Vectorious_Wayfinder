@@ -55,7 +55,7 @@ export function LiveDayPage() {
   const [answered, setAnswered] = useState<string | null>(null);
   const shown = parts.flatMap((part) => (part.ops.data ? [part.ops.data] : []));
   // Every depot's day, once each is read: only then do the counts add up, or a trip none of them holds count as gone.
-  const all = shown.length === parts.length ? shown : null;
+  const all = parts.length > 0 && shown.length === parts.length ? shown : null;
   const trips = shown.flatMap(allTrips);
   const watched = agreed(shown.map((day) => day.day));
   const tripParam = params.get('trip');
