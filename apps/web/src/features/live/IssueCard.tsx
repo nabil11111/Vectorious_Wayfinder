@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LOADING_DECISIONS, type Issue, type IssueDecision, type LoadingDecision } from '@wayfinder/contracts';
 import storeManager from '@/assets/icons/icon-person-store-manager.png';
 import { Button } from '@/components/ui/button';
-import { useMe } from '@/features/auth/api';
 import { orangeButton } from '@/features/plan/parts/look';
 import {
   brandOfShop, clockTime, coldWords, countedLine, driverSentLine, issuePlace, issueTitle, NO_REPLACEMENT, raisedLine, receivedOf, refusalReplacementLine,
@@ -26,25 +25,25 @@ export function RaisedAt({ issue }: { issue: Issue }) {
   return <span className="shrink-0 rounded-full bg-muted px-2.5 py-[5px] text-[10px] leading-3 font-semibold tabular-nums">{clockTime(issue.raisedAt)}</span>;
 }
 
-// The line of the green card once an answer is sent, which names the depot the cartons go back to. A driver's problem
-// and a shop's report tell the shop too (spec 015).
-export function AnsweredLine({ issue }: { issue: Issue }) {
-  const { data: me } = useMe();
-  const depot = me?.depotId ?? 'the depot';
+// The line of the green card once an answer is sent, which names the depot the cartons go back to: the problem's own,
+// also on both depots together (spec 021). A driver's problem and a shop's report tell the shop too (spec 015).
+export function AnsweredLine({ issue, depot }: { issue: Issue; depot: string }) {
   if (issue.kind === 'loading') return <>{answeredLine(issue, depot)}</>;
   return <>{issue.kind === 'receipt' ? reportSentLine(issue) : driverSentLine(issue, depot)}</>;
 }
 
 // One open problem in full (Dispatcher · Live day · issue open): what is wrong, where, who raised it and when, the
-// facts that bear on it, then the answers and the orange button that sends the chosen one.
-export function IssueCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
-  if (issue.kind === 'loading') return <FlagCard issue={issue} answering={answering} time={time} className={className} />;
-  if (issue.kind === 'receipt') return <ReportCard issue={issue} answering={answering} time={time} className={className} />;
-  return <DriverCard issue={issue} answering={answering} time={time} className={className} />;
+// facts that bear on it, then the answers and the orange button that sends the chosen one. depot is the problem's own,
+// the depot of the list it came in, which its words, its replacement day and its photo are for (spec 021).
+interface CardProps { issue: Issue; depot: string; answering: Answering; time: boolean; className?: string }
+export function IssueCard(props: CardProps) {
+  if (props.issue.kind === 'loading') return <FlagCard {...props} />;
+  if (props.issue.kind === 'receipt') return <ReportCard {...props} />;
+  return <DriverCard {...props} />;
 }
 
 // A loader's flag (spec 012): the count at the dock and the note, then "Go short" or "Load it all", and "Send to loader".
-function FlagCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
+function FlagCard({ issue, answering, time, className }: CardProps) {
   const [choice, setChoice] = useState<LoadingDecision>('go_short');
   const brand = brandOfShop(issue.stop.shopName);
   return (
@@ -65,8 +64,9 @@ function FlagCard({ issue, answering, time, className }: { issue: Issue; answeri
 }
 
 // The photo of a driver's problem or a shop's report, opened in a tab of its own from bytes fetched the shared way, which
-// names the depot the tab shows (D-95). A photo that could not be opened says why beside the link.
-function PhotoLink({ issue }: { issue: Issue }) {
+// names the depot the tab shows (D-95) and the problem's depot (spec 021). A photo that could not be opened says why
+// beside the link.
+function PhotoLink({ issue, depot }: { issue: Issue; depot: string }) {
   const [problem, setProblem] = useState<string | null>(null);
   // A photo still on its way when the card goes (a sign-out, a depot switch) is dropped, so a late answer from the old
   // session cannot sign out whoever signs in next.
@@ -77,7 +77,7 @@ function PhotoLink({ issue }: { issue: Issue }) {
     onItsWay.current?.abort();
     const asked = new AbortController();
     onItsWay.current = asked;
-    void openIssuePhoto(issue, asked.signal).then((line) => { if (!asked.signal.aborted) setProblem(line); });
+    void openIssuePhoto(issue, depot, asked.signal).then((line) => { if (!asked.signal.aborted) setProblem(line); });
   };
   return (
     <>
@@ -97,11 +97,10 @@ function useChoice(options: { decision: IssueDecision }[]) {
 // dock and what is still on the truck; or a shop that was closed. "Bring them back", for a refusal "Send N
 // replacements" as well while a day is open (spec 015, D-59), and for a closed shop "Try again on this trip" while the
 // trip is out. The shop sees the answer too, so the button sends it to both.
-function DriverCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
-  const { data: me } = useMe();
-  const replaceOn = useReplaceOn();
+function DriverCard({ issue, depot, answering, time, className }: CardProps) {
+  const replaceOn = useReplaceOn(depot);
   const options = [
-    ...driverAnswers(issue, me?.depotId ?? 'the depot'),
+    ...driverAnswers(issue, depot),
     ...(issue.kind === 'refused' && replaceOn && issue.short > 0
       ? [{ decision: 'send_replacements' as const, title: sendReplacementsTitle(issue.short, replaceOn), line: refusalReplacementLine(issue.short) }]
       : []),
@@ -110,7 +109,7 @@ function DriverCard({ issue, answering, time, className }: { issue: Issue; answe
   const rows: { label: string; value: ReactNode }[] = [
     ...(issue.kind === 'refused' ? [{ label: 'Driver', value: driverRaised(issue) }] : []),
     ...(issue.note ? [{ label: 'Note', value: issue.note }] : []),
-    ...(issue.hasPhoto ? [{ label: 'Photo', value: <PhotoLink issue={issue} /> }] : []),
+    ...(issue.hasPhoto ? [{ label: 'Photo', value: <PhotoLink issue={issue} depot={depot} /> }] : []),
     ...(issue.kind === 'refused' ? [{ label: 'At the dock', value: atTheDock(issue) }] : []),
     { label: stillOnLabel(issue), value: stillOnValue(issue) },
   ];
@@ -133,8 +132,8 @@ function DriverCard({ issue, answering, time, className }: { issue: Issue; answe
 // on, who confirmed it and when, each counted line as received of handed over, the cold check, the photo, then "Send N
 // replacements" for the day an order placed now is for, or "No replacement", and "Send to shop". A report of the cold
 // alone counts nothing short, so it only takes "No replacement", as does any report while no day is open.
-function ReportCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
-  const replaceOn = useReplaceOn();
+function ReportCard({ issue, depot, answering, time, className }: CardProps) {
+  const replaceOn = useReplaceOn(depot);
   const options = [
     ...(replaceOn && issue.short > 0
       ? [{ decision: 'send_replacements' as const, title: sendReplacementsTitle(issue.short, replaceOn), line: reportReplacementLine(issue.short) }]
@@ -150,7 +149,7 @@ function ReportCard({ issue, answering, time, className }: { issue: Issue; answe
     },
     { key: 'received', label: 'Received', value: receivedOf(issue) },
     ...(issue.cold !== null ? [{ key: 'cold', label: 'Cold on arrival', value: coldWords(issue.cold) }] : []),
-    ...(issue.hasPhoto ? [{ key: 'photo', label: 'Photo', value: <PhotoLink issue={issue} /> }] : []),
+    ...(issue.hasPhoto ? [{ key: 'photo', label: 'Photo', value: <PhotoLink issue={issue} depot={depot} /> }] : []),
   ];
   return (
     <article aria-label={reportTitle(issue)} className={className}>

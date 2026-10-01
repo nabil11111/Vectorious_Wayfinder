@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LookupHistoryQuery, type Brand, type LookupHistory } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
+import { useScope } from '@/features/dispatcher/scope';
 import { useOnline } from '@/features/live/operations';
 import { plainButton } from '@/features/plan/parts/look';
 import { useAppClock } from '@/lib/clock';
@@ -50,7 +51,8 @@ export function HistoryPage() {
   const [search, setSearch] = useSearchParams();
   const params = paramsOf(search);
   useFollowLookupMessages();
-  const options = historyOptions(me, params ?? {});
+  const depot = useScope().depots[0] ?? null;
+  const options = historyOptions(me, depot, params ?? {});
   const query = useQuery({ ...options, enabled: options.enabled && params !== null });
   const clockDay = clock.state?.day ?? null;
   useFollowGeneration(clockDay, query.data?.demoDay ?? null);
@@ -65,7 +67,7 @@ export function HistoryPage() {
   // The selected trip is the address's, while the read holds it and its records are of the reset the clock shows.
   const { trip: selected, gone } = historySelection(data, search.get('trip'), clockDay);
   // The photo belongs to the account, depot, date, selected trip and reset it was opened in.
-  const viewer = usePhotoViewer(scopeOf({ userId: me?.id ?? null, depotId: me?.depotId ?? null, params: { ...params, trip: selected?.tripId ?? null }, generation: data?.demoDay ?? null, clockGeneration: clockDay }));
+  const viewer = usePhotoViewer(scopeOf({ userId: me?.id ?? null, depotId: me?.depotId ?? null, params: { ...params, trip: selected?.tripId ?? null }, generation: data?.demoDay ?? null, clockGeneration: clockDay }), depot ?? '');
 
   const shownTrips = data ? data.trips.filter((trip) => matchesTrip(trip, filters)) : [];
   const deferrals = data ? data.deferrals.filter((deferral) => filters.brand === 'all' || deferral.outlet.brand === filters.brand) : [];

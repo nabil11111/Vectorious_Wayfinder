@@ -8,9 +8,10 @@ import { plainButton } from '@/features/plan/parts/look';
 import { reasonOf } from '@/features/store/words';
 import { clockTime, shortDay, whole } from '@/features/loader/words';
 import { useAppClock } from '@/lib/clock';
+import { useScope } from '@/features/dispatcher/scope';
 import { cn } from '@/lib/utils';
 import { NeedsYou } from './NeedsYou';
-import { useAnswer, useIssues } from './issues';
+import { useAnswer, useIssueLists } from './issues';
 import { isLive, useOnline, useOperations } from './operations';
 import { Events } from './parts/Events';
 import { focusIssue, focusOpener, showTrip } from './parts/focus';
@@ -30,8 +31,9 @@ const FILTERS: { value: Filter; label: string }[] = [{ value: 'all', label: 'All
 // Needs you cards (spec 012) and Drops and events. ?trip= opens a trip's details and ?issue= focuses a problem's card,
 // as the dashboard's links do. Below 1024 the counts come first, then Needs you, the trip cards and the events.
 export function LiveDayPage() {
-  const ops = useOperations();
-  const issues = useIssues();
+  const { depots } = useScope();
+  const ops = useOperations(depots)[0]!;
+  const issues = useIssueLists(depots)[0]!;
   const answering = useAnswer();
   const { at } = useAppClock();
   // Live only while the last read worked and this browser is online; a held or failed read shows the last one.
@@ -117,7 +119,7 @@ export function LiveDayPage() {
           {notice && <p role="status" className="rounded-[10px] bg-muted px-3 py-2.5 text-xs leading-4 font-semibold">{notice}</p>}
           <Trips query={ops} filter={filter} issues={issues.data} actions={actions} at={at} />
         </section>
-        <NeedsYou query={issues} answering={answering} className="order-1 lg:col-start-2 lg:row-start-1" />
+        <NeedsYou query={issues} depot={depots[0]!} answering={answering} className="order-1 lg:col-start-2 lg:row-start-1" />
         <Events day={day} className="order-3 lg:col-start-2 lg:row-start-2" />
       </div>
     </div>

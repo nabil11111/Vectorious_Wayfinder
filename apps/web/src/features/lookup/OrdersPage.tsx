@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LookupOrdersQuery, type LookupOrders } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
+import { useScope } from '@/features/dispatcher/scope';
 import { useOnline } from '@/features/live/operations';
 import { plainButton } from '@/features/plan/parts/look';
 import { useAppClock } from '@/lib/clock';
@@ -46,7 +47,8 @@ export function OrdersPage() {
   const [search, setSearch] = useSearchParams();
   const params = paramsOf(search);
   useFollowLookupMessages();
-  const options = ordersOptions(me, params ?? { range: 'day' });
+  const depot = useScope().depots[0] ?? null;
+  const options = ordersOptions(me, depot, params ?? { range: 'day' });
   const query = useQuery({ ...options, enabled: options.enabled && params !== null });
   const clockDay = clock.state?.day ?? null;
   useFollowGeneration(clockDay, query.data?.demoDay ?? null);

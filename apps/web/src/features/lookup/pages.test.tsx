@@ -86,7 +86,7 @@ function draw(page: ReactNode, path: string, cached: [readonly unknown[], unknow
   client.clear();
   return { html, text: html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') };
 }
-const ordersDay = lookupKey('orders', held.me, { range: 'day' });
+const ordersDay = lookupKey('orders', held.me, 'Peliyagoda', { range: 'day' });
 
 it('AC-34 a date that is not a calendar date shows nothing a cached read holds', () => {
   held.clockDay = 1;
@@ -94,15 +94,15 @@ it('AC-34 a date that is not a calendar date shows nothing a cached read holds',
   expect(orders.text).toContain(NOT_A_DATE);
   for (const cached of ['Thu 25 Jun', 'Fresh Nugegoda', 'Skipped lately', 'Fresh Dickwella', 'Live · updated']) expect(orders.text).not.toContain(cached);
   expect(orders.html).not.toContain('2026-06-25');
-  const history = draw(<HistoryPage />, `/dispatcher/history?date=2026-02-31&trip=${id(800)}`, [[lookupKey('history', held.me, {}), historyRead(1)]]);
+  const history = draw(<HistoryPage />, `/dispatcher/history?date=2026-02-31&trip=${id(800)}`, [[lookupKey('history', held.me, 'Peliyagoda', {}), historyRead(1)]]);
   expect(history.text).toContain(NOT_A_DATE);
   for (const cached of ['Thu 25 Jun', 'Wed 24 Jun', 'VEH035', 'Shop confirmation', 'Live · updated']) expect(history.text).not.toContain(cached);
   expect(history.html).not.toContain('2026-06-25');
 });
 
 it('AC-29 records read before a reset the clock already shows are never drawn, so none can be chosen', () => {
-  const history = lookupKey('history', held.me, { date: THU });
-  const fleet = lookupKey('fleet', held.me, {});
+  const history = lookupKey('history', held.me, 'Peliyagoda', { date: THU });
+  const fleet = lookupKey('fleet', held.me, 'Peliyagoda', {});
   // The same reads drawn while the clock is on their reset: the rows, the confirmation and the vehicle are there.
   held.clockDay = 1;
   expect(draw(<OrdersPage />, '/dispatcher/orders', [[ordersDay, ordersRead(1)]]).text).toContain('Fresh Nugegoda');

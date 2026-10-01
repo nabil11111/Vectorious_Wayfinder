@@ -93,7 +93,7 @@ it('AC-6 Orders filters its returned rows without a new request', async () => {
   expect(ordersPage(read, { search: '', filter: 'all' }, id(42)).selected).toBeNull();
 
   // One read answers the whole page: filtering, searching and opening a row ask nothing more of the server.
-  const observer = new QueryObserver(client, ordersOptions(ruwan, { range: 'day' }));
+  const observer = new QueryObserver(client, ordersOptions(ruwan, 'Peliyagoda', { range: 'day' }));
   stop = observer.subscribe(() => {});
   await settle();
   respond(0, read);
@@ -107,7 +107,7 @@ it('AC-6 Orders filters its returned rows without a new request', async () => {
     }
   }
   await settle();
-  expect(requests).toEqual(['/api/v1/lookup/orders?range=day']);
+  expect(requests).toEqual(['/api/v1/lookup/orders?range=day&depot=Peliyagoda']);
 });
 
 const ruwan: Me = { id: 'dispatcher-ruwan', username: 'ruwan', staffId: 'P-001', displayName: 'Ruwan', role: 'dispatcher', depotId: 'Peliyagoda', outletId: null };

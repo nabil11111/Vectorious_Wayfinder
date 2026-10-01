@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { LookupFleet } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
+import { useScope } from '@/features/dispatcher/scope';
 import { useOnline } from '@/features/live/operations';
 import { Chip } from '@/features/live/parts/ui';
 import { plainButton } from '@/features/plan/parts/look';
@@ -34,7 +35,8 @@ export function FleetPage() {
   const clock = useAppClock();
   const online = useOnline();
   useFollowLookupMessages();
-  const options = fleetOptions(me);
+  const depot = useScope().depots[0] ?? null;
+  const options = fleetOptions(me, depot);
   const query = useQuery(options);
   const clockDay = clock.state?.day ?? null;
   useFollowGeneration(clockDay, query.data?.demoDay ?? null);

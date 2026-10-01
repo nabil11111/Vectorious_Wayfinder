@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useIssues } from '@/features/live/issues';
+import { useIssueLists } from '@/features/live/issues';
 import { isLive, useOnline, useOperations } from '@/features/live/operations';
 import { CARD, LiveLine, StaleLine } from '@/features/live/parts/ui';
 import { LOAD_FAILED, NO_DAY, staleLine } from '@/features/live/words';
@@ -9,6 +9,7 @@ import { plainButton } from '@/features/plan/parts/look';
 import { reasonOf } from '@/features/store/words';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
+import { useScope } from './scope';
 import { MapSkeleton, TilesSkeleton, TrucksSkeleton } from './parts/DashboardSkeleton';
 import { FleetMap } from './parts/FleetMap';
 import { NeedsYouCard } from './parts/NeedsYouCard';
@@ -20,8 +21,9 @@ import { TrucksOut } from './parts/TrucksOut';
 // the trucks out now, problems first. From 1280 wide the map sits right of Needs you, 520 wide as in the frame; below
 // that it goes under Needs you. Below 1024 the tiles go two to a row, then Needs you, the map and the truck cards.
 export function DashboardPage() {
-  const ops = useOperations();
-  const issues = useIssues();
+  const { depots } = useScope();
+  const ops = useOperations(depots)[0]!;
+  const issues = useIssueLists(depots)[0]!;
   const clock = useAppClock();
   const online = useOnline();
   const day = ops.data;
