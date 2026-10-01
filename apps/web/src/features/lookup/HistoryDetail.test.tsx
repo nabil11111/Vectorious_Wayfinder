@@ -78,7 +78,7 @@ const viewer: PhotoViewer = { view: CLOSED, open: () => {}, close: () => {}, ret
 const textOf = (node: React.ReactNode) => renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 it('History shows each stop\'s own shop confirmation and says one that is not there, never a signature or an empty receipt', () => {
-  const text = textOf(<HistoryDetail trip={trip} brand="all" viewer={viewer} onClose={() => {}} />);
+  const text = textOf(<HistoryDetail trip={trip} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />);
   // The confirmed stop: the shop and its time, its orders and received cartons, the shortage on the receipt apart from
   // the one at the depot, the cold check, the report and the depot's answer with the replacement it placed.
   expect(text).toContain('Shop confirmation · Fresh Nugegoda');
@@ -126,7 +126,7 @@ it('History keeps a closed visit as its own attempt, listed once, with its own t
         notDelivered: 94, photo: null, decision: 'bring_back', decidedBy: 'Ruwan', decidedAt: at('05:50') }],
     })],
   });
-  const text = textOf(<HistoryDetail trip={closed} brand="all" viewer={viewer} onClose={() => {}} />);
+  const text = textOf(<HistoryDetail trip={closed} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />);
   expect(text.match(/Closed attempt · nobody there/g)).toHaveLength(1);
   expect(text).not.toContain('Nobody at the shop');
   expect(text).toContain('closed by Dilshan 05:45 · 94 cartons not delivered');

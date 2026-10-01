@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { LookupFuel, LookupVehicle } from '@wayfinder/contracts';
 import { CARD, Chip } from '@/features/live/parts/ui';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,8 @@ const INK = { bad: 'text-bad', warn: 'text-warn-ink', good: 'text-foreground' } 
 export function VehicleTable({ groups, today, depot, selectedId, onSelect }: {
   groups: VehicleGroup[]; today: string; depot: string; selectedId: string | null; onSelect: (vehicleId: string) => void;
 }) {
+  // Its own ids, as Fleet on both depots together draws a table per depot (spec 021).
+  const id = useId();
   return (
     <div className="min-w-[960px] space-y-2.5">
       <div aria-hidden="true" className={cn('grid gap-x-2.5 px-6 text-[10px] leading-3 font-semibold text-muted-foreground', COLUMNS)}>
@@ -27,10 +30,10 @@ export function VehicleTable({ groups, today, depot, selectedId, onSelect }: {
         {HEADS.map((head) => <span key={head}>{head}</span>)}
       </div>
       {groups.map(({ group, vehicles }) => (
-        <section key={group} aria-labelledby={`fleet-${group}`} className={cn(CARD, 'px-4 pt-3 pb-2')}>
+        <section key={group} aria-labelledby={`${id}-${group}`} className={cn(CARD, 'px-4 pt-3 pb-2')}>
           <div className="flex items-center gap-2.5">
             <img src={vehiclePicture(vehicles[0]!)} alt="" className="size-[26px] object-contain" />
-            <h2 id={`fleet-${group}`} className="text-[15px] leading-5 font-bold">{GROUP_WORDS[group]}</h2>
+            <h2 id={`${id}-${group}`} className="text-[15px] leading-5 font-bold">{GROUP_WORDS[group]}</h2>
             <span className="text-[11px] leading-[14px] text-muted-foreground">{whole(vehicles.length)} at {depot}</span>
           </div>
           <div role="table" aria-label={GROUP_WORDS[group]} className="mt-1.5">
