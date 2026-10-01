@@ -1,6 +1,6 @@
-import type { Minutes } from './types';
+import type { EngineVehicle, Minutes } from './types';
 
-// How the checker writes times and amounts in its messages, so every rule reads the same.
+// How the checker writes times, amounts, orders and vehicles in its messages, so every rule reads the same.
 
 // '03:30' to 210. Used by the code that prepares the checker's input, and by tests.
 export function toMinutes(clock: string): Minutes {
@@ -29,3 +29,20 @@ export const litres = (n: number) => `${trim(n, 1)} litres`;
 // dry order most days, and a split order leaves two for one shop (D-17), so the shop alone does not say which.
 // It comes with no "a" or "an", because 800 kg would need the other one. The sentence puts "the" in front.
 export const orderCalled = (kilos: number, chilled: boolean, shop: string) => `${kg(kilos)} ${chilled ? 'chilled' : 'dry'} order for ${shop}`;
+
+// What a sentence calls a vehicle (spec 024): its kind in the board's own words and its id, "the reefer truck
+// VEH001", "the dry truck VEH044", "the reefer van VEH035" or "the van VEH037".
+type Vehicle = Pick<EngineVehicle, 'id' | 'type' | 'temp'>;
+const kindOf = ({ type, temp }: Vehicle) => (type === 'van' ? (temp === 'reefer' ? 'reefer van' : 'van') : temp === 'reefer' ? 'reefer truck' : 'dry truck');
+export const vehicleCalled = (vehicle: Vehicle) => `the ${kindOf(vehicle)} ${vehicle.id}`;
+
+// A trip is numbered only where that tells it from the vehicle's other trip (spec 024). A vehicle's second trip is
+// "the second trip of the reefer truck VEH001", or "its second trip" once the sentence has named the vehicle. Its
+// first or only trip gets no number: it is the vehicle itself, and itsTrip gives null for the sentence to say it
+// in its own words.
+const isSecond = (tripNo: number) => tripNo === 2;
+export const tripCalled = (vehicle: Vehicle, tripNo: number) => (isSecond(tripNo) ? `the second trip of ${vehicleCalled(vehicle)}` : vehicleCalled(vehicle));
+export const itsTrip = (tripNo: number) => (isSecond(tripNo) ? 'its second trip' : null);
+
+// A sentence that leads with a vehicle starts "The dry truck VEH044".
+export const capital = (sentence: string) => sentence.charAt(0).toUpperCase() + sentence.slice(1);
