@@ -11,6 +11,7 @@ import { keyOf, placesOf, startTrip, swapTruck, tripOf, type TripKey } from './d
 import { BoardHeader, type Tab } from './parts/BoardHeader';
 import { BuildPanel } from './parts/BuildPanel';
 import { DoneList } from './parts/DoneList';
+import { startUndo } from './parts/drops';
 import { FindSlot } from './parts/FindSlot';
 import { ICON } from './parts/icons';
 import { groupKey, indexOf } from './parts/lookup';
@@ -110,7 +111,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
     }
     const started = startTrip(draft, vehicleId, pick.startWith);
     if (!started) return;
-    change(started.plan);
+    change(started.plan, startUndo(pick, draft, started));
     const group = pick.group;
     if (group) setStartedFrom({ ...startedFrom, [started.key]: group });
     openTrip(started.key);

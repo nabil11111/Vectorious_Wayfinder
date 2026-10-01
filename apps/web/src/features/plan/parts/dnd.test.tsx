@@ -95,7 +95,7 @@ it('spec 023 AC-1 makes a finished drag its change of the draft, with its Undo, 
   expect(plan.trips[0].stops.map((s: { outletId: string }) => s.outletId)).toEqual(['OUT001', 'OUT005', 'OUT002']);
   expect(undo).toMatchObject({ line: 'Fresh Dehiwala added to VEH035', tripKey: 'VEH035-1' });
   landDrop(planOf(BOARD), dehiwala, { kind: 'middle' }, { change, start });
-  expect(start).toHaveBeenCalledWith({ kind: 'start', group: dehiwala.group, orders: dehiwala.orders, startWith: dehiwala.orders });
+  expect(start).toHaveBeenCalledWith({ kind: 'start', group: dehiwala.group, orders: dehiwala.orders, startWith: dehiwala.orders, dropped: 'Fresh Dehiwala' });
   // Put back, or dropped where it cannot land: nothing happens.
   landDrop(planOf(BOARD), dehiwala, undefined, { change, start });
   landDrop(planOf(BOARD), dehiwala, { kind: 'unplanned' }, { change, start });

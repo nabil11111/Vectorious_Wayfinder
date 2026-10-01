@@ -1,7 +1,7 @@
 import type { BoardOrder, DraftPlan } from '@wayfinder/contracts';
 import { expect, it } from 'vitest';
-import { addOrders, moveStop, takeOff } from '../draft';
-import { canLand, dropOf, type Dragged, type Landing } from './drops';
+import { addOrders, moveStop, startTrip, takeOff } from '../draft';
+import { canLand, dropOf, startUndo, type Dragged, type Landing } from './drops';
 
 // Spec 023: every drop on the plan board is the change its button or menu makes, one change of the draft with a line
 // naming it for Undo (rule 1), and nothing here judges the plan: the checker does, after the drop (rule 2). The day is
@@ -43,7 +43,20 @@ it('spec 023 AC-1 an order dropped on a trip\'s card in Done joins that trip at 
 });
 
 it('spec 023 AC-4 an order dropped in the empty middle opens the truck picker for its group, starting with it', () => {
-  expect(dropOf(PLAN, dehiwala, { kind: 'middle' })).toEqual({ kind: 'start', pick: { kind: 'start', group: COLOMBO, orders: dehiwala.orders, startWith: dehiwala.orders } });
+  expect(dropOf(PLAN, dehiwala, { kind: 'middle' })).toEqual({ kind: 'start', pick: { kind: 'start', group: COLOMBO, orders: dehiwala.orders, startWith: dehiwala.orders, dropped: 'Fresh Dehiwala' } });
+});
+
+it('spec 023 AC-5 a trip a drop started is one change with its Undo, naming the truck the picker gave it', () => {
+  const pick = { kind: 'start' as const, group: COLOMBO, orders: dehiwala.orders, startWith: dehiwala.orders, dropped: 'Fresh Dehiwala' };
+  const started = startTrip(PLAN, 'VEH004', pick.startWith)!;
+  expect(startUndo(pick, PLAN, started)).toEqual({ before: PLAN, line: 'Fresh Dehiwala added to VEH004', tripKey: 'VEH004-1' });
+  // A second trip, as its card names it.
+  const second = startTrip(PLAN, 'VEH035', pick.startWith)!;
+  expect(startUndo(pick, PLAN, second)).toMatchObject({ line: 'Fresh Dehiwala added to VEH035 trip 2', tripKey: 'VEH035-2' });
+  // A trip started from a button has no Undo, as before.
+  const { dropped: _dropped, ...button } = pick;
+  expect(startUndo(button, PLAN, started)).toBeUndefined();
+  expect(startUndo({ kind: 'swap', key: 'VEH035-1' }, PLAN, started)).toBeUndefined();
 });
 
 it('spec 023 AC-3 a stop dragged up or down is the menu\'s move, by as many places as it went', () => {
