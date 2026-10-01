@@ -2,7 +2,7 @@
 
 One pull request per task. The API tasks, and T0's functions, write their tests from the criteria first (D-07).
 
-- [ ] **T0 · Shared parts** · lead, on `nabil/driver` brought up to date with `main` once spec 012 is merged there, because
+- [x] **T0 · Shared parts** · lead, on `nabil/driver` brought up to date with `main` once spec 012 is merged there, because
   A4 reads its loaded counts, problems and locks. The migration `driver` and its schema (plan.md, Data changes).
   `packages/contracts/src/driver.ts` with its shapes and error codes and `applyDriverWrite`, `nextStop`, `tripFigures`
   and `phoneView`, their unit tests written first (AC-9, `apps/api/src/driver/rules.test.ts`); the kinds, reasons,
@@ -14,29 +14,29 @@ One pull request per task. The API tasks, and T0's functions, write their tests 
   in `localStorage` and read at once on start, with `networkMode: 'always'`, in `features/auth/api.ts` and `lib/clock.ts`,
   a `status` slot in `AppShell.tsx` with the demo chip's short form beside it, and the seven icons in `assets/icons/`. The
   new tables in `docs/data-model.md`, and A4 as "Building" in the map. D-43 to D-50 are in `docs/decisions.md` already.
-- [ ] **T1 · Reading the driver's day** (AC-1 to AC-5) · after T0, with the account's applied ids and a closed stop's lines
+- [x] **T1 · Reading the driver's day** (AC-1 to AC-5) · after T0, with the account's applied ids and a closed stop's lines
   read from its problem. Files: `apps/api/src/driver/day.ts`, the GET route in `routes/driver.ts`, the `driver`
   announcement in spec 012's `loading/writes.ts` and spec 010's `plans/send.ts`, and `apps/api/tests/driver-plan.ts` and
   `driver-read.test.ts`.
-- [ ] **T2 · The driver's writes** (AC-6, AC-8, AC-10 to AC-21) · after T1.
+- [x] **T2 · The driver's writes** (AC-6, AC-8, AC-10 to AC-21) · after T1.
   Files: `driver/kept-time.ts` and `driver/photo.ts` with their tests, `driver/writes.ts`, the POST route in
   `routes/driver.ts`, and `apps/api/tests/driver-writes.test.ts`.
-- [ ] **T3 · Saved once** (AC-22 to AC-29) · after T2: the write ids and their hashes, a lost answer, the ids listed past
+- [x] **T3 · Saved once** (AC-22 to AC-29) · after T2: the write ids and their hashes, a lost answer, the ids listed past
   16:00 and after 48 hours, the clock read under the trip's lock, and the reset. Files: `driver/writes.ts`,
   `driver/day.ts` and `apps/api/tests/driver-sync.test.ts`.
-- [ ] **T4 · The answers and the photo** (AC-30 to AC-37) · after T3, whose problems its tests raise.
+- [x] **T4 · The answers and the photo** (AC-30 to AC-37) · after T3, whose problems its tests raise.
   Files: spec 012's `issues/read.ts` and `issues/decide.ts`, the photo route in `routes/issues.ts`, and
   `apps/api/tests/driver-answers.test.ts`.
-- [ ] **T5 · The phone's store and sync loop** (the phone's part of AC-40, AC-43 to AC-48, AC-50) · after T0: the one tab
+- [x] **T5 · The phone's store and sync loop** (the phone's part of AC-40, AC-43 to AC-48, AC-50) · after T0: the one tab
   that owns the driver's app, the loop that fetches, keeps and sends, and the signal. Files:
   `apps/web/src/features/driver/store.ts`, `sender.ts`, `signal.ts` and `photo.ts`, and in `parts/` the status chip and
   the waiting sheet.
-- [ ] **T6 · The driver's screens** (AC-38 to AC-40, the driver's part of AC-41 and AC-42, the other tab's line of AC-48,
+- [x] **T6 · The driver's screens** (AC-38 to AC-40, the driver's part of AC-41 and AC-42, the other tab's line of AC-48,
   AC-49, AC-50) · after T5. It uses spec 012's `features/loader/words.ts`. Files: everything else in
   `apps/web/src/features/driver/`.
-- [ ] **T7 · Live day's card for the driver's problems** (the dispatcher's part of AC-41 and AC-42) · after T6.
+- [x] **T7 · Live day's card for the driver's problems** (the dispatcher's part of AC-41 and AC-42) · after T6.
   Files: spec 012's `features/live/IssueCard.tsx` and the problem words it uses.
-- [ ] **T8 · Join and click through** · lead · after T4 and T7. Build the app and run it as it runs hosted, since the
+- [x] **T8 · Join and click through** · lead · after T4 and T7. Build the app and run it as it runs hosted, since the
   service worker is off on the development server. Then the click-throughs of AC-38 to AC-49 in Nabil's Chrome next to
   the frames, on a fresh reset through the walkthroughs of specs 009, 010 and 012 and then this one: the network turned
   off in DevTools and a cold reload for AC-40, two browsers for AC-41 to AC-43, DevTools' storage quota for AC-44, the

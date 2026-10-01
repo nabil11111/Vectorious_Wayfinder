@@ -1,6 +1,6 @@
 # 013 · The driver
 
-**Status:** Spec, reviewed once, with three open questions at the bottom  ·  **Owner:**  ·  **Design:** Driver · Today's trip, · Next stop, · Unload, · Proof, · photo preview, · delivery saved locally, · No signal, · connection restored, · Something's wrong · refused and · shop closed, · Next stop · after refusal and · after no answer, · Trip done, · Trip done · refused and · shop closed, · Day done, the offline and last stop variants of Unload, Proof and delivery saved locally, and the right-hand column of Dispatcher · Live day · issue open and · issue open · decision sent.
+**Status:** Done, with three open questions at the bottom  ·  **Owner:**  ·  **Design:** Driver · Today's trip, · Next stop, · Unload, · Proof, · photo preview, · delivery saved locally, · No signal, · connection restored, · Something's wrong · refused and · shop closed, · Next stop · after refusal and · after no answer, · Trip done, · Trip done · refused and · shop closed, · Day done, the offline and last stop variants of Unload, Proof and delivery saved locally, and the right-hand column of Dispatcher · Live day · issue open and · issue open · decision sent.
 
 Piece A4 of [the map](../000-map.md), with the driver's no-signal screens the map first put in A6 (D-43). It starts where
 spec 012 ends, with a truck marked `ready` and its loaded counts written. The clock, live updates and the seeded day are

@@ -66,5 +66,5 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [010](010-plan-board/spec.md) | The plan board: the dispatcher plans by hand | Done |
 | [011](011-planner/spec.md) | The planner: the suggested plan's engine | Done |
 | [012](012-loading/spec.md) | Loading: the loader loads and flags, the dispatcher answers | Done |
-| [013](013-driver/spec.md) | The driver: the trip, proof, a refused delivery, a closed shop and working with no signal | Building |
+| [013](013-driver/spec.md) | The driver: the trip, proof, a refused delivery, a closed shop and working with no signal | Done |
 | [014](014-suggested-plan/spec.md) | The suggested plan on the board: build it, explain it, decide and send | Done |
