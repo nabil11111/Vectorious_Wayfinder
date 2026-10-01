@@ -84,8 +84,10 @@ export const HistoryStop = z.object({ id: z.uuid(), seq: Count, outlet: LookupSh
   lines: z.array(HistoryLine), stages: HistoryStages, flags: HistoryFlags, receipt: HistoryReceipt.nullable(),
   proof: LookupPhoto.nullable(), problems: z.array(HistoryProblem), attempts: z.array(HistoryClosedAttempt) });
 export type HistoryStop = z.infer<typeof HistoryStop>;
+// noGoods and closed are what the delivered count leaves out, as Live day counts them (Q-45): stops delivered or refused
+// with nothing handed over, and stops nobody was at.
 export const HistoryCounts = z.object({ trips: Count, stops: Count, orders: Count, delivered: Count, finished: Count, partial: Count,
-  late: Count, short: Count, returned: Count, deferred: Count, confirmations: Count, receivedOrders: Count, stages: HistoryStages });
+  noGoods: Count, closed: Count, late: Count, short: Count, returned: Count, deferred: Count, confirmations: Count, receivedOrders: Count, stages: HistoryStages });
 export type HistoryCounts = z.infer<typeof HistoryCounts>;
 export const HistoryTrip = z.object({ tripId: z.uuid(), planId: z.uuid(), date: Day, vehicleId: z.string(), vehicleType: z.enum(['truck', 'van']),
   vehicleTemp: z.enum(['reefer', 'ambient']), archived: z.boolean(), tripNo: Count, driver: z.object({ id: z.uuid(), name: z.string() }).nullable(),

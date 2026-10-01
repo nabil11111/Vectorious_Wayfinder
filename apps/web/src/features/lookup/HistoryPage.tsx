@@ -7,6 +7,7 @@ import { useMe } from '@/features/auth/api';
 import { DepotHeading } from '@/features/dispatcher/parts/DepotHeading';
 import { partId, useScope } from '@/features/dispatcher/scope';
 import { useOnline } from '@/features/live/operations';
+import { deliveredExtras } from '@/features/live/words';
 import { plainButton } from '@/features/plan/parts/look';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
@@ -260,12 +261,13 @@ function ClearFilters({ onClick }: { onClick: () => void }) {
 }
 
 // The whole publication's own counts, never the filtered rows (rule 6): trips, stops, orders, stops delivered of all
-// stops with the partial ones, late, short, return instructed, deferred orders and shop confirmations. On both depots
+// stops with the partial, none delivered and closed ones as Live day says them (Q-45), late, short, return instructed, deferred orders and shop confirmations. On both depots
 // together they are the two sent plans' added up.
 function summaryOf(c: HistoryCounts): Figure[] {
   return [
     { value: whole(c.trips), label: c.trips === 1 ? 'trip' : 'trips' },
-    { value: `${whole(c.delivered)} / ${whole(c.stops)}`, label: `stops delivered${c.partial ? ` · ${whole(c.partial)} partial` : ''}` },
+    { value: `${whole(c.delivered)} / ${whole(c.stops)}`,
+      label: ['stops delivered', ...deliveredExtras({ partialStops: c.partial, noGoodsStops: c.noGoods, closedStops: c.closed })].join(' · ') },
     { value: whole(c.orders), label: c.orders === 1 ? 'order on trips' : 'orders on trips' },
     { value: whole(c.late), label: 'late', tone: c.late > 0 ? 'warn' : undefined },
     { value: whole(c.short), label: 'short', tone: c.short > 0 ? 'bad' : undefined },

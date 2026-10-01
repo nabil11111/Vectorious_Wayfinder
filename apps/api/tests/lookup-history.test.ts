@@ -52,6 +52,17 @@ it.each(['refused', 'closed'] as const)('AC-13 zero handover finishes without de
     : { handedOver: { units: 0 }, received: { units: null }, notDelivered: { units: 0 }, refused: { units: 94 } });
   expect(stop.attempts).toHaveLength(kind === 'closed' ? 1 : 0);
 });
+// Q-45: Kandy's Dashboard and Live day read "8 / 64 stops delivered · 1 partial · 1 closed" and History "8 / 64 stops
+// delivered · 1 partial". History's header counts a closed stop, and a stop with none delivered, as Live day does.
+it.each(['refused', 'closed'] as const)('Q-45 the header counts a %s stop with nothing handed over the way Live day does', async kind => {
+  const trip = await h.road.wellawatte();
+  await h.road.write(trip, kind === 'refused' ? 'refuse' : 'closed', 228, 2, kind === 'refused'
+    ? { reason: 'damaged', note: '', lines: driverStop(trip, 2).lines.map(line => ({ lineId: line.lineId, refused: line.loaded })) } : {});
+  const { counts } = await operations(h.ruwan), day = await read();
+  expect(day.counts).toMatchObject({ delivered: 1, partial: 0, noGoods: kind === 'refused' ? 1 : 0, closed: kind === 'closed' ? 1 : 0 });
+  expect([day.counts!.delivered, day.counts!.partial, day.counts!.noGoods, day.counts!.closed])
+    .toEqual([counts.stopsDelivered, counts.partialStops, counts.noGoodsStops, counts.closedStops]);
+});
 // L-13: VEH035 with Nugegoda confirmed and Wellawatte closed read "Handed over · not recorded · 2 of 3 lines", although
 // nothing more can be recorded for Wellawatte's lines. A closed shop was handed nothing, so the trip's figures are whole.
 it('L-13 counts a closed shop as nothing handed over, received or short on the receipt, so the trip reads whole figures', async () => {

@@ -133,6 +133,7 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    | Trips / stops | Trip rows / distinct current stops of this publication. Attempts never add stops. |
    | Stops delivered | Current delivered/refused outcomes with more than zero units handed over. Partial deliveries are marked; a closed or completely refused stop is not delivered. |
    | Finished / partial | Stops with a current outcome / delivered stops with a refusal quantity above zero. |
+   | None delivered / closed | Delivered or refused stops with nothing handed over / stops whose current outcome is closed. The header says them beside stops delivered as Live day and the Dashboard do, "8 / 64 stops delivered · 1 partial · 1 closed" (Q-45). |
    | Late | Current recorded arrival strictly after the saved effective window close; no arrival is unknown, never late from elapsed time alone. |
    | Short | Distinct current stops with any known depot short, refused quantity or receipt short above zero. A not-cold report with no count difference is a problem, not a short quantity. |
    | Returned | Distinct stops with a closed problem answered Bring them back, or a refusal answered Bring them back or Send replacements (015 still sends the refused goods back). Label “Return instructed”; this is not a depot return scan. Earlier retry attempts alone do not make it returned. |

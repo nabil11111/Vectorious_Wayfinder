@@ -69,7 +69,7 @@ const historyRead = (demoDay: number, depot: Depot = 'Peliyagoda') => {
   const { shop, vehicle, driver, base } = OWN[depot];
   return LookupHistory.parse({
     ...scope(demoDay, depot), date: THU, publishedDates: [THU, '2026-06-24'], publication: { ...sent, id: id(base + 900) },
-    counts: { trips: 1, stops: 1, orders: 1, delivered: 1, finished: 1, partial: 0, late: 0, short: 0, returned: 0, deferred: 0, confirmations: 1, receivedOrders: 1, stages },
+    counts: { trips: 1, stops: 1, orders: 1, delivered: 1, finished: 1, partial: 0, noGoods: 0, closed: 0, late: 0, short: 0, returned: 0, deferred: 0, confirmations: 1, receivedOrders: 1, stages },
     groups: [{ brand: 'Fresh', district: shop.district, tripIds: [id(base + 800)] }],
     trips: [{
       tripId: id(base + 800), planId: id(base + 900), date: THU, vehicleId: vehicle, vehicleType: 'van', vehicleTemp: 'reefer', archived: false, tripNo: 1,
@@ -250,6 +250,14 @@ it('Q-44 History\'s header gives loaded and handed over so far, and counts the l
   expect(text).toContain('8 ordered 4,031 loaded so far 3,990 handed over so far 0 short from the depot');
   expect(text).toContain('Not recorded yet: loaded and handed over (130 of 163 lines); received (154 of 163 lines)');
   expect(text).not.toContain('33 of 163');
+});
+
+it('Q-45 History\'s header says the partial, none delivered and closed stops beside the delivered ones, as Live day does', () => {
+  held.clockDay = 1;
+  const read = historyRead(1);
+  read.counts = { ...read.counts!, stops: 64, delivered: 8, finished: 11, partial: 1, noGoods: 1, closed: 1 };
+  const { text } = draw(<HistoryPage />, `/dispatcher/history?date=${THU}`, [[lookupKey('history', held.me, 'Peliyagoda', { date: THU }), read]]);
+  expect(text).toContain('8 / 64 stops delivered · 1 partial · 1 with none delivered · 1 closed');
 });
 
 it('Q-14 a depot whose sent plans are all still to come says so beside their chip, offers to open the soonest, and never says none was sent', () => {

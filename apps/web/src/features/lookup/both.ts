@@ -27,6 +27,7 @@ export function sumHistory(all: HistoryCounts[]): HistoryCounts {
   const stage = (key: Exclude<keyof HistoryStages, 'ordered'>) => sumMeasure(all.map((counts) => counts.stages[key]));
   return {
     trips: sum('trips'), stops: sum('stops'), orders: sum('orders'), delivered: sum('delivered'), finished: sum('finished'), partial: sum('partial'),
+    noGoods: sum('noGoods'), closed: sum('closed'),
     late: sum('late'), short: sum('short'), returned: sum('returned'), deferred: sum('deferred'), confirmations: sum('confirmations'), receivedOrders: sum('receivedOrders'),
     stages: {
       ordered: added(all.map((counts) => counts.stages.ordered)), loaded: stage('loaded'), handedOver: stage('handedOver'), received: stage('received'),

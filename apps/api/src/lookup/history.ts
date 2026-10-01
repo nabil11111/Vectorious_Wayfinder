@@ -109,7 +109,9 @@ export function getLookupHistory(caller: DepotCaller, query: LookupHistoryQuery)
         const own = shown.filter(row => JSON.stringify([row.brand, row.district]) === key);
         return { brand: own[0]!.brand, district: own[0]!.district, tripIds: own.map(row => row.tripId) };
       }), counts: { trips: shown.length, stops: allStops.length, orders: new Set(allStops.flatMap(row => row.orderIds)).size, delivered: delivered.length, finished: allStops.filter(row => row.outcome !== null).length,
-        partial: delivered.filter(row => (row.stages.refused.units ?? 0) > 0).length, late: allStops.filter(row => row.flags.late === true).length, short: allStops.filter(row => row.flags.short).length,
+        partial: delivered.filter(row => (row.stages.refused.units ?? 0) > 0).length,
+        noGoods: allStops.filter(row => (row.outcome === 'delivered' || row.outcome === 'refused') && row.stages.handedOver.units === 0).length,
+        closed: allStops.filter(row => row.outcome === 'closed').length, late: allStops.filter(row => row.flags.late === true).length, short: allStops.filter(row => row.flags.short).length,
         returned: allStops.filter(row => row.flags.returned).length, deferred: new Set(deferred.map(row => row.order.id)).size, confirmations: allStops.filter(row => row.receipt !== null).length,
         receivedOrders: new Set(allStops.flatMap(row => row.receipt ? row.orderIds : [])).size, stages: stagesOf(allStops.flatMap(row => row.lines)) },
       deferrals: deferred.map(({ deferral, order, shop }) => ({ planId: plan.id, date: plan.date, orderId: order.id, outlet: shop, temp: order.temp, code: DeferralCode.parse(deferral.code), reason: deferral.reason,

@@ -90,8 +90,9 @@ export function timeOn(moment: string, day: string | null) {
 // "1 / 38", and "– / 2" when the numerator was not recorded.
 export const ratio = (numerator: number | null, denominator: number) => `${numerator === null ? '–' : whole(numerator)} / ${whole(denominator)}`;
 
-// What the delivered count leaves out, said beside it: "1 partial", "1 with none delivered", "1 closed".
-export function deliveredExtras(counts: OperationsCounts) {
+// What the delivered count leaves out, said beside it: "1 partial", "1 with none delivered", "1 closed". History's
+// header says them the same way (Q-45).
+export function deliveredExtras(counts: Pick<OperationsCounts, 'partialStops' | 'noGoodsStops' | 'closedStops'>) {
   return [
     counts.partialStops ? `${whole(counts.partialStops)} partial` : null,
     counts.noGoodsStops ? `${whole(counts.noGoodsStops)} with none delivered` : null,
