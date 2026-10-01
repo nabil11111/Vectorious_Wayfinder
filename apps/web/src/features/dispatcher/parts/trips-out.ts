@@ -16,7 +16,7 @@ export function tripsOut(day: OperationsDay): OutTrip[] {
 const priority = (trip: OutTrip) => {
   const status = trip.outRow.status;
   if (status.kind === 'open_problem') return [0, status.raisedAt, status.issueId] as const;
-  if (status.kind === 'departure_unreported' || status.kind === 'arrival_unreported') return [1, status.plannedAt, ''] as const;
+  if ('plannedAt' in status) return [1, status.plannedAt, ''] as const;
   return [2, trip.detailRecorded ? trip.schedule.leavesAt : '~', ''] as const;
 };
 export function outOrder(a: OutTrip, b: OutTrip) {

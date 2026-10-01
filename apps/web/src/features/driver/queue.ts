@@ -30,8 +30,13 @@ export const driverQueue = createPhoneQueue({
   view: phoneView,
   accountOf: (day) => day.driverId,
   recordOf,
-  // A stop done on the road ends the green "Back online" line.
-  backOnline: { placeOf, closedBy: (write) => write.kind === 'deliver' || write.kind === 'refuse' || write.kind === 'closed' },
+  // The green "Back online" line belongs to the trip of the records it names, and shows only on that trip (Q-30). The
+  // next stop done on the road ends it, and so does checking the trip in.
+  backOnline: {
+    placeOf,
+    belongsTo: (write) => write.tripId,
+    closedBy: (write) => write.kind === 'deliver' || write.kind === 'refuse' || write.kind === 'closed' || write.kind === 'finish',
+  },
 });
 
 export const {

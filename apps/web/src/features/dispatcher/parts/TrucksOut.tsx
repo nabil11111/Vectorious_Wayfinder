@@ -78,7 +78,7 @@ function statusOf(trip: OutTrip): { text: string; tone: Tone | null } {
   const status: OperationsStatus = trip.outRow.status;
   if (status.kind === 'open_problem') return { text: status.summary, tone: 'bad' };
   if (status.kind === 'arrival_unreported') return { text: 'Arrival not reported', tone: 'warn' };
-  if (status.kind === 'departure_unreported') return { text: statusSentence(status, null)!, tone: 'warn' };
+  if ('word' in status) return { text: status.sentence, tone: 'warn' };
   if (status.kind === 'out') {
     const left = isRecorded(trip) ? trip.trip.leftAt : null;
     return { text: left ? `Left ${clockTime(left)}` : 'Out', tone: null };

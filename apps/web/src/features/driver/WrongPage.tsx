@@ -13,9 +13,10 @@ import { GOODS, ICON } from './parts/icons';
 import { TopArea } from './parts/TopArea';
 import { ActionBar, BIG, Card, PLAIN, Problem, StopHead } from './parts/ui';
 import { useSave } from './queue';
+import { NO_PAIR, refusalPair, type Pair, type PairBox } from './tally';
 import { useDriverView } from './view';
 import {
-  aboutStop, brandOf, clockTime, entranceOf, lineKindLine, NOT_SAVED, pickLine, REASON_WORDS, stayLine, stopOfLine, waitedLine,
+  aboutStop, brandOf, clockTime, entranceOf, lineKindLine, NOT_SAVED, pickLine, REASON_WORDS, stayLine, stopOfLine, waitedLine, wholeCountsLine,
 } from './words';
 
 // Driver · Something's wrong · refused and · shop closed at /driver/wrong?stop= (spec 013, rules 5 and 6). The shop
@@ -56,9 +57,10 @@ function Wrong({ me, stopId }: { me: Me; stopId: string }) {
   const { save, saving, failed } = useSave();
   const { photo, unusable, reading, take, inputRef, pick } = usePhoto();
   const [kind, setKind] = useState<Kind>('refused');
-  // The lines picked, and how many of each the shop refused: the form's own pair, never a figure the phone keeps.
+  // The lines picked, and how many of each the shop refused with what each box holds: the form's own pair, never a
+  // figure the phone keeps.
   const [picked, setPicked] = useState<string[]>([]);
-  const [refused, setRefused] = useState<Record<string, number>>({});
+  const [pair, setPair] = useState<Pair>(NO_PAIR);
   const [reason, setReason] = useState<RefusalReason | null>(null);
   const [note, setNote] = useState('');
   const [leaving, setLeaving] = useState(false);
@@ -71,12 +73,18 @@ function Wrong({ me, stopId }: { me: Me; stopId: string }) {
   const counts = figures.byStop[trip.stops.indexOf(stop)]!;
   const brand = brandOf(trip, stop);
   const loadedOf = (line: DriverLine) => counts.byLine[stop.lines.indexOf(line)]!.loaded;
-  const refusedOf = (line: DriverLine) => refused[line.lineId] ?? 0;
-  const chosen = stop.lines.filter((line) => picked.includes(line.lineId) && refusedOf(line) > 0);
-  const canSave = kind === 'closed' || (chosen.length > 0 && reason !== null);
+  const refusedOf = (line: DriverLine) => refusalPair.refusedOf(pair, line.lineId);
+  const isWrong = (line: DriverLine, box: PairBox) => refusalPair.isWrong(pair, line.lineId, box, loadedOf(line));
+  const shown = stop.lines.filter((line) => picked.includes(line.lineId));
+  // A box that holds something that is not a count keeps "Save partial delivery" off until it is fixed (Q-25).
+  const anyWrong = shown.some((line) => isWrong(line, 'accepted') || isWrong(line, 'refused'));
+  const chosen = shown.filter((line) => refusedOf(line) > 0);
+  const canSave = kind === 'closed' || (chosen.length > 0 && reason !== null && !anyWrong);
 
-  const toggle = (line: DriverLine) => setPicked((held) => (held.includes(line.lineId) ? held.filter((id) => id !== line.lineId) : [...held, line.lineId]));
-  const setCount = (line: DriverLine, n: number) => setRefused((held) => ({ ...held, [line.lineId]: Math.min(loadedOf(line), Math.max(0, n)) }));
+  const toggle = (line: DriverLine) => {
+    if (picked.includes(line.lineId)) setPair((held) => refusalPair.drop(held, line.lineId));
+    setPicked((held) => (held.includes(line.lineId) ? held.filter((id) => id !== line.lineId) : [...held, line.lineId]));
+  };
 
   // Not while a photo is being read: the one before it, or none, would be saved instead. At the app clock's time at
   // the press.
@@ -117,17 +125,32 @@ function Wrong({ me, stopId }: { me: Me; stopId: string }) {
               </Chip>
             ))}
           </div>
-          {stop.lines.filter((line) => picked.includes(line.lineId)).map((line) => {
+          {shown.map((line) => {
             const loaded = loadedOf(line);
             const kindWord = lineKindLine(line, brand);
+            const box = (which: PairBox, title: string, icon: string, value: number) => {
+              const fix = isWrong(line, which) ? `fix-${line.lineId}-${which}` : undefined;
+              return (
+                <CounterCard icon={icon} title={title} sub={kindWord} fix={fix && <p id={fix} role="alert" className="mt-2.5 text-[13px] leading-4 font-semibold text-bad">{wholeCountsLine(loaded)}</p>}>
+                  <Counter
+                    label={`${title} ${kindWord}`}
+                    value={value}
+                    text={refusalPair.textOf(pair, line.lineId, which)}
+                    max={loaded}
+                    of={loaded}
+                    invalid={fix}
+                    disabled={saving}
+                    onStep={(n) => setPair((held) => refusalPair.step(held, line.lineId, which, n, loaded))}
+                    onType={(text) => setPair((held) => refusalPair.type(held, line.lineId, which, text, loaded))}
+                    onLeave={() => setPair((held) => refusalPair.leave(held, line.lineId, which, loaded))}
+                  />
+                </CounterCard>
+              );
+            };
             return (
               <div key={line.lineId} className="mt-2.5 space-y-2.5">
-                <CounterCard icon={GOODS[line.temp]} title="Accepted" sub={kindWord}>
-                  <Counter label={`Accepted ${kindWord}`} value={loaded - refusedOf(line)} max={loaded} of={loaded} disabled={saving} onChange={(n) => setCount(line, loaded - n)} />
-                </CounterCard>
-                <CounterCard icon={ICON.damaged} title="Refused" sub={kindWord}>
-                  <Counter label={`Refused ${kindWord}`} value={refusedOf(line)} max={loaded} of={loaded} disabled={saving} onChange={(n) => setCount(line, n)} />
-                </CounterCard>
+                {box('accepted', 'Accepted', GOODS[line.temp], loaded - refusedOf(line))}
+                {box('refused', 'Refused', ICON.damaged, refusedOf(line))}
               </div>
             );
           })}
@@ -179,16 +202,20 @@ function Wrong({ me, stopId }: { me: Me; stopId: string }) {
   );
 }
 
-// An "Accepted" or "Refused" card: the goods' picture, what it counts, and its counter.
-function CounterCard({ icon, title, sub, children }: { icon: string; title: string; sub: string; children: ReactNode }) {
+// An "Accepted" or "Refused" card: the goods' picture, what it counts, and its counter, with the line that says what is
+// wrong with its box under them.
+function CounterCard({ icon, title, sub, fix, children }: { icon: string; title: string; sub: string; fix?: ReactNode; children: ReactNode }) {
   return (
-    <Card className="flex items-center gap-3 px-4 py-4">
-      <img src={icon} alt="" className="size-9 shrink-0 object-contain" />
-      <span className="min-w-0 flex-1">
-        <span className="block font-heading text-lg leading-[22px] font-bold">{title}</span>
-        <span className="block text-xs leading-4 text-muted-foreground">{sub}</span>
-      </span>
-      {children}
+    <Card className="px-4 py-4">
+      <div className="flex items-center gap-3">
+        <img src={icon} alt="" className="size-9 shrink-0 object-contain" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-heading text-lg leading-[22px] font-bold">{title}</span>
+          <span className="block text-xs leading-4 text-muted-foreground">{sub}</span>
+        </span>
+        {children}
+      </div>
+      {fix}
     </Card>
   );
 }

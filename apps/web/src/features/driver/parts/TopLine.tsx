@@ -13,18 +13,20 @@ import { Band } from './ui';
 // The lines under the top bar (spec 013, rule 12 and the screen states' top line): the yellow "No signal" bar in place
 // of the top line on Next stop, the green "Back online" in its place until it is closed, and otherwise the top line,
 // the trip's latest problem or else the last stop done. An answer from the dispatcher shows under "Back online" at
-// once, so the driver never has to close the bar to read it.
+// once, so the driver never has to close the bar to read it. The green line shows only on the trip whose records it
+// names, so trip 1's never comes back on trip 2 (Q-30).
 export function TopLines({ day, trip, figures, waiting, waitingRecords, noSignalBar }: {
   day: DriverDay; trip: DriverTrip; figures: Figures; waiting: Queued[]; waitingRecords: number; noSignalBar: boolean;
 }) {
   const signal = useSignal();
   const { backOnline } = useSync();
   if (noSignalBar && !signal) return <NoSignal waiting={waitingRecords} />;
+  const bar = backOnline?.belongsTo.includes(trip.tripId) ? backOnline : null;
   const answered = latestProblem(trip)?.problem.decision != null;
   return (
     <>
-      {backOnline && <BackOnline names={backOnline} />}
-      {(!backOnline || answered) && <TopLine day={day} trip={trip} figures={figures} waiting={waiting} />}
+      {bar && <BackOnline names={bar.names} />}
+      {(!bar || answered) && <TopLine day={day} trip={trip} figures={figures} waiting={waiting} />}
     </>
   );
 }
@@ -102,15 +104,15 @@ function NoSignal({ waiting }: { waiting: number }) {
 }
 
 // Driver · connection restored: the green bar with the sync picture, what was sent and where it reached, and the dark
-// tick that closes it.
+// tick that closes it. Its lines wrap at the phone's width rather than being cut, and the bar grows with them (Q-27).
 function BackOnline({ names }: { names: string[] }) {
   const { title, line } = backOnlineLines(names);
   return (
-    <Band tone="good" className="flex h-[54px] items-center gap-3 border-b border-good/15 md:border-b-0">
+    <Band tone="good" className="flex min-h-[54px] items-center gap-3 border-b border-good/15 py-2 md:border-b-0">
       <img src={ICON.sync} alt="" className="size-[30px] shrink-0 object-contain" />
       <div role="status" className="min-w-0 flex-1">
-        <p className="truncate text-[13px] leading-4 font-bold">{title}</p>
-        <p className="mt-0.5 truncate text-[11px] leading-[14px] text-muted-foreground">{line}</p>
+        <p className="text-[13px] leading-4 font-bold">{title}</p>
+        <p className="mt-0.5 text-[11px] leading-[14px] text-muted-foreground">{line}</p>
       </div>
       <button type="button" aria-label="Close" onClick={closeBackOnline} className="flex h-[25px] w-[31px] shrink-0 items-center justify-center rounded-full bg-secondary outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         {/* The design draws a plain tick here, so it is the outline set's. */}

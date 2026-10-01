@@ -1,4 +1,4 @@
-import type { Issue, OperationsDay, OperationsGroup, OperationsStatus, OperationsTrip } from '@wayfinder/contracts';
+import type { Issue, OperationsDay, OperationsGroup, OperationsStatus, OperationsTrip, TripAttention } from '@wayfinder/contracts';
 import { clockTime, whole } from '@/features/loader/words';
 import { ARRIVED_AFTER_WINDOW, NOT_RECORDED, backAtDepot, problemLine, problemWord, statusSentence } from '../words';
 import type { Tone } from './ui';
@@ -24,9 +24,11 @@ export function statusOf(trip: OperationsTrip, issues: Issue[] | undefined): Ope
   return { kind: trip.status === 'done' ? 'out' : trip.status };
 }
 
-// Rule 5: Problems only shows trips with an open problem or a missing departure or arrival report.
-export const needsAttention = (trip: OperationsTrip) =>
-  trip.openIssueIds.length > 0 || (isRecorded(trip) && (trip.attention.kind === 'departure_unreported' || trip.attention.kind === 'arrival_unreported'));
+// A trip past its planned leave and not out, or past a stop's planned arrival with no arrival (rule 4).
+export const isWatched = (attention: TripAttention): attention is Extract<TripAttention, { plannedAt: string }> => 'plannedAt' in attention;
+
+// Rule 5: Problems only shows trips with an open problem, a trip past its leave and not out, or a missing arrival report.
+export const needsAttention = (trip: OperationsTrip) => trip.openIssueIds.length > 0 || (isRecorded(trip) && isWatched(trip.attention));
 
 export interface RowFacts {
   status: OperationsStatus;
@@ -64,9 +66,9 @@ export function rowFacts(trip: OperationsTrip, issues: Issue[] | undefined): Row
     const issue = issues?.find((i) => i.id === status.issueId);
     return { status, sentence: issue ? problemLine(issue) : status.summary, word: problemWord(status.issueKind, issue), tone: 'bad', tint: 'bad' };
   }
-  if (status.kind === 'departure_unreported' || status.kind === 'arrival_unreported') {
-    return { status, sentence: statusSentence(status, null)!, word: 'watching', tone: 'warn', tint: 'warn' };
-  }
+  // Past its leaving time the server says what the dock recorded, a sentence and a word (Q-24).
+  if ('word' in status) return { status, sentence: status.sentence, word: status.word, tone: 'warn', tint: 'warn' };
+  if (status.kind === 'arrival_unreported') return { status, sentence: statusSentence(status, null)!, word: 'watching', tone: 'warn', tint: 'warn' };
   // A trip whose problem is not in the open list yet still says it has one, until the list catches up.
   const tint = trip.openIssueIds.length > 0 ? 'bad' : null;
   if (!isRecorded(trip)) return { status, sentence: NOT_RECORDED, word: WORD.unrecorded!, tone: 'plain', tint };

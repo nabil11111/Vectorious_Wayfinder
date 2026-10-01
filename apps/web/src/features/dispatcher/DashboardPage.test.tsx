@@ -176,3 +176,18 @@ it('AC-7 while the days load the map card shows its switch and a grey block in t
   expect(first.views).toEqual([['Peliyagoda', true], ['Kandy', false], ['Both', false]]);
   expect(first.card).toContain('aria-label="Loading the district map"');
 });
+
+it('Q-33 a tile counting one says it in the singular: 1 needs you now, 1 order for Thursday, 1 stop', async () => {
+  const kandy = { ...RUWAN, depotId: 'Kandy' };
+  const one = dayOf({ depot: 'Kandy', orders: 1, fuel: { litres: 0, quota: 10660 }, deferred: 1, plan: true, stops: { delivered: 0, total: 1 } });
+  expect(tiles((await dashboard(kandy, [{ depot: 'Kandy', day: one, issues: listOf([flagAtKandy]) }])).html)).toEqual([
+    '1 needs you now', '0 / 1 stop delivered', '0 / 22 trucks out now', '1 order for Thursday · closes Wed 16:00', '0% fuel · 0 / 10,660 L this week', '1 deferred on this plan',
+  ]);
+  // Two or none keep the plural.
+  const two = dayOf({ depot: 'Kandy', orders: 2, fuel: { litres: 0, quota: 10660 }, deferred: 0, plan: true, stops: { delivered: 0, total: 2 } });
+  expect(tiles((await dashboard(kandy, [{ depot: 'Kandy', day: two, issues: listOf([flagAtKandy, flagAtPeliyagoda]) }])).html).slice(0, 4)).toEqual([
+    '2 need you now', '0 / 2 stops delivered', '0 / 22 trucks out now', '2 orders for Thursday · closes Wed 16:00',
+  ]);
+  expect(tiles((await dashboard(kandy, [{ depot: 'Kandy', day: dayOf({ depot: 'Kandy', orders: 0, fuel: null, deferred: 0, plan: true }), issues: listOf([]) }])).html)[3])
+    .toBe('0 orders for Thursday · closes Wed 16:00');
+});

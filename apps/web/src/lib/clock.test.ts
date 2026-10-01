@@ -173,7 +173,7 @@ function tripOf(status: 'ready' | 'out', delivered = false): DriverTrip {
   };
 }
 const dayOf = (trip: DriverTrip): DriverDay => ({ depot: 'Peliyagoda', driver: 'Dilshan', driverId: '7e000000-0000-4000-8000-000000000001', day: '2026-06-25', planSent: true, appliedWriteIds: [], trips: [trip] });
-const viewOf = (trip: DriverTrip): DriverView => ({ ready: true, day: dayOf(trip), waiting: [], refused: [], waitingRecords: 0, refusedRecords: 0, trip, figures: tripFigures(trip), allDone: false });
+const viewOf = (trip: DriverTrip): DriverView => ({ ready: true, day: dayOf(trip), waiting: [], refused: [], waitingRecords: 0, refusedRecords: 0, trip, figures: tripFigures(trip), allDone: false, closed: null, wholeDay: null });
 
 // The press of the button that says `label` among a screen's elements, as a tap would make it.
 const textOf = (node: unknown): string =>

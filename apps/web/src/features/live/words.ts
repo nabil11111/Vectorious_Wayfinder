@@ -2,6 +2,7 @@ import { DEPOT_TIME_ZONE, type Brand, type Issue, type IssueDecision, type Issue
 import { brandOfShop, clockTime, issueTitle, reportTitle, sentLine as loaderSentLine, shortDay, truckName, unitsWords, whole } from '@/features/loader/words';
 import { countOf } from '@/features/plan/words';
 import { inDepot } from '@/lib/clock';
+import { weekday } from '@/features/store/words';
 
 // The words of a driver's problem on Live day (spec 013, the screen states' Live day rows): a shop that refused some
 // and a shop that was closed. Every number is the API's, as spec 012's problem words take them; this only writes them
@@ -97,11 +98,13 @@ export function deliveredExtras(counts: OperationsCounts) {
     counts.closedStops ? `${whole(counts.closedStops)} closed` : null,
   ].filter((part): part is string => part !== null);
 }
-// Under the dashboard's delivered tile: "stops delivered · 1 partial", and "· no plan out" when no plan is out.
+// Under the dashboard's delivered tile: "stops delivered · 1 partial", and "· no plan out" when no plan is out. A day of
+// one stop says "stop delivered" under "0 / 1" (Q-33).
 export function deliveredNote(counts: OperationsCounts, planOut: boolean) {
-  if (!planOut) return 'stops delivered · no plan out';
-  if (counts.stopsDelivered === null) return 'stops delivered · not recorded';
-  return ['stops delivered', ...deliveredExtras(counts)].join(' · ');
+  const stops = `${counts.stopsTotal === 1 ? 'stop' : 'stops'} delivered`;
+  if (!planOut) return `${stops} · no plan out`;
+  if (counts.stopsDelivered === null) return `${stops} · not recorded`;
+  return [stops, ...deliveredExtras(counts)].join(' · ');
 }
 
 export type Fuel = NonNullable<OperationsDay['fuel']>;
@@ -113,6 +116,13 @@ export const fuelLitres = (fuel: Fuel) => `${LITRES.format(fuel.litres)} / ${LIT
 
 // The next run: "Next run · Fri 26 Jun" and "Orders close Thu 16:00".
 export const nextRunTitle = (date: string) => `Next run · ${shortDay(date)}`;
+
+// Under the dashboard's figures, one and many (Q-33): "1 needs you now", "2 need you now", and "1 order for Friday ·
+// closes Thu 16:00".
+export const needYouNow = (open: number | null) => (open === 1 ? 'needs you now' : 'need you now');
+export const trucksOutNow = (fleet: number) => (fleet === 1 ? 'truck out now' : 'trucks out now');
+export const nextRunOrders = (next: { orders: number; date: string; cutoffAt: string }) =>
+  `${next.orders === 1 ? 'order' : 'orders'} for ${weekday(next.date)} · closes ${inDepot(Date.parse(next.cutoffAt)).weekday} ${clockTime(next.cutoffAt)}`;
 export const ordersClose = (cutoffAt: string) => `Orders close ${inDepot(Date.parse(cutoffAt)).weekday} ${clockTime(cutoffAt)}`;
 export const NO_NEXT_DAY = 'No next delivery day.';
 
@@ -150,7 +160,6 @@ export function brandLine(total: { vehiclesTotal: number; tripsTotal: number; st
 }
 
 // Rule 4's sentences: what was recorded, or which report is missing. Nothing predicts a time or a place.
-export const departureNotReported = (plannedAt: string) => `Departure not reported · planned ${clockTime(plannedAt)}`;
 export const arrivalNotReported = (plannedAt: string) => `Arrival not reported · planned ${clockTime(plannedAt)}`;
 export const retryRequested = (requestedAt: string) => `Retry requested ${clockTime(requestedAt)}`;
 export const atShop = (shop: string, arrivedAt: string) => `At ${shop} · arrived ${clockTime(arrivedAt)}`;
@@ -162,7 +171,8 @@ export const ARRIVED_AFTER_WINDOW = 'Arrived after window';
 export function statusSentence(status: OperationsStatus, problem: string | null) {
   switch (status.kind) {
     case 'open_problem': return problem ?? status.summary;
-    case 'departure_unreported': return departureNotReported(status.plannedAt);
+    // A trip past its leaving time and not out, as the server words it (Q-24).
+    case 'not_loaded': case 'still_loading': case 'departure_unreported': return status.sentence;
     case 'arrival_unreported': return arrivalNotReported(status.plannedAt);
     case 'retry_requested': return retryRequested(status.requestedAt);
     case 'at_stop': return atShop(status.shopName, status.arrivedAt);
@@ -181,11 +191,18 @@ export function problemWord(kind: IssueKind, issue: Issue | undefined) {
   if (issue?.kind === 'loading') return issue.reason === 'wont_fit' ? `${whole(issue.short)} won't fit` : `${whole(issue.short)} short`;
   return PROBLEM_WORD[kind];
 }
-export function problemLine(issue: Issue) {
-  if (issue.kind === 'loading') return `${issue.stop.shopName} · ${issueTitle(issue)}`;
-  if (issue.kind === 'receipt') return `${issue.stop.shopName} · ${reportTitle(issue)}`;
-  return `${issue.stop.shopName} · ${driverIssueTitle(issue)}`;
+// A problem's title as Live day's card gives it, by its kind: the loader's flag "1 dry carton short", the driver's
+// "3 chilled cartons refused" or "Nobody at Fresh Mulgampola", and the shop's report by its reason, "1 chilled carton
+// damaged" or "Chilled goods not cold" (Q-39).
+export function problemTitle(issue: Issue) {
+  if (issue.kind === 'loading') return issueTitle(issue);
+  if (issue.kind === 'receipt') return reportTitle(issue);
+  return driverIssueTitle(issue);
 }
+
+// A problem in a row, the dashboard's Needs you and a truck's row on Live day: its shop and its card's title, "Fresh
+// Peradeniya · 1 chilled carton damaged", or the title alone where it names the shop, "Nobody at Fresh Mulgampola".
+export const problemLine = (issue: Issue) => (issue.kind === 'closed' ? problemTitle(issue) : `${issue.stop.shopName} · ${problemTitle(issue)}`);
 
 // The dispatcher's answers, as Drops and events names them.
 export const DECISION_WORDS: Record<IssueDecision, string> = {

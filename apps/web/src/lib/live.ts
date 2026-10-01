@@ -60,6 +60,9 @@ export function useLive() {
           if (['plans', 'loading', 'driver', 'orders', 'issues'].includes(topic)) {
             void qc.invalidateQueries({ queryKey: ['operations'] });
           }
+          // A driver's record moves a problem's card too: "Still on VEH057 · 39 cartons · 1 stop left" follows the
+          // trip on Live day and the Dashboard, to "no stops left" once the last stop is done (Q-28).
+          if (topic === 'driver') void qc.invalidateQueries({ queryKey: ['issues'] });
         }
       });
       stream.onopen = () => {
