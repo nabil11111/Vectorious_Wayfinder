@@ -20,7 +20,7 @@ import {
 } from './parts/ui';
 import { currentRead, ordersOptions, readState, scopeOf, useFollowDefault, useFollowGeneration, useFollowLookupMessages, useSelection } from './queries';
 import {
-  CHOOSE_DAY, CHOOSE_DAY_LINE, NOT_A_DATE, NO_MATCH, NO_ORDERS, NO_ORDERS_IN_RANGE, NO_SENT_PLAN, NO_SENT_PLANS, ORDERS_FAILED, PICK_ORDER,
+  CHOOSE_DAY, CHOOSE_DAY_LINE, NOT_A_DATE, NO_MATCH, NO_ORDERS, NO_ORDERS_IN_RANGE, NO_SENT_PLAN, NO_SENT_PLANS, ON_EARLIER_PLANS, ORDERS_FAILED, PICK_ORDER,
   ordersTitle, shortDay, showing, whole,
 } from './words';
 
@@ -172,7 +172,8 @@ function ClearFilters({ onClick }: { onClick: () => void }) {
 }
 
 // The server's own totals, never the filtered rows: orders, then the listed days' own sent plans' planned and deferred
-// orders (said to be no sent plan when none was sent), carried over and split parts. On both depots together each is
+// orders (said to be no sent plan when none was sent, and the deferred ones then said to be on earlier plans, Q-48),
+// carried over and split parts. On both depots together each is
 // the two depots' added up, and a depot with no sent plan is named.
 function summaryOf(reads: LookupOrders[], depots: string[]): Figure[] {
   const s = sumOrders(reads.map((read) => read.summary!));
@@ -182,7 +183,7 @@ function summaryOf(reads: LookupOrders[], depots: string[]): Figure[] {
   return [
     { value: whole(s.orders), label: s.orders === 1 ? 'order' : 'orders' },
     { value: whole(s.planned), label: 'planned', note: unsent },
-    { value: whole(s.deferred), label: 'deferred', tone: s.deferred > 0 ? 'warn' : undefined },
+    { value: whole(s.deferred), label: 'deferred', tone: s.deferred > 0 ? 'warn' : undefined, note: s.deferred > 0 && unsentAt.length === reads.length ? ON_EARLIER_PLANS : undefined },
     { value: whole(s.carriedOver), label: 'carried over from earlier days', tone: s.carriedOver > 0 ? 'warn' : undefined },
     { value: whole(s.split), label: s.split === 1 ? 'split part' : 'split parts' },
   ];

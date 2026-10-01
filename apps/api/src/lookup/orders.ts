@@ -69,7 +69,8 @@ export function getLookupOrders(caller: DepotCaller, query: LookupOrdersQuery): 
       const unique = [...new Set(inherited.map(row => row.deferral.planId))].map(id => inherited.find(row => row.deferral.planId === id && row.deferral.orderId === order.id) ?? inherited.find(row => row.deferral.planId === id)!);
       const original = order.splitFrom ? all.find(row => row.id === order.splitFrom) : null;
       if (order.splitFrom && !original) throw new Error(`No original for part ${order.id}.`);
-      return { ...detail(order), outlet: shop, splitFrom: order.splitFrom, broughtBack: broughtBack(order), original: original ? detail(original) : null,
+      return { ...detail(order), outlet: shop, splitFrom: order.splitFrom, broughtBack: broughtBack(order),
+        deferredEarlier: order.status === 'deferred' && days.some(day => !publications.some(plan => plan.date === day)), original: original ? detail(original) : null,
         parts: original ? all.filter(row => row.splitFrom === original.id).sort((a, b) => a.id.localeCompare(b.id)).map(detail) : [],
         deferralHistory: unique.map(row => ({ ...reason(row.deferral), planId: row.deferral.planId, date: row.date })), timesDeferred: unique.length,
         days: days.map(day => {
@@ -100,7 +101,9 @@ export function getLookupOrders(caller: DepotCaller, query: LookupOrdersQuery): 
     }).sort((a, b) => b.count - a.count || b.latestDate.localeCompare(a.latestDate) || a.outlet.name.localeCompare(b.outlet.name) || a.outlet.id.localeCompare(b.outlet.id));
     return LookupOrders.parse({ ...scope, date, from, range: query.range, rows, summary: { orders: rows.length,
       planned: new Set(assigned.map(row => row.orderId)).size,
-      deferred: new Set(deferred.map(row => row.orderId)).size,
+      // A listed day's own sent plan's deferrals, and before a day is sent the orders still deferred from an earlier one
+      // (Q-48), each order once.
+      deferred: new Set([...deferred.map(row => row.orderId), ...rows.filter(row => row.deferredEarlier).map(row => row.id)]).size,
       carriedOver: rows.filter(row => row.days.some(day => day.carriedOver)).length, split: rows.filter(row => row.splitFrom).length },
       skippedLately: { from: skippedFrom, to: date, rows: skippedRows } });
   });

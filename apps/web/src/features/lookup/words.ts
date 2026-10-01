@@ -53,6 +53,8 @@ export const NO_ORDERS_IN_RANGE = 'No orders in these four weeks.';
 export const NO_MATCH = 'No orders match these filters.';
 export const NO_SKIPS = 'No shops skipped in these four weeks.';
 export const NO_SENT_PLAN = 'No sent plan';
+// Beside the deferred count of a day not sent yet: its orders were deferred by earlier sent plans (Q-48).
+export const ON_EARLIER_PLANS = 'on earlier plans';
 export const NO_SENT_PLANS = 'No sent plans';
 export const PICK_ORDER = 'Choose an order to see its lines and its sent plans.';
 export const showing = (shown: number, total: number) => `Showing ${whole(shown)} of ${whole(total)}`;

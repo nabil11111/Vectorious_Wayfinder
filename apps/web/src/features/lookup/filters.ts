@@ -28,12 +28,13 @@ export function matchesSearch(row: LookupOrderRow, search: string) {
   return needle === '' || row.outlet.name.toLowerCase().includes(needle) || row.outlet.id.toLowerCase().includes(needle);
 }
 
-// Carried over on any listed day; deferred by a listed day's own sent plan; a part of a split order.
+// Carried over on any listed day; deferred by a listed day's own sent plan, or before a day is sent still deferred from
+// an earlier one (Q-48), the rows the header counts; a part of a split order.
 export function matchesFilter(row: LookupOrderRow, filter: OrderFilter) {
   switch (filter) {
     case 'all': return true;
     case 'carried_over': return row.days.some((day) => day.carriedOver);
-    case 'deferred': return row.days.some((day) => day.deferral !== null);
+    case 'deferred': return row.deferredEarlier || row.days.some((day) => day.deferral !== null);
     case 'split': return row.splitFrom !== null;
   }
 }

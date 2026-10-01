@@ -40,8 +40,10 @@ export const LookupOrderDay = z.object({ date: Day, carriedOver: z.boolean(), pu
     closed: z.array(ClosedVisit) }).nullable(),
   deferral: Reason.nullable() });
 // broughtBack: placed again by "Bring them back" at a closed shop and on no later sent plan yet (Q-46), as the shop's
-// own Today says it.
+// own Today says it. deferredEarlier: deferred by an earlier sent plan and listed on a day with no sent plan yet, so it
+// counts as deferred there, as its row reads (Q-48).
 export const LookupOrderRow = LookupOrderDetail.extend({ outlet: LookupShop, splitFrom: z.uuid().nullable(), broughtBack: z.boolean(),
+  deferredEarlier: z.boolean(),
   original: LookupOrderDetail.nullable(), parts: z.array(LookupOrderDetail), days: z.array(LookupOrderDay),
   deferralHistory: z.array(Reason.extend({ planId: z.uuid(), date: Day })), timesDeferred: Count });
 export type LookupOrderRow = z.infer<typeof LookupOrderRow>;

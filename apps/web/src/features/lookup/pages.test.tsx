@@ -53,7 +53,7 @@ const ordersRead = (demoDay: number, depot: Depot = 'Peliyagoda') => {
     rows: [{
       id: id(base + 1), wantedDate: THU, placedAt: '2026-06-24T03:00:00.000Z', temp: 'chilled', status: kandy ? 'deferred' : 'loaded', note: null, load,
       lines: [{ lineId: id(base + 2), productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 8 }],
-      outlet: shop, splitFrom: null, broughtBack: false, original: null, parts: [], deferralHistory: [], timesDeferred: kandy ? 1 : 0,
+      outlet: shop, splitFrom: null, broughtBack: false, deferredEarlier: false, original: null, parts: [], deferralHistory: [], timesDeferred: kandy ? 1 : 0,
       days: [kandy
         ? { date: THU, carriedOver: true, publication: { ...sent, id: id(base + 900) }, deferral: { code: 'no_reefer', reason: 'No fridge truck was left for Kandy.' }, assignment: null }
         : { date: THU, carriedOver: false, publication: sent, deferral: null,
@@ -260,6 +260,19 @@ it('Q-45 History\'s header says the partial, none delivered and closed stops bes
   read.counts = { ...read.counts!, stops: 64, delivered: 8, finished: 11, partial: 1, noGoods: 1, closed: 1 };
   const { text } = draw(<HistoryPage />, `/dispatcher/history?date=${THU}`, [[lookupKey('history', held.me, 'Peliyagoda', { date: THU }), read]]);
   expect(text).toContain('8 / 64 stops delivered · 1 partial · 1 with none delivered · 1 closed');
+});
+
+// Q-48: Friday's Orders read "0 deferred" above six rows whose Status read "Deferred".
+it('Q-48 a day with no sent plan says its deferred orders were deferred on earlier plans, as the rows read', () => {
+  held.clockDay = 1;
+  const read = ordersRead(1, 'Kandy');
+  const row = read.rows[0]!;
+  read.date = '2026-06-26'; read.from = '2026-06-26';
+  read.summary = { orders: 1, planned: 0, deferred: 1, carriedOver: 1, split: 0 };
+  read.rows = [{ ...row, deferredEarlier: true, days: [{ date: '2026-06-26', carriedOver: true, publication: null, assignment: null, deferral: null }] }];
+  const { text } = draw(<OrdersPage />, '/dispatcher/orders?date=2026-06-26', [[lookupKey('orders', held.me, 'Peliyagoda', { date: '2026-06-26', range: 'day' }), read]]);
+  expect(text).toContain('1 order 0 planned No sent plan 1 deferred on earlier plans 1 carried over from earlier days');
+  expect(text).toContain('no planned arrival Deferred deferred 1×');
 });
 
 // Q-46: Mulgampola's order, brought back from the closed shop, read "Placed" with no closed shop or return in its history.

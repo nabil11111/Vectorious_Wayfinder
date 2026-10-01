@@ -69,7 +69,7 @@ export function OrderTable({ groups, range, selectedId, onSelect }: {
 function OrderRow({ row, range, selected, onSelect }: { row: LookupOrderRow; range: Range; selected: boolean; onSelect: (orderId: string) => void }) {
   const assigned = row.days.filter((day) => day.assignment !== null);
   const carried = row.days.some((day) => day.carriedOver);
-  const tint = deferredOnListedDay(row) ? 'bg-warn-tint' : selected ? 'bg-selected' : null;
+  const tint = deferredOnListedDay(row) || row.deferredEarlier ? 'bg-warn-tint' : selected ? 'bg-selected' : null;
   return (
     <div
       role="row"
