@@ -408,3 +408,9 @@ and the live stream ignore it, and photos go through the same check as every oth
 driver and gives the others the depot's free drivers in staff ID order, as the frames show a driver on every trip.
 Choosing a driver who is on another vehicle swaps the two. A dispatcher can still leave a vehicle with no driver
 (D-31) (Nabil, 1 Oct, spec 022).
+
+**D-98 · 1 Oct · The plan board plans by drag and drop too.** Orders, trucks and stops can be dragged where the board's
+buttons and menus would put them, with the pointer or the keyboard, and each drop is the same draft change the button
+makes, checked by the same checker. The empty middle offers "Build the suggested plan" and a drop area in place of
+"Start a blank trip". Drag and drop uses `@dnd-kit`, which handles the pointer, the keyboard and announcements (Nabil,
+1 Oct, spec 023).
