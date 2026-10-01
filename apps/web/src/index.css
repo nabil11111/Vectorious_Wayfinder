@@ -141,8 +141,8 @@
   --map-muted: #647480;         /* "Map view", vehicles and routes, the key's words and the source line */
   --map-stores: #354957;        /* "75 stores" */
   --map-chosen: #263B46;        /* the view switch's chosen depot */
-  --map-option: #F2F5F6;        /* a view the dispatcher cannot choose */
-  --map-option-ink: #63727C;    /* that view's name, greyed further on the card */
+  --map-option: #F2F5F6;        /* a view not chosen */
+  --map-option-ink: #63727C;    /* that view's name; Both, which comes later, greys it further */
   --map-active-tint: #FFF0E2;   /* the "12 active" chip */
   --map-active-ink: #BD550E;    /* the chip's words */
   --map-sea: #EDF3F6;           /* the sea, and the map's frame */

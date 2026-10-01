@@ -7,8 +7,9 @@ import { db, type Db, type Tx } from './client';
 import type { PRODUCTS } from './fixtures';
 import { calendarDays, deferrals, demoDay, fuelLog, orderLines, orders, outlets, plans, users, vehicleDaysOff, vehicles } from './schema';
 
-// The seeded delivery day (spec 008): Thu 25 Jun 2026 from Peliyagoda, written once in demo mode. Each later
-// piece adds its own block of records to seedDemoDay, so a reset brings them back too.
+// The seeded delivery day (spec 008): Thu 25 Jun 2026 from Peliyagoda, written once in demo mode, and since spec 020
+// Kandy's orders for that Thursday too. Each later piece adds its own block of records to seedDemoDay, so a reset
+// brings them back too.
 //
 // The whole day is in the rules and the fixed rows below. Nothing is random, so the same shops and vehicles
 // give the same day every time. The totals they add up to are in the spec and are pinned by
@@ -123,6 +124,24 @@ const DRAFT_SAVED = { atMinutes: 14 * 60 + 40, driverNote: 'Ring the bell at the
 // the history never travelled through the app.
 const receivedAt = (wantedFor: string) => (wantedFor === WED ? depotInstant(WED, 7 * 60 + 42) : depotInstant(wantedFor, 7 * 60 + 3 * (Number(wantedFor.slice(8)) % 10)));
 
+// ── Spec 020 · Kandy's day ──────────────────────────────────────────────────────────────────────────────────
+// Thursday's orders from Kandy's 45 shops, by the rules for Peliyagoda's at the top, so a dispatcher who switches to
+// Kandy has a day to plan (D-94). Kandy's Tech shops order by the pallet and the crate too, so their five orders are
+// written out, sized like Peliyagoda's four. OUT093 is the one Tech shop only a van can reach, and a van has no tail
+// lift (D-24), so nothing in its order needs one. Kandy has no earlier plan, no order that waited and nothing in the
+// workshop, and its fuel week starts full.
+const KANDY = 'Kandy';
+const KANDY_TECH_ORDERS: { outletId: string; lines: Line[] }[] = [
+  { outletId: 'OUT093', lines: [['tech-tv', 2], ['tech-small', 1]] },
+  { outletId: 'OUT094', lines: [['tech-fridge', 2]] },
+  { outletId: 'OUT095', lines: [['tech-washer', 2], ['tech-small', 1]] },
+  { outletId: 'OUT103', lines: [['tech-tv', 3]] },
+  { outletId: 'OUT115', lines: [['tech-washer', 1]] },
+];
+// Kandy's shops follow Peliyagoda's 75 in the booklet's list. Their orders came in the same five-minute steps, counted
+// from Kandy's first shop: OUT076's at 08:05 and OUT119's at 11:40, all before the clock starts at 15:00.
+const KANDY_FIRST_SHOP = 76;
+
 // The same id for the same seeded row on every machine and after every reset, so a test or a later seed can
 // point at "OUT002's chilled order for Thursday": demoId('order', '2026-06-25:OUT002:chilled'). It is a
 // SHA-1 of "kind:key" shaped as a UUID.
@@ -152,8 +171,8 @@ const orderKey = (o: SeedOrder) => `${o.wantedFor}:${o.outletId}:${o.temp}`;
 const orderId = (o: SeedOrder) => demoId('order', orderKey(o));
 const planId = (date: string) => demoId('plan', `${date}:${DEMO_DAY.depotId}`);
 
-// Thursday's placed orders, by the rules at the top.
-function placedOrders(shops: { id: string; brand: Brand }[]): SeedOrder[] {
+// Thursday's placed orders of a depot's shops, by the rules at the top, and the depot's Tech orders as written out.
+function placedOrders(shops: { id: string; brand: Brand }[], techOrders: { outletId: string; lines: Line[] }[]): SeedOrder[] {
   const list: SeedOrder[] = [];
   const place = (outletId: string, temp: Temp, lines: Line[]) => list.push({ outletId, wantedFor: THU, temp, status: 'placed', lines });
   for (const { id, brand } of shops) {
@@ -164,8 +183,33 @@ function placedOrders(shops: { id: string; brand: Brand }[]): SeedOrder[] {
     }
     if (brand === 'Style' && ordersStyle(n)) place(id, 'dry', id === BIG_STYLE_ORDER.outletId ? BIG_STYLE_ORDER.lines : styleLines(n));
   }
-  for (const tech of TECH_ORDERS) place(tech.outletId, 'dry', tech.lines);
+  for (const tech of techOrders) place(tech.outletId, 'dry', tech.lines);
   return list;
+}
+
+// Kandy's Thursday orders, by the same rules as Peliyagoda's.
+async function kandysOrders(tx: Tx): Promise<SeedOrder[]> {
+  const shops = await tx.select({ id: outlets.id, brand: outlets.brand }).from(outlets).where(eq(outlets.depotId, KANDY)).orderBy(outlets.id);
+  return placedOrders(shops, KANDY_TECH_ORDERS);
+}
+
+// Writes Kandy's orders and their lines, each a plain insert with its own id, as every row of the day is.
+async function writeKandysDay(tx: Tx, kandy: SeedOrder[]): Promise<void> {
+  await tx.insert(orders).values(kandy.map((o) => ({
+    id: orderId(o),
+    outletId: o.outletId,
+    deliveryDate: o.wantedFor,
+    temp: o.temp,
+    status: o.status,
+    // Like Peliyagoda's, they came in before the day the app runs, so nobody is named on them.
+    placedAt: placedAt(o.wantedFor, numberOf(o.outletId) - KANDY_FIRST_SHOP + 1),
+  })));
+  await tx.insert(orderLines).values(kandy.flatMap((o) => o.lines.map(([productId, quantity]) => ({
+    id: demoId('line', `${orderKey(o)}:${productId}`),
+    orderId: orderId(o),
+    productId,
+    quantity,
+  }))));
 }
 
 // Nadeesha's draft is two orders, because chilled and dry cartons travel on different trucks.
@@ -207,14 +251,15 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
     // stops the seed and leaves nothing of the day behind.
 
     // The orders and their lines: Thursday's placed ones, Nadeesha's two drafts and the four that waited.
-    const dayOrders = [...placedOrders(shops), ...DRAFT_ORDERS, ...WAITED_ORDERS.map(waitedOrder)];
+    const dayOrders = [...placedOrders(shops, TECH_ORDERS), ...DRAFT_ORDERS, ...WAITED_ORDERS.map(waitedOrder)];
     await tx.insert(orders).values(dayOrders.map((o) => ({
       id: orderId(o),
       outletId: o.outletId,
       deliveryDate: o.wantedFor,
       temp: o.temp,
       status: o.status,
-      // A draft is its maker's and has not been placed. The other shops have no account, so nobody is named.
+      // A draft is its maker's and has not been placed. The others came in before the day the app runs, so nobody is
+      // named on them, though since spec 020 every shop has an account.
       createdBy: o.status === 'draft' ? userId(DRAFT.by) : null,
       placedAt: o.status === 'draft' ? null : placedAt(o.wantedFor, numberOf(o.outletId)),
     })));
@@ -299,7 +344,29 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
     }
     await tx.update(orderLines).set({ receivedQty: sql`${orderLines.quantity}` }).where(inArray(orderLines.orderId, ownOrders.map(({ order }) => orderId(order))));
 
+    // ── Spec 020 · Kandy's day ──────────────────────────────────────────────────────────────────────────────
+    await writeKandysDay(tx, await kandysOrders(tx));
+
     await tx.update(demoDay).set({ seededAt: realNow() });
+    return true;
+  });
+}
+
+// An install whose day was written before spec 020 has all of it but Kandy's orders, and the day is written only once.
+// On such an install this writes Kandy's orders, once: when the day is written and no Kandy shop has an order for
+// Thursday. If one has, people may have ordered or planned Kandy since, so nothing is added. It says whether it wrote them, does nothing when demo mode
+// is off, and touches no row that is there. Handed a transaction, as the tests do, it becomes a savepoint inside it.
+export async function addKandysDay(on: Db | Tx = db): Promise<boolean> {
+  if (!config.DEMO_MODE) return false;
+  return on.transaction(async (tx) => {
+    // The seed's lock, so two starts at the same moment add them once.
+    const [day] = await tx.select().from(demoDay).for('update');
+    if (!day?.seededAt) return false;
+    // Any order of a Kandy shop for Thursday counts, whether the seed wrote it or the shop placed it on the screen.
+    const [there] = await tx.select({ id: orders.id }).from(orders).innerJoin(outlets, eq(outlets.id, orders.outletId))
+      .where(and(eq(outlets.depotId, KANDY), eq(orders.deliveryDate, THU))).limit(1);
+    if (there) return false;
+    await writeKandysDay(tx, await kandysOrders(tx));
     return true;
   });
 }

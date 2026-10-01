@@ -2,7 +2,7 @@ import { hash } from '@node-rs/argon2';
 import type { Role } from '@wayfinder/contracts';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { config } from '../lib/config';
-import { db } from './client';
+import { db, type Db, type Tx } from './client';
 import { DEMO_USERS } from './fixtures';
 import { users } from './schema';
 
@@ -16,11 +16,13 @@ export interface DemoAccount {
 }
 
 // The demo accounts and what they sign in with (spec 018). An account that is not there is added with its staff ID
-// and the demo PIN, admin's own for admin. One seeded before staff IDs has neither: it gets them once, each only
-// where it is empty, and nothing else of the row changes, so a staff ID or PIN that is there stays. A later start
-// finds nothing to do, so it hashes nothing and writes nothing. Each PIN is hashed once for all the accounts using it.
-export async function seedDemoAccounts(accounts: readonly DemoAccount[] = DEMO_USERS): Promise<{ added: number; filled: number }> {
-  const rows = await db.select({ username: users.username, staffId: users.staffId, pinHash: users.pinHash })
+// and the demo PIN, admin's own for admin: so an install seeded before spec 020 gets every shop's store manager and
+// Kandy's staff on its next start. One seeded before staff IDs has neither: it gets them once, each only where it is
+// empty, and nothing else of the row changes, so a staff ID or PIN that is there stays. A later start finds nothing to
+// do, so it hashes nothing and writes nothing. Each PIN is hashed once for all the accounts using it. Handed a
+// transaction, as the tests do, it writes in it.
+export async function seedDemoAccounts(accounts: readonly DemoAccount[] = DEMO_USERS, on: Db | Tx = db): Promise<{ added: number; filled: number }> {
+  const rows = await on.select({ username: users.username, staffId: users.staffId, pinHash: users.pinHash })
     .from(users).where(inArray(users.username, accounts.map((account) => account.username)));
   const found = new Map(rows.map((row) => [row.username, row]));
   const missing = accounts.filter((account) => !found.has(account.username));
@@ -35,7 +37,7 @@ export async function seedDemoAccounts(accounts: readonly DemoAccount[] = DEMO_U
   const pinHashOf = (account: DemoAccount) => (account.role === 'admin' ? adminPinHash : demoPinHash);
 
   const added = missing.length
-    ? await db.insert(users).values(missing.map((account) => ({
+    ? await on.insert(users).values(missing.map((account) => ({
       username: account.username,
       staffId: account.staffId,
       displayName: account.displayName,
@@ -47,7 +49,7 @@ export async function seedDemoAccounts(accounts: readonly DemoAccount[] = DEMO_U
     : [];
   let filled = 0;
   for (const account of empty) {
-    const done = await db.update(users)
+    const done = await on.update(users)
       .set({ staffId: sql`coalesce(${users.staffId}, ${account.staffId})`, pinHash: sql`coalesce(${users.pinHash}, ${pinHashOf(account)})` })
       .where(and(eq(users.username, account.username), or(isNull(users.staffId), isNull(users.pinHash))))
       .returning({ id: users.id });

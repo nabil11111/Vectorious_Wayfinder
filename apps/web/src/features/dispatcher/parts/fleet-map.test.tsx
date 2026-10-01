@@ -1,23 +1,32 @@
+import { MutationObserver, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { OperationsDay } from '@wayfinder/contracts';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FLEET_MAP } from '@/lib/map/fleet-map-shapes';
-import { youPlan } from '../depots';
+import { BOTH_LATER, switchDepotMutation } from '../depots';
 import { FleetMap } from './FleetMap';
 import { LABEL_OFFSETS, arrowSpots, deliveredList, drawingOf, liveLine, statsOf, type MapShapes } from './fleet-map';
 
-// Spec 019's card from plain reads: the header and its numbers (AC-3), the arrows and lines (AC-4), Stores delivered
-// (AC-5) and the view switch (AC-6). A trip here needs only what the map reads of it: its vehicle, trip number,
-// district and whether it is out. They are written as trips without recorded detail, the shortest the contract takes.
+// Spec 019's card from plain reads: the header and its numbers (AC-3), the arrows and lines (AC-4) and Stores delivered
+// (AC-5), and spec 020's view switch and the chosen depot's map (AC-6). A trip here needs only what the map reads of it:
+// its vehicle, trip number, district and whether it is out. They are written as trips without recorded detail, the
+// shortest the contract takes.
+
+vi.mock('sonner', () => ({ toast: vi.fn() }));
 
 type Point = readonly [number, number];
 const THU = '2026-06-25';
 const PLAN = '9a000000-0000-4000-8000-000000000001';
 const tripId = (n: number) => `9b000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const PELIYAGODA = [['Colombo', 24], ['Galle', 9], ['Gampaha', 15], ['Kalutara', 10], ['Kurunegala', 8], ['Matara', 6], ['Puttalam', 3]] as const;
+// Each depot's districts with its shops in them, and its fleet (outlets.csv, vehicles.csv).
+const DEPOT = {
+  Peliyagoda: { vehicles: 38, districts: [['Colombo', 24], ['Galle', 9], ['Gampaha', 15], ['Kalutara', 10], ['Kurunegala', 8], ['Matara', 6], ['Puttalam', 3]] },
+  Kandy: { vehicles: 22, districts: [['Badulla', 6], ['Kandy', 20], ['Kegalle', 5], ['Matale', 8], ['Nuwara Eliya', 6]] },
+} as const;
+const PELIYAGODA = DEPOT.Peliyagoda.districts;
 
 interface TripSpec { vehicleId: string; district: string; tripNo?: number; status?: 'out' | 'ready'; earlier?: boolean }
-function dayWith(specs: TripSpec[], delivered: Partial<Record<string, number | null>> = {}): OperationsDay {
+function dayWith(specs: TripSpec[], delivered: Partial<Record<string, number | null>> = {}, depot: keyof typeof DEPOT = 'Peliyagoda'): OperationsDay {
   const trips = specs.map((spec, i) => {
     const out = (spec.status ?? 'out') === 'out';
     return {
@@ -30,15 +39,19 @@ function dayWith(specs: TripSpec[], delivered: Partial<Record<string, number | n
   const group = (rows: typeof trips) => [{ brand: 'Fresh', district: 'Colombo', tripsTotal: rows.length, vehiclesTotal: rows.length, stopsTotal: rows.length, stopsDone: null, trips: rows }];
   const today = trips.filter((trip) => trip.date === THU), earlier = trips.filter((trip) => trip.date !== THU);
   const out = trips.filter((trip) => trip.status === 'out');
+  const { vehicles, districts } = DEPOT[depot];
   return OperationsDay.parse({
-    depot: { id: 'Peliyagoda', name: 'Peliyagoda' }, demoDay: 1, day: THU, dayChangesAt: '2026-06-25T10:30:00.000Z', readAt: '2026-06-24T22:08:00.000Z',
+    depot: { id: depot, name: depot }, demoDay: 1, day: THU, dayChangesAt: '2026-06-25T10:30:00.000Z', readAt: '2026-06-24T22:08:00.000Z',
     plan: { id: PLAN, revision: 0, publishedAt: '2026-06-24T10:30:00.000Z', detailRecorded: false },
     counts: {
       stopsTotal: today.length, stopsDelivered: null, stopsDone: null, partialStops: null, noGoodsStops: null, closedStops: null, tripsTotal: today.length,
-      vehiclesOut: new Set(out.map((trip) => trip.vehicleId)).size, vehiclesTotal: 38, deferredOrders: 0,
-      deliveryProgress: { numerator: null, denominator: today.length, percent: null }, truckProgress: { numerator: out.length, denominator: 38, percent: 0 },
+      vehiclesOut: new Set(out.map((trip) => trip.vehicleId)).size, vehiclesTotal: vehicles, deferredOrders: 0,
+      deliveryProgress: { numerator: null, denominator: today.length, percent: null }, truckProgress: { numerator: out.length, denominator: vehicles, percent: 0 },
     },
-    map: { shops: 75, districts: PELIYAGODA.map(([district, shops]) => ({ district, shops, shopsDelivered: delivered[district] === undefined ? 0 : delivered[district] })) },
+    map: {
+      shops: districts.reduce((sum, [, shops]) => sum + shops, 0),
+      districts: districts.map(([district, shops]) => ({ district, shops, shopsDelivered: delivered[district] === undefined ? 0 : delivered[district] })),
+    },
     nextRun: null, fuel: null, brandTotals: [], groups: today.length ? group(today) : [], timeline: null,
     earlierOut: earlier.length ? [{ date: '2026-06-24', brandTotals: [], groups: group(earlier), timeline: { start: '2026-06-23T22:00:00.000Z', end: '2026-06-24T10:00:00.000Z', ticks: [], now: null } }] : [],
     outTripIds: out.map((trip) => trip.tripId), events: [], eventsTruncated: false,
@@ -62,16 +75,22 @@ const SHAPES: MapShapes = {
 // How far along its straight line an arrow sits, as a share of the line's length.
 const shareAlong = (points: readonly Point[], at: readonly [number, number]) =>
   Math.hypot(at[0] - points[0][0], at[1] - points[0][1]) / Math.hypot(points[40][0] - points[0][0], points[40][1] - points[0][1]);
+// The card as the dashboard draws it, inside the app's query client, which its view switch uses.
+const card = (day: OperationsDay, qc = new QueryClient()) => renderToStaticMarkup(<QueryClientProvider client={qc}><FleetMap day={day} /></QueryClientProvider>);
 // The wide card, as from 640 wide; the narrow one draws the same map again below it.
 const wide = (markup: string) => markup.slice(0, markup.indexOf('data-layout="narrow"'));
+const narrow = (markup: string) => markup.slice(markup.indexOf('data-layout="narrow"'));
 const count = (markup: string, part: string) => markup.split(part).length - 1;
+// The view switch's buttons by name, and whether each shows pressed; Both has no pressed state.
+const views = (markup: string) => [...markup.matchAll(/<button([^>]*)>(Peliyagoda|Kandy|Both)<\/button>/g)]
+  .map(([, attributes, name]) => [name, attributes.includes('aria-pressed="true"') ? 'chosen' : attributes.includes('aria-pressed="false"') ? 'button' : attributes.includes('aria-disabled="true"') ? 'greyed' : 'other']);
 
 describe('the card numbers', () => {
   it('AC-3 the header says Live at the read time and the stats come from the read', () => {
     const day = dayWith([{ vehicleId: 'VEH035', district: 'Colombo' }, { vehicleId: 'VEH004', district: 'Gampaha', status: 'ready' }]);
     expect(liveLine(day)).toBe('Live · 03:38');
     expect(statsOf(day)).toEqual({ stores: '75 stores', vehicles: '38 vehicles', routes: '2 routes', active: '1 active' });
-    const markup = wide(renderToStaticMarkup(<FleetMap day={day} />));
+    const markup = wide(card(day));
     for (const words of ['Live · 03:38', 'Map view', '75 stores', '38 vehicles', '2 routes', '1 active', 'Stores delivered']) expect(markup).toContain(words);
   });
 
@@ -139,7 +158,7 @@ describe('the arrows and lines', () => {
 
   it('AC-4 the card draws one arrow per trip on the road, the badge on a later trip, and orange only on its line', () => {
     const day = dayWith([{ vehicleId: 'VEH035', district: 'Colombo' }, { vehicleId: 'VEH004', district: 'Colombo', tripNo: 2 }, { vehicleId: 'VEH010', district: 'Galle' }]);
-    const markup = wide(renderToStaticMarkup(<FleetMap day={day} />));
+    const markup = wide(card(day));
     expect(count(markup, 'data-vehicle=')).toBe(3);
     expect(count(markup, 'data-badge=')).toBe(1);
     expect(markup).toMatch(/data-badge="VEH004"/);
@@ -166,7 +185,7 @@ describe('the arrows and lines', () => {
   it('AC-4 on the real shapes, Puttalam with no active shop and a truck still out keeps its orange line and arrow', () => {
     const day = dayWith([{ vehicleId: 'VEH032', district: 'Puttalam', earlier: true }]);
     const archived = { ...day, map: { shops: day.map.shops - 3, districts: day.map.districts.filter((row) => row.district !== 'Puttalam') } };
-    const markup = wide(renderToStaticMarkup(<FleetMap day={archived} />));
+    const markup = wide(card(archived));
     expect(count(markup, 'data-vehicle=')).toBe(archived.counts.vehiclesOut);
     expect(markup).toMatch(/data-line="Puttalam"[^>]*class="stroke-map-line"/);
     // The totals stay the active shops'.
@@ -190,7 +209,7 @@ describe('Stores delivered', () => {
       ['Colombo', '2/24'], ['Galle', '0/9'], ['Gampaha', '0/15'], ['Kalutara', '0/10'], ['Kurunegala', '0/8'], ['Matara', '0/6'], ['Puttalam', '0/3'],
     ]);
     expect(list.bars).toBe(true);
-    const markup = wide(renderToStaticMarkup(<FleetMap day={day} />));
+    const markup = wide(card(day));
     expect(count(markup, 'role="meter"')).toBe(7);
     expect(markup).toContain('aria-valuenow="2"');
   });
@@ -203,16 +222,57 @@ describe('Stores delivered', () => {
   });
 });
 
-describe('the view switch', () => {
-  it('AC-6 shows the dispatcher depot chosen and greys the others, which say whose depot this is', () => {
-    const markup = wide(renderToStaticMarkup(<FleetMap day={dayWith([])} />));
-    expect(markup).toMatch(/<span[^>]*aria-current="true"[^>]*>Peliyagoda<\/span>/);
-    for (const other of ['Kandy', 'Both']) expect(markup).toMatch(new RegExp(`<button[^>]*aria-disabled="true"[^>]*>${other}</button>`));
-    expect(youPlan('Peliyagoda')).toBe('You plan Peliyagoda');
+describe('the view switch and the chosen depot (spec 020)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('AC-6 Peliyagoda and Kandy are buttons with the depot on show chosen, at every width, and Both stays greyed with its line', () => {
+    const markup = card(dayWith([]));
+    for (const layout of [wide(markup), narrow(markup)]) {
+      expect(views(layout)).toEqual([['Peliyagoda', 'chosen'], ['Kandy', 'button'], ['Both', 'greyed']]);
+      expect(layout).toMatch(/<button[^>]*aria-pressed="true"[^>]*class="[^"]*bg-map-chosen[^"]*"[^>]*>Peliyagoda<\/button>/);
+      expect(layout).toMatch(/<button[^>]*aria-pressed="false"[^>]*class="[^"]*bg-map-option text-map-option-ink(?!\/)[^"]*"[^>]*>Kandy<\/button>/);
+      expect(layout).toMatch(/<button[^>]*aria-disabled="true"[^>]*class="[^"]*text-map-option-ink\/65[^"]*"[^>]*>Both<\/button>/);
+    }
+    expect(BOTH_LATER).toBe('Both depots together come later.');
   });
 
+  it('AC-6 the card draws the chosen depot: Kandy\'s frame from the shapes module, its lines and its list, with Kandy chosen', () => {
+    const day = dayWith([{ vehicleId: 'VEH041', district: 'Matale' }, { vehicleId: 'VEH045', district: 'Kandy', tripNo: 2 }], { Kandy: 3 }, 'Kandy');
+    const markup = card(day);
+    expect(views(wide(markup))).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'greyed']]);
+    expect(views(narrow(markup))).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'greyed']]);
+
+    const drawn = wide(markup);
+    const kandy = drawingOf(day, FLEET_MAP.Kandy);
+    for (const district of kandy.districts) expect(drawn).toContain(`d="${district.d}"`);
+    expect(drawn).not.toContain(FLEET_MAP.Peliyagoda.districts.find((district) => district.name === 'Colombo')!.d);
+    expect([...drawn.matchAll(/data-line="([^"]+)"/g)].map(([, district]) => district)).toEqual(['Badulla', 'Kandy', 'Kegalle', 'Matale', 'Nuwara Eliya']);
+    expect(drawn).toMatch(/data-line="Matale"[^>]*class="stroke-map-line"/);
+    expect(drawn).toMatch(/data-line="Badulla"[^>]*class="stroke-map-line-muted"/);
+    expect(count(drawn, 'data-vehicle=')).toBe(2);
+    // The depot's diamond sits on Kandy, and the design names it by its district's name, not beside it.
+    expect(kandy.depots).toEqual([{ name: 'Kandy', at: [175.72, 161.03], label: null }]);
+    expect(drawn).toContain('translate(170.72 156.03)');
+    expect(drawn).toContain('aria-label="Kandy&#x27;s districts on a schematic map. On the road: VEH045 trip 2 to Kandy, VEH041 to Matale."');
+    expect(drawn).toContain('45 stores');
+    expect(drawn).toContain('22 vehicles');
+    expect(drawn).toContain('3 of 45 stores');
+    expect(drawn).toContain('3/20');
+  });
+
+  it('AC-6 a depot pressed on either switch shows chosen on the card at once', async () => {
+    const qc = new QueryClient();
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
+    void new MutationObserver(qc, switchDepotMutation(qc)).mutate('Kandy');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const markup = card(dayWith([]), qc);
+    for (const layout of [wide(markup), narrow(markup)]) expect(views(layout)).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'greyed']]);
+  });
+});
+
+describe('the credit', () => {
   it('AC-8 the card credits OpenStreetMap', () => {
-    const markup = wide(renderToStaticMarkup(<FleetMap day={dayWith([])} />));
+    const markup = wide(card(dayWith([])));
     expect(markup).toContain('Schematic district routes · not GPS');
     expect(markup).toMatch(/<a[^>]*href="https:\/\/www\.openstreetmap\.org\/copyright"[^>]*>© OpenStreetMap contributors<\/a>/);
   });

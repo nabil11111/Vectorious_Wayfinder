@@ -20,14 +20,17 @@ export const loadUser: RequestHandler = async (req, _res, next) => {
   const token = req.cookies?.[SESSION_COOKIE];
   if (!token) return next();
   const [row] = await db
-    .select({ id: users.id, username: users.username, staffId: users.staffId, displayName: users.displayName, role: users.role, depotId: users.depotId, outletId: users.outletId, active: users.active })
+    .select({ id: users.id, username: users.username, staffId: users.staffId, displayName: users.displayName, role: users.role, depotId: users.depotId, outletId: users.outletId, active: users.active, chosenDepotId: sessions.depotId })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.id, hashToken(token)), gt(sessions.expiresAt, new Date())));
   // An account with no staff ID, which only a row seeded before staff IDs can be, is signed out: the sign-in treats
   // it as unknown too (spec 018).
   if (row?.active && row.staffId !== null) {
-    req.user = { id: row.id, username: row.username, staffId: row.staffId, displayName: row.displayName, role: row.role, depotId: row.depotId, outletId: row.outletId };
+    // A dispatcher works on the depot this session switched to, once it has (spec 020, D-93), so every route that reads
+    // the caller's depot follows the switch. Every other role keeps the depot of its account.
+    const depotId = row.role === 'dispatcher' && row.chosenDepotId !== null ? row.chosenDepotId : row.depotId;
+    req.user = { id: row.id, username: row.username, staffId: row.staffId, displayName: row.displayName, role: row.role, depotId, outletId: row.outletId };
   }
   next();
 };
@@ -57,6 +60,7 @@ export const requireDepot: RequestHandler = (req, _res, next) => {
   next();
 };
 
-// The person asking and the depot their account belongs to, once requireRole and requireDepot have passed.
+// The person asking and the depot they work on, once requireRole and requireDepot have passed: their account's, or for a
+// dispatcher the one their session switched to (loadUser).
 export interface DepotCaller { userId: string; depotId: string }
 export const depotCallerOf = (req: Request): DepotCaller => ({ userId: req.user!.id, depotId: req.user!.depotId! });

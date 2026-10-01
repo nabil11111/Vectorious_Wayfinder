@@ -19,6 +19,7 @@ import { healthRouter } from './routes/health';
 import { issuesRouter } from './routes/issues';
 import { loadingRouter } from './routes/loading';
 import { lookupRouter } from './routes/lookup';
+import { meRouter } from './routes/me';
 import { operationsRouter } from './routes/operations';
 import { plansRouter } from './routes/plans';
 import { storeRouter } from './routes/store';
@@ -55,6 +56,7 @@ export function createApp() {
   api.use(loadUser);
   api.use('/health', healthRouter);
   api.use('/auth', authRouter);
+  api.use('/me', meRouter);
   api.use('/admin', adminRouter);
   api.use('/clock', clockRouter);
   api.use('/events', eventsRouter);

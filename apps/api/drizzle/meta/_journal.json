@@ -71,6 +71,13 @@
       "when": 1790834916234,
       "tag": "0009_sign_in",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790843945741,
+      "tag": "0010_depot_switch",
+      "breakpoints": true
     }
   ]
 }

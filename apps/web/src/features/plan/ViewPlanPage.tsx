@@ -4,11 +4,12 @@ import { useNavigate, useParams } from 'react-router';
 import type { BoardCounts, Brand, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { workingFor } from '@/features/auth/api';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { reasonOf } from '@/features/store/words';
 import { ApiRequestError } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { acceptDecisions, boardKey, dayKey, refOf, sendPlan, unsendPlan, useBoard, useDayBoard, useOrdersFollow, usePlanSaver } from './board';
+import { acceptDecisions, boardKey, dayKey, sendPlan, unsendPlan, useBoard, useDayBoard, useOrdersFollow, usePlanSaver, writeOutsideBoard } from './board';
 import { ChecksPanel } from './parts/ChecksPanel';
 import { Decisions } from './parts/Decisions';
 import { BRAND_ICON } from './parts/icons';
@@ -70,16 +71,14 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
   const run = async (kind: 'send' | 'unsend' | 'accept', call: (day: string, ref: PlanRef) => Promise<PlanBoard>) => {
     setBusy(kind);
     setRefused(null);
+    const sentFor = workingFor(qc);
     let problem: string | null = null;
     if (saver.date === date) {
       if (fresh) saver.sync(board);
       problem = await saver.act(call);
     } else {
       try {
-        // A read of this day already on its way would land after the answer and bring back the plan before it.
-        await qc.cancelQueries({ queryKey: dayKey(date) });
-        const answer = await call(date, refOf(board));
-        qc.setQueryData(dayKey(date), answer);
+        await writeOutsideBoard(qc, date, board, call);
       } catch (error) {
         problem = reasonOf(error);
         if (error instanceof ApiRequestError && error.status === 409) void qc.invalidateQueries({ queryKey: dayKey(date) });
@@ -87,6 +86,9 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
     }
     setBusy(null);
     setAccepting(null);
+    // An answer that lands once the screen works for another account or depot (spec 020) is not this page's: it says
+    // and opens nothing.
+    if (workingFor(qc) !== sentFor) return;
     setRefused(problem);
     void qc.invalidateQueries({ queryKey: boardKey });
     if (problem === null && kind === 'unsend') navigate('/dispatcher/plan');

@@ -109,7 +109,8 @@ that vehicle's trips on its phone. The booklet gives every vehicle a driver and 
 constraint.
 
 **D-32 · 1 Oct · A dispatcher plans their own depot only.** Every plan route checks the record belongs to the
-caller's depot, so the depot switch in the top bar shows the depot and changes nothing.
+caller's depot, so the depot switch in the top bar shows the depot and changes nothing. Replaced by D-93: the
+caller's depot is now the one the dispatcher's session switched to, and the switch works.
 
 **D-33 · 1 Oct · A sent plan can go back to edit until loading starts** (Nabil). The booklet says printed loading
 lists go out of date when plans change and wants the dispatcher's decisions to reach the loader. Once a trip is
@@ -384,3 +385,13 @@ training records at 07:30; that data never enters the repo, and a dispatcher nee
 frame's shapes, lines, arrows, labels and list, and takes its numbers from the operations read. Its view switch
 follows D-32: the dispatcher's own depot only. The district shapes are derived from geoBoundaries (OpenStreetMap,
 ODbL), so the card credits OpenStreetMap and `docs/map-data.md` names the source (Nabil, 1 Oct, spec 019).
+
+**D-93 · 1 Oct · A dispatcher switches between the two depots.** The top bar's switch works as the design draws it:
+the dispatcher picks Peliyagoda or Kandy, and every page plans, answers and looks up that depot until they switch
+back or sign out. The choice lives on the session, so the routes that read the caller's depot follow it unchanged.
+"Both" waits. This replaces D-32's own depot only, and the map card's switch follows it (Nabil, 1 Oct, spec 020).
+
+**D-94 · 1 Oct · Every shop has an account and Kandy has its day.** For a QA run "with as much data as possible",
+the seed gives each of the 120 shops a store manager (S-001 to S-120), Kandy a driver per working vehicle and a loader,
+and the seeded day Kandy's Thursday orders by Peliyagoda's rules. Peliyagoda's numbers stay as the walkthrough has
+them (Nabil, 1 Oct, spec 020).

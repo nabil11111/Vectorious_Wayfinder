@@ -2,9 +2,9 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type {
-  AcceptDecisionsRequest, DraftPlan, JoinOrderRequest, Me, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
+  AcceptDecisionsRequest, DraftPlan, JoinOrderRequest, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
 } from '@wayfinder/contracts';
-import { meKey } from '@/features/auth/api';
+import { workingFor } from '@/features/auth/api';
 import { reasonOf } from '@/features/store/words';
 import { api, ApiRequestError } from '@/lib/api';
 import { planOf, sameDraft } from './draft';
@@ -20,8 +20,12 @@ export const slotsKey = (date: string, orderId: string) => ['plans', date, 'slot
 // The write that is running. Writes go one after the other, and a read waits for the one on its way, so an
 // older answer never lands on top of a newer one.
 let writing: Promise<unknown> = Promise.resolve();
+// The writes queued or sent and not answered yet, from the board's queue and View plan alike. A dispatcher's depot
+// switch waits for none of them (spec 020).
+let unanswered = 0;
 function write<T>(request: () => Promise<T>): Promise<T> {
-  const run = writing.then(request);
+  unanswered += 1;
+  const run = writing.then(request).finally(() => { unanswered -= 1; });
   // The chain itself never rejects, or one refused write would fail every write after it.
   writing = run.catch(() => undefined);
   return run;
@@ -180,9 +184,10 @@ class PlanSaver {
     return this.screen?.board.day?.date ?? null;
   }
 
-  // An answer can arrive after its person signed out and someone else signed in on this browser.
+  // An answer can arrive after its person signed out and someone else signed in on this browser, or after the
+  // dispatcher switched depots (spec 020). Either way it is for a board no longer on show.
   private stillMine() {
-    return this.owner !== null && this.qc.getQueryData<Me | null>(meKey)?.id === this.owner;
+    return this.owner !== null && workingFor(this.qc) === this.owner;
   }
 
   private show(patch: Partial<BoardScreen>) {
@@ -193,6 +198,12 @@ class PlanSaver {
 
   private pending() {
     return this.running || this.acting || this.seq !== this.savedSeq;
+  }
+
+  // A change is on its way to the server: a save, or a split, join, send, build or accept that has not answered.
+  // Changes the server turned down wait for Try again, so they are not on their way.
+  onItsWay() {
+    return this.pending() && this.screen?.saving !== 'refused';
   }
 
   // Shows a board: its numbers always, and its draft too when nothing on screen is waiting to be saved. An
@@ -305,6 +316,13 @@ class PlanSaver {
     try {
       // A read that started before this save would answer with the draft as it was.
       await this.cancelReads(date);
+      // A queue for an account or depot no longer on show sends nothing (spec 020): the session may now work on the
+      // other depot. Whatever waited for the changes goes on without them.
+      if (!this.stillMine()) {
+        this.running = false;
+        this.settle(false);
+        return;
+      }
       const answer = await saveDraft(date, { ...refOf(before), plan: sent });
       this.running = false;
       if (!this.stillMine()) return;
@@ -413,6 +431,8 @@ class PlanSaver {
   // is saved and any other of them has answered, and the board holds still until this one answers. It says why when
   // it was refused, or null.
   act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>): Promise<string | null> => {
+    // A queue for an account or depot no longer on show sends nothing (spec 020), here and below before the send.
+    if (!this.stillMine()) return null;
     do {
       if (!(await this.idle())) return 'The plan has changes that are not saved yet. Save them first.';
     } while (this.acting || this.running);
@@ -424,6 +444,7 @@ class PlanSaver {
     this.show({ acting: true });
     try {
       await this.cancelReads(date);
+      if (!this.stillMine()) return null;
       const answer = await run(date, refOf(before));
       if (!this.stillMine()) return null;
       this.answered(answer, true);
@@ -451,9 +472,11 @@ class PlanSaver {
     if (this.screen && board.day?.date === this.date) this.incoming(board);
   };
 
+  // The queue's end: no retry is left to fire, and whatever waited for its changes goes on without them.
   stop() {
     window.clearTimeout(this.retryTimer);
     this.listeners.clear();
+    this.settle(false);
   }
 }
 
@@ -461,9 +484,10 @@ export type Saver = PlanSaver;
 
 const savers = new WeakMap<QueryClient, PlanSaver>();
 
-// One queue per signed-in person. Someone else signing in on this browser gets a new one.
+// One queue per signed-in person and depot (spec 020). Someone else signing in on this browser, or a dispatcher
+// switching depots, gets a new one, so nothing held for the board before is drawn again.
 function saverOf(qc: QueryClient) {
-  const owner = qc.getQueryData<Me | null>(meKey)?.id ?? null;
+  const owner = workingFor(qc);
   let saver = savers.get(qc);
   if (!saver || saver.owner !== owner) {
     saver?.stop();
@@ -475,6 +499,34 @@ function saverOf(qc: QueryClient) {
 
 export function usePlanSaver() {
   return saverOf(useQueryClient());
+}
+
+// A depot switch retires the board's queue whatever page is on show (spec 020): no save waiting to try again, and no
+// change held for the depot before, is sent once the session works on the other depot.
+export function retireBoard(qc: QueryClient) {
+  savers.get(qc)?.stop();
+  savers.delete(qc);
+}
+
+// A plan change is still on its way to the server: a write queued or sent, from the board or View plan, or a change on
+// the board on show waiting to be saved. A dispatcher's depot switch is refused until it lands (spec 020), so no
+// change is dropped without a word and no answer lands after the switch.
+export function planWriteOnItsWay(qc: QueryClient) {
+  const saver = savers.get(qc);
+  return unanswered > 0 || (saver !== undefined && saver.owner === workingFor(qc) && saver.onItsWay());
+}
+
+// View plan's send, back to edit or accept for a day the board's queue does not hold, such as after a reload: it names
+// the plan on screen, and its answer replaces the day's read only while the screen still works for the account and
+// depot it went out for. It answers null otherwise, and throws what the server refused.
+export async function writeOutsideBoard(qc: QueryClient, date: string, board: PlanBoard, call: (day: string, ref: PlanRef) => Promise<PlanBoard>) {
+  const sentFor = workingFor(qc);
+  // A read of this day already on its way would land after the answer and bring back the plan before it.
+  await qc.cancelQueries({ queryKey: dayKey(date) });
+  const answer = await call(date, refOf(board));
+  if (workingFor(qc) !== sentFor) return null;
+  qc.setQueryData(dayKey(date), answer);
+  return answer;
 }
 
 // The board on screen: the last answer's numbers with the draft as the dispatcher left it.

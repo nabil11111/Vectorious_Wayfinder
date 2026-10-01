@@ -22,6 +22,7 @@ export type LoginRequest = z.infer<typeof LoginRequest>;
 export const AUTH_ERROR_CODES = ['bad_credentials', 'locked'] as const;
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
+// For a dispatcher, depotId is the depot their session works on: their own until they switch (spec 020).
 export const Me = z.object({
   id: z.string(),
   username: z.string(),
@@ -32,6 +33,13 @@ export const Me = z.object({
   outletId: z.string().nullable(),
 });
 export type Me = z.infer<typeof Me>;
+
+// PUT /me/depot: the dispatcher's depot switch (spec 020, D-93). It answers Me with the chosen depot. Only a dispatcher
+// may switch (403 forbidden), and only to a depot on the list (400 unknown_record).
+export const SwitchDepotRequest = z.object({
+  depotId: z.string().min(1).max(64),
+});
+export type SwitchDepotRequest = z.infer<typeof SwitchDepotRequest>;
 
 // Every error the API sends has this shape, so screens can show one message and act on one code.
 export const ApiError = z.object({

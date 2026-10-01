@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { hash } from '@node-rs/argon2';
-import { CutoffPassedDetails, PlaceOrdersResponse, StoreNextOrder, type DraftRefs, type LoginRequest } from '@wayfinder/contracts';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { CutoffPassedDetails, PlaceOrdersResponse, StoreNextOrder, TEMPS, type DraftRefs, type LoginRequest } from '@wayfinder/contracts';
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
+import { demoId } from '../src/db/demo-day';
 import { orderLines, orders, outlets, products, users } from '../src/db/schema';
 import { depotInstant, realNow, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
@@ -16,14 +17,16 @@ import { PIN, signInAs } from './sign-in';
 // Spec 009: the next order, its draft and placing it. Every test runs against the real database with the
 // app's clock frozen.
 //
-// The shops are three of Kandy's. No account belongs to them and the seeded day has no order for them, so
-// the seeded draft and whatever a judge ordered can never break a test. The store managers are made here and
-// removed at the end with every order of those shops. Nothing is written to a shop that has an account.
+// The shops are three of Kandy's, so the seeded draft and whatever a judge ordered at the walkthrough's shops can never
+// break a test. The store managers are made here and removed at the end with every order made here. Since spec 020
+// each of these shops has an account and the seeded day has its orders for Thu 25 Jun as well: the tests' days are in
+// early June, and every read and clean-up below leaves the seeded day's orders out, so they stay as the seed wrote them.
 const FRESH = 'OUT084';
 const STYLE = 'OUT089';
 const TECH = 'OUT094';
 const SHOPS = [FRESH, STYLE, TECH];
 const DEPOT = 'Kandy';
+const SEEDED = SHOPS.flatMap((shop) => TEMPS.map((temp) => demoId('order', `2026-06-25:${shop}:${temp}`)));
 
 const TUE = '2026-06-02';
 const WED = '2026-06-03';
@@ -79,7 +82,7 @@ let kasun: Asker;
 let dilshan: Asker;
 let admin: Asker;
 
-const removeOrders = () => db.delete(orders).where(inArray(orders.outletId, SHOPS));
+const removeOrders = () => db.delete(orders).where(and(inArray(orders.outletId, SHOPS), notInArray(orders.id, SEEDED)));
 const removeManagers = () => db.delete(users).where(inArray(users.username, MANAGERS.map((m) => m.username)));
 
 beforeAll(async () => {
@@ -135,9 +138,10 @@ async function savedDraft(deliveryDate = WED): Promise<DraftRefs> {
   return StoreNextOrder.parse(res.body).draft!.refs;
 }
 
-// Every order of a shop with its lines, as the database holds them. A refused request leaves this as it was.
+// Every order of a shop with its lines, as the database holds them, but the seeded day's. A refused request leaves this
+// as it was.
 async function held(outletId = FRESH) {
-  const rows = await db.select().from(orders).where(eq(orders.outletId, outletId)).orderBy(orders.temp, orders.placedAt, orders.id);
+  const rows = await db.select().from(orders).where(and(eq(orders.outletId, outletId), notInArray(orders.id, SEEDED))).orderBy(orders.temp, orders.placedAt, orders.id);
   const lines = rows.length
     ? await db.select().from(orderLines).where(inArray(orderLines.orderId, rows.map((o) => o.id))).orderBy(orderLines.orderId, orderLines.productId)
     : [];

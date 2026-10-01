@@ -30,11 +30,13 @@ async function followClock(qc: QueryClient, topic: 'clock' | 'demo') {
   toast(line, { id: 'demo-clock', duration: 6000, classNames: { title: 'text-pretty' } });
 }
 
-// The live stream, mounted once in the shell. It opens when someone signs in and closes when they sign out.
+// The live stream, mounted once in the shell. It opens when someone signs in and closes when they sign out. A stream
+// carries the depot it opened with, so it opens again when a dispatcher switches depots (spec 020).
 export function useLive() {
   const qc = useQueryClient();
   const { data: me } = useMe();
   const userId = me?.id;
+  const depotId = me?.depotId;
 
   useEffect(() => {
     if (!userId) return;
@@ -90,5 +92,5 @@ export function useLive() {
       window.clearTimeout(reopen);
       stream.close();
     };
-  }, [qc, userId]);
+  }, [qc, userId, depotId]);
 }

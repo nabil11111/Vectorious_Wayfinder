@@ -27,6 +27,9 @@ export const users = pgTable('users', {
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // The depot a dispatcher switched this session to (spec 020, D-93). Null until they switch: their own depot. A new
+  // sign-in is a new session, so it starts there.
+  depotId: text('depot_id').references(() => depots.id),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

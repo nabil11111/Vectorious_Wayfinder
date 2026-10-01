@@ -1,0 +1,2 @@
+ALTER TABLE "sessions" ADD COLUMN "depot_id" text;--> statement-breakpoint
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_depot_id_depots_id_fk" FOREIGN KEY ("depot_id") REFERENCES "public"."depots"("id") ON DELETE no action ON UPDATE no action;

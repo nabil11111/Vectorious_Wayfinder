@@ -30,6 +30,7 @@ The seed writes one realistic delivery day: Thursday 25 June 2026 from the Peliy
 orders, four chilled orders that earlier plans left out (one of them twice), three vehicles in the workshop and
 the week's fuel used so far.
 It is short of fridge trucks on purpose, so the plan has to defer and explain.
+The same Thursday has Kandy's orders too, 64 from its 45 shops by the same rules, for a dispatcher who switches to Kandy.
 
 The app runs on its own clock, the same for every screen, starting on Wednesday 24 June at 15:00 with orders
 open. The demo control in the top bar moves the whole app to the next part of the day (orders close at 16:00,
@@ -50,6 +51,8 @@ npm test                     # needs the db running
 
 An install seeded before staff IDs and PINs gets them from the seed: after pulling, run
 `npm run db:migrate && npm run db:seed` once. `docker compose up` does both on every start.
+An install seeded before every shop had an account gets the new accounts and Kandy's orders the same way, with
+`npm run db:migrate && npm run db:seed`, and nothing it already has changes.
 
 Changed the schema in `apps/api/src/db/schema`? Run `npm run db:generate` and commit the new file in
 `apps/api/drizzle` with it. CI fails if they disagree.
@@ -82,6 +85,10 @@ PIN for the demo accounts: `1234` (`SEED_PIN`). Admin has its own: `9024` (`SEED
 | Driver | `D-001` | Dilshan | Peliyagoda depot. 34 more drivers there, one per working vehicle (`D-003` Chaminda, `D-004` Lasantha and so on to `D-036` Wasantha), for the plan board |
 | Driver | `D-002` | Prasanna | Kandy depot |
 | Admin | `A-001` | Admin | Everything |
+
+Every shop has an account, so a test run can sign in as any of the 120: `S-004` to `S-120` are the other shops in
+outlet order (OUT002 is `S-004`). Kandy has a driver for each of its 22 vehicles, Prasanna and `D-037` to `D-057`,
+and a loader, `L-002` Sarath. [`docs/accounts.md`](docs/accounts.md) lists every account with its shop or depot.
 
 ## Judge walkthrough
 
@@ -250,7 +257,8 @@ Anything we built differently from our Designathon submission, and why.
 - **No "Changes · N" and no "Back to the suggestion"** in the board's header. View plan says when the plan was
   suggested, with no switch between the suggested and the edited plan.
 - **Orders are named by shop, amount and wanted day.** The design's order numbers (WF-2402) do not exist here.
-- **The depot switch** shows the dispatcher's own depot and greys the others (D-32), from 1280 wide.
+- **The depot switch** works between Peliyagoda and Kandy (D-93) and shows from 1280 wide. Only Both is greyed: it says
+  both depots together come later.
 - **Drivers** are picked from the depot's driver accounts, and a vehicle may have none (D-31).
 - **Moving stops** shows no "12 km shorter" or "35 min earlier", and a late stop says "late": the checker's
   kilometres depend only on the number of stops, and its sentence under the timeline gives the minutes.
@@ -305,10 +313,10 @@ Anything we built differently from our Designathon submission, and why.
 **The dashboard and Live day**
 - **No waves:** Live day has no "Wave 2", and the next run's button is "View plan" with no draft line.
 - **The district map** says "Live · 07:30" where the frame says "Replay · 07:30": it shows the day as it is, where the
-  design drew a replay, so every number on it comes from the live read (D-92). Its Map view switch shows only the
-  dispatcher's own depot and greys Kandy and Both (D-32), districts and trucks have no hover details, the active chip
-  carries the design's lorry picture, and the card credits OpenStreetMap for the district outlines. Below 1280 wide it
-  sits under Needs you, and below 640 its Stores delivered list goes under the map.
+  design drew a replay, so every number on it comes from the live read (D-92). Its Map view switch works between
+  Peliyagoda and Kandy as the top bar's does, with only Both greyed (D-93); districts and trucks have no hover details,
+  the active chip carries the design's lorry picture, and the card credits OpenStreetMap for the district outlines.
+  Below 1280 wide it sits under Needs you, and below 640 its Stores delivered list goes under the map.
 - **One answer per problem:** "Decide" opens its card, where the design also draws Warn, Skip, Credit and Resend, and an
   answered row reads "Decided", never "Warned". There is no Undo.
 - **Recorded times only (D-68):** the trucks table shows the planned arrival and the planned return, never an estimate,

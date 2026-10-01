@@ -5,7 +5,8 @@ import { CARD } from '@/features/live/parts/ui';
 import { truckName } from '@/features/loader/words';
 import { FLEET_MAP, FLEET_MAP_SIZE } from '@/lib/map/fleet-map-shapes';
 import { cn } from '@/lib/utils';
-import { OtherDepot } from '../DepotSwitch';
+import { BothLater } from '../DepotSwitch';
+import { useSwitchDepot } from '../depots';
 import { CARD_SIZE, VIEWS, deliveredList, drawingOf, liveLine, statsOf, type MapDrawing, type MapShapes } from './fleet-map';
 
 // One of the frame's pixels. The wide card sets it to its own width over 520, so it is the frame scaled to its column
@@ -31,7 +32,8 @@ const baseline = (y: number, size: number) => y + (Math.ceil(size * 1.3) - 1.209
 const n2 = (n: number) => n.toFixed(2);
 const pathOf = (points: readonly (readonly [number, number])[]) => points.map((p, i) => `${i ? 'L' : 'M'}${n2(p[0])} ${n2(p[1])}`).join(' ');
 
-// The dispatcher's own depot is the map's view (D-32). A depot the shapes do not have gets no drawing, and says so.
+// The map's view is the depot the read is for, the one the dispatcher chose (D-93). A depot the shapes do not have gets
+// no drawing, and says so.
 const shapesOf = (depotId: string): MapShapes | null => (depotId === 'Peliyagoda' || depotId === 'Kandy' ? FLEET_MAP[depotId] : null);
 
 // The dashboard's district map (spec 019), the card right of Needs you on Dispatcher · Dashboard (53:11540), as the
@@ -42,7 +44,7 @@ export function FleetMap({ day }: { day: OperationsDay }) {
   const drawing = shapes && drawingOf(day, shapes);
   const list = deliveredList(day.map);
   const stats = statsOf(day);
-  const depot = day.depot.name;
+  const { id: depotId, name: depot } = day.depot;
   const last = VIEWS[VIEWS.length - 1];
   return (
     <section aria-label="District map" className={cn(CARD, '@container overflow-hidden')}>
@@ -51,7 +53,7 @@ export function FleetMap({ day }: { day: OperationsDay }) {
         {/* "Map view" ends 12 px before the switch, which ends 26 px from the card's right edge. */}
         <div className="flex items-start justify-end" style={{ ...atRight(222, 11, last.x + last.width - 222), gap: u(12) }}>
           <span className="text-map-muted" style={{ ...type(9), marginTop: u(9) }}>Map view</span>
-          <ViewSwitch depot={depot} />
+          <ViewSwitch depot={depotId} />
         </div>
         <span className="text-map-stores" style={{ ...at(16, 51), ...type(11, 600) }}>{stats.stores}</span>
         <span className="text-map-muted" style={{ ...at(108, 51), ...type(11) }}>{stats.vehicles}</span>
@@ -72,7 +74,7 @@ export function FleetMap({ day }: { day: OperationsDay }) {
           <h2 className="font-sans text-map-title" style={type(14, 600)}>{liveLine(day)}</h2>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <span className="text-map-muted" style={type(9)}>Map view</span>
-            <ViewSwitch depot={depot} />
+            <ViewSwitch depot={depotId} />
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-4">
@@ -95,17 +97,24 @@ export function FleetMap({ day }: { day: OperationsDay }) {
   );
 }
 
-// "Map view": the dispatcher's own depot chosen, and the others greyed as the top bar's are, saying whose depot this is
-// when pointed at or pressed. Nothing else changes (D-32). A button centres its words, so the box puts them where the
-// frame does, 7 px from the top.
+// "Map view": the depot the card draws chosen, and the other one a button that switches every page to it, as the top
+// bar's switch does (D-93). This is how a dispatcher switches below 1280 wide, where the top bar hides its switch. Both
+// is greyed as the top bar's is. A button centres its words, so the box puts them where the frame does, 7 px from the
+// top.
 function ViewSwitch({ depot }: { depot: string }) {
+  const { chosen, switching, choose } = useSwitchDepot(depot);
   return (
-    <div role="group" aria-label="Map view" className="flex shrink-0" style={{ gap: u(3) }}>
+    <div role="group" aria-label="Map view" aria-busy={switching} className="flex shrink-0" style={{ gap: u(3) }}>
       {VIEWS.map((view) => {
         const box: CSSProperties = { ...type(10, 600), display: 'flex', alignItems: 'flex-start', width: u(view.width), height: u(29), borderRadius: u(6), paddingLeft: u(view.inset), paddingTop: u(7) };
-        return view.name === depot
-          ? <span key={view.name} aria-current="true" className="bg-map-chosen text-white" style={box}>{view.name}</span>
-          : <OtherDepot key={view.name} name={view.name} depot={depot} className="shrink-0 bg-map-option text-map-option-ink/65 outline-none focus-visible:ring-3 focus-visible:ring-ring/50" style={box} />;
+        const focus = 'shrink-0 outline-none focus-visible:ring-3 focus-visible:ring-ring/50';
+        if (view.name === 'Both') return <BothLater key={view.name} className={cn(focus, 'bg-map-option text-map-option-ink/65')} style={box} />;
+        return (
+          <button key={view.name} type="button" aria-pressed={view.name === chosen} onClick={() => choose(view.name)} style={box}
+            className={cn(focus, view.name === chosen ? 'bg-map-chosen text-white' : 'bg-map-option text-map-option-ink')}>
+            {view.name}
+          </button>
+        );
       })}
     </div>
   );

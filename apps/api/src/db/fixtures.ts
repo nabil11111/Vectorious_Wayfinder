@@ -14,6 +14,9 @@ export const PRODUCTS = [
   { id: 'tech-small', brand: 'Tech', name: 'Small appliances', unit: 'pallet', kgPerUnit: '190', m3PerUnit: '0.62', temp: 'dry', needsTailLift: false, keepUpright: false },
 ] as const;
 
+// The number in the id of every shop but the three below, in outlet order: 2 to 16, 18 to 63 and 65 to 120.
+const OTHER_SHOPS = Array.from({ length: 120 }, (_, i) => i + 1).filter((n) => ![1, 17, 64].includes(n));
+
 // One account per role, named after the personas in the design, plus a Peliyagoda driver so the shop, dispatcher,
 // loader and a driver all belong to the same depot. A store manager belongs to one shop: Nadeesha's is the Fresh
 // shop of the design, and the Style and Tech brands have a manager each so all three order forms can be seen
@@ -35,4 +38,29 @@ export const DEMO_USERS = [
     'Sunil', 'Nimal', 'Janaka', 'Roshan', 'Suresh', 'Anura', 'Buddhika', 'Dinesh', 'Gayan', 'Harsha', 'Isuru', 'Jagath',
     'Kelum', 'Lahiru', 'Madushan', 'Nalin', 'Pasan', 'Rangana', 'Sampath', 'Thilak', 'Udara', 'Viraj', 'Wasantha',
   ].map((name, i) => ({ username: name.toLowerCase(), staffId: `D-${String(i + 3).padStart(3, '0')}`, displayName: name, role: 'driver', depot: 'Peliyagoda', outlet: null }) as const),
+  // Every other shop has a store manager too, so all 120 can sign in on a test run with as much data as possible
+  // (spec 020, D-94). They are S-004 to S-120 in outlet order, OUT002 being S-004, skipping the three shops above, and
+  // each belongs to their shop's depot: OUT002 to OUT075 are Peliyagoda's, OUT076 to OUT120 Kandy's. The names are
+  // written out in that order, so every seed gives a shop the same person.
+  ...['Chamari', 'Ayesha', 'Dulani', 'Kavitha', 'Sanduni', 'Mohamed', 'Nirmala', 'Rizwan', 'Thilini', 'Sivakumar', 'Hiruni', 'Ajith',
+    'Fathima', 'Kumudini', 'Anoma', 'Rajan', 'Iresha', 'Lakmini', 'Imran', 'Sachini', 'Tharshini', 'Madhavi', 'Bandula', 'Nilmini',
+    'Zainab', 'Shashika', 'Gayani', 'Murugan', 'Yasoda', 'Ruwani', 'Chandana', 'Sewwandi', 'Farhan', 'Malsha', 'Priya', 'Piumi',
+    'Damith', 'Hasini', 'Kaushalya', 'Selvam', 'Inoka', 'Dinusha', 'Nazeer', 'Upeksha', 'Nethmi', 'Gihan', 'Oshadi', 'Lakshmi',
+    'Sajini', 'Tharushi', 'Hemantha', 'Erandi', 'Shafna', 'Hansika', 'Imesha', 'Kannan', 'Janani', 'Kalpani', 'Indika', 'Lasanthi',
+    'Menaka', 'Rifkhan', 'Nayomi', 'Pavithra', 'Senthil', 'Rashmi', 'Jayantha', 'Samanthi', 'Thushari', 'Hafsa', 'Udari', 'Vindya',
+    'Arun', 'Wathsala', 'Kapila', 'Yashodha', 'Buddhini', 'Ashraff', 'Champika', 'Dilrukshi', 'Ganesh', 'Gimhani', 'Lalith', 'Harshani',
+    'Ishani', 'Shiyam', 'Jayani', 'Kanchana', 'Vasanthi', 'Lochana', 'Malinda', 'Manjula', 'Niluka', 'Fazil', 'Prabha', 'Rasika',
+    'Meena', 'Sandamali', 'Nalaka', 'Shanika', 'Uthpala', 'Nuzrath', 'Anjali', 'Prabath', 'Dilani', 'Vijay', 'Rohan', 'Michelle',
+    'Sajith', 'Ramesh', 'Kumari', 'Tharanga', 'Selvi', 'Upul', 'Shirani', 'Kumaran', 'Vimukthi',
+  ].map((name, i) => {
+    const n = OTHER_SHOPS[i]!;
+    return { username: name.toLowerCase(), staffId: `S-${String(i + 4).padStart(3, '0')}`, displayName: name, role: 'store_manager', depot: n <= 75 ? 'Peliyagoda' : 'Kandy', outlet: `OUT${String(n).padStart(3, '0')}` } as const;
+  }),
+  // A driver for each of Kandy's 22 vehicles, none of which is in the workshop on Thursday, so Kandy's trips can name
+  // one too, and a loader for its dock (spec 020). Prasanna, above, is one of them; the others are D-037 to D-057 in
+  // this order.
+  ...['Ashen', 'Charith', 'Dulaj', 'Hasitha', 'Kavindu', 'Lakshan', 'Mihiran', 'Nadun', 'Pathum', 'Ravindu', 'Sahan', 'Thisara',
+    'Eranga', 'Niroshan', 'Sandun', 'Supun', 'Thushara', 'Asitha', 'Rajkumar', 'Nawaz', 'Chamal',
+  ].map((name, i) => ({ username: name.toLowerCase(), staffId: `D-${String(i + 37).padStart(3, '0')}`, displayName: name, role: 'driver', depot: 'Kandy', outlet: null }) as const),
+  { username: 'sarath', staffId: 'L-002', displayName: 'Sarath', role: 'loader', depot: 'Kandy', outlet: null },
 ] as const;

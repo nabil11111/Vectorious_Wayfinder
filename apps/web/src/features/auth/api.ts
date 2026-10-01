@@ -24,6 +24,19 @@ function keptAccount(): Me | undefined {
   } catch (error) { console.warn('Could not read the kept account on this phone.', error); return undefined; }
 }
 
+// An account the server just answered with, such as a dispatcher's after a depot switch (spec 020): on screen at once,
+// and kept for the next load.
+export function takeAccount(qc: QueryClient, me: Me) {
+  qc.setQueryData(meKey, keepAccount(me));
+}
+
+// Whom the screen works for: the account signed in and the depot it works on, which a dispatcher can switch (spec 020).
+// A write's answer is taken only while this is still what it was when the write went out.
+export function workingFor(qc: QueryClient) {
+  const me = qc.getQueryData<Me | null>(meKey);
+  return me ? `${me.id} ${me.depotId}` : null;
+}
+
 
 // The driver's area keeps its account and screens through a 401, so the trip and the records kept on the phone stay
 // in reach, and its own line asks the driver to sign in again (spec 013, AC-45). It holds this while it is open, and

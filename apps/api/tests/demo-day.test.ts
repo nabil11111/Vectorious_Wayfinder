@@ -1,8 +1,8 @@
 import { DEMO_DAY } from '@wayfinder/contracts';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { db, pool, type Tx } from '../src/db/client';
-import { clearDemoDay, demoId, seedDemoDay } from '../src/db/demo-day';
+import { addKandysDay, clearDemoDay, demoId, seedDemoDay } from '../src/db/demo-day';
 import {
   auditLog, calendarDays, deferrals, demoDay, districtTravel, fuelLog, orderLines, orders, outlets, plans, products, sessions, stopOrders, stops, trips,
   users, vehicleDaysOff, vehicles,
@@ -76,6 +76,7 @@ const total = (list: Order[]) => ({
   m3: sum(list.map((o) => o.litres)) / 1000,
 });
 const is = (brand: string, temp: string) => (o: Order) => o.brand === brand && o.temp === temp;
+const at = (depotId: string) => (o: Order) => o.depotId === depotId;
 const shopNumber = (o: Order) => Number(o.outletId.slice(3));
 
 // What one order holds, as { product: quantity }.
@@ -113,6 +114,12 @@ async function rowsIn(tx: Tx, tables: string[], { realTime = true } = {}) {
 }
 const everyRow = (tx: Tx, options?: { realTime?: boolean }) => rowsIn(tx, DAY_TABLES, options);
 const rowCounts = async (tx: Tx, tables = DAY_TABLES) => Object.fromEntries(Object.entries(await rowsIn(tx, tables)).map(([table, rows]) => [table, rows.length]));
+// How many orders and order lines each depot's shops have.
+async function rowsByDepot(tx: Tx) {
+  const found = await tx.select({ depotId: outlets.depotId, orders: sql<number>`count(distinct ${orders.id})::int`, lines: sql<number>`count(${orderLines.id})::int` })
+    .from(orders).innerJoin(outlets, eq(outlets.id, orders.outletId)).leftJoin(orderLines, eq(orderLines.orderId, orders.id)).groupBy(outlets.depotId);
+  return Object.fromEntries(found.map(({ depotId, ...counts }) => [depotId, counts]));
+}
 
 describe('the seeded day on an empty database', () => {
   it('AC-1 holds the clock at Wed 24 Jun 2026 15:00 depot time, in the part ordering, with revision 0 and day 1', async () => {
@@ -137,12 +144,14 @@ describe('the seeded day on an empty database', () => {
     });
   });
 
-  it('AC-28 writes 98 placed orders for Thursday, all for Peliyagoda shops: 48 Fresh dry, 34 Fresh chilled, 12 Style and 4 Tech', async () => {
+  it('AC-28 writes 98 placed orders for Thursday for Peliyagoda shops: 48 Fresh dry, 34 Fresh chilled, 12 Style and 4 Tech', async () => {
     await seeded(async (tx) => {
-      const placed = (await ordersWithLoads(tx)).filter((o) => o.status === 'placed');
+      const every = (await ordersWithLoads(tx)).filter((o) => o.status === 'placed');
+      // Every placed order is for Thursday, Peliyagoda's and, since spec 020, Kandy's (below).
+      expect([...new Set(every.map((o) => o.date))]).toEqual([THU]);
+      expect([...new Set(every.map((o) => o.depotId))].sort()).toEqual(['Kandy', 'Peliyagoda']);
+      const placed = every.filter(at('Peliyagoda'));
       expect(placed).toHaveLength(98);
-      expect([...new Set(placed.map((o) => o.date))]).toEqual([THU]);
-      expect([...new Set(placed.map((o) => o.depotId))]).toEqual(['Peliyagoda']);
       // A shop has one order per temperature, never two, and an order holds only items of its shop's brand
       // and of its own temperature. So a Fresh chilled order is chilled cartons and nothing else.
       expect(new Set(placed.map((o) => `${o.outletId} ${o.temp}`)).size).toBe(98);
@@ -165,7 +174,7 @@ describe('the seeded day on an empty database', () => {
 
   it('AC-29 adds up to 2,605 dry cartons, 1,669 chilled cartons, 501 Style units at 113.02 m³ and 11 Tech units at 2,290 kg', async () => {
     await seeded(async (tx) => {
-      const placed = (await ordersWithLoads(tx)).filter((o) => o.status === 'placed');
+      const placed = (await ordersWithLoads(tx)).filter((o) => o.status === 'placed').filter(at('Peliyagoda'));
       expect(total(placed.filter(is('Fresh', 'dry')))).toEqual({ orders: 48, units: 2605, kg: 17974.5, m3: 96.385 });
       expect(total(placed.filter(is('Fresh', 'chilled')))).toEqual({ orders: 34, units: 1669, kg: 11516.1, m3: 61.753 });
       expect(total(placed.filter(is('Style', 'dry')))).toEqual({ orders: 12, units: 501, kg: 6674, m3: 113.02 });
@@ -275,7 +284,7 @@ describe('the seeded day on an empty database', () => {
     await seeded(async (tx) => {
       // Due on Thursday: placed for that day, or still waiting from an earlier one.
       const dueOnThursday = (o: Order) => (o.status === 'placed' && o.date === THU) || (o.status === 'deferred' && o.date < THU);
-      const due = (await ordersWithLoads(tx)).filter((o) => o.temp === 'chilled' && dueOnThursday(o));
+      const due = (await ordersWithLoads(tx)).filter(at('Peliyagoda')).filter((o) => o.temp === 'chilled' && dueOnThursday(o));
       expect(total(due)).toEqual({ orders: 38, units: 1825, kg: 12592.5, m3: 67.525 });
 
       // The spec's table under "Why the day comes up short".
@@ -362,10 +371,12 @@ describe('the seeded day on an empty database', () => {
   it('AC-36 gives every row the same id and content each time it writes the day', async () => {
     await seeded(async (tx) => {
       const first = await everyRow(tx, { realTime: false });
-      // 104 orders and 142 lines from spec 008, and the 25 orders of one line each that spec 009 adds for OUT001.
+      // Peliyagoda's 104 orders and 142 lines from spec 008 and the 25 orders of one line each that spec 009 adds for
+      // OUT001, and Kandy's 64 orders and 87 lines from spec 020.
       expect(await rowCounts(tx)).toEqual({
-        ...NOTHING, demo_day: 1, orders: 129, order_lines: 167, plans: 2, deferrals: 5, vehicle_days_off: 6, fuel_log: 111,
+        ...NOTHING, demo_day: 1, orders: 129 + 64, order_lines: 167 + 87, plans: 2, deferrals: 5, vehicle_days_off: 6, fuel_log: 111,
       });
+      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 129, lines: 167 }, Kandy: { orders: 64, lines: 87 } });
 
       // What a reset does: the day is removed and written again.
       await clearDemoDay(tx);
@@ -418,6 +429,8 @@ describe('the seeded day on an empty database', () => {
       ['fuel_log', (tx) => tx.insert(fuelLog).values({ vehicleId: 'VEH002', date: TUE, litres: '5' })],
       // Spec 009's block comes after all of those: OUT001's dry order for Wednesday is one of its rows.
       ['orders', (tx) => tx.insert(orders).values({ id: demoId('order', `${WED}:OUT001:dry`), outletId: 'OUT001', deliveryDate: WED, ...placed, temp: 'dry' })],
+      // Kandy's block (spec 020) is the last: OUT076's dry order for Thursday is one of its rows.
+      ['orders', (tx) => tx.insert(orders).values({ id: demoId('order', `${THU}:OUT076:dry`), outletId: 'OUT076', deliveryDate: THU, ...placed, temp: 'dry' })],
     ];
     for (const [table, plant] of clashes) {
       await onEmptyDatabase(async (tx) => {
@@ -447,7 +460,7 @@ describe('the seeded day on an empty database', () => {
 
   it('places every order at 08:00 plus 5 minutes for each shop number, on the day before it is wanted, with nobody named as its maker', async () => {
     await seeded(async (tx) => {
-      const all = await ordersWithLoads(tx);
+      const all = (await ordersWithLoads(tx)).filter(at('Peliyagoda'));
       const when = (o: Order) => (o.placedAt ? [depotDate(o.placedAt), depotMinutes(o.placedAt)] : null);
       const placed = all.filter((o) => o.status === 'placed');
       for (const o of placed) expect([o.outletId, when(o)]).toEqual([o.outletId, [WED, 8 * 60 + 5 * shopNumber(o)]]);
@@ -464,7 +477,8 @@ describe('the seeded day on an empty database', () => {
         ['OUT060', [MON, 13 * 60]],
       ]);
 
-      // Those shops have no account, so nobody is named. Nothing has been changed yet, so every revision is 0.
+      // They came in before the day the app runs, so nobody is named, though every shop has an account since spec 020.
+      // Nothing has been changed yet, so every revision is 0.
       expect([...placed, ...waited].filter((o) => o.createdBy !== null)).toEqual([]);
       expect(all.filter((o) => o.revision !== 0)).toEqual([]);
     });
@@ -594,6 +608,165 @@ describe('the seeded day of a shop with an account', () => {
   });
 });
 
+// Spec 020: Kandy's Thursday, by spec 008's rules for Peliyagoda's shops applied to Kandy's 45, so a dispatcher who
+// switches to Kandy has a day to plan (D-94). Every figure is worked out from data/shared and the product list.
+const KANDY_TECH = ['OUT093', 'OUT094', 'OUT095', 'OUT103', 'OUT115'];
+
+describe('Kandy\'s day (spec 020)', () => {
+  it('AC-2 writes 64 placed orders for Thursday from Kandy\'s shops by Peliyagoda\'s rules: 31 Fresh dry, 21 Fresh chilled, 7 Style and 5 Tech', async () => {
+    await seeded(async (tx) => {
+      const kandy = (await ordersWithLoads(tx)).filter(at('Kandy'));
+      expect(kandy).toHaveLength(64);
+      expect(kandy.filter((o) => o.status !== 'placed' || o.date !== THU)).toEqual([]);
+      // One order per shop and temperature, each holding only items of its shop's brand and its own temperature.
+      expect(new Set(kandy.map((o) => `${o.outletId} ${o.temp}`)).size).toBe(64);
+      expect(kandy.filter((o) => o.strays > 0 || o.units === 0)).toEqual([]);
+      const count = (brand: string, temp: string) => kandy.filter(is(brand, temp)).length;
+      expect({ freshDry: count('Fresh', 'dry'), freshChilled: count('Fresh', 'chilled'), style: count('Style', 'dry'), tech: count('Tech', 'dry') })
+        .toEqual({ freshDry: 31, freshChilled: 21, style: 7, tech: 5 });
+
+      // By the number in the shop's id: every Fresh shop orders dry cartons, and chilled ones too unless its number ends
+      // in 0, 4 or 7. Every Style shop whose number is not a multiple of 5 orders. Each Tech shop has its written-out
+      // order. So the only shops with nothing are OUT090 and OUT120, Style shops numbered by a multiple of 5.
+      const shops = await tx.select().from(outlets).where(eq(outlets.depotId, 'Kandy')).orderBy(outlets.id);
+      expect(shops).toHaveLength(45);
+      const numbered = (brand: string, rule: (n: number) => boolean) => shops.filter((s) => s.brand === brand && rule(Number(s.id.slice(3)))).map((s) => s.id);
+      const shopsOf = (brand: string, temp: string) => kandy.filter(is(brand, temp)).map((o) => o.outletId);
+      expect(shopsOf('Fresh', 'dry')).toEqual(numbered('Fresh', () => true));
+      expect(shopsOf('Fresh', 'chilled')).toEqual(numbered('Fresh', (n) => ![0, 4, 7].includes(n % 10)));
+      expect(shopsOf('Style', 'dry')).toEqual(numbered('Style', (n) => n % 5 !== 0));
+      expect([shopsOf('Tech', 'dry'), numbered('Tech', () => true)]).toEqual([KANDY_TECH, KANDY_TECH]);
+      expect(shops.filter((s) => !kandy.some((o) => o.outletId === s.id)).map((s) => s.id)).toEqual(['OUT090', 'OUT120']);
+    });
+  });
+
+  it('AC-2 adds up to 1,716 dry cartons, 1,053 chilled cartons, 244 Style units at 55.02 m³ and 12 Tech units at 2,360 kg', async () => {
+    await seeded(async (tx) => {
+      const kandy = (await ordersWithLoads(tx)).filter(at('Kandy'));
+      expect(total(kandy.filter(is('Fresh', 'dry')))).toEqual({ orders: 31, units: 1716, kg: 11840.4, m3: 63.492 });
+      expect(total(kandy.filter(is('Fresh', 'chilled')))).toEqual({ orders: 21, units: 1053, kg: 7265.7, m3: 38.961 });
+      expect(total(kandy.filter(is('Style', 'dry')))).toEqual({ orders: 7, units: 244, kg: 3228, m3: 55.02 });
+      expect(total(kandy.filter(is('Tech', 'dry')))).toEqual({ orders: 5, units: 12, kg: 2360, m3: 8.04 });
+      expect(total(kandy)).toEqual({ orders: 64, units: 3025, kg: 24694.1, m3: 165.513 });
+
+      // 45 to 65 dry cartons and 39 to 60 chilled ones, inside Peliyagoda's ranges.
+      const cartons = (temp: string) => kandy.filter(is('Fresh', temp)).map((o) => o.units);
+      expect([Math.min(...cartons('dry')), Math.max(...cartons('dry'))]).toEqual([45, 65]);
+      expect([Math.min(...cartons('chilled')), Math.max(...cartons('chilled'))]).toEqual([39, 60]);
+
+      // OUT076: 45 + (836 mod 21) = 62 dry cartons, and 38 + (380 mod 23) = 50 chilled ones.
+      const order = (outletId: string, temp: string) => kandy.filter((o) => o.outletId === outletId && o.temp === temp);
+      expect(total(order('OUT076', 'dry'))).toMatchObject({ orders: 1, units: 62 });
+      expect(total(order('OUT076', 'chilled'))).toEqual({ orders: 1, units: 50, kg: 345, m3: 1.85 });
+      // A Style shop. OUT088: folded 10 + (352 mod 9), hanging 6 + (440 mod 7), shoes 4 + (88 mod 6), bags 3 + (88 mod 4).
+      expect(await linesOf(tx, order('OUT088', 'dry')[0]!.id)).toEqual({ 'style-folded': 11, 'style-hanging': 12, 'style-shoes': 8, 'style-bags': 3 });
+
+      // The five Tech orders, sized like Peliyagoda's four. OUT093 is the one Tech shop only a van can reach, and a van
+      // has no tail lift (D-24), so nothing in its order needs one.
+      const tech = [];
+      for (const o of kandy.filter(is('Tech', 'dry'))) tech.push([o.outletId, o.parking, await linesOf(tx, o.id), o.centikilos / 100, o.litres / 1000, o.tailLift]);
+      expect(tech).toEqual([
+        ['OUT093', 'van_only', { 'tech-tv': 2, 'tech-small': 1 }, 530, 1.82, false],
+        ['OUT094', 'mall_dock', { 'tech-fridge': 2 }, 500, 1.7, true],
+        ['OUT095', 'normal', { 'tech-washer': 2, 'tech-small': 1 }, 610, 2.02, true],
+        ['OUT103', 'normal', { 'tech-tv': 3 }, 510, 1.8, false],
+        ['OUT115', 'normal', { 'tech-washer': 1 }, 210, 0.7, true],
+      ]);
+    });
+  });
+
+  it('AC-2 places Kandy\'s orders on Wednesday from 08:05, five minutes apart in shop order, before the clock starts, naming nobody', async () => {
+    await seeded(async (tx) => {
+      const kandy = (await ordersWithLoads(tx)).filter(at('Kandy'));
+      // Kandy's shops follow Peliyagoda's 75 in the booklet's list, so its five-minute steps count from OUT076.
+      for (const o of kandy) expect([o.outletId, depotDate(o.placedAt!), depotMinutes(o.placedAt!)]).toEqual([o.outletId, WED, 8 * 60 + 5 * (shopNumber(o) - 75)]);
+      // OUT076's at 08:05 and the last shop to order, OUT119, at 11:40. All of them are in before 15:00.
+      expect(depotMinutes(kandy.find((o) => o.outletId === 'OUT076')!.placedAt!)).toBe(8 * 60 + 5);
+      expect([kandy.at(-1)!.outletId, depotMinutes(kandy.at(-1)!.placedAt!)]).toEqual(['OUT119', 11 * 60 + 40]);
+      expect(kandy.filter((o) => o.placedAt!.getTime() >= new Date(DEMO_DAY.parts[0].at).getTime())).toEqual([]);
+      // Like Peliyagoda's, they came in before the day the app runs: nobody is named, and nothing has changed them.
+      const rows = await tx.select().from(orders).where(inArray(orders.id, kandy.map((o) => o.id)));
+      expect(rows.filter((o) => o.createdBy !== null || o.placedBy !== null || o.revision !== 0 || o.savedAt !== null || o.driverNote !== null)).toEqual([]);
+    });
+  });
+
+  it('AC-2 gives Kandy no earlier plan, no order that waited, no draft, nothing in the workshop and no fuel used this week', async () => {
+    await seeded(async (tx) => {
+      expect(await tx.select().from(plans).where(eq(plans.depotId, 'Kandy'))).toEqual([]);
+      expect((await ordersWithLoads(tx)).filter(at('Kandy')).filter((o) => o.status !== 'placed')).toEqual([]);
+      const fleet = (await tx.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.depotId, 'Kandy'))).map((v) => v.id);
+      expect(fleet).toHaveLength(22);
+      expect(await tx.select().from(vehicleDaysOff).where(inArray(vehicleDaysOff.vehicleId, fleet))).toEqual([]);
+      expect(await tx.select().from(fuelLog).where(inArray(fuelLog.vehicleId, fleet))).toEqual([]);
+    });
+  });
+});
+
+// An install whose day was written before spec 020 has all of it but Kandy's orders, and the day is written once. The
+// seed adds Kandy's orders on its next start, once, and touches nothing that is there (spec 020's failure paths).
+describe('Kandy\'s day on an install seeded before spec 020', () => {
+  // The day as such an install has it: the seeded day without Kandy's orders, whose lines go with them.
+  const withoutKandy = (tx: Tx) => tx.delete(orders).where(inArray(orders.outletId, tx.select({ id: outlets.id }).from(outlets).where(eq(outlets.depotId, 'Kandy'))));
+
+  it('AC-2 writes Kandy\'s orders as a fresh seed writes them, leaves every row that was there as it was, and does nothing on a later start', async () => {
+    await seeded(async (tx) => {
+      const fresh = await everyRow(tx, { realTime: false });
+      await withoutKandy(tx);
+      const before = await everyRow(tx);
+      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 129, lines: 167 } });
+
+      expect(await addKandysDay(tx)).toBe(true);
+
+      // Every row that was there is as it was, Peliyagoda's above all, and the rows added are Kandy's 64 orders and 87
+      // lines, the same as a fresh seed's.
+      const after = await everyRow(tx);
+      for (const table of DAY_TABLES) expect([table, after[table]]).toEqual([table, expect.arrayContaining(before[table]!)]);
+      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 129, lines: 167 }, Kandy: { orders: 64, lines: 87 } });
+      expect(await everyRow(tx, { realTime: false })).toEqual(fresh);
+
+      // Every later start finds them there and writes nothing.
+      expect(await addKandysDay(tx)).toBe(false);
+      expect(await everyRow(tx)).toEqual(after);
+    });
+  });
+
+  it('writes nothing when any of Kandy\'s orders is there, so a day people have worked on is never added to', async () => {
+    await seeded(async (tx) => {
+      // All of Kandy's orders but OUT076's dry one are gone, and that one was planned since.
+      const kept = demoId('order', `${THU}:OUT076:dry`);
+      await tx.delete(orders).where(and(inArray(orders.outletId, tx.select({ id: outlets.id }).from(outlets).where(eq(outlets.depotId, 'Kandy'))), ne(orders.id, kept)));
+      await tx.update(orders).set({ status: 'planned', revision: 1 }).where(eq(orders.id, kept));
+      const before = await everyRow(tx);
+
+      expect(await addKandysDay(tx)).toBe(false);
+      expect(await everyRow(tx)).toEqual(before);
+    });
+  });
+
+  it('writes nothing when a Kandy shop already has an order for Thursday that the seed did not write', async () => {
+    await seeded(async (tx) => {
+      await withoutKandy(tx);
+      // OUT076's manager placed it on the screen, on an install that had the new accounts before Kandy's orders.
+      await tx.insert(orders).values({ outletId: 'OUT076', deliveryDate: THU, temp: 'dry', status: 'placed', placedAt: new Date(DEMO_DAY.parts[0].at) });
+      const before = await everyRow(tx);
+
+      expect(await addKandysDay(tx)).toBe(false);
+      expect(await everyRow(tx)).toEqual(before);
+    });
+  });
+
+  it('writes nothing before the day is written: the seed writes Kandy\'s orders with the rest of it', async () => {
+    await onEmptyDatabase(async (tx) => {
+      expect(await addKandysDay(tx)).toBe(false);
+      expect(await rowCounts(tx)).toEqual(NOTHING);
+      // A clock row with no day written yet.
+      await tx.insert(demoDay).values({ clockBase: new Date(DEMO_DAY.parts[0].at), clockSetAt: realNow() });
+      expect(await addKandysDay(tx)).toBe(false);
+      expect(await rowCounts(tx)).toEqual({ ...NOTHING, demo_day: 1 });
+    });
+  });
+});
+
 describe('the seed with demo mode off', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -612,6 +785,7 @@ describe('the seed with demo mode off', () => {
       // Handed the empty database's transaction, so anything it wrote would show here.
       await onEmptyDatabase(async (tx) => {
         expect(await off.seedDemoDay(tx)).toBe(false);
+        expect(await off.addKandysDay(tx)).toBe(false);
         expect(await rowCounts(tx)).toEqual(NOTHING);
       });
     } finally {

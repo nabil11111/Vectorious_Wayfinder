@@ -1,10 +1,11 @@
 import { hash } from '@node-rs/argon2';
-import { StoreOrderList, type OrderStatus, type Temp } from '@wayfinder/contracts';
-import { eq, inArray } from 'drizzle-orm';
+import { StoreOrderList, TEMPS, type OrderStatus, type Temp } from '@wayfinder/contracts';
+import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
+import { demoId } from '../src/db/demo-day';
 import { deferrals, orderLines, orders, outlets, plans, stopOrders, stops, trips, users } from '../src/db/schema';
 import { depotInstant, setClockForTests } from '../src/lib/clock';
 import { toMinutes } from '../src/planning/words';
@@ -14,13 +15,18 @@ import { PIN, signInAs } from './sign-in';
 // Spec 009: the lists of a shop's orders. Every test runs against the real database with the app's clock
 // frozen, and puts the orders and plans it needs straight into the tables.
 //
-// The two shops are Kandy's. No account belongs to them and the seeded day has no order or plan for their
-// depot, so the seeded day and whatever a judge ordered can never break a test. The two managers are made
-// here. They, every order of the two shops and every plan made here are removed at the end.
+// The two shops are Kandy's, so the walkthrough's seeded orders and whatever a judge ordered at its shops can never
+// break a test. The two managers are made here. They, every order made here and every plan made here are removed at
+// the end. Since spec 020 both shops have an account and the seeded day has their orders for Thu 25 Jun as well. The
+// tests' days are in early June, the clean-up leaves the seeded day's orders as the seed wrote them, and every list is
+// read without them: `ids` leaves them out and `ownOpen` takes them off the open count.
 const MINE = 'OUT085';
 const THEIRS = 'OUT086';
 const DEPOT = 'Kandy';
 const VEHICLE = 'VEH039';
+const SEEDED = new Set([MINE, THEIRS].flatMap((shop) => TEMPS.map((temp) => demoId('order', `2026-06-25:${shop}:${temp}`))));
+// How many orders each shop has open before any test adds one: the seeded day's, read in beforeAll.
+const seededOpen: Record<string, number> = {};
 
 const MON = '2026-06-01';
 const TUE = '2026-06-02';
@@ -50,7 +56,7 @@ async function removeEverything() {
   const made = await db.select({ id: users.id }).from(users).where(inArray(users.username, MANAGERS.map((m) => m.username)));
   // Plans first: what hangs off them points at the orders.
   if (made.length) await db.delete(plans).where(inArray(plans.createdBy, made.map((user) => user.id)));
-  await db.delete(orders).where(inArray(orders.outletId, [MINE, THEIRS]));
+  await db.delete(orders).where(and(inArray(orders.outletId, [MINE, THEIRS]), notInArray(orders.id, [...SEEDED])));
 }
 const removeManagers = () => db.delete(users).where(inArray(users.username, MANAGERS.map((m) => m.username)));
 
@@ -65,6 +71,13 @@ beforeAll(async () => {
   planner = made[0]!.id;
   mine = await signIn('S-901');
   theirs = await signIn('S-902');
+  // Before any test adds an order, all a shop has open is the seeded day's.
+  setClockForTests(at(WED, '09:00'));
+  for (const [as, shop] of [[mine, MINE], [theirs, THEIRS]] as const) {
+    const open = await list(as, 'open');
+    expect([shop, open.orders.filter((o) => !SEEDED.has(o.id))]).toEqual([shop, []]);
+    seededOpen[shop] = open.openCount;
+  }
 });
 
 // Every test starts on Wed 3 Jun 2026 at 09:00.
@@ -113,7 +126,10 @@ async function list(as: Asker, name: string, cursor?: string) {
   expect(res.status).toBe(200);
   return StoreOrderList.parse(res.body);
 }
-const ids = (answer: StoreOrderList) => answer.orders.map((o) => o.id);
+// The tests' own orders in a list, and the count of the shop's open orders without the seeded day's.
+const own = (answer: StoreOrderList) => answer.orders.filter((o) => !SEEDED.has(o.id));
+const ids = (answer: StoreOrderList) => own(answer).map((o) => o.id);
+const ownOpen = (answer: StoreOrderList) => answer.openCount - seededOpen[answer.outlet.id]!;
 
 describe('the lists of a shop\'s orders', () => {
   it('AC-9 returns only the orders of the manager\'s own outlet', async () => {
@@ -135,7 +151,7 @@ describe('the lists of a shop\'s orders', () => {
       expect(ids(await list(as, 'open'))).toEqual([has.today, has.open]);
       expect(ids(await list(as, 'past'))).toEqual([has.past]);
       // The count is the shop's own too, and so are the shop and the day on top of the list.
-      expect(today.openCount).toBe(2);
+      expect(ownOpen(today)).toBe(2);
       expect(today.outlet).toMatchObject({ id: shop, name: shopRow!.name, brand: 'Fresh', dockType: 'rear_dock' });
       expect(today.today).toBe(WED);
     }
@@ -233,7 +249,7 @@ describe('the lists of a shop\'s orders', () => {
     // An order counts for the day of the sent plan it is on, and until then for the day the shop wanted. So the
     // one wanted on Tuesday that Thursday's plan carries comes with Thursday's, after the chilled one.
     expect(ids(open)).toEqual([stillWaiting, todayChilled, todayDry, thursdayChilled, thursdayDry, friday]);
-    expect(open.orders.map((o) => [o.temp, o.status, o.deliveryDate, o.scheduledDate])).toEqual([
+    expect(own(open).map((o) => [o.temp, o.status, o.deliveryDate, o.scheduledDate])).toEqual([
       ['chilled', 'deferred', TUE, null],
       ['chilled', 'loaded', WED, WED],
       ['dry', 'delivered', WED, WED],
@@ -241,12 +257,14 @@ describe('the lists of a shop\'s orders', () => {
       ['dry', 'planned', TUE, THU],
       ['dry', 'placed', FRI, null],
     ]);
-    expect(open).toMatchObject({ openCount: 6, nextCursor: null, today: WED });
+    expect(open).toMatchObject({ nextCursor: null, today: WED });
+    expect(ownOpen(open)).toBe(6);
 
     // The count of open orders comes with every list.
-    expect((await list(mine, 'today')).openCount).toBe(6);
-    expect((await list(mine, 'past')).openCount).toBe(6);
-    expect((await list(theirs, 'open'))).toMatchObject({ orders: [], openCount: 0 });
+    expect(ownOpen(await list(mine, 'today'))).toBe(6);
+    expect(ownOpen(await list(mine, 'past'))).toBe(6);
+    const theirsOpen = await list(theirs, 'open');
+    expect([ids(theirsOpen), ownOpen(theirsOpen)]).toEqual([[], 0]);
   });
 
   it('AC-26 lists received orders newest day first, 20 at a time, and the next page continues with no order repeated or missed', async () => {
@@ -320,7 +338,7 @@ describe('the lists of a shop\'s orders', () => {
     await plan(THU, { status: 'draft', leavesOut: { [waitedTwice]: 'Still being planned.' } });
 
     const open = await list(mine, 'open');
-    expect(open.orders.map((o) => [o.id, o.status, o.deliveryDate, o.deferralReason])).toEqual([
+    expect(own(open).map((o) => [o.id, o.status, o.deliveryDate, o.deferralReason])).toEqual([
       [waitedTwice, 'deferred', MON, 'No fridge truck was left for Kandy. Two were in the workshop.'],
       [waitedOnce, 'deferred', TUE, 'The fridge van was full.'],
       // The reason is only set on an order that is waiting now. This one waited on Monday and is planned.

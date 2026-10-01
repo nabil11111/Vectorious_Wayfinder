@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { db, pool } from './client';
 import { seedDemoAccounts } from './demo-accounts';
-import { seedDemoDay } from './demo-day';
+import { addKandysDay, seedDemoDay } from './demo-day';
 import { DEMO_USERS, PRODUCTS } from './fixtures';
 import * as s from './schema';
 
@@ -100,6 +100,8 @@ if (accounts.added || accounts.filled) logger.info(accounts, 'demo accounts give
 
 // In demo mode: the app's clock, and the delivery day the walkthrough runs on. Written once (spec 008).
 if (await seedDemoDay()) logger.info('demo day written');
+// A day written before spec 020 has no Kandy orders. They are added once, and nothing that is there is touched.
+if (await addKandysDay()) logger.info('Kandy\'s orders added to the demo day');
 
 logger.info({ outlets: outletRows.length, vehicles: vehicleRows.length, users: DEMO_USERS.length }, 'seed done');
 await pool.end();
