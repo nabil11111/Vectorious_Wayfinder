@@ -30,6 +30,17 @@ const reply = (answer: Answer) => {
 };
 const refusal = (status: number, code: string, message: string): Answer => ({ status, body: { error: { code, message } } });
 const answerOf = (own: Own | Promise<Own> | (() => Own) | undefined) => (typeof own === 'function' ? own() : own);
+// A request's own answer, unless the request is aborted first: then it fails as fetch does.
+function unlessAborted(own: Own | Promise<Own> | (() => Own) | undefined, signal: AbortSignal | null | undefined) {
+  const answer = answerOf(own);
+  if (!signal) return answer;
+  const aborted = new Promise<never>((_, reject) => {
+    const fail = () => reject(new DOMException('The operation was aborted.', 'AbortError'));
+    if (signal.aborted) fail();
+    else signal.addEventListener('abort', fail, { once: true });
+  });
+  return Promise.race([answer, aborted]);
+}
 
 // The shop's next order as the API keeps it: the draft's quantities, note and refs, and what is placed for Thursday.
 // A save or a place can be answered otherwise, or held until the test lets it go.
@@ -115,7 +126,7 @@ class Server {
       this.log.push('PUT draft');
       const body = JSON.parse(String(init.body)) as SaveDraftRequest;
       this.saves.push(body);
-      const own = await answerOf(this.saveAnswers.shift());
+      const own = await unlessAborted(this.saveAnswers.shift(), init.signal);
       if (own && own !== 'usual') return reply(own);
       if (!this.sameRefs(body.refs)) return reply(refusal(409, 'stale', 'This order was changed somewhere else.'));
       this.write(Object.fromEntries(body.lines.map((line) => [line.productId, line.quantity])), body.driverNote);
@@ -125,7 +136,7 @@ class Server {
       this.log.push('POST place');
       const body = JSON.parse(String(init.body)) as PlaceOrdersRequest;
       this.places.push(body);
-      const own = await answerOf(this.placeAnswers.shift());
+      const own = await unlessAborted(this.placeAnswers.shift(), init.signal);
       if (own && own !== 'usual') return reply(own);
       const named = [body.refs.chilled?.id, body.refs.dry?.id].filter(Boolean);
       const already = this.placed.filter((order) => named.includes(order.id));
@@ -154,9 +165,9 @@ const signOut = (qc: QueryClient) => new MutationObserver(qc, logoutMutation(qc)
 // The form as the page opens it: on screen, for Nadeesha, with what the server holds. The screen is every patch the
 // form told it, merged.
 const open: { qc: QueryClient; form: DraftForm }[] = [];
-function openForm(server: Server) {
+function openForm(server: Server, me: Me = NADEESHA) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  qc.setQueryData(meKey, NADEESHA);
+  qc.setQueryData(meKey, me);
   const next = server.next();
   qc.setQueryData<StoreNextOrder>(nextOrderKey, next);
   const screen: Partial<Screen> = {};
@@ -587,5 +598,53 @@ describe('Q-04 a sign-out never waits on an answer that does not come', () => {
     expect(server.log).toEqual(['PUT draft', 'POST logout', 'POST logout']);
     save.release('no signal');
     await after(0);
+  });
+});
+
+describe('Q-04 a request the sign-out stopped waiting for is cut off', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  // The next store manager signs in on the same page, with no reload, and orders.
+  async function nextManagerOrders() {
+    const { form } = openForm(server, { ...NADEESHA, id: 'ishara', username: 'ishara' });
+    form.setQuantity(DRY.id, 5);
+    await after(600);
+    return form;
+  }
+
+  it('aborts a save that never answers at the deadline, so the next shop’s orders go through', async () => {
+    server = new Server({ [DRY.id]: 2 });
+    const { qc, form } = openForm(server);
+    server.saveAnswers.push(held().answer);
+    form.typeQuantity(CHILLED.id, '10');
+    const signingOut = signOut(qc);
+    await after(5000);
+    await signingOut;
+    expect(server.log).toEqual(['PUT draft', 'POST logout']);
+    // The abandoned form neither goes on nor tries again.
+    await after(60_000);
+    expect(server.log).toEqual(['PUT draft', 'POST logout']);
+    await nextManagerOrders();
+    expect(server.log).toEqual(['PUT draft', 'POST logout', 'PUT draft']);
+    expect(server.quantities).toEqual({ [DRY.id]: 5 });
+  });
+
+  it('aborts a place that never answers at the deadline, so the next shop’s orders go through', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { qc, form } = openForm(server);
+    server.placeAnswers.push(held().answer);
+    const placing = form.place();
+    await after(0);
+    const signingOut = signOut(qc);
+    await after(5000);
+    await signingOut;
+    await placing;
+    expect(server.log).toEqual(['POST place', 'POST logout']);
+    await after(60_000);
+    expect(server.log).toEqual(['POST place', 'POST logout']);
+    await nextManagerOrders();
+    expect(server.log).toEqual(['POST place', 'POST logout', 'PUT draft']);
   });
 });
