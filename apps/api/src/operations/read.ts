@@ -78,9 +78,10 @@ async function operationsDayOf(tx: Tx, caller: DepotCaller): Promise<OperationsD
         arrivedAfterWindow: fact.arrivedAt === null ? null : fact.arrivedAt > windowClose, figures: figures.byStop.find(row => row.stopId === stop.id)!, issueIds: ownIssues.filter(issue => issue.stop.id === stop.id).map(issue => issue.id) };
     });
     const arrivals = new Map(stopDetails.map(stop => [stop.id, stop.plannedArrival]));
-    return { ...base, detailRecorded: true, brand: facts.brand, district: facts.district, trip: facts, figures, onSoFar: dock.find(row => row.tripId === trip.id)?.on ?? null,
+    const atDock = dock.find(row => row.tripId === trip.id);
+    return { ...base, detailRecorded: true, brand: facts.brand, district: facts.district, trip: facts, figures, onSoFar: atDock?.on ?? null,
       lastReportAt: trip.lastEventAt?.toISOString() ?? null, schedule: { leavesAt: facts.leavesAt, backAt: facts.backBy }, stopDetails,
-      attention: attentionOf(facts, arrivals, readAt), outRow: trip.status === 'out' ? outRowOf(facts, arrivals, ownIssues, readAt) : null };
+      attention: attentionOf(facts, arrivals, readAt, atDock ? { on: atDock.on.units, units: atDock.units } : null), outRow: trip.status === 'out' ? outRowOf(facts, arrivals, ownIssues, readAt) : null };
   });
   const current = shown.filter(row => row.date === day), out = shown.filter(row => row.status === 'out');
   const timeline = (date: string, section: OperationsTrip[]) => timelineOf(date, section.flatMap(row => row.detailRecorded ? [row.schedule.leavesAt, row.schedule.backAt,

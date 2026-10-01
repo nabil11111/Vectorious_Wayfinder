@@ -24,15 +24,22 @@ export const OperationsFigures = OperationsQuantities.extend({
   stops: Count, stopsDone: Count, byStop: z.array(OperationsStopFigures), byTemp: ByTemp, next: DriverStop.nullable(),
 });
 export type OperationsFigures = z.infer<typeof OperationsFigures>;
+// A trip past its planned leave and not out says what the dock recorded, in the server's words (rule 4, Q-24): never
+// loaded, "Not loaded · planned 03:30" and "still at the dock"; loading, "Still loading · 120 of 437 on · planned 03:30"
+// and "still at the dock"; ready, "Departure not reported · planned 03:30" and "watching". `sentence` is the row's
+// sentence and `word` its short status.
+const Said = { sentence: z.string(), word: z.string() };
+const NotLoaded = z.object({ kind: z.literal('not_loaded'), plannedAt: Moment, ...Said });
+const StillLoading = z.object({ kind: z.literal('still_loading'), plannedAt: Moment, on: Count, units: Count, ...Said });
+const DepartureUnreported = z.object({ kind: z.literal('departure_unreported'), plannedAt: Moment, ...Said });
+const ArrivalUnreported = z.object({ kind: z.literal('arrival_unreported'), stopId: z.uuid(), plannedAt: Moment });
+const RetryRequested = z.object({ kind: z.literal('retry_requested'), stopId: z.uuid(), requestedAt: Moment });
 export const TripAttention = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('none') }),
-  z.object({ kind: z.literal('departure_unreported'), plannedAt: Moment }),
-  z.object({ kind: z.literal('arrival_unreported'), stopId: z.uuid(), plannedAt: Moment }),
-  z.object({ kind: z.literal('retry_requested'), stopId: z.uuid(), requestedAt: Moment }),
+  z.object({ kind: z.literal('none') }), NotLoaded, StillLoading, DepartureUnreported, ArrivalUnreported, RetryRequested,
 ]);
 export type TripAttention = z.infer<typeof TripAttention>;
 export const OperationsStatus = z.discriminatedUnion('kind', [
-  TripAttention.options[1], TripAttention.options[2], TripAttention.options[3],
+  NotLoaded, StillLoading, DepartureUnreported, ArrivalUnreported, RetryRequested,
   z.object({ kind: z.literal('open_problem'), issueId: z.uuid(), issueKind: IssueKind, summary: z.string(), raisedAt: Moment }),
   z.object({ kind: z.literal('at_stop'), stopId: z.uuid(), shopName: z.string(), arrivedAt: Moment }),
   z.object({ kind: z.literal('returning') }), z.object({ kind: z.literal('back'), backAt: Moment }),

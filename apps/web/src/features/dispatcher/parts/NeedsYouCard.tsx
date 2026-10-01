@@ -4,10 +4,10 @@ import type { Issue, IssueList, OperationsDay } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ICON, problemIcon } from '@/features/live/parts/icons';
-import { allTrips, isRecorded, type RecordedTrip } from '@/features/live/parts/rows';
+import { allTrips, isRecorded, isWatched, type RecordedTrip } from '@/features/live/parts/rows';
 import { CARD } from '@/features/live/parts/ui';
 import { openOf } from '@/features/live/sums';
-import { NOTHING_NEEDS_YOU, NO_NEXT_DAY, driverIssueTitle, nextRunTitle, ordersClose } from '@/features/live/words';
+import { NOTHING_NEEDS_YOU, NO_NEXT_DAY, driverIssueTitle, nextRunTitle, ordersClose, statusSentence } from '@/features/live/words';
 import { clockTime, countOf, issueTitle, truckName, whole } from '@/features/loader/words';
 import { inkButton, orangeButton, plainButton } from '@/features/plan/parts/look';
 import { StaleNotice } from '@/features/store/parts/LoadError';
@@ -66,10 +66,11 @@ export function NeedsYouCard({ parts, both }: { parts: DashboardPart[]; both: bo
   );
 }
 
-// The trucks whose departure or arrival report is missing and that have no open problem.
+// The trucks past their leaving time and not out, or past a stop's planned arrival with no arrival, that have no open
+// problem.
 const watchingOf = (day: OperationsDay) => allTrips(day).filter(isRecorded)
-  .filter((trip) => trip.openIssueIds.length === 0 && (trip.attention.kind === 'departure_unreported' || trip.attention.kind === 'arrival_unreported'));
-const plannedOf = (trip: RecordedTrip) => (trip.attention.kind === 'departure_unreported' || trip.attention.kind === 'arrival_unreported' ? trip.attention.plannedAt : '');
+  .filter((trip) => trip.openIssueIds.length === 0 && isWatched(trip.attention));
+const plannedOf = (trip: RecordedTrip) => (isWatched(trip.attention) ? trip.attention.plannedAt : '');
 const ROW = 'flex flex-col gap-3 rounded-[14px] border px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4 lg:px-5';
 const BUTTON = 'h-10 w-full shrink-0 text-[13px] sm:w-[150px]';
 // A row's depot, on both depots together, at the head of its second line.
@@ -92,18 +93,21 @@ function ProblemRow({ issue, depot, first }: { issue: Issue; depot: string | nul
   );
 }
 
-// A missing report (rule 4): "Watching · VEH035 · Colombo · departure not reported", in grey, as the frame's row.
+// A truck to watch (rule 4), in grey, as the frame's row, with the sentence its row on Live day has: "Watching · VEH035 ·
+// Colombo · Departure not reported · planned 04:36", or past its leaving time at the dock "Watching · VEH006 · Galle ·
+// Not loaded · planned 03:30", which says it is still at the dock under it (Q-24).
 function WatchingRow({ trip, depot }: { trip: RecordedTrip; depot: string | null }) {
   const attention = trip.attention as Extract<RecordedTrip['attention'], { plannedAt: string }>;
-  const what = attention.kind === 'departure_unreported' ? 'departure not reported' : 'arrival not reported';
+  const sentence = statusSentence(attention, null);
+  const where = 'word' in attention && attention.word !== 'watching' ? attention.word : null;
   const last = trip.lastReportAt ? `last report ${clockTime(trip.lastReportAt)}` : 'no report yet';
   return (
     <li className={ROW}>
       <div className="flex min-w-0 flex-1 items-center gap-3.5">
         <img src={ICON.watching} alt="" className="size-8 shrink-0 object-contain" />
         <div className="min-w-0">
-          <p className="text-[15px] leading-5 font-semibold text-muted-foreground">Watching · {truckName(trip)} · {trip.district} · {what}</p>
-          <p className="mt-1 text-xs leading-4 text-muted-foreground"><Depot depot={depot} />{[trip.driver?.name, `planned ${clockTime(attention.plannedAt)}`, last].filter(Boolean).join(' · ')}</p>
+          <p className="text-[15px] leading-5 font-semibold text-muted-foreground">Watching · {truckName(trip)} · {trip.district} · {sentence}</p>
+          <p className="mt-1 text-xs leading-4 text-muted-foreground"><Depot depot={depot} />{[trip.driver?.name, where, last].filter(Boolean).join(' · ')}</p>
         </div>
       </div>
       <Link to={`/dispatcher/live?trip=${encodeURIComponent(trip.tripId)}`} className={plainButton(BUTTON)}>Open trip</Link>

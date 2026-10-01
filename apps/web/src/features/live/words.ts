@@ -150,7 +150,6 @@ export function brandLine(total: { vehiclesTotal: number; tripsTotal: number; st
 }
 
 // Rule 4's sentences: what was recorded, or which report is missing. Nothing predicts a time or a place.
-export const departureNotReported = (plannedAt: string) => `Departure not reported · planned ${clockTime(plannedAt)}`;
 export const arrivalNotReported = (plannedAt: string) => `Arrival not reported · planned ${clockTime(plannedAt)}`;
 export const retryRequested = (requestedAt: string) => `Retry requested ${clockTime(requestedAt)}`;
 export const atShop = (shop: string, arrivedAt: string) => `At ${shop} · arrived ${clockTime(arrivedAt)}`;
@@ -162,7 +161,8 @@ export const ARRIVED_AFTER_WINDOW = 'Arrived after window';
 export function statusSentence(status: OperationsStatus, problem: string | null) {
   switch (status.kind) {
     case 'open_problem': return problem ?? status.summary;
-    case 'departure_unreported': return departureNotReported(status.plannedAt);
+    // A trip past its leaving time and not out, as the server words it (Q-24).
+    case 'not_loaded': case 'still_loading': case 'departure_unreported': return status.sentence;
     case 'arrival_unreported': return arrivalNotReported(status.plannedAt);
     case 'retry_requested': return retryRequested(status.requestedAt);
     case 'at_stop': return atShop(status.shopName, status.arrivedAt);

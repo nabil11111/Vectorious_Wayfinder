@@ -339,7 +339,10 @@ Anything we built differently from our Designathon submission, and why.
 - **One answer per problem:** "Decide" opens its card, where the design also draws Warn, Skip, Credit and Resend, and an
   answered row reads "Decided", never "Warned". There is no Undo.
 - **Recorded times only (D-68):** the trucks table shows the planned arrival and the planned return, never an estimate,
-  and the tiles say "stops delivered · partial or closed", "fuel · litres this week" and "deferred on this plan".
+  and the tiles say "stops delivered · partial or closed", "fuel · litres this week" and "deferred on this plan". A
+  truck past its leaving time says what the dock recorded, "Not loaded · planned 03:30 · still at the dock" or "Still
+  loading · 120 of 437 on", and only a ready one "Departure not reported", so the dispatcher sees which trucks are
+  still on the dock.
 - **Every open problem shows in full** in Needs you, as spec 012 built it, not one focused card with short "Next" rows.
 - **Events say "· photo"** without opening it, and the Trip column shows the trip's number only.
 - **Between 1024 and 1279 wide** the tiles take three columns and the trucks table folds the driver and trip under the

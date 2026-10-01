@@ -125,7 +125,11 @@ five orders, 118 cartons ordered, 117 loaded and one dry carton short. Times are
    or the current time outside it. A label includes the date across midnight. The now line is the app time only when
    it is on the row's date. Never animate a truck between stops or fill a line up to now as evidence of travel.
 
-   A trip not yet out after its planned leave says "Departure not reported · planned 04:36". For an out trip, use
+   A trip not yet out after its planned leave says what the dock recorded, in the server's words, a sentence and a
+   short word (Q-24): a trip never loaded "Not loaded · planned 03:30" and "still at the dock", a trip being loaded
+   "Still loading · 120 of 437 on · planned 03:30" (on so far of its units) and "still at the dock", and only a ready
+   trip "Departure not reported · planned 04:36" and "watching", since it alone may have left without reporting it. The
+   dashboard's Watching row carries the same sentence: "Watching · VEH006 · Galle · Not loaded · planned 03:30". For an out trip, use
    013's `nextStop`, including its retry order: an unfinished next stop past planned arrival with no arrival says
    "Arrival not reported · planned 05:00". These are amber Watching rows, not new issues or inferred lateness. Once a
    stop is sent back, say "Retry requested [time]"; the old planned arrival is not a new overdue target. An arrived
@@ -241,7 +245,7 @@ branch, not on fabricated API data. AC-19 was removed after review; the other cr
 - [ ] **AC-13** When another depot has a trip and issue, the system shall exclude them from every operations count, row and event.
 - [ ] **AC-14** When a read races a demo reset, the system shall finish both without deadlock and return one whole generation, with no old event or mixed trip/line membership.
 - [ ] **AC-15** When a fixture has one vehicle on two trips in different districts of the same brand, a mixed-brand trip and a stop completed with zero goods loaded, the system shall return distinct brand as well as district totals, count that vehicle once in its brand, list each trip once, exclude the empty delivery from delivered stops and exclude split parents from demand.
-- [ ] **AC-16** When the next report is missing past its sent time, the system shall produce rule 4's unreported departure/arrival attention, stop doing so on arrival, and show Retry requested instead for a reopened stop, without an ETA or offline claim.
+- [ ] **AC-16** When the next report is missing past its sent time, the system shall produce rule 4's attention, "Not loaded", "Still loading" with what is on so far, or "Departure not reported" by what the dock recorded, or an unreported arrival, stop doing so on arrival, and show Retry requested instead for a reopened stop, without an ETA or offline claim.
 - [ ] **AC-17** When the walkthrough's records are read twice, including a repeated driver write, a late-synced refusal and a joined 015 receipt problem, the system shall return rule 7's ordered, unique events by problem kind at their business times, with only a photo marker and the same result on both reads.
 - [ ] **AC-18** When more than 50 scoped events exist and a reset follows, the system shall return the newest 50 with the truncated flag before reset and none of those old records after reset, despite the surviving audit log.
 - [ ] **AC-20** When a loader reads a sent or resent publication, the system shall give its demo generation, publication time and publisher from that exact plan.sent revision, never its original creator or audit wall time.
