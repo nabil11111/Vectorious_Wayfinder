@@ -44,7 +44,7 @@ export async function readBoard(tx: Tx, depotId: string, date: string | null, mo
   const blank: PlanBoard = {
     depot: depotId, demoDay: clock.demoDay, day: null,
     plan: { ...emptyDraft(), id: null, revision: 0, status: 'draft', savedAt: null, sentAt: null, canUnsend: false },
-    dropped: [], check: null, orders: [], shops: [], vehicles: [], drivers: [], figures: null, counts: null,
+    dropped: [], check: null, orders: [], shops: [], vehicles: [], drivers: [], figures: null, counts: null, suggestion: null,
   };
   if (!date) return { board: blank, input: null };
   const cutoffDate = days.filter((day) => day < date).at(-1);
