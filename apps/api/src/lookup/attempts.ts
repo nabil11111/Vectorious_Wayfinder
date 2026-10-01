@@ -1,4 +1,4 @@
-import { ClosedReason, type HistoryClosedAttempt, type HistoryProblem, type Issue, type LookupPhoto } from '@wayfinder/contracts';
+import { ClosedReason, type HistoryClosedAttempt, type HistoryLine, type HistoryProblem, type Issue, type LookupPhoto } from '@wayfinder/contracts';
 import type { photos } from '../db/schema';
 
 export type PhotoFact = Pick<typeof photos.$inferSelect, 'stopId' | 'issueId' | 'takenAt'>;
@@ -7,9 +7,16 @@ export function photoOf(row: PhotoFact | undefined): LookupPhoto | null {
   return row.issueId === null ? { kind: 'proof', stopId: row.stopId, takenAt: row.takenAt.toISOString() }
     : { kind: 'issue', issueId: row.issueId, takenAt: row.takenAt.toISOString() };
 }
-export function problemOf(problem: Issue, pictures: PhotoFact[]): HistoryProblem {
+export function problemOf(problem: Issue, stopLines: HistoryLine[], pictures: PhotoFact[]): HistoryProblem {
   const { trip: _trip, stop, ...facts } = problem;
-  return { ...facts, stopId: stop.id, photo: photoOf(pictures.find(row => row.issueId === problem.id)) };
+  const lines = problem.lines.map(line => {
+    // A closed issue keeps its own attempt, even after a successful retry of this stop.
+    if (problem.kind === 'closed') return line;
+    const own = stopLines.find(row => row.lineId === line.lineId);
+    if (!own) throw new Error(`Problem ${problem.id} has no history line ${line.lineId}.`);
+    return { ...line, loaded: own.loaded, delivered: own.delivered, received: own.received };
+  });
+  return { ...facts, lines, stopId: stop.id, photo: photoOf(pictures.find(row => row.issueId === problem.id)) };
 }
 export function attemptsOf(problems: Issue[], pictures: PhotoFact[]): HistoryClosedAttempt[] {
   return problems.filter(problem => problem.kind === 'closed').map(problem => ({

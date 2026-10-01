@@ -88,7 +88,7 @@ export function getLookupHistory(caller: DepotCaller, query: LookupHistoryQuery)
           loadedAt: member.stop.loadedAt?.toISOString() ?? null, arrivedAt: stop.arrivedAt, doneAt: stop.doneAt, outcome: stop.outcome, lines, stages,
           flags: { late, short: lines.some(line => (line.depotShort ?? 0) > 0 || (line.refused ?? 0) > 0 || (line.receiptShort ?? 0) > 0),
             returned: ownProblems.some(row => (row.kind === 'closed' && row.decision === 'bring_back') || (row.kind === 'refused' && ['bring_back', 'send_replacements'].includes(row.decision ?? ''))) },
-          receipt, proof: photoOf(pictures.find(row => row.stopId === stop.id && row.issueId === null)), problems: ownProblems.map(row => problemOf(row, pictures)), attempts: attemptsOf(ownProblems, pictures) };
+          receipt, proof: photoOf(pictures.find(row => row.stopId === stop.id && row.issueId === null)), problems: ownProblems.map(row => problemOf(row, lines, pictures)), attempts: attemptsOf(ownProblems, pictures) };
       });
       const ownBrands = [...new Set(shownStops.map(row => row.outlet.brand))].sort((a, b) => brands.indexOf(a) - brands.indexOf(b));
       return { tripId: trip.id, planId: plan.id, date: plan.date, vehicleId: vehicle.id, vehicleType: vehicle.type, vehicleTemp: vehicle.temp, archived: vehicle.archivedAt !== null,
