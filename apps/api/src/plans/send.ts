@@ -29,6 +29,12 @@ export async function sendPlan(caller: Planner, date: string, body: SendPlanRequ
     const check = board.check;
     if (!check) throw new Error('A draft has no plan check.');
     if (!check.ok) throw new HttpError(409, 'not_ready', 'This plan still has checks to resolve.', { blocks: check.problems.filter((p) => p.level === 'block') });
+    // The planner's decisions are the dispatcher's to accept, and a warning is not consent (spec 014, D-54).
+    const open = board.suggestion?.decisions.filter((d) => d.open).map((d) => d.key) ?? [];
+    if (open.length) {
+      const one = open.length === 1;
+      throw new HttpError(409, 'decisions_open', `${open.length} of the planner's decisions ${one ? 'is' : 'are'} still open. Accept ${one ? 'it' : 'them'} before sending.`, { keys: open });
+    }
     for (const originalId of new Set(board.orders.flatMap((o) => o.splitFrom ? [o.splitFrom] : []))) {
       if (!await partsAddUp(tx, originalId)) throw new HttpError(409, 'split_mismatch', 'The split parts no longer add up to the original order.', { orderId: originalId });
     }
