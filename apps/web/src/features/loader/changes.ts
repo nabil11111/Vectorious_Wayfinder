@@ -103,6 +103,13 @@ export function comparePublications(before: Publication, after: Publication): Ch
 // The trucks on the current list that a row names: they get the changed chip. The bell counts the rows.
 export const changedKeys = (rows: ChangeRow[]) => new Set(rows.flatMap((row) => (row.after ? [truckKey(row.after)] : [])));
 
+// The chips of the list on screen: only while that list is the publication the comparison was made for.
+export function chipsOf(snapshot: Snapshot, day: LoadingDay | undefined) {
+  const kept = snapshot.kept;
+  if (!kept?.changes || !day?.plan || day.plan.id !== kept.latest.planId || day.plan.revision !== kept.latest.revision) return new Set<string>();
+  return changedKeys(kept.changes);
+}
+
 // ── What this tab keeps ──────────────────────────────────────────────────────────────────────────────────────────
 const PREFIX = 'wayfinder-plan-changes';
 export interface Scope { account: string; depot: string; demoDay: number; day: string }

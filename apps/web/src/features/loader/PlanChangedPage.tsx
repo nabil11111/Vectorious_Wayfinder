@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { orangeButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
 import {
-  NONE_KEPT, NOT_KEPT, SENT_AGAIN, changeTitle, changedKeys, closeChanges, leavesLine, markChangesOpened, planChangedLine, stopsLine, usePlanChanges,
+  NONE_KEPT, NOT_KEPT, SENT_AGAIN, changeTitle, chipsOf, closeChanges, leavesLine, markChangesOpened, planChangedLine, stopsLine, usePlanChanges,
   type ChangeDetail, type ChangeRow, type KeptTrip,
 } from './changes';
 import { useLoadingDay } from './loading';
@@ -55,7 +55,7 @@ export function PlanChangedPage() {
             : rows.map((row) => <ChangeCard key={`${row.kind}:${row.before ? `${row.before.vehicleId}#${row.before.tripNo}` : ''}:${row.after ? `${row.after.vehicleId}#${row.after.tripNo}` : ''}`} row={row} />)}
         </div>
         <div className="flex flex-col gap-y-4 lg:min-h-[calc(100dvh-170px)]">
-          <NextList trucks={trucks} from={1} changed={changedKeys(rows)} className="lg:-mt-1" />
+          <NextList trucks={trucks} from={1} changed={chipsOf({ kept, failed }, query.data)} className="lg:-mt-1" />
           <Button className={orangeButton('h-16 w-full rounded-[12px] text-lg lg:mt-auto')} onClick={gotIt}>Got it</Button>
         </div>
       </div>

@@ -4,7 +4,7 @@ import type { LoadingDay, LoadingTruck } from '@wayfinder/contracts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { useAppClock } from '@/lib/clock';
-import { NOT_KEPT, SEE_CHANGES, WITHDRAWN, changedKeys, markChangesOpened, noticeOf, planChangedLine, truckKey, usePlanChanges } from './changes';
+import { NOT_KEPT, SEE_CHANGES, WITHDRAWN, chipsOf, markChangesOpened, noticeOf, planChangedLine, truckKey, usePlanChanges } from './changes';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { LoadFailed } from './parts/LoadFailed';
 import { DayNote, NextOutCard } from './parts/NextOutCard';
@@ -48,7 +48,7 @@ function Trucks({ day, writes, stale }: { day: LoadingDay; writes: LoaderWrites;
   // publication opens its notice once, never over a write on its way. The changed chips stay after Got it.
   const changes = usePlanChanges();
   const notice = noticeOf(changes, day);
-  const changed = changedKeys(changes.kept?.changes ?? []);
+  const changed = chipsOf(changes, day);
   const unopened = (notice === 'changed' || notice === 'unchanged') && !changes.kept?.opened;
   useEffect(() => {
     if (!unopened || busy) return;
