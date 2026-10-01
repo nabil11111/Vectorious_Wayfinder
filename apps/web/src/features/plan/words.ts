@@ -137,6 +137,9 @@ export function reasonLine(length: number, refused: boolean): { words: string; r
 // A problem in one line: its sentence and, when there is one, what would clear it.
 export const problemLine = (problem: Problem) => [problem.message, problem.fix].filter(Boolean).join(' ');
 
+// A group's ⋮ menu: "Defer all 3", and "Defer it" for a group of one order (L-08).
+export const deferGroup = (n: number) => (n === 1 ? 'Defer it' : `Defer all ${WHOLE.format(n)}`);
+
 // "1 order", "2 orders".
 export const countOf = (n: number, one: string, many = `${one}s`) => `${WHOLE.format(n)} ${n === 1 ? one : many}`;
 
