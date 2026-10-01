@@ -3,7 +3,6 @@ import {
   closestCenter, closestCorners, getFirstCollision, KeyboardCode, pointerWithin, useDroppable,
   type Active, type Announcements, type CollisionDetection, type DraggableSyntheticListeners, type KeyboardCoordinateGetter, type Over, type ScreenReaderInstructions,
 } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { DraftPlan } from '@wayfinder/contracts';
 import { editable, type BoardScreen, type Undo } from '../board';
 import { canLand, dropOf, type Dragged, type DragData, type DropData, type Landing } from './drops';
@@ -52,11 +51,12 @@ export const landingCollision: CollisionDetection = (args) => (args.pointerCoord
 
 const ARROWS: string[] = [KeyboardCode.Down, KeyboardCode.Right, KeyboardCode.Up, KeyboardCode.Left];
 
-// The arrow keys move a picked-up stop along its list, as dnd-kit's sortable lists do, and a picked-up order, which is
-// not itself a place to land, to the nearest place to land in the arrow's direction.
+// The arrow keys move a picked-up order or stop to the nearest place to land in the arrow's direction: the next stop
+// along the list, a trip's card, Unplanned orders. The drag is centred on that place, so the collision the board then
+// takes (the closest centre) picks the same place, however tall the dragged row is, such as a stop with its split form
+// open.
 export const boardKeyboardCoordinates: KeyboardCoordinateGetter = (event, args) => {
   const { active, collisionRect, droppableRects, droppableContainers, over } = args.context;
-  if (active && droppableContainers.get(active.id)) return sortableKeyboardCoordinates(event, args);
   if (!ARROWS.includes(event.code)) return undefined;
   event.preventDefault();
   if (!active || !collisionRect) return undefined;
@@ -72,7 +72,7 @@ export const boardKeyboardCoordinates: KeyboardCoordinateGetter = (event, args) 
   let id = getFirstCollision(collisions, 'id');
   if (id === over?.id && collisions.length > 1) id = collisions[1]!.id;
   const rect = id == null ? undefined : droppableRects.get(id);
-  return rect ? { x: rect.left, y: rect.top } : undefined;
+  return rect ? { x: rect.left + (rect.width - collisionRect.width) / 2, y: rect.top + (rect.height - collisionRect.height) / 2 } : undefined;
 };
 
 // Each step of a drag in words, for a screen reader.
