@@ -1,7 +1,8 @@
 import { CrewList, PlanBoard, type Crew, type DraftTrip } from '@wayfinder/contracts';
 import { expect, it } from 'vitest';
 import { planOf, startTrip, swapTruck } from '../draft';
-import { crewChange, crewRows, pickOrders, type Pick } from './crews';
+import { crewsKey } from '../board';
+import { crewChange, crewRows, crewsFor, pickOrders, type Pick } from './crews';
 import { indexOf } from './lookup';
 
 // Spec 026's crew picker, without the screen: its rows as the crews read gives them, what each says before the press
@@ -97,7 +98,8 @@ it('rule 1 a pick is one change of the draft with one Undo, naming the crew', ()
     key: 'VEH035-1', undo: { before: DRAFT, line: 'Fresh Dehiwala added to Dilshan\'s reefer van. VEH001 has no driver now.' },
   });
   expect(crewChange({ kind: 'swap', key: 'VEH011-1' }, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toEqual({
-    ...swapTruck(DRAFT, 'VEH011-1', { vehicleId: 'VEH035', driverId: WASANTHA })!, undo: { before: DRAFT, line: 'Trip moved to Wasantha\'s reefer van', tripKey: 'VEH035-1' },
+    ...swapTruck(DRAFT, 'VEH011-1', { vehicleId: 'VEH035', driverId: WASANTHA })!, // Chaminda drove the trip, and Wasantha drives it now, so the line says Chaminda is off his truck.
+    undo: { before: DRAFT, line: 'Trip moved to Wasantha\'s reefer van. Chaminda is off VEH011 now.', tripKey: 'VEH035-1' },
   });
   // A second trip says so.
   expect(crewChange(button, DRAFT, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX)).toMatchObject({ key: 'VEH011-2', undo: { line: 'Second trip started on Chaminda\'s dry truck' } });
@@ -109,4 +111,24 @@ it('rule 1 picks for the group\'s orders, the dropped ones, or the trip\'s, and 
   const full = { ...DRAFT, trips: [...DRAFT.trips, trip('VEH011', CHAMINDA, 'OUT006', uuid(7), 2)] };
   expect(crewChange(DROPPED, full, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX)).toBeNull();
   expect(crewRows({ ...LIST, crews: [crew('VEH011', CHAMINDA)] }, DROPPED, full, INDEX)[0]).toMatchObject({ line: 'on two trips already', disabled: true });
+});
+
+// Review of 026: a crews read is offered only for the draft it was read from, and a pick names every driver it moves.
+it('rule 2 names every driver a pick displaces, the truck\'s own driver too', () => {
+  // A read from before Chaminda took VEH001 and Dilshan moved to VEH002 still offers VEH001 with Dilshan.
+  const now = { ...DRAFT, trips: [trip('VEH001', CHAMINDA, 'OUT006', FORT), trip('VEH002', DILSHAN, 'OUT051', GALLE)] };
+  const old = { ...LIST, crews: [crew('VEH001', DILSHAN)] };
+  expect(crewRows(old, DROPPED, now, INDEX)[0]!.warning)
+    .toBe('Dilshan drives VEH002 now; it will have no driver. Chaminda drives VEH001 now and will be taken off it');
+  expect(crewChange(DROPPED, now, { vehicleId: 'VEH001', driverId: DILSHAN }, INDEX)!.undo.line)
+    .toBe('Fresh Dehiwala added to the second trip of Dilshan\'s reefer truck. VEH002 has no driver now. Chaminda is off VEH001 now.');
+});
+
+it('offers a crews read only while it is for the saved draft on screen, and keys it by the draft\'s revision', () => {
+  expect(crewsKey('2026-06-25', [DEHIWALA], 3)).toEqual(['plans', '2026-06-25', 'crews', DEHIWALA, 3]);
+  expect(crewsFor(LIST, BOARD, DRAFT)).toBe(LIST);
+  // Read at another revision, or with a change on screen not yet saved: none, and the picker says it is finding them.
+  expect(crewsFor({ ...LIST, revision: 2 }, BOARD, DRAFT)).toBeNull();
+  expect(crewsFor(LIST, BOARD, { ...DRAFT, trips: DRAFT.trips.slice(1) })).toBeNull();
+  expect(crewsFor(undefined, BOARD, DRAFT)).toBeNull();
 });
