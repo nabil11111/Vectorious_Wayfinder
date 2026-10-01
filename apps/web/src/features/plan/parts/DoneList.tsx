@@ -7,7 +7,6 @@ import { keyOf, planOf, sameTrip, tripOf, type TripKey } from '../draft';
 import { countOf, figure, hhmm, whole } from '../words';
 import { DepotRow } from './DepotRow';
 import { BoardChange, useLanding } from './dragging';
-import { tripLabel } from './drops';
 import { ICON } from './icons';
 import type { BoardIndex } from './lookup';
 import { toneOf } from './look';
@@ -15,8 +14,8 @@ import { ColumnHead, Figure } from './ui';
 
 const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 
-// The right column (Edit plan, "Done · N trips"): every trip but the open one, a card each with its vehicle,
-// driver, brand and district, its stops and times and figures, opening to its stops. Its title opens the trip.
+// The right column (Edit plan, "Done · N trips"): every trip but the open one, a card each with its truck named by
+// its driver, its brand and district, its stops and times and figures, opening to its stops. Its title opens the trip.
 export function DoneList({ screen, index, openKey, onOpen }: { screen: BoardScreen; index: BoardIndex; openKey: TripKey | null; onOpen: (key: TripKey) => void }) {
   const { draft } = screen;
   const brandOf = (trip: DraftTrip) => (trip.stops[0] ? index.shop(trip.stops[0].outletId)?.brand : undefined);
@@ -46,16 +45,15 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
   const figures = index.figures(trip.vehicleId, trip.tripNo);
   const problems = inStep ? index.problems(trip.vehicleId, trip.tripNo) : [];
   const has = (code: string) => problems.some((problem) => problem.code === code);
-  const vehicle = index.vehicle(trip.vehicleId);
   const driver = index.driver(trip.driverId);
   const shop = trip.stops[0] ? index.shop(trip.stops[0].outletId) : null;
-  // Two lines, as the frame has them: the vehicle and its driver, or "no driver" in the warning colour (spec 022), then
-  // the brand and district.
-  const name = tripLabel(trip);
-  const where = [shop?.brand, shop?.district, vehicle?.type === 'van' && 'van'].filter(Boolean).join(' · ');
-  const title = [name, driver?.name ?? 'no driver', where].filter(Boolean).join(' · ');
+  // Two lines, as the frame has them: the truck named by its driver, "Chaminda · dry truck" (spec 026), or by its kind
+  // and number with "no driver" in the warning colour (spec 022), then the brand and district.
+  const name = index.crew(trip);
+  const where = [shop?.brand, shop?.district].filter(Boolean).join(' · ');
+  const title = [name, !driver && 'no driver', where].filter(Boolean).join(' · ');
   // An order or a stop dropped on the card joins this trip at the end, and the drop's Undo line shows here (spec 023).
-  const { setNodeRef: landingRef, look: landingLook } = useLanding(`card:${key}`, { kind: 'card', tripKey: key }, `${name}'s card`);
+  const { setNodeRef: landingRef, look: landingLook } = useLanding(`card:${key}`, { kind: 'card', tripKey: key }, `the card of ${index.called(trip)}`);
   const change = useContext(BoardChange);
   const undo = screen.undo?.tripKey === key ? screen.undo : null;
 
@@ -63,7 +61,7 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
     <li ref={landingRef} className={cn('border-t py-2.5', landingLook)}>
       <div className="flex items-start gap-2">
         <button type="button" onClick={() => onOpen(key)} className="mr-auto min-w-0 rounded-sm text-left text-xs leading-[17px] font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
-          <span className="block">{name} · {driver ? driver.name : <span className="text-warn-ink">no driver</span>}{where && ' ·'}</span>
+          <span className="block">{name}{!driver && <> · <span className="text-warn-ink">no driver</span></>}{where && ' ·'}</span>
           {where && <span className="block">{where}</span>}
         </button>
         {/* One chevron for both states, turned while the card is open. */}

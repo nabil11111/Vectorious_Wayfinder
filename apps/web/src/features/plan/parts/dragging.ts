@@ -5,7 +5,7 @@ import {
 } from '@dnd-kit/core';
 import type { DraftPlan } from '@wayfinder/contracts';
 import { editable, type BoardScreen, type Undo } from '../board';
-import { canLand, dropOf, type Dragged, type DragData, type DropData, type Landing } from './drops';
+import { canLand, dropOf, type Called, type Dragged, type DragData, type DropData, type Landing } from './drops';
 import type { Pick } from './PickTruck';
 
 // How the plan board's drag and drop runs with dnd-kit (spec 023, D-98): what can move, how a finished drag becomes
@@ -49,9 +49,10 @@ export const landingOf = (over: Over | null) => (over?.data.current as DropData 
 export function landDrop(plan: DraftPlan, dragged: Dragged | undefined, landing: Landing | undefined, apply: {
   change: (next: DraftPlan, undo: Undo) => void;
   start: (pick: Pick) => void;
+  called: Called;
 }) {
   if (!dragged || !landing) return;
-  const drop = dropOf(plan, dragged, landing);
+  const drop = dropOf(plan, dragged, landing, apply.called);
   if (drop?.kind === 'change') apply.change(drop.plan, drop.undo);
   else if (drop?.kind === 'start') apply.start(drop.pick);
 }

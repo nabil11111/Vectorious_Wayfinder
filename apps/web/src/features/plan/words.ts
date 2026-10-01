@@ -42,6 +42,23 @@ export const vehicleKind = (v: Pick<BoardVehicle, 'type' | 'temp'>) =>
 // "reefer 6.8 t · 33.4 m³"
 export const vehicleSize = (v: BoardVehicle) => `${vehicleKind(v)} ${tonnes(v.weightCapKg)} · ${cubic(v.volumeCapM3)}`;
 
+// Trucks named by their drivers (spec 026, D-100). A truck's kind as the checker's sentences call it: "reefer truck",
+// "dry truck", "reefer van" or "van".
+type Truck = Pick<BoardVehicle, 'id' | 'type' | 'temp'>;
+export const truckKind = (v: Pick<BoardVehicle, 'type' | 'temp'>) =>
+  (v.type === 'van' ? (v.temp === 'reefer' ? 'reefer van' : 'van') : v.temp === 'reefer' ? 'reefer truck' : 'dry truck');
+// On the plan board's and View plan's cards and headers: "Chaminda · dry truck", "Chaminda · dry truck · trip 2" for its
+// second trip, or by its kind and number while it has no driver, "dry truck VEH044". No number beside a driver.
+export const crewName = (truck: Truck, driver: string | null, tripNo = 1) =>
+  `${driver ? `${driver} · ${truckKind(truck)}` : `${truckKind(truck)} ${truck.id}`}${tripNo === 2 ? ' · trip 2' : ''}`;
+// In a sentence: "Chaminda's dry truck", "the second trip of Chaminda's dry truck", or "the dry truck VEH044".
+export function truckCalled(truck: Truck, driver: string | null, tripNo = 1) {
+  const called = driver ? `${driver}'s ${truckKind(truck)}` : `the ${truckKind(truck)} ${truck.id}`;
+  return tripNo === 2 ? `the second trip of ${called}` : called;
+}
+// A sentence that starts with a truck: "Chaminda's dry truck leaves early", "The dry truck VEH044 leaves early".
+export const capital = (sentence: string) => sentence.charAt(0).toUpperCase() + sentence.slice(1);
+
 // "Fresh Nugegoda" to "Nugegoda": a group row already says the brand. A shop's name is its brand and then its
 // place (spec 003).
 export const placeOf = (shop: Pick<BoardShop, 'name' | 'brand'>) =>
@@ -117,9 +134,6 @@ export function reasonLine(length: number, refused: boolean): { words: string; r
   return null;
 }
 
-// "VEH004 trip 1", the way the checker names a trip.
-export const tripName = (trip: { vehicleId: string; tripNo: number }) => `${trip.vehicleId} trip ${trip.tripNo}`;
-
 // A problem in one line: its sentence and, when there is one, what would clear it.
 export const problemLine = (problem: Problem) => [problem.message, problem.fix].filter(Boolean).join(' ');
 
@@ -151,11 +165,12 @@ export function replaceLine(orders: number, trips: number, deferred: number) {
 }
 export const KEEP_DRAFT = 'Keep the draft';
 
-// A decision's title by its kind: "VEH002 trip 1 leaves early, at 03:07", "Fresh Dickwella waits again" and "Fresh
-// Pannala would be late, so it waits". shop is the shop of the order the decision is about.
-// An order the board no longer has is called "This order".
-export function decisionTitle(decision: Pick<SuggestionDecision, 'kind' | 'vehicleId' | 'tripNo' | 'leaveAt'>, shop: string | null) {
-  if (decision.kind === 'early_leave') return `${decision.vehicleId} trip ${decision.tripNo} leaves early${decision.leaveAt === null ? '' : `, at ${hhmm(decision.leaveAt)}`}`;
+// A decision's title by its kind: "Chaminda's dry truck leaves early, at 03:07", "Fresh Dickwella waits again" and
+// "Fresh Pannala would be late, so it waits". shop is the shop of the order the decision is about, and truck the trip
+// an early departure is about, in a sentence's words (spec 026). An order the board no longer has is called "This
+// order".
+export function decisionTitle(decision: Pick<SuggestionDecision, 'kind' | 'leaveAt'>, shop: string | null, truck: string | null) {
+  if (decision.kind === 'early_leave') return `${capital(truck ?? 'a trip')} leaves early${decision.leaveAt === null ? '' : `, at ${hhmm(decision.leaveAt)}`}`;
   const who = shop ?? 'This order';
   return decision.kind === 'waited_again' ? `${who} waits again` : `${who} would be late, so it waits`;
 }

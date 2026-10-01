@@ -7,9 +7,11 @@ import { DoneList } from './DoneList';
 import { driverChange, driverRows } from './drivers';
 import { indexOf } from './lookup';
 import { TripPanel } from './TripPanel';
+import { VehicleRow } from './VehicleRow';
+import { decisionTitle } from '../words';
 
 // Spec 022's drivers on the plan board, drawn as the page draws them: Done's cards and the open trip's header name the
-// driver after the vehicle, or say "no driver" in the warning colour (AC-4). The board is made up: VEH004 with
+// truck by its driver (spec 026, AC-3), or by its kind and number with "no driver" in the warning colour (AC-4). The board is made up: VEH004 with
 // Chaminda to a Colombo shop, and VEH002 with nobody to a Galle shop. The driver menu offers a driver who drives
 // another vehicle as a move, which leaves that vehicle with no driver, made as one change of the draft (spec 026, rule 2).
 
@@ -51,21 +53,50 @@ const tripPanel = (board: PlanBoard, vehicleId: string) => renderToStaticMarkup(
   />,
 );
 
-it('AC-4 Done\'s cards name the driver after the vehicle, as the frame does: "VEH004 · Chaminda · Fresh · Colombo"', () => {
-  expect(doneList(BOARD)).toContain('<span class="block">VEH004 · Chaminda ·</span><span class="block">Fresh · Colombo</span>');
+it('spec 026 AC-3 Done\'s cards name the truck by its driver, with no number: "Chaminda · reefer truck · Fresh · Colombo"', () => {
+  expect(doneList(BOARD)).toContain('<span class="block">Chaminda · reefer truck ·</span><span class="block">Fresh · Colombo</span>');
+  // A second trip says so.
+  const second = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
+  expect(doneList(second)).toContain('<span class="block">Chaminda · reefer truck · trip 2 ·</span><span class="block">Fresh · Galle</span>');
+  expect(doneList(BOARD)).not.toContain('VEH004');
 });
 
-it('AC-4 a trip with no driver reads "VEH002 · no driver" on its card, in the warning colour', () => {
+it('spec 026 AC-3 a truck with no driver reads by its kind and number on its card, "no driver" in the warning colour (spec 022)', () => {
   const markup = doneList(BOARD);
-  expect(markup).toContain('<span class="block">VEH002 · <span class="text-warn-ink">no driver</span> ·</span><span class="block">Fresh · Galle</span>');
+  expect(markup).toContain('<span class="block">reefer truck VEH002 · <span class="text-warn-ink">no driver</span> ·</span><span class="block">Fresh · Galle</span>');
   // The button that opens a card's stops says whose they are.
-  expect(markup).toContain('aria-label="Show the stops of VEH002 · no driver · Fresh · Galle"');
-  expect(markup).toContain('aria-label="Show the stops of VEH004 · Chaminda · Fresh · Colombo"');
+  expect(markup).toContain('aria-label="Show the stops of reefer truck VEH002 · no driver · Fresh · Galle"');
+  expect(markup).toContain('aria-label="Show the stops of Chaminda · reefer truck · Fresh · Colombo"');
 });
 
-it('AC-4 the open trip\'s header names its driver after the vehicle the same way', () => {
-  expect(tripPanel(BOARD, 'VEH004')).toMatch(/<h2 class="[^"]*">Planning · VEH004 · <button[^>]*>Chaminda<\/button><\/h2>/);
-  expect(tripPanel(BOARD, 'VEH002')).toMatch(/<h2 class="[^"]*">Planning · VEH002 · <button[^>]*class="[^"]*text-warn-ink[^"]*"[^>]*>no driver<\/button><\/h2>/);
+it('spec 026 AC-3 the open trip\'s header names the truck by its driver, whose name is the driver menu', () => {
+  expect(tripPanel(BOARD, 'VEH004')).toMatch(/<h2 class="[^"]*">Planning · <button[^>]*>Chaminda<\/button> · reefer truck<\/h2>/);
+  expect(tripPanel(BOARD, 'VEH002')).toMatch(/<h2 class="[^"]*">Planning · reefer truck VEH002 · <button[^>]*class="[^"]*text-warn-ink[^"]*"[^>]*>no driver<\/button><\/h2>/);
+  const second = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
+  const markup = renderToStaticMarkup(
+    <TripPanel
+      screen={screenOf(second)} index={indexOf(second)} trip={second.plan.trips[1]!} group={null}
+      change={() => undefined} act={async () => null} onSwap={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+    />,
+  );
+  expect(markup).toMatch(/<h2 class="[^"]*">Planning · <button[^>]*>Chaminda<\/button> · reefer truck · trip 2<\/h2>/);
+  expect(markup).toContain('6.8 t · 33.4 m³ · trip 2 of 2');
+});
+
+it('spec 026 AC-3 View plan\'s rows name the truck by its driver, and by its kind and number with none', () => {
+  const row = (vehicleId: string, driverName: string | null) => renderToStaticMarkup(
+    <VehicleRow vehicleId={vehicleId} trips={BOARD.plan.trips.filter((t) => t.vehicleId === vehicleId)} driverName={driverName} index={indexOf(BOARD)} />,
+  );
+  expect(row('VEH004', 'Chaminda')).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
+  expect(row('VEH004', 'Chaminda')).not.toContain('VEH004');
+  expect(row('VEH002', null)).toMatch(/<p class="[^"]*">reefer truck VEH002<\/p>/);
+});
+
+it('spec 026 AC-3 an early departure\'s title names its truck by its driver', () => {
+  const early = { kind: 'early_leave' as const, leaveAt: 187 };
+  expect(decisionTitle(early, null, 'Chaminda\'s dry truck')).toBe('Chaminda\'s dry truck leaves early, at 03:07');
+  expect(decisionTitle(early, null, 'the second trip of the dry truck VEH044')).toBe('The second trip of the dry truck VEH044 leaves early, at 03:07');
+  expect(decisionTitle({ kind: 'waited_again', leaveAt: null }, 'Fresh Dickwella', null)).toBe('Fresh Dickwella waits again');
 });
 
 // Spec 026's move (rule 2): Dilshan drives VEH001 on both its trips, Sanjeewa VEH035 and Chaminda VEH004.

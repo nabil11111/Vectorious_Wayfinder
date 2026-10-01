@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { reasonOf } from '@/features/store/words';
 import { useSlots, type BoardScreen, type Undo } from '../board';
 import { addOrders, defer, keyOf, type TripKey } from '../draft';
-import { cubic, deferredTimes, ENTRANCE, hhmm, kilos, orderAmount, shortDay, tripName } from '../words';
+import { cubic, deferredTimes, ENTRANCE, hhmm, kilos, orderAmount, shortDay } from '../words';
 import { DeferForm } from './DeferForm';
 import type { BoardIndex } from './lookup';
 import type { Pick } from './PickTruck';
@@ -26,6 +26,8 @@ export function FindSlot({ screen, index, orderId, change, onPut, onStartTrip, o
 }) {
   const { board, draft } = screen;
   const date = board.day!.date;
+  // A trip named by its truck's driver on the draft (spec 026): "Chaminda · dry truck".
+  const crewOf = (trip: { vehicleId: string; tripNo: number }) => index.crew({ ...trip, driverId: draft.trips.find((t) => t.vehicleId === trip.vehicleId)?.driverId ?? null });
   const order = index.order(orderId);
   const shop = order ? index.shop(order.outletId) : null;
   // The search is worked out on the saved draft, so it waits for the save on its way.
@@ -90,7 +92,7 @@ export function FindSlot({ screen, index, orderId, change, onPut, onStartTrip, o
           current.slots.map((slot, i) => (
             <div key={`${slot.vehicleId}-${slot.tripNo}`} className="flex flex-wrap items-center gap-3 rounded-[12px] border-[1.5px] border-good bg-good-tint px-5 py-4">
               <p className="min-w-0 flex-1 text-[15px] leading-5 font-semibold">
-                {tripName(slot)} · stop {slot.stopSeq} · arrives {hhmm(slot.arriveAt)}
+                {crewOf(slot)} · stop {slot.stopSeq} · arrives {hhmm(slot.arriveAt)}
               </p>
               <Button
                 variant={i === 0 ? 'default' : 'outline'}
@@ -108,7 +110,7 @@ export function FindSlot({ screen, index, orderId, change, onPut, onStartTrip, o
               <dl className="mt-3 grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-xs leading-[15px]">
                 {current.refused.map((trip) => (
                   <div key={`${trip.vehicleId}-${trip.tripNo}`} className="contents">
-                    <dt className="text-muted-foreground">{tripName(trip)}</dt>
+                    <dt className="text-muted-foreground">{crewOf(trip)}</dt>
                     <dd className="font-semibold">{trip.problem.message}</dd>
                   </div>
                 ))}

@@ -31,6 +31,7 @@ const order = (id: string, outletId: string) => ({
   load: { kg: 82.8, m3: 0.444, units: 12, needsReefer: true, needsTailLift: false, keepUpright: false },
   carriedOver: false, timesDeferred: 0, lastDeferral: null, splitFrom: null, originalUnits: null,
 });
+const vehicle = (id: string, type: string) => ({ id, type, temp: 'reefer', weightCapKg: 1040, volumeCapM3: 7, working: true, offReason: null, litresLeft: 300, fuelLeftPct: 80 });
 const TRIPS: DraftTrip[] = [
   { vehicleId: 'VEH035', tripNo: 1, leaveAt: null, driverId: null, stops: [{ outletId: 'OUT001', orderIds: [NUGEGODA] }, { outletId: 'OUT002', orderIds: [WELLAWATTE] }] },
   { vehicleId: 'VEH002', tripNo: 1, leaveAt: null, driverId: null, stops: [{ outletId: 'OUT051', orderIds: [GALLE] }] },
@@ -40,7 +41,7 @@ const boardWith = (trips: DraftTrip[]) => PlanBoard.parse({
   plan: { mixBrands: false, trips, deferrals: [], id: uuid(100), revision: 3, status: 'draft', savedAt: '2026-06-24T10:31:00.000Z', sentAt: null, canUnsend: false },
   dropped: [], check: null, orders: [order(NUGEGODA, 'OUT001'), order(WELLAWATTE, 'OUT002'), order(GALLE, 'OUT051'), order(DEHIWALA, 'OUT005')],
   shops: [shop('OUT001', 'Fresh Nugegoda', 'Colombo'), shop('OUT002', 'Fresh Wellawatte', 'Colombo'), shop('OUT005', 'Fresh Dehiwala', 'Colombo'), shop('OUT051', 'Fresh Galle Fort', 'Galle')],
-  vehicles: [], drivers: [], figures: null, counts: null, suggestion: null,
+  vehicles: [vehicle('VEH035', 'van'), vehicle('VEH002', 'truck')], drivers: [], figures: null, counts: null, suggestion: null,
 });
 const BOARD = boardWith(TRIPS);
 const INDEX = indexOf(BOARD);
@@ -89,16 +90,17 @@ const stopTwo: Landing = { kind: 'stops', tripKey: 'VEH035-1', at: 1 };
 it('spec 023 AC-1 makes a finished drag its change of the draft, with its Undo, or opens the truck picker', () => {
   const change = vi.fn();
   const start = vi.fn();
-  landDrop(planOf(BOARD), dehiwala, stopTwo, { change, start });
+  landDrop(planOf(BOARD), dehiwala, stopTwo, { change, start, called: INDEX.called });
   expect(change).toHaveBeenCalledOnce();
   const [plan, undo] = change.mock.calls[0]!;
   expect(plan.trips[0].stops.map((s: { outletId: string }) => s.outletId)).toEqual(['OUT001', 'OUT005', 'OUT002']);
-  expect(undo).toMatchObject({ line: 'Fresh Dehiwala added to VEH035', tripKey: 'VEH035-1' });
-  landDrop(planOf(BOARD), dehiwala, { kind: 'middle' }, { change, start });
+  // Named by the truck, which has no driver yet (spec 026).
+  expect(undo).toMatchObject({ line: 'Fresh Dehiwala added to the reefer van VEH035', tripKey: 'VEH035-1' });
+  landDrop(planOf(BOARD), dehiwala, { kind: 'middle' }, { change, start, called: INDEX.called });
   expect(start).toHaveBeenCalledWith({ kind: 'start', group: dehiwala.group, orders: dehiwala.orders, startWith: dehiwala.orders, dropped: 'Fresh Dehiwala' });
   // Put back, or dropped where it cannot land: nothing happens.
-  landDrop(planOf(BOARD), dehiwala, undefined, { change, start });
-  landDrop(planOf(BOARD), dehiwala, { kind: 'unplanned' }, { change, start });
+  landDrop(planOf(BOARD), dehiwala, undefined, { change, start, called: INDEX.called });
+  landDrop(planOf(BOARD), dehiwala, { kind: 'unplanned' }, { change, start, called: INDEX.called });
   expect(change).toHaveBeenCalledOnce();
   expect(start).toHaveBeenCalledOnce();
 });

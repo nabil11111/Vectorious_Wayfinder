@@ -9,7 +9,7 @@ import { DeferForm } from './DeferForm';
 import { movable, useLanding } from './dragging';
 import type { Dragged } from './drops';
 import { BRAND_ICON, ICON } from './icons';
-import { decisionShop, groupKey, listed, type BoardIndex } from './lookup';
+import { decisionShop, decisionTruck, groupKey, listed, type BoardIndex } from './lookup';
 import { plainButton } from './look';
 import { DragRow } from './PlanDnd';
 import { Column, ColumnHead, MenuItem, MenuPopup, MenuRoot, MenuTrigger, Pills, Tag } from './ui';
@@ -239,7 +239,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
                               align="start"
                               title={title}
                               reasons={[{ key: order.id, reason: choice.reason }]}
-                              decisions={decisions.map((decision) => ({ key: decision.key, title: decisionTitle(decision, decisionShop(index, decision)), acceptedAt: decision.acceptedAt }))}
+                              decisions={decisions.map((decision) => ({ key: decision.key, title: decisionTitle(decision, decisionShop(index, decision), decisionTruck(index, draft, decision)), acceptedAt: decision.acceptedAt }))}
                             />
                           )}
                         </div>

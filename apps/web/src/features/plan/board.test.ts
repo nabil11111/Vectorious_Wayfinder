@@ -381,7 +381,7 @@ it('spec 023 AC-5 a drop goes out as one save of the draft, checked as a button\
   const sent = () => vi.mocked(fetch).mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { plan: DraftPlan }).plan.trips[0]!.stops.map((s) => s.outletId));
 
   // Fresh Nugegoda dragged from first to last place.
-  landDrop(day, { kind: 'stop', tripKey: 'VEH035-1', index: 0, label: 'Fresh Nugegoda', brand: 'Fresh' }, { kind: 'stops', tripKey: 'VEH035-1', at: 2 }, { change: saver.change, start: () => undefined });
+  landDrop(day, { kind: 'stop', tripKey: 'VEH035-1', index: 0, label: 'Fresh Nugegoda', brand: 'Fresh' }, { kind: 'stops', tripKey: 'VEH035-1', at: 2 }, { change: saver.change, start: () => undefined, called: (trip) => trip.vehicleId });
   await settled();
   expect(sent()).toEqual([['OUT003', 'OUT002', 'OUT001']]);
   answer(Response.json({ ...board, plan: { ...board.plan, ...saver.snapshot()!.draft, revision: 2 } }));

@@ -1,7 +1,7 @@
 import type {
   BoardDriver, BoardOrder, BoardShop, BoardSuggestion, BoardVehicle, Brand, PlanBoard, Problem, SuggestionChoice, TripCheck, TripFigures, VehicleDay,
 } from '@wayfinder/contracts';
-import { countOf } from '../words';
+import { countOf, crewName, truckCalled } from '../words';
 
 // One of the planner's decisions as the board answers it (spec 014).
 export type BoardDecision = BoardSuggestion['decisions'][number];
@@ -57,12 +57,27 @@ export interface BoardIndex {
   choice: (orderId: string) => SuggestionChoice | null;
   // The planner's decisions about this order, listed or not, in the planner's order.
   decisions: (orderId: string) => BoardDecision[];
+  // A trip's truck named by its driver (spec 026): on a card or header, "Chaminda · dry truck", and in a sentence,
+  // "Chaminda's dry truck".
+  crew: (trip: TripRef) => string;
+  called: (trip: TripRef) => string;
 }
+
+// A trip as a name needs it: its truck, its number and its driver.
+export interface TripRef { vehicleId: string; tripNo: number; driverId: string | null }
 
 // The name of the shop a decision's order goes to, or null for an early departure or an order the board no longer has.
 export function decisionShop(index: BoardIndex, decision: BoardDecision): string | null {
   const order = decision.orderId === null ? null : index.order(decision.orderId);
   return order ? index.shop(order.outletId)?.name ?? null : null;
+}
+
+// The trip an early departure is about, in a sentence's words with the draft's driver (spec 026), or null for a decision
+// about an order.
+export function decisionTruck(index: BoardIndex, plan: Pick<PlanBoard['plan'], 'trips'>, decision: BoardDecision): string | null {
+  if (decision.vehicleId === null || decision.tripNo === null) return null;
+  const driverId = plan.trips.find((trip) => trip.vehicleId === decision.vehicleId)?.driverId ?? null;
+  return index.called({ vehicleId: decision.vehicleId, tripNo: decision.tripNo, driverId });
 }
 
 const byId = <T extends { id: string }>(rows: T[]) => {
@@ -96,5 +111,14 @@ export function indexOf(board: PlanBoard): BoardIndex {
     problems: (vehicleId, tripNo) => problems.filter((p) => p.vehicleId === vehicleId && (p.tripNo === undefined || p.tripNo === tripNo)),
     choice: (orderId) => choices.get(orderId) ?? null,
     decisions: (orderId) => decided.get(orderId) ?? [],
+    // A truck the board does not list goes by its number.
+    crew: (trip) => {
+      const truck = vehicle(trip.vehicleId);
+      return truck ? crewName(truck, driver(trip.driverId)?.name ?? null, trip.tripNo) : trip.vehicleId;
+    },
+    called: (trip) => {
+      const truck = vehicle(trip.vehicleId);
+      return truck ? truckCalled(truck, driver(trip.driverId)?.name ?? null, trip.tripNo) : trip.vehicleId;
+    },
   };
 }
