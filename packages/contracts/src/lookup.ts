@@ -9,8 +9,13 @@ import { OrderStatus } from './store';
 
 // Spec 017: complete, depot-scoped reads. The browser filters these rows and opens their inline detail.
 // All dates are calendar dates, including leap-day validation. Unknown/repeated query keys are refused.
-const Day = z.iso.date(), Moment = z.iso.datetime(), Count = z.number().int().min(0);
-export const LookupOrdersQuery = z.strictObject({ date: Day.optional(), range: z.enum(['day', 'four_weeks']).default('day') });
+const Day = z.iso.date().refine(date => date >= '0001-01-01', 'Choose a date in year 0001 or later.');
+const Moment = z.iso.datetime(), Count = z.number().int().min(0);
+// Skipped lately always includes D-27, even when the table shows just one day.
+export const LookupOrdersQuery = z.strictObject({
+  date: Day.refine(date => date >= '0001-01-28', 'The preceding 27 days must also be in year 0001 or later.').optional(),
+  range: z.enum(['day', 'four_weeks']).default('day'),
+});
 export type LookupOrdersQuery = z.infer<typeof LookupOrdersQuery>;
 export const LookupHistoryQuery = z.strictObject({ date: Day.optional() });
 export type LookupHistoryQuery = z.infer<typeof LookupHistoryQuery>;
