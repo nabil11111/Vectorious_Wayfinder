@@ -289,10 +289,11 @@ export type CrewQuery = z.infer<typeof CrewQuery>;
 
 // Why a truck may not take the orders, by the checker's cargo rules (spec 007): more weight or volume than it takes, a
 // chilled order and no fridge, or a shop that takes vans only; or, for a truck on its first trip already, that it is
-// ready again only after every window of the orders closes (L-04). The order or shop it is about, as the checker's
-// problem names it, or null.
-export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only', 'ready_late'] as const;
-export const CrewMisfit = z.object({ code: z.enum(CREW_MISFITS), orderId: z.uuid().nullable(), outletId: z.string().nullable() });
+// ready again only after every window of the orders closes (L-04); or that its trip would reach a shop of the orders
+// after the shop's window closes, by the checker's timeline (L-17). The order or shop it is about, as the checker's
+// problem names it, or null; and for arrives_late, the minutes after the window it arrives, as the checker counts them.
+export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only', 'ready_late', 'arrives_late'] as const;
+export const CrewMisfit = z.object({ code: z.enum(CREW_MISFITS), orderId: z.uuid().nullable(), outletId: z.string().nullable(), lateMin: z.number().int().min(0).optional() });
 export type CrewMisfit = z.infer<typeof CrewMisfit>;
 
 // A truck of the depot with its driver (D-100): the one the draft gives it, or else its usual driver, who drove it on the

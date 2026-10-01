@@ -146,3 +146,17 @@ it('L-04 says when a second trip is ready, and that it is after every window clo
     'ready 08:18, after every window closes · trip 2 · fuel 62% left',
   ]);
 });
+
+it('L-17 says a crew whose trip would reach a shop after its window does not fit, and by how much', () => {
+  const late = { ...LIST, crews: [
+    crew('VEH001', DILSHAN, { readyAt: 418, fits: false, misfits: [{ code: 'arrives_late', orderId: null, outletId: 'OUT005', lateMin: 111 }] }),
+    crew('VEH035', WASANTHA, { fits: false, misfits: [{ code: 'arrives_late', orderId: null, outletId: 'OUT005', lateMin: 40 }] }),
+    crew('VEH011', CHAMINDA, { readyAt: 418, fits: false, misfits: [{ code: 'arrives_late', orderId: null, outletId: 'OUT005', lateMin: 0 }] }),
+  ] };
+  expect(crewRows(late, DROPPED, DRAFT, INDEX).map((row) => row.line)).toEqual([
+    'reaches Fresh Dehiwala 1 h 51 min after its window · trip 2 · ready 06:58 · fuel 62% left',
+    'reaches Fresh Dehiwala 40 min after its window · fuel 62% left',
+    // A Fresh shop reached at 08:00 is late with no minutes past its window to count.
+    'reaches Fresh Dehiwala too late for its window · trip 2 · ready 06:58 · fuel 62% left',
+  ]);
+});

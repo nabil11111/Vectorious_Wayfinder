@@ -31,7 +31,9 @@ Nabil, 1 Oct:
   The order:
   1. crews whose truck fits the trip's orders (weight, volume, fridge, every shop reachable) and, on a second trip, is
      ready before the last of their windows closes; one ready after says so: "ready 08:18, after every window closes"
-     (L-04);
+     (L-04). A crew whose trip would reach any of the orders' shops after its window closes does not fit either, by the
+     checker's own timeline for the trip the pick would make (after the truck's first trip, if it has one), and its
+     line says by how much: "reaches Fresh Puttalam 1 h 51 min after its window" (L-17);
   2. then those that ran this district on the latest sent plan;
   3. then the most fuel left.
 

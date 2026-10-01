@@ -1,7 +1,7 @@
 import type { BoardOrder, Brand, Crew, CrewList, DraftPlan, PlanBoard } from '@wayfinder/contracts';
 import type { Undo } from '../board';
 import { freeTripNo, keyOf, planOf, sameDraft, startTrip, swapTruck, tripOf, type CrewRef, type TripKey } from '../draft';
-import { countOf, crewName, cubic, hhmm, tonnes } from '../words';
+import { countOf, crewName, cubic, hhmm, span, tonnes } from '../words';
 import { movesLine } from './drivers';
 import type { BoardIndex } from './lookup';
 
@@ -59,6 +59,11 @@ function misfitWords(crew: Crew, load: CrewList['load'], index: BoardIndex): str
   if (crew.misfits.some((m) => m.code === 'over_volume')) words.push(`too big: ${cubic(load.m3)} of ${cubic(crew.volumeCapM3)}`);
   for (const outletId of new Set(crew.misfits.filter((m) => m.code === 'van_only').map((m) => m.outletId))) {
     words.push(`cannot reach ${(outletId && index.shop(outletId)?.name) ?? 'a shop'}: van only`);
+  }
+  // A shop its trip would reach after the window closes, by the checker's timeline and minutes (L-17).
+  for (const late of crew.misfits.filter((m) => m.code === 'arrives_late')) {
+    const shop = (late.outletId && index.shop(late.outletId)?.name) ?? 'a shop';
+    words.push(late.lateMin ? `reaches ${shop} ${span(late.lateMin)} after its window` : `reaches ${shop} too late for its window`);
   }
   const chilled = new Set(crew.misfits.filter((m) => m.code === 'needs_reefer').map((m) => m.orderId)).size;
   if (chilled > 0) words.push(chilled === 1 ? 'no fridge for the chilled order' : `no fridge for ${countOf(chilled, 'chilled order')}`);

@@ -14,6 +14,9 @@ export const viewPlanOf = (date: string) => `View plan · ${shortDay(date)}`;
 // reads 24:10, as the checker writes it.
 export const hhmm = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
+// A stretch of minutes: "40 min", "2 h", "1 h 51 min".
+export const span = (minutes: number) => (minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60} min` : ''}`);
+
 // "03:15" to 195: a time written HH:MM from 00:00 to 23:59. Anything else is null, and the field says how to write it.
 export function readClock(text: string): number | null {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(text.trim());
