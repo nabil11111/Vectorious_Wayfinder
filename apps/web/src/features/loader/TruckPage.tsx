@@ -17,7 +17,7 @@ import { NextList } from './parts/TruckRow';
 import { ActionBar, Card, Label, NotSaved, Tag, TickBox } from './parts/ui';
 import { KeptRefusal } from './TrucksPage';
 import { useTicks } from './ticks';
-import { allOnLine, answeredBy, answerSentence, brandOfStop, countOf, lineWords, readyLine, readyNote, truckName, waitingLine, whole } from './words';
+import { allOnLine, answeredBy, answerSentence, brandOfStop, countOf, lineWords, outOnLine, readyLine, readyNote, truckName, waitingLine, whole } from './words';
 
 // Load a truck at /loader/trucks/:tripId (spec 012, Loader · Load a truck, · phone and · all on, and Loader · Truck
 // ready). The truck is found in the loading day by its id. It is loaded last stop first, a whole stop at a time, and
@@ -106,6 +106,7 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
     <div>
       <BackLink to="/loader">Trucks</BackLink>
       <div className="mt-2.5 lg:mt-3.5">
+        <OutOnLine truck={truck} />
         <KeptRefusal />
         {/* A start refused because the plan changed (012's refusal) offers the comparison when there is one. */}
         {refusal && <ChangesLink className="mb-3" />}
@@ -179,6 +180,14 @@ function AllOn({ truck }: { truck: LoadingTruck }) {
   );
 }
 
+// A trip whose vehicle is still out on an earlier one says so at the top of its page (Q-26): it can be started, and its
+// goods go ready on the dock until the vehicle is back. The trip and the time come from the API.
+function OutOnLine({ truck }: { truck: LoadingTruck }) {
+  const line = outOnLine(truck);
+  if (!line) return null;
+  return <p role="status" className="mb-3 rounded-[10px] bg-warn-tint px-3 py-2.5 text-[13px] leading-4 font-semibold text-warn-ink">{line}</p>;
+}
+
 // An answer from the dispatcher, with the dispatcher's picture: who and when, then what to do.
 function Answer({ issue }: { issue: Issue }) {
   return (
@@ -201,6 +210,7 @@ function ReadyTruck({ day, truck, stale }: { day: LoadingDay; truck: LoadingTruc
   return (
     <div className="lg:pt-1">
       {stale && <div className="mb-3">{stale}</div>}
+      <OutOnLine truck={truck} />
       <div className="grid grid-cols-1 gap-y-4 lg:grid-cols-[minmax(0,680fr)_minmax(0,420fr)] lg:gap-x-6">
         <Card className="px-5 pt-5 pb-6 lg:self-start lg:px-7 lg:pt-[22px] lg:pb-8">
           <div className="flex items-center gap-3.5">

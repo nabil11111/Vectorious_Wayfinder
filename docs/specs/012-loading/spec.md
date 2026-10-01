@@ -95,8 +95,11 @@ where two stops are needed, VEH004 with OUT026 and OUT028 as in spec 010's AC-11
 2. **The trucks.** A truck on the list is a trip of that plan that is `planned`, `loading` or `ready`: one that is
    `out` or `done` has left (A4). They come in leaving order, then by vehicle and trip number. A trip's leaving time is
    the one in its plan's kept check (spec 010). "Next out" is the first that is not ready, and the others are numbered
-   from 2. A trip 2 can be loaded while its truck is still out on trip 1, as loaders put goods ready on the dock.
-   *With VEH004's trip as well, VEH004 leaves at 03:30 and comes first, then VEH035 at 04:36.*
+   from 2. A trip 2 can be loaded while its truck is still out on trip 1, as loaders put goods ready on the dock. Its
+   row then reads "out on trip 1 · back by 06:38" where it says when it leaves, and its page starts with "VEH057 is out
+   on trip 1 · back by 06:38. Put the cartons ready on the dock; they go on when it is back.", until trip 1 is checked
+   in. The API names the trip and the time. *With VEH004's trip as well, VEH004 leaves at 03:30 and comes first, then
+   VEH035 at 04:36.*
 3. **Starting (D-33).** "Start loading" makes a `planned` trip `loading`. It takes the planning locks of spec 010 and
    checks that the plan is still sent at the revision the loader's screen showed. From then on the plan cannot go back
    to edit, and View plan says so where "Back to edit" was: "Loading has started, so this plan cannot go back to edit."

@@ -22,7 +22,7 @@ function truck(spec: TripSpec): LoadingTruck {
     tripId: crypto.randomUUID(), revision: 0, vehicleId: spec.vehicleId, vehicleType: 'truck', vehicleTemp: 'reefer', tripNo: spec.tripNo ?? 1, brand: 'Fresh', district: spec.district,
     status: 'planned', leavesAt: spec.leavesAt, readyAt: null, driver: spec.driver, weightCapKg: 3990, volumeCapM3: 21.1, units, on: { units: 0, kg: 0, m3: 0 }, short: 0,
     // The loader's list carries its stops last stop first.
-    stops: [...stops].reverse(), issues: [],
+    stops: [...stops].reverse(), issues: [], outOn: null,
   };
 }
 const PLAN = crypto.randomUUID();

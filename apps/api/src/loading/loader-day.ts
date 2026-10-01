@@ -13,12 +13,13 @@ export function loaderDay(today: string, minutesNow: number, operatingDays: stri
   return [...operatingDays].sort().find((day) => day > today || (day === today && minutesNow < CUTOFF_MINUTES)) ?? null;
 }
 
-// Where and when a sent trip goes (rule 2): its district and its leaving time in its plan's kept check (spec 010), as
-// an instant on the plan's day. A send keeps the times of every trip, so a sent trip without them is a broken plan.
-export function sentTrip(planDate: string, check: PlanCheck | null, vehicleId: string, tripNo: number): { leavesAt: Date; district: string } {
+// Where and when a sent trip goes (rule 2): its district, and its leaving time and the time it is due back in its plan's
+// kept check (spec 010), as instants on the plan's day. A send keeps the times of every trip, so a sent trip without
+// them is a broken plan.
+export function sentTrip(planDate: string, check: PlanCheck | null, vehicleId: string, tripNo: number): { leavesAt: Date; backBy: Date; district: string } {
   const times = check?.trips.find((t) => t.vehicleId === vehicleId && t.tripNo === tripNo)?.times;
   if (!times) throw new Error(`The sent plan for ${planDate} keeps no times for ${vehicleId} trip ${tripNo}.`);
-  return { leavesAt: depotInstant(planDate, times.leaveAt), district: times.district };
+  return { leavesAt: depotInstant(planDate, times.leaveAt), backBy: depotInstant(planDate, times.backAt), district: times.district };
 }
 
 // A stop's lines in the order the loader reads them: chilled before dry, then the order placed first, then the

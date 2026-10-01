@@ -76,7 +76,7 @@ it("AC-3 holds the walkthrough's truck with its last stop first and nothing on y
   expect(truck).toEqual({
     tripId: trip!.id, revision: 0, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1, brand: 'Fresh', district: 'Colombo',
     status: 'planned', leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString(), readyAt: null, driver: 'Dilshan', weightCapKg: 1040, volumeCapM3: 7,
-    units: 118, on: { units: 0, kg: 0, m3: 0 }, short: 0, issues: [],
+    units: 118, on: { units: 0, kg: 0, m3: 0 }, short: 0, issues: [], outOn: null,
   });
   expect(stops.map(({ lines: _lines, id: _id, ...stop }) => stop)).toEqual([
     { seq: 2, outletId: 'OUT002', shopName: 'Fresh Wellawatte', loaded: false, units: 94, going: 94, short: 0 },

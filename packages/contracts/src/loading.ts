@@ -66,6 +66,9 @@ export const LoadingTruck = z.object({
   stops: z.array(LoadingStop),
   // The open ones first, then the answered ones, latest first.
   issues: z.array(LoadingIssue),
+  // The vehicle's earlier trip it is still out on, and when that trip is due back, or null while the vehicle is at the
+  // depot (Q-26). Its goods are put ready on the dock meanwhile (rule 2).
+  outOn: z.object({ tripNo: z.number().int().min(1), backBy: Moment }).nullable(),
 });
 export type LoadingTruck = z.infer<typeof LoadingTruck>;
 
