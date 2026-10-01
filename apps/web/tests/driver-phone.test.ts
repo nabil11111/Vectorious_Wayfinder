@@ -111,6 +111,7 @@ function dayFor(account: Account, applied: string[]): DriverDay {
 }
 
 const arrive = (): DriverWrite => ({ kind: 'arrive', writeId: crypto.randomUUID(), tripId: TRIP, stopId: STOP, at: '2026-06-24T22:04:00.000Z', revision: 0 });
+const closed = (): DriverWrite => ({ kind: 'closed', writeId: crypto.randomUUID(), tripId: TRIP, stopId: STOP, at: '2026-06-24T22:07:00.000Z', revision: 1, note: '' });
 
 // The server: whose session the cookie holds, the writes it applied, the ones it refuses, and every write posted.
 interface Server { session: Account | null; applied: string[]; refuse: Set<string>; posted: string[] }
@@ -187,5 +188,44 @@ describe('the driver\'s phone', () => {
     await until(() => phone.queue().length === 0);
     expect(server.posted).toEqual([waiting.writeId]);
     expect(phone.sync().signedOut).toBe(false);
+  });
+
+  it('keeps a start whose reads failed failed, sends nothing meanwhile, and reads again before a new action', async () => {
+    const older = arrive();
+    keptBefore(db, DILSHAN, older);
+    db.failReads = 1000;
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [] };
+    serve(server);
+    const phone = await open(DILSHAN);
+
+    await until(() => phone.store.readKept().failed);
+    expect(phone.store.readKept()).toMatchObject({ userId: DILSHAN.id, ready: false, failed: true, queue: [] });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(server.posted).toEqual([]);
+
+    // The phone can read again: a new action waits for the read, and the older write goes first.
+    db.failReads = 0;
+    const newer = closed();
+    await phone.sender.saveAction(newer, 'Stop 1 · Fresh Nugegoda');
+    await until(() => phone.queue().length === 0);
+    expect(server.posted).toEqual([older.writeId, newer.writeId]);
+  });
+
+  it('refuses a new action while the phone still cannot read what it kept, and sends once its own retry reads it', async () => {
+    const older = arrive();
+    keptBefore(db, DILSHAN, older);
+    db.failReads = 1000;
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [] };
+    serve(server);
+    const phone = await open(DILSHAN);
+
+    await until(() => phone.store.readKept().failed);
+    await expect(phone.sender.saveAction(closed(), 'Stop 1 · Fresh Nugegoda')).rejects.toThrow();
+    expect(db.states()).toEqual(['waiting']);
+    expect(server.posted).toEqual([]);
+
+    db.failReads = 0;
+    await until(() => phone.store.readKept().ready && phone.queue().length === 0);
+    expect(server.posted).toEqual([older.writeId]);
   });
 });

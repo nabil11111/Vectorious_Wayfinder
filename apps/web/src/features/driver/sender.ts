@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DriverDay, DriverWrite, phoneView } from '@wayfinder/contracts';
 import { api, ApiRequestError } from '@/lib/api';
 import { answered, hasSignal, noAnswer, probeNow, retryDelay, startSignal, whenBack, whenLost, within } from './signal';
-import { addWrite, keepDay, openAccount, readKept, refuseWrite, type Queued } from './store';
+import { addWrite, keepDay, openAccount, readFirst, readKept, refuseWrite, type Queued } from './store';
 
 // The driver's sync loop (spec 013, rule 10, D-45, D-50, plan.md "The phone"). One tab owns the driver's app: the tab
 // that holds the browser's lock `wayfinder-driver`, for as long as it is open. Only that tab runs this loop, which
@@ -241,12 +241,18 @@ async function sendWrite(entry: Queued, turn: number) {
 }
 
 // A turn runs even while the driver is asked to sign in again: its fetch is how the phone learns they have, in this
-// tab or another, and nothing is sent until a fetch shows the session is theirs.
+// tab or another, and nothing is sent until a fetch shows the session is theirs. Nothing is fetched or sent before
+// the phone has read what it kept for the account; a read that failed is tried again on the retry schedule.
 async function turn() {
   const who = account;
   const now = generation;
-  const kept = readKept();
-  if (!who || !hasSignal() || !kept.ready || kept.userId !== who.id) return;
+  if (!who) return;
+  if (!(await readFirst(who.id))) {
+    const kept = readKept();
+    if (now === generation && kept.userId === who.id && kept.failed) later();
+    return;
+  }
+  if (now !== generation || !hasSignal()) return;
   if (!(await fetchDay(who, now))) return;
   // The account may have changed while the day was kept; its writes are not this turn's to send.
   if (now !== generation) return;
@@ -339,6 +345,18 @@ export function setAccount(me: { id: string }) {
   ring();
 }
 
+// "Try again" on "Could not read what this phone kept.": read again, and once read carry on as when the app opened.
+// It resolves whether the phone could read.
+export async function readAgain() {
+  const who = account;
+  if (!who) return false;
+  if (!(await readFirst(who.id))) return false;
+  hold();
+  through();
+  ring();
+  return true;
+}
+
 // The live stream's driver message, a clock or demo message and the minute's refetch start the loop's fetch. A new
 // fetch calls off one still running.
 export function fetchNow() {
@@ -354,12 +372,15 @@ export function retrySync() {
 }
 
 // Saves one action on the phone before the screen moves on. It resolves once the write is in the phone's database,
-// and throws when it could not be saved, so nothing is sent.
+// and throws when it could not be saved, so nothing is sent. The phone first reads what it kept for the account if
+// it could not before, so a new action never goes ahead of a write kept earlier.
 export async function saveAction(write: DriverWrite, about: string) {
-  if (!account) throw new Error('No signed-in driver to save for.');
+  const who = account;
+  if (!who) throw new Error('No signed-in driver to save for.');
+  if (!(await readFirst(who.id))) throw new Error('The phone could not read what it kept, so the action was not saved.');
   // Kept as the contracts' shape reads it, the exact request the server will parse, trimmed note and all.
   const request = DriverWrite.parse(write);
-  await addWrite(account.id, request, about, request.at);
+  await addWrite(who.id, request, about, request.at);
   // A stop done on the road ends the green "Back online" line.
   if (write.kind === 'deliver' || write.kind === 'refuse' || write.kind === 'closed') update({ backOnline: null });
   hold();

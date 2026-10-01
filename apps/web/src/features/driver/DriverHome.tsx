@@ -7,7 +7,7 @@ import { DayDone, TripDone } from './DonePage';
 import { NextStopPage } from './NextStopPage';
 import { ProofPage } from './ProofPage';
 import { SavedPage } from './SavedPage';
-import { CouldNotLoad, NoTrip, TodaysTrip, TripSkeleton } from './TripPage';
+import { CouldNotLoad, CouldNotRead, NoTrip, TodaysTrip, TripSkeleton } from './TripPage';
 import { UnloadPage } from './UnloadPage';
 import { WrongPage } from './WrongPage';
 import { holdPictures } from './parts/icons';
@@ -15,6 +15,7 @@ import { StatusChip } from './parts/StatusChip';
 import { Card } from './parts/ui';
 import { setAccount, useDriverQuery, useOwner, useSync } from './sender';
 import { useSignal } from './signal';
+import { useKept } from './store';
 import { useDriverView } from './view';
 import { OTHER_TAB } from './words';
 
@@ -49,6 +50,9 @@ function DriverArea({ me }: { me: Me }) {
   useEffect(() => { holdPictures(); }, []);
   // The query ['driver'] brings the live stream's messages and the minute's refetch to the sync loop.
   useDriverQuery();
+  const kept = useKept();
+  // The phone could not read what it kept for this account: every route says so until it can.
+  if (kept.userId === id && kept.failed) return <CouldNotRead />;
   return (
     <Routes>
       <Route index element={<NowPage me={me} />} />

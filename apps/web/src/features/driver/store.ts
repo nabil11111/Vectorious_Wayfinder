@@ -50,13 +50,16 @@ export interface Kept {
   userId: string | null;
   // The database has been read for this account.
   ready: boolean;
+  // The database could not be read for this account. Nothing is sent or saved for it until a later read works, so a
+  // write kept earlier is never passed by a newer one.
+  failed: boolean;
   // The day the server last sent, or null when the phone has none.
   day: DriverDay | null;
   // Waiting and refused writes, oldest first.
   queue: Queued[];
 }
 
-let kept: Kept = { userId: null, ready: false, day: null, queue: [] };
+let kept: Kept = { userId: null, ready: false, failed: false, day: null, queue: [] };
 const listeners = new Set<() => void>();
 
 function set(next: Kept) {
@@ -93,21 +96,46 @@ async function readAccount(userId: string) {
   return { day: day.success ? day.data : null, queue };
 }
 
-// Reads an account's day and writes from the database, so the screens can open at once with no signal. A read that
-// fails is tried twice more before the screens open without it, so waiting writes are not hidden by one bad read.
-export async function openAccount(userId: string) {
-  set({ userId, ready: false, day: null, queue: [] });
-  let found: Awaited<ReturnType<typeof readAccount>> = { day: null, queue: [] };
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      found = await readAccount(userId);
-      break;
-    } catch (error) {
-      console.warn('Could not read what this phone kept.', error);
-      await new Promise((resolve) => window.setTimeout(resolve, 300));
+// The read running now, so a second caller waits for it rather than reading again.
+let reading: { userId: string; done: Promise<boolean> } | null = null;
+
+// Reads an account's day and writes, three tries 300 ms apart. It resolves whether they were read: on success the
+// account is ready, and otherwise it is failed and shows "Could not read what this phone kept.".
+function read(userId: string): Promise<boolean> {
+  if (reading?.userId === userId) return reading.done;
+  const done = (async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const found = await readAccount(userId);
+        if (kept.userId !== userId) return false;
+        set({ userId, ready: true, failed: false, ...found });
+        return true;
+      } catch (error) {
+        console.warn('Could not read what this phone kept.', error);
+        if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 300));
+      }
     }
-  }
-  if (kept.userId === userId) set({ userId, ready: true, ...found });
+    if (kept.userId === userId) set({ ...kept, ready: false, failed: true });
+    return false;
+  })();
+  reading = { userId, done };
+  void done.then(() => { if (reading?.done === done) reading = null; });
+  return done;
+}
+
+// Opens an account's part of the phone, its day and writes from the database, so the screens can open at once with
+// no signal. A start whose reads all fail stays failed: it never shows an empty queue as if nothing waited.
+export function openAccount(userId: string) {
+  set({ userId, ready: false, failed: false, day: null, queue: [] });
+  return read(userId);
+}
+
+// Whether the account's records have been read, reading them again first when they could not be. The loop asks it
+// before every send and a save before every new action.
+export function readFirst(userId: string): Promise<boolean> {
+  if (kept.userId !== userId) return Promise.resolve(false);
+  if (kept.ready) return Promise.resolve(true);
+  return read(userId);
 }
 
 let askedToPersist = false;
