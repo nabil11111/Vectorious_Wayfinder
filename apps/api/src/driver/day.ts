@@ -65,8 +65,11 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[]): Promise<DriverTri
           lines: ownLines.map(({ lineId, orderId, temp, productId, name, unit, quantity, loaded, delivered }) => {
             const attempt = closed?.lines.find(line => line.lineId === lineId);
             if (closed && !attempt) throw new Error(`Closed attempt ${closed.id} has no count for ${lineId}.`);
-            const wontFit = notFitting.has(`${trip.id}:${lineId}`) && loaded !== null ? quantity - loaded : 0;
-            return { lineId, orderId, temp, productId, name, unit, quantity, loaded: attempt ? attempt.counted : loaded, wontFit, delivered: closed ? null : delivered };
+            // A closed attempt keeps its own count, which a bring-back leaves as it was while it clears the live one, so
+            // the loaded count and what would not fit both come from the attempt.
+            const counted = attempt ? attempt.counted : loaded;
+            const wontFit = notFitting.has(`${trip.id}:${lineId}`) && counted !== null ? quantity - counted : 0;
+            return { lineId, orderId, temp, productId, name, unit, quantity, loaded: counted, wontFit, delivered: closed ? null : delivered };
           }) };
       }), problems: tripProblems,
     };
