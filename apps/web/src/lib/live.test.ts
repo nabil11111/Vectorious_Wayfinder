@@ -16,7 +16,8 @@ class Stream {
   onerror = () => {};
   change = (_: { data: string }) => {};
   close = vi.fn();
-  constructor(readonly url: string) { Stream.current = this; }
+  readonly url: string;
+  constructor(url: string) { this.url = url; Stream.current = this; }
   addEventListener(_event: string, listener: (message: { data: string }) => void) { this.change = listener; }
 }
 let cleanup: void | (() => void);
