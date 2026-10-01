@@ -60,6 +60,12 @@ export function nextDrawIn(clock: HeldClock, reading: number): number | null {
   return at >= holds ? null : Math.min(minuteEnds, holds) - at;
 }
 
+// What a drawing made at a reading shows: its minute, and whether the clock waits there.
+function drawn(clock: HeldClock, reading: number) {
+  const at = shownAt(clock, Math.max(reading, clock.heldAt));
+  return `${Math.floor(at / MINUTE)} ${clock.holdsAt !== null && at >= Date.parse(clock.holdsAt)}`;
+}
+
 const depotFormat = new Intl.DateTimeFormat('en-GB', {
   timeZone: DEPOT_TIME_ZONE, hourCycle: 'h23',
   weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -97,6 +103,9 @@ export interface AppClock {
   // The first read of the clock failed, so there is no time to show yet, and retry asks again.
   failed: boolean;
   retry: () => void;
+  // The app clock read at the moment it is asked, or null until the clock has arrived. A write takes its time from
+  // here at the press: `at` is the drawing's, which turns only with the minute.
+  readNow: () => number | null;
 }
 
 // The time on screen. It comes from GET /clock and runs on by itself. It is drawn again the moment its minute
@@ -110,21 +119,25 @@ export function useAppClock(): AppClock {
   const state = query.data;
   const retry = () => void query.refetch();
   const [reading, setReading] = useState(() => performance.now());
-  // After each drawing, and with each clock the server sends, the next drawing waits for the minute to end. A
-  // timer that fires a moment early draws the same minute and waits the rest.
+  // After each drawing, and with each clock the server sends, the clock is read again. A drawing behind that
+  // reading, such as one a timer read just before the minute turned with this effect running just after, is drawn
+  // again at once, so no minute is skipped and the wait is never missed. Otherwise the next drawing is timed from
+  // that reading, for the minute's end or the wait, whichever is first. The timer reads the clock when it fires.
   useEffect(() => {
     if (!state) return;
-    const wait = nextDrawIn(state, Math.max(performance.now(), state.heldAt));
+    const now = performance.now();
+    const wait = drawn(state, reading) !== drawn(state, now) ? 0 : nextDrawIn(state, Math.max(now, state.heldAt));
     if (wait === null) return;
     const timer = window.setTimeout(() => setReading(performance.now()), wait);
     return () => window.clearTimeout(timer);
   }, [state, reading]);
 
   // A later read that fails leaves the clock it had running on, so only a first read that failed is shown.
-  if (!state) return { state, at: null, time: '--:--', waiting: false, failed: query.isError, retry };
+  if (!state) return { state, at: null, time: '--:--', waiting: false, failed: query.isError, retry, readNow: () => null };
   // A clock that arrived after the last drawing shows the time it arrived with.
   const at = shownAt(state, Math.max(reading, state.heldAt));
-  return { state, at, time: inDepot(at).time, waiting: state.holdsAt !== null && at >= Date.parse(state.holdsAt), failed: false, retry };
+  const readNow = () => shownAt(state, Math.max(performance.now(), state.heldAt));
+  return { state, at, time: inDepot(at).time, waiting: state.holdsAt !== null && at >= Date.parse(state.holdsAt), failed: false, retry, readNow };
 }
 
 // Takes the clock a move or a reset answered with. "Today" changed with it, so every list is fetched again.

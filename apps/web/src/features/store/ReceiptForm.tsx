@@ -23,7 +23,7 @@ import { aboutDelivery, ADD_PHOTO, arrivedLine, NOT_SAVED_ON_PHONE, RECEIPT_TITL
 export function ReceiptForm({ delivery, outlet, today, record }: { delivery: StoreDelivery; outlet: StoreOutlet; today: string; record: ReceiptRecord | null }) {
   const { brand } = outlet;
   const figures = deliveryFigures(delivery);
-  const { at } = useAppClock();
+  const { at, readNow } = useAppClock();
   const { save, saving, failed } = shopQueue.useSave();
   const { photo, unusable, reading, inputRef, take, pick } = usePhoto();
   const sent = record?.write ?? null;
@@ -44,14 +44,15 @@ export function ReceiptForm({ delivery, outlet, today, record }: { delivery: Sto
 
   // Every line once, a line handed over at 0 at 0, the cold answer only when chilled goods came, what is wrong only
   // when a line is short, and the photo only with a report. Not while a photo is being read, or the one before it, or
-  // none, would go instead. With no clock known yet, it waits.
+  // none, would go instead. With no clock known yet, it waits. The receipt takes the app clock's time at the press.
   const confirm = () => {
-    if (at === null || off || reading) return;
+    const now = readNow();
+    if (now === null || off || reading) return;
     const write: ReceiptWrite = {
       kind: 'receipt',
       writeId: newWriteId(),
       stopId: delivery.stopId,
-      at: new Date(at).toISOString(),
+      at: new Date(now).toISOString(),
       revision: delivery.revision,
       lines: delivery.lines.map((line, i) => ({ lineId: line.lineId, received: countAt(i) })),
       cold: figures.chilled ? cold : null,

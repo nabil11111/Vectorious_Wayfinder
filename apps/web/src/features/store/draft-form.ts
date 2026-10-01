@@ -7,14 +7,20 @@ import { CutoffPassedDetails, MAX_LINE_UNITS, StoreOrder, type DraftRefs, type M
 import { finishBeforeSignOut, meKey } from '@/features/auth/api';
 import { ApiRequestError } from '@/lib/api';
 import { fetchNextOrder, nextOrderKey, placeOrders, saveDraft } from './next-order';
-import { NOT_KEPT, reasonOf } from './words';
+import { NOT_CONFIRMED, NOT_KEPT, PLACE_NOT_CONFIRMED, reasonOf } from './words';
 
 // A change is saved this long after it was made, so a run of taps is one save.
 const SAVE_AFTER_MS = 600;
 
 // A change that could not be saved is said, also once the form has left the screen or its person has signed out, so
 // it is never lost without a word (Q-04). The line outlasts the move to the sign-in page.
-const notKept = () => toast(NOT_KEPT, { id: 'draft-not-kept', duration: 10_000, classNames: { title: 'text-pretty' } });
+const notKept = (line = NOT_KEPT) => toast(line, { id: 'draft-not-kept', duration: 10_000, classNames: { title: 'text-pretty' } });
+
+// Resolves once the sign-out's deadline has passed.
+const passedBy = (deadline: AbortSignal) => new Promise<'passed'>((resolve) => {
+  if (deadline.aborted) resolve('passed');
+  else deadline.addEventListener('abort', () => resolve('passed'), { once: true });
+});
 
 // The next order while a delivery day is open. The form only exists then.
 export type OpenOrder = StoreNextOrder & { deliveryDate: string };
@@ -314,11 +320,28 @@ export class DraftForm {
 
   // Sign-out waits for this, and so does leaving the form: a place on its way goes first, then every change is
   // saved. One that cannot be saved is never lost without a word: the person is told, on whatever screen comes
-  // next (Q-04).
-  leave = async () => {
-    if (this.placingNow) await this.placingNow;
-    if (!(await this.settle())) notKept();
+  // next (Q-04). A sign-out hands over its deadline, and a save or a place that has not answered by then is let go.
+  leave = async (deadline?: AbortSignal) => {
+    const done = (async () => {
+      if (this.placingNow) await this.placingNow;
+      return this.settle();
+    })();
+    const kept = await (deadline ? Promise.race([done, passedBy(deadline)]) : done);
+    if (kept === 'passed') this.letGo();
+    else if (!kept) notKept();
   };
+
+  // The sign-out could not wait any longer for an answer. Nothing more is tried, the person is told the change, or
+  // the order, could not be confirmed, and a form already left lets go of the sign-out, so none waits for it again.
+  private letGo() {
+    window.clearTimeout(this.timer);
+    window.clearTimeout(this.retryTimer);
+    this.timer = 0;
+    notKept(this.placing ? PLACE_NOT_CONFIRMED : NOT_CONFIRMED);
+    if (this.onScreen) return;
+    this.stopWaiting?.();
+    this.stopWaiting = null;
+  }
 
   // From the tap on Place until the place settles, the form holds still. A change made then would be saved
   // behind the place, and once the drafts are placed, as a new draft nobody asked for.

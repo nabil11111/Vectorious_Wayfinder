@@ -16,16 +16,17 @@ import { aboutStop, backByLine, brandOf, isLate, leftLine, NOT_SAVED, shopLine, 
 // thing, what to unload, the shop's note, the trip bar and "I've arrived". The stop is the trip's next one by
 // nextStop, so a stop the dispatcher sent back comes after the others (rule 4).
 export function NextStopPage({ view, day, trip, figures, stop }: { view: DriverView; day: DriverDay; trip: DriverTrip; figures: Figures; stop: DriverStop }) {
-  const { at } = useAppClock();
+  const { at, readNow } = useAppClock();
   const { save, saving, failed } = useSave();
   const counts = figures.byStop[trip.stops.indexOf(stop)]!;
   const brand = brandOf(trip, stop);
   const late = isLate(trip, stop, at);
 
-  // "I've arrived" records the arrival at the app clock's time, naming the stop's revision on screen.
+  // "I've arrived" records the arrival at the app clock's time at the press, naming the stop's revision on screen.
   const arrive = () => {
-    if (at === null) return;
-    void save({ kind: 'arrive', writeId: newWriteId(), tripId: trip.tripId, stopId: stop.id, at: new Date(at).toISOString(), revision: stop.revision }, aboutStop(stop));
+    const now = readNow();
+    if (now === null) return;
+    void save({ kind: 'arrive', writeId: newWriteId(), tripId: trip.tripId, stopId: stop.id, at: new Date(now).toISOString(), revision: stop.revision }, aboutStop(stop));
   };
 
   return (

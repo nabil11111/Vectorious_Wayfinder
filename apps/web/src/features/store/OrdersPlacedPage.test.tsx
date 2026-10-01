@@ -82,12 +82,13 @@ describe('Q-03 a second order for the same day', () => {
     expect(text).not.toContain('Submission confirmation · 09:25');
   });
 
-  it('opened again from Today, confirms the latest place and says the earlier one apart', () => {
+  it('opened from Today with no place in hand, shows the day’s orders, each with its own time, and calls none just placed', () => {
     const text = draw(next);
-    expect(text).toContain('Your order is placed');
-    expect(text).toContain('Folded clothing 10 boxes');
-    expect(text).toContain('Placed earlier for Thursday 135 boxes 09:25');
-    expect(text).toContain('Submission confirmation · 15:37');
+    expect(text).toContain('Your 2 orders are placed');
+    expect(text).toContain('135 boxes placed 09:25 Folded clothing 50 boxes Hanging garments 45 rail boxes Shoes 25 cartons Bags and accessories 15 cartons');
+    expect(text).toContain('19 boxes placed 15:37 Folded clothing 10 boxes Hanging garments 6 rail boxes Shoes 3 cartons');
+    expect(text).toContain('The depot has received both requests.');
+    for (const claim of ['Submission confirmation', 'Placed earlier', '60 boxes']) expect(text).not.toContain(claim);
   });
 
   it('confirms a Fresh place of two orders together, as the frame draws it, with nothing earlier', () => {
@@ -111,5 +112,37 @@ describe('Q-03 a second order for the same day', () => {
     expect(text).not.toContain('Chilled 20 cartons');
     expect(text).toContain('Placed earlier for Thursday 12 chilled cartons 09:25');
     expect(text).toContain('Submission confirmation · 15:37');
+  });
+});
+
+describe('Q-03 places made while the demo clock waits at 15:59:59', () => {
+  // Every order placed then has the same time, so a place is told apart only by the orders its answer named.
+  const AT_HOLD = '2026-06-24T10:29:59.000Z';
+  const first = order(STYLE, AT_HOLD, { 'style-folded': 50, 'style-hanging': 45, 'style-shoes': 25, 'style-bags': 15 });
+  const second = order(STYLE, AT_HOLD, { 'style-folded': 10, 'style-hanging': 6, 'style-shoes': 3 });
+  const next = nextOrder('Style', STYLE, [first, second]);
+
+  it('confirms the place by the orders its answer named, and says the other apart', () => {
+    const text = draw(next, [second]);
+    expect(text).toContain('Your order is placed');
+    expect(text).toContain('Folded clothing 10 boxes Hanging garments 6 rail boxes Shoes 3 cartons');
+    expect(text).not.toContain('60 boxes');
+    expect(text).toContain('Placed earlier for Thursday 135 boxes 15:59');
+  });
+
+  it('opened from Today, shows the two orders apart and never as one place', () => {
+    const text = draw(next);
+    expect(text).toContain('135 boxes placed 15:59');
+    expect(text).toContain('19 boxes placed 15:59');
+    for (const claim of ['Submission confirmation', 'Placed earlier', '60 boxes', 'Your order is placed']) expect(text).not.toContain(claim);
+  });
+
+  it('opened from Today, shows a Fresh day of one chilled and one dry order with each order’s own time', () => {
+    const chilled = order(FRESH, AT_HOLD, { 'fresh-chilled-carton': 8 }, 'chilled');
+    const dry = order(FRESH, AT_HOLD, { 'fresh-dry-carton': 4 });
+    const text = draw(nextOrder('Fresh', FRESH, [chilled, dry]));
+    expect(text).toContain('Your 2 orders are placed');
+    expect(text).toContain('8 chilled cartons placed 15:59 4 dry cartons placed 15:59');
+    expect(text).not.toContain('Submission confirmation');
   });
 });

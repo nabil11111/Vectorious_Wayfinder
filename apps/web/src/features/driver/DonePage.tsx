@@ -47,11 +47,13 @@ function TripCards({ day, trip, figures }: { day: DriverDay; trip: DriverTrip; f
 // Driver · Trip done, · refused and · shop closed at /driver (spec 013, rules 7 and 9): every stop delivered, refused or
 // closed, the counts that add up, what is still on the truck, and "I'm back at the depot".
 export function TripDone({ view, day, trip, figures }: { view: DriverView; day: DriverDay; trip: DriverTrip; figures: Figures }) {
-  const { at } = useAppClock();
+  const { at, readNow } = useAppClock();
   const { save, saving, failed } = useSave();
+  // At the app clock's time at the press.
   const finish = () => {
-    if (at === null) return;
-    void save({ kind: 'finish', writeId: newWriteId(), tripId: trip.tripId, at: new Date(at).toISOString(), revision: trip.revision }, aboutTrip(trip, 'finish'));
+    const now = readNow();
+    if (now === null) return;
+    void save({ kind: 'finish', writeId: newWriteId(), tripId: trip.tripId, at: new Date(now).toISOString(), revision: trip.revision }, aboutTrip(trip, 'finish'));
   };
   return (
     <div>

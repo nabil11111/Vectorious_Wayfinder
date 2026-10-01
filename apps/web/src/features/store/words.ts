@@ -113,6 +113,10 @@ export const PLACED_ELSEWHERE_LOST = 'This order was placed from another screen,
 
 // When a change to the order could not be saved and the form can no longer try: signed out, or the form left (Q-04).
 export const NOT_KEPT = 'Your last change to the order was not saved. Check the draft before you place it.';
+// When a sign-out could not wait any longer for a save or a place that had not answered: it may or may not have
+// gone through.
+export const NOT_CONFIRMED = 'Your last change to the order could not be confirmed. Check the draft before you place it.';
+export const PLACE_NOT_CONFIRMED = 'Your order could not be confirmed as placed. Check Today before you order again.';
 
 // The note for the driver takes 200 characters at most, as the API checks it (Q-06).
 const NOTE_MOST = 200;

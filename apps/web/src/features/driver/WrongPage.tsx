@@ -52,7 +52,7 @@ function Chip({ on, onClick, disabled = false, children }: { on: boolean; onClic
 function Wrong({ me, stopId }: { me: Me; stopId: string }) {
   const view = useDriverView(me.id);
   const navigate = useNavigate();
-  const { at } = useAppClock();
+  const { at, readNow } = useAppClock();
   const { save, saving, failed } = useSave();
   const { photo, unusable, reading, take, inputRef, pick } = usePhoto();
   const [kind, setKind] = useState<Kind>('refused');
@@ -78,10 +78,12 @@ function Wrong({ me, stopId }: { me: Me; stopId: string }) {
   const toggle = (line: DriverLine) => setPicked((held) => (held.includes(line.lineId) ? held.filter((id) => id !== line.lineId) : [...held, line.lineId]));
   const setCount = (line: DriverLine, n: number) => setRefused((held) => ({ ...held, [line.lineId]: Math.min(loadedOf(line), Math.max(0, n)) }));
 
-  // Not while a photo is being read: the one before it, or none, would be saved instead.
+  // Not while a photo is being read: the one before it, or none, would be saved instead. At the app clock's time at
+  // the press.
   const submit = async () => {
-    if (at === null || !canSave || reading) return;
-    const base = { writeId: newWriteId(), tripId: trip.tripId, stopId: stop.id, at: new Date(at).toISOString(), revision: stop.revision, note: note.trim(), ...(photo ? { photo } : {}) };
+    const now = readNow();
+    if (now === null || !canSave || reading) return;
+    const base = { writeId: newWriteId(), tripId: trip.tripId, stopId: stop.id, at: new Date(now).toISOString(), revision: stop.revision, note: note.trim(), ...(photo ? { photo } : {}) };
     setLeaving(true);
     const saved = kind === 'refused' && reason !== null
       ? await save({ ...base, kind: 'refuse', reason, lines: chosen.map((line) => ({ lineId: line.lineId, refused: refusedOf(line) })) }, aboutStop(stop))

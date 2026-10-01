@@ -115,20 +115,33 @@ export async function attemptSignIn(login: { mutateAsync: (body: LoginRequest) =
   }
 }
 
+// Sign-out waits this long at most for the work handed to it, so a request that never answers cannot hold it.
+const SIGN_OUT_WAITS_MS = 5000;
+
 // Work that must end before its person signs out, such as the shop's draft that is still saving (Q-04). Sign-out
-// waits for all of it. Each piece tells the person itself what it could not finish, so it never throws. A screen
-// hands its work over here and takes it back with the function this returns.
-const beforeSignOut = new Set<() => Promise<void>>();
-export function finishBeforeSignOut(work: () => Promise<void>) {
-  const entry = () => work();
+// waits for all of it, 5 seconds at most. The work gets that deadline as a signal and ends by then, telling the person
+// itself what it could not finish, so it never throws. A screen hands its work over here and takes it back with the
+// function this returns.
+const beforeSignOut = new Set<(deadline: AbortSignal) => Promise<void>>();
+export function finishBeforeSignOut(work: (deadline: AbortSignal) => Promise<void>) {
+  const entry = (deadline: AbortSignal) => work(deadline);
   beforeSignOut.add(entry);
   return () => { beforeSignOut.delete(entry); };
+}
+
+// The work handed to sign-out, until it has all ended or its deadline passes, whichever is first.
+async function finishWork() {
+  const deadline = new AbortController();
+  const timer = window.setTimeout(() => deadline.abort(), SIGN_OUT_WAITS_MS);
+  const passed = new Promise<void>((resolve) => { deadline.signal.addEventListener('abort', () => resolve(), { once: true }); });
+  await Promise.race([Promise.all([...beforeSignOut].map((work) => work(deadline.signal))), passed]);
+  window.clearTimeout(timer);
 }
 
 export const logoutMutation = (qc: QueryClient): UseMutationOptions<void, Error, void> => ({
   onMutate: () => qc.cancelQueries({ queryKey: meKey }),
   mutationFn: async () => {
-    if (beforeSignOut.size) await Promise.all([...beforeSignOut].map((work) => work()));
+    if (beforeSignOut.size) await finishWork();
     return api<void>('/auth/logout', { method: 'POST', json: {} });
   },
   // The screens on show must see the empty account before the rest of the cache goes, or they keep the old one.
