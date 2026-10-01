@@ -12,19 +12,20 @@ import { ICON } from './icons';
 import { Band } from './ui';
 
 // The lines under the top bar (spec 013, rule 12 and the screen states' top line): the yellow "No signal" bar in place
-// of the top line on Next stop, and otherwise the top line, the trip's latest problem or else the last stop done. The
-// green "Back online" sits over the top line until it is closed, so an answer the dispatcher sends meanwhile shows at
-// once.
+// of the top line on Next stop, the green "Back online" in its place until it is closed, and otherwise the top line,
+// the trip's latest problem or else the last stop done. An answer from the dispatcher shows under "Back online" at
+// once, so the driver never has to close the bar to read it.
 export function TopLines({ day, trip, figures, waiting, waitingRecords, noSignalBar }: {
   day: DriverDay; trip: DriverTrip; figures: Figures; waiting: Queued[]; waitingRecords: number; noSignalBar: boolean;
 }) {
   const signal = useSignal();
   const { backOnline } = useSync();
   if (noSignalBar && !signal) return <NoSignal waiting={waitingRecords} />;
+  const answered = latestProblem(trip)?.problem.decision != null;
   return (
     <>
       {backOnline && <BackOnline names={backOnline} />}
-      <TopLine day={day} trip={trip} figures={figures} waiting={waiting} />
+      {(!backOnline || answered) && <TopLine day={day} trip={trip} figures={figures} waiting={waiting} />}
     </>
   );
 }
