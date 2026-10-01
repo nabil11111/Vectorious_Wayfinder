@@ -41,7 +41,7 @@ only when the dispatcher picked one, and the suggested plan picks none, so a bui
    on two vehicles.
 2. VEH035 got its driver from the suggestion. Ruwan chooses Dilshan for it in the menu. If Dilshan was on VEH001,
    VEH001 now has VEH035's old driver, and both changes save as one change of the draft (the README walkthrough's step
-   5).
+   5). Spec 026 replaced the swap with a move: VEH001 is left with no driver, and the menu says so before the press.
 3. A trip that leaves 03:30, makes six stops and is back 10:20 shows "Peliyagoda 03:30" at the start of its line and
    "back 10:20" at the end. The line spans 03:00 to 11:00.
 4. Pointing at Fresh Koggala's dot on a late trip shows "Stop 6 · Fresh Koggala", "arrives 08:05 · leaves 08:20",

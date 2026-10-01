@@ -14,13 +14,17 @@ Nabil, 1 Oct:
 
 ## What it does
 - **A crew is a truck with its driver.** Every truck has a usual driver: the driver who drove it on the depot's latest
-  sent plan, or failing that the one the suggested plan gives it (D-97). Starting a trip, swapping a truck and changing
-  a trip's driver all happen in one place, the crew picker, and picking a crew sets both the truck and the driver.
+  sent plan, or failing that the one a fixed pairing gives it, the depot's drivers in staff ID order with its trucks in
+  id order. The suggested plan gives each truck it uses its usual driver (D-97). Starting a trip and swapping a truck
+  happen in one place, the crew picker, and picking a crew sets both the truck and the driver.
 - **The crew picker.** It opens from:
-  - a group's "Start a trip";
-  - an order dropped in the middle (spec 023);
-  - "Swap truck";
-  - the driver's name in a trip's header.
+  - a group's "Start a trip", and Find a slot's;
+  - an order dropped in the middle (spec 023), at the drop area;
+  - "Swap truck".
+- **The driver alone.** The driver's name in a trip's header keeps spec 022's driver menu, for a change of driver
+  alone: without it, a truck with no usual driver (VEH036 to VEH038) could never get one, and a driver whose truck is in
+  the workshop could never drive another. Picking a driver who is on another truck moves them here (rule 2), and the
+  menu says so before the press. Once that plan is sent, history makes the new pair the usual one.
 
   It is a dropdown of crews, each row reading "Chaminda · dry truck · 7.2 t · 38 m³", with what matters for these
   orders under it, such as "fits", "ran Galle last time", "fuel 62% left" or "cannot reach Tech Kadugannawa: van only".
@@ -46,24 +50,27 @@ Nabil, 1 Oct:
 ## Rules, with worked examples
 1. **One pick sets both.** Ruwan presses "Start a trip" on Fresh · Galle · 4 and picks "Chaminda · reefer truck · 6.8 t
    · 33.4 m³". The trip opens on VEH006 with Chaminda, in one change of the draft, with one Undo.
-2. **A crew stays together.** Picking a crew whose driver is on another truck moves the driver to this truck, and that
-   truck's own trips are left with no driver. The picker says so before the press ("Chaminda drives VEH004 now; it
-   will have no driver"). The checker marks the driverless trip as today.
-3. **History decides the usual driver.** On the seeded day, VEH035's usual driver is Dilshan if he drove it on the
-   latest sent Peliyagoda plan. Otherwise it is the one the suggestion gives it. Kandy has no earlier plan, so its
-   usual drivers come from the suggestion.
+2. **A crew stays together.** Picking a crew, or a driver in the driver menu, whose driver is on another truck moves
+   the driver to this truck, and that truck's own trips are left with no driver. The picker and the menu say so before
+   the press ("Chaminda drives VEH004 now; it will have no driver"). The checker marks the driverless trip as today.
+3. **History decides the usual driver.** The seed's sent plans hold no trips, so on the seeded day every truck's
+   usual driver comes from the fixed pairing: VEH001 Dilshan (D-001), VEH002 Chaminda (D-003) and so on to VEH035
+   Wasantha (D-036), and VEH036 to VEH038 none. Once Thursday's plan is sent with Dilshan on VEH035, Friday's usual
+   driver for VEH035 is Dilshan, and the trucks history does not pair take the drivers it left, in the same order.
+   Kandy pairs its own drivers with its own trucks the same way.
 
 ## Acceptance criteria
-- [ ] AC-1 When a trip is started, a truck swapped or a trip's driver changed, the system shall open the crew picker.
+- [ ] AC-1 When a trip is started or a truck swapped, the system shall open the crew picker.
   It shall list crews by fit, then the district last run, then fuel. The workshop's and fully used trucks shall come
-  last with their reasons and not be pickable. Picking one shall set the truck and the driver as one change of the
+  last with their reasons and not be pickable. A trip's driver alone shall change from the driver menu, a driver on
+  another truck moving and leaving it with none. Picking one shall set the truck and the driver as one change of the
   draft.
 - [ ] AC-2 The plan board shall show no "Unassigned trucks" panel. Unplanned orders shall take the left column's full
   height, and the header shall keep the trucks count.
 - [ ] AC-3 Every sentence the checker, the planner's "why?" and the notifications write shall name a truck by its
   driver ("Chaminda's dry truck"), or by kind and number when it has no driver. The plan board's and View plan's
   cards and headers shall read "Chaminda · dry truck" with no vehicle number.
-- [ ] AC-4 The usual driver shall come from the latest sent plan, or else the suggestion's choice, pinned by tests on
+- [ ] AC-4 The usual driver shall come from the latest sent plan, or else the fixed pairing, pinned by tests on
   the seeded day.
 - [ ] AC-5 The README's departures shall say the trucks panel is gone and why, and the walkthrough's plan board steps
   shall use the crew picker.

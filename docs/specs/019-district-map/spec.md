@@ -40,7 +40,7 @@ The design drew a replay of February's records; the app draws the live day (D-92
 ## Rules, with worked examples
 1. **Lines.** One line per district the depot has shops in, from the depot's diamond to the district's centre,
    exactly as the shapes module draws it. A line is orange when a truck on the road is going to that district, muted
-   otherwise. At "Trucks leave, Thu 03:30" Dilshan's VEH035 is out to Colombo: Colombo's line is orange, the others
+   otherwise. At "Trucks leave, Thu 03:30" Wasantha's VEH035 is out to Colombo: Colombo's line is orange, the others
    muted.
 2. **Arrows.** One arrow per trip on the road, on its district's line: alone at 55% of the line's length; two or more
    spread from 24% to 78%, ordered by vehicle id, as the design does. The arrow points along the line, away from the
@@ -48,7 +48,7 @@ The design drew a replay of February's records; the app draws the live day (D-92
 3. **Stores delivered.** A shop counts when it had at least one stop on today's plan and each of its stops counts on
    the "stops delivered" tile: goods were handed over, whether the stop ended `delivered` or `refused` in part
    (`stopCounts` in `apps/api/src/operations/figures.ts`). A drop refused in full and a closed shop do not count.
-   Fresh Nugegoda and Fresh Wellawatte are in Colombo: after Dilshan delivers Nugegoda (one dry carton short) and
+   Fresh Nugegoda and Fresh Wellawatte are in Colombo: after Wasantha delivers Nugegoda (one dry carton short) and
    Wellawatte refuses 2 of its chilled cartons, Colombo shows 2 of its 24 shops and the list's line reads "2 of 75
    stores". Shops with no stop today stay in the total. On a plan sent before the driver's piece, whose stop details
    were not recorded, the counts are unknown and the list shows a dash, as the tile does.

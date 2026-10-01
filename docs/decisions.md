@@ -410,9 +410,12 @@ either depot are answered from it, each going to its own depot. A plan and its s
 board and View plan ask which depot to plan, and a plan write on Both is refused (Nabil, 1 Oct, spec 021).
 
 **D-97 · 1 Oct · The suggested plan names a driver for every vehicle.** The suggestion keeps a vehicle's earlier
-driver and gives the others the depot's free drivers in staff ID order, as the frames show a driver on every trip.
-Choosing a driver who is on another vehicle swaps the two. A dispatcher can still leave a vehicle with no driver
-(D-31) (Nabil, 1 Oct, spec 022).
+driver, gives each other vehicle its usual driver while no other vehicle of the plan has them, and the rest the depot's
+first free drivers in staff ID order, as the frames show a driver on every trip. The usual driver is the one who drove
+the vehicle on the depot's latest sent plan, or else a fixed pairing of the drivers in staff ID order with the vehicles
+in id order, and the planner's reasons name each truck by its driver. Choosing a driver who is on another vehicle moves
+them, and that vehicle is left with none. A dispatcher can still leave a vehicle with no driver (D-31) (Nabil, 1 Oct,
+specs 022 and 026).
 
 **D-98 · 1 Oct · The plan board plans by drag and drop too.** Orders and stops can be dragged where the board's buttons
 and menus would put them, with the pointer or the keyboard, and each drop is the same draft change the button

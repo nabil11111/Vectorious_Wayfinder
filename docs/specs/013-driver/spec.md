@@ -19,7 +19,7 @@ screen: the next shop and its window, "I've arrived", counting the cartons off, 
 delivery is saved. When the shop refuses some cartons or is closed, "Something's wrong" records it and the dispatcher
 answers from Live day. Every action is saved on the phone before the screen moves on, and sent when there is a signal,
 oldest first, once. With no signal the driver keeps working, sees what waits to send, and gets one line when it has all
-gone. "I'm back at the depot" closes the trip. On the walkthrough Dilshan drives VEH035 from Thu 25 Jun 03:31: Fresh
+gone. "I'm back at the depot" closes the trip. On the walkthrough Wasantha (Dilshan before spec 026) drives VEH035 from Thu 25 Jun 03:31: Fresh
 Nugegoda takes its 23 cartons, and at Fresh Wellawatte, with the network off, the shop refuses 2 damaged chilled cartons.
 Back online, Ruwan tells him to bring them back.
 
@@ -423,7 +423,7 @@ reset. A helper runs the walkthroughs of specs 009, 010 and 012 to VEH035 ready 
 
 ## Walkthrough
 It follows spec 012's: Kasun marked VEH035 ready at 02:36, 117 of 118 cartons on and 1 dry carton short for Fresh
-Nugegoda, and Dilshan drives it. The times below are examples.
+Nugegoda, and Wasantha drives it. The times below are examples.
 
 1. Move the clock on to "Trucks leave, Thu 03:30".
 2. On a phone, or Chrome at 390 wide, sign in as `dilshan`. Today's trip: "Thu 25 Jun · trip 1", "VEH035", "leaves 04:36
@@ -447,9 +447,9 @@ Nugegoda, and Dilshan drives it. The times below are examples.
 7. Turn the network back on. Within a few seconds: "Back online · 1 stop sent" and "Wellawatte reached the depot", and the
    chip turns "● Online".
 8. In a desktop browser, sign in as `ruwan`. The bell shows 1. Live day: "2 chilled cartons refused", "Fresh Wellawatte ·
-   stop 2 · VEH035 · Dilshan · damaged, the shop took 46 of 48 chilled", "Note · 2 crushed at the bottom" and "Still on
+   stop 2 · VEH035 · Wasantha · damaged, the shop took 46 of 48 chilled", "Note · 2 crushed at the bottom" and "Still on
    VEH035 · 2 chilled cartons · no stops left", with "Bring them back to Peliyagoda" chosen. Tap "Send to driver": "✓ Sent
-   03:52" and "VEH035 · 2 cartons back to Peliyagoda, Dilshan told".
+   03:52" and "VEH035 · 2 cartons back to Peliyagoda, Wasantha told".
 9. On the phone, without a reload: "Ruwan, dispatcher · 03:52 · Bring the 2 chilled cartons back to Peliyagoda." Tap
    "I'm back at the depot": "✓ Trip closed · 2 of 2 stops · all records sent", "Back at Peliyagoda" and "Checked in at the
    depot 03:55".
@@ -457,7 +457,7 @@ Nugegoda, and Dilshan drives it. The times below are examples.
 
 **The closed shop.** At step 6 choose "Shop closed" instead: "Nobody at the shop · since 03:45", "Waited · 3 min" and "94
 cartons stay on the truck", then "Save attempt and move on". Ruwan's card is "Nobody at Fresh Wellawatte". "Try again on
-this trip" makes Wellawatte Dilshan's next stop again, after any stop still to do, and delivering it ends at 117 of 118.
+this trip" makes Wellawatte Wasantha's next stop again, after any stop still to do, and delivering it ends at 117 of 118.
 "Bring them back" ends with "Hand them in; they go on the next run.", and OUT002's two orders are placed again for
 Friday's plan while Thursday's stop 2 stays closed.
 

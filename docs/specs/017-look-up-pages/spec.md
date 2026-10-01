@@ -264,12 +264,12 @@ the judge sees the times actually recorded at their pace. Do not manufacture com
    Nadeesha places her 8 chilled and 4 dry draft: **104** and **129** respectively (README step 3), without reload.
    Skipped lately initially shows Dickwella twice; Nugegoda, Ragama and Unawatuna once each. Its counts are shop-plan
    skips, not deferred order quantities. The panel updates from actual deferrals when the new plan is sent.
-2. Send the README's VEH035 plan, Dilshan driving, OUT001's 12 carried chilled + 8 new chilled + 4 dry and OUT002's
+2. Send the README's VEH035 plan, Wasantha driving, OUT001's 12 carried chilled + 8 new chilled + 4 dry and OUT002's
    48 chilled + 46 dry. Thursday Orders shows 104 rows, **five planned and 99 deferred**, four Carried over. History
    shows one trip, two stops, five orders, 118 cartons and the saved 04:36 / 05:00 / 05:24 / 06:10 schedule.
 3. Kasun loads Wellawatte first, flags Nugegoda's dry count at 3 of 4; Ruwan answers Go short; Kasun marks ready.
    History shows 117 loaded and one depot short, with the recorded flag, answer and ready times.
-4. Dilshan starts, arrives and photographs Nugegoda's delivery (12, 8 and 3 handed over), then refuses two of
+4. Wasantha starts, arrives and photographs Nugegoda's delivery (12, 8 and 3 handed over), then refuses two of
    Wellawatte's 48 chilled cartons and hands over 46 chilled + 46 dry. History reads 115 handed over, two refused,
    one depot short, two delivered stops and one partial. Open the actual proof; an absent optional refusal photo
    stays absent. Bring them back is answered in Live day, not here.
