@@ -1,5 +1,4 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { OperationsDay } from '@wayfinder/contracts';
 import { ICON } from '@/features/live/parts/icons';
 import { CARD } from '@/features/live/parts/ui';
 import { truckName } from '@/features/loader/words';
@@ -7,7 +6,7 @@ import { FLEET_MAP, FLEET_MAP_SIZE } from '@/lib/map/fleet-map-shapes';
 import { cn } from '@/lib/utils';
 import { BothLater } from '../DepotSwitch';
 import { useSwitchDepot } from '../depots';
-import { CARD_SIZE, VIEWS, deliveredList, drawingOf, liveLine, statsOf, type MapDrawing, type MapShapes } from './fleet-map';
+import { CARD_SIZE, VIEWS, deliveredList, drawingOf, liveLine, statsOf, type MapDrawing, type MapRead, type MapShapes } from './fleet-map';
 
 // One of the frame's pixels. The wide card sets it to its own width over 520, so it is the frame scaled to its column
 // and never scrolls sideways, up to one and a half times the frame; the narrow card sets it to 1px.
@@ -32,34 +31,33 @@ const baseline = (y: number, size: number) => y + (Math.ceil(size * 1.3) - 1.209
 const n2 = (n: number) => n.toFixed(2);
 const pathOf = (points: readonly (readonly [number, number])[]) => points.map((p, i) => `${i ? 'L' : 'M'}${n2(p[0])} ${n2(p[1])}`).join(' ');
 
-// The map's view is the depot the read is for, the one the dispatcher chose (D-93). A depot the shapes do not have gets
-// no drawing, and says so.
-const shapesOf = (depotId: string): MapShapes | null => (depotId === 'Peliyagoda' || depotId === 'Kandy' ? FLEET_MAP[depotId] : null);
+// The map's view is the depot the read is for, the one the dispatcher chose (D-93), or Both, which draws both depots
+// together (spec 021). A view the shapes do not have gets no drawing, and says so.
+const shapesOf = (view: string): MapShapes | null => (view === 'Peliyagoda' || view === 'Kandy' || view === 'Both' ? FLEET_MAP[view] : null);
 
 // The dashboard's district map (spec 019), the card right of Needs you on Dispatcher · Dashboard (53:11540), as the
 // design's map-fleet-overview.js draws it, with the live day's numbers (D-92). From 640 wide it is the frame's card
 // scaled to its column; below that its parts stack, the list under the map. Hover details are not built.
-export function FleetMap({ day }: { day: OperationsDay }) {
-  const shapes = shapesOf(day.depot.id);
-  const drawing = shapes && drawingOf(day, shapes);
-  const list = deliveredList(day.map);
-  const stats = statsOf(day);
-  const { id: depotId, name: depot } = day.depot;
+export function FleetMap({ read }: { read: MapRead }) {
+  const shapes = shapesOf(read.view);
+  const drawing = shapes && drawingOf(read, shapes);
+  const list = deliveredList(read.map);
+  const stats = statsOf(read);
   const last = VIEWS[VIEWS.length - 1];
   return (
     <section aria-label="District map" className={cn(CARD, '@container overflow-hidden')}>
       <div data-layout="wide" className="relative hidden sm:block" style={{ '--u': WIDE_UNIT, height: u(CARD_SIZE.height) } as CSSProperties}>
-        <h2 className="font-sans text-map-title" style={{ ...at(16, 15), ...type(14, 600) }}>{liveLine(day)}</h2>
+        <h2 className="font-sans text-map-title" style={{ ...at(16, 15), ...type(14, 600) }}>{liveLine(read)}</h2>
         {/* "Map view" ends 12 px before the switch, which ends 26 px from the card's right edge. */}
         <div className="flex items-start justify-end" style={{ ...atRight(222, 11, last.x + last.width - 222), gap: u(12) }}>
           <span className="text-map-muted" style={{ ...type(9), marginTop: u(9) }}>Map view</span>
-          <ViewSwitch depot={depotId} />
+          <ViewSwitch depot={read.view} />
         </div>
         <span className="text-map-stores" style={{ ...at(16, 51), ...type(11, 600) }}>{stats.stores}</span>
         <span className="text-map-muted" style={{ ...at(108, 51), ...type(11) }}>{stats.vehicles}</span>
         <span className="text-map-muted" style={{ ...at(214, 51), ...type(11) }}>{stats.routes}</span>
         <ActiveChip active={stats.active} style={atRight(399, 48, 105)} />
-        <MapPicture drawing={drawing} depot={depot} style={at(0, 77, FLEET_MAP_SIZE.width, FLEET_MAP_SIZE.height)} />
+        <MapPicture drawing={drawing} read={read} style={at(0, 77, FLEET_MAP_SIZE.width, FLEET_MAP_SIZE.height)} />
         <span aria-hidden="true" className="bg-map-divider" style={at(340, 77, 1, FLEET_MAP_SIZE.height)} />
         <Delivered list={list} style={{ ...at(354, 88), right: u(CARD_SIZE.width - 354 - 153) }} />
         <KeyItem style={across(16, 357)} sign={<VehicleKey style={at(0, 7)} />} words="Vehicle" gap={17} />
@@ -71,10 +69,10 @@ export function FleetMap({ day }: { day: OperationsDay }) {
 
       <div data-layout="narrow" className="pb-3 sm:hidden" style={{ '--u': '1px' } as CSSProperties}>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 px-4 pt-[15px]">
-          <h2 className="font-sans text-map-title" style={type(14, 600)}>{liveLine(day)}</h2>
+          <h2 className="font-sans text-map-title" style={type(14, 600)}>{liveLine(read)}</h2>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <span className="text-map-muted" style={type(9)}>Map view</span>
-            <ViewSwitch depot={depotId} />
+            <ViewSwitch depot={read.view} />
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-4">
@@ -83,7 +81,7 @@ export function FleetMap({ day }: { day: OperationsDay }) {
           <span className="text-map-muted" style={type(11)}>{stats.routes}</span>
           <ActiveChip active={stats.active} className="ml-auto" />
         </div>
-        <MapPicture drawing={drawing} depot={depot} className="mt-3 block aspect-[340/280] h-auto w-full" />
+        <MapPicture drawing={drawing} read={read} className="mt-3 block aspect-[340/280] h-auto w-full" />
         <Delivered list={list} className="px-4 pt-[11px]" />
         <ul aria-label="Map key" className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-2 px-4">
           <li className="flex items-center gap-[7px]"><VehicleKey /><span className="text-map-muted" style={type(9)}>Vehicle</span></li>
@@ -132,12 +130,12 @@ function ActiveChip({ active, style, className }: { active: string; style?: CSSP
 
 // The 340 by 280 map in the script's order: sea, districts, lines, arrows, the trip badges, district names and line
 // ends, the depot and "INDIAN OCEAN" last.
-function MapPicture({ drawing, depot, style, className }: { drawing: MapDrawing | null; depot: string; style?: CSSProperties; className?: string }) {
+function MapPicture({ drawing, read, style, className }: { drawing: MapDrawing | null; read: MapRead; style?: CSSProperties; className?: string }) {
   const { width, height } = FLEET_MAP_SIZE;
   const trips = drawing?.arrows.map((arrow) => `${truckName(arrow)} to ${arrow.district}`) ?? [];
-  const words = `${depot}'s districts on a schematic map. ${trips.length ? `On the road: ${trips.join(', ')}.` : 'No truck on the road.'}`;
+  const words = `${read.whose} districts on a schematic map. ${trips.length ? `On the road: ${trips.join(', ')}.` : 'No truck on the road.'}`;
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={drawing ? words : `No district map for ${depot}.`} className={className} style={style}>
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={drawing ? words : `No district map for ${read.name}.`} className={className} style={style}>
       <rect width={width} height={height} className="fill-map-sea" />
       {drawing ? (
         <>
@@ -173,7 +171,7 @@ function MapPicture({ drawing, depot, style, className }: { drawing: MapDrawing 
           ))}
           <text x={20} y={n2(baseline(247, 7))} fontSize={7} className="fill-map-ocean">INDIAN OCEAN</text>
         </>
-      ) : <text x={width / 2} y={height / 2} textAnchor="middle" fontSize={11} className="fill-map-muted">No district map for {depot}.</text>}
+      ) : <text x={width / 2} y={height / 2} textAnchor="middle" fontSize={11} className="fill-map-muted">No district map for {read.name}.</text>}
     </svg>
   );
 }

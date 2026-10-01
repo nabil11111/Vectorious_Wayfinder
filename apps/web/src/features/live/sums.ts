@@ -51,10 +51,12 @@ export function openCount(lists: { data?: IssueList; isError: boolean }[]): numb
   return added(lists.map((list) => list.data!.issues.length));
 }
 
-// Every depot's open problems in one list, oldest first as each depot's own list is, each with its depot.
+// Every depot's open problems in one list, oldest first as each depot's own list is, each with its depot. One depot's
+// list keeps the order it came in.
 export function openOf(lists: { depot: string; list: IssueList }[]): { depot: string; issue: Issue }[] {
-  return lists.flatMap(({ depot, list }) => list.issues.map((issue) => ({ depot, issue })))
-    .sort((a, b) => a.issue.raisedAt.localeCompare(b.issue.raisedAt) || a.issue.id.localeCompare(b.issue.id));
+  const all = lists.flatMap(({ depot, list }) => list.issues.map((issue) => ({ depot, issue })));
+  if (lists.length < 2) return all;
+  return all.sort((a, b) => a.issue.raisedAt.localeCompare(b.issue.raisedAt) || a.issue.id.localeCompare(b.issue.id));
 }
 
 // The value every depot's read gives, such as the watched day, or undefined when they differ or there is none.

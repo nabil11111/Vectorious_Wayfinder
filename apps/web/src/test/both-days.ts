@@ -20,7 +20,7 @@ export const DEPOT_DISTRICTS: Record<DepotName, [string, number][]> = {
 };
 const FLEET: Record<DepotName, number> = { Peliyagoda: 38, Kandy: 22 };
 
-export interface OutSpec { tripId: number; vehicleId: string; district: string; driver?: string; issueId?: string }
+export interface OutSpec { tripId: number; vehicleId: string; district: string; driver?: string; issueId?: string; raisedAt?: string }
 export interface DaySpec {
   depot: DepotName;
   orders: number;
@@ -45,7 +45,7 @@ export function dayOf(spec: DaySpec): OperationsDay {
     outRow: {
       progress: { numerator: null, denominator: 1, percent: null }, nextStop: null, plannedArrival: null, arrivalIsOriginal: false, plannedReturn: null,
       status: trip.issueId
-        ? { kind: 'open_problem', issueId: trip.issueId, issueKind: 'loading', summary: 'Short', raisedAt: '2026-06-23T21:03:00.000Z' }
+        ? { kind: 'open_problem', issueId: trip.issueId, issueKind: 'loading', summary: 'Short', raisedAt: trip.raisedAt ?? '2026-06-23T21:03:00.000Z' }
         : { kind: 'unrecorded' },
     },
   }));

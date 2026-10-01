@@ -6,7 +6,7 @@ import { meKey } from '@/features/auth/api';
 import { FLEET_MAP } from '@/lib/map/fleet-map-shapes';
 import { BOTH_LATER, switchDepotMutation } from '../depots';
 import { FleetMap } from './FleetMap';
-import { LABEL_OFFSETS, arrowSpots, deliveredList, drawingOf, liveLine, statsOf, type MapShapes } from './fleet-map';
+import { LABEL_OFFSETS, arrowSpots, bothMapRead, deliveredList, drawingOf, liveLine, mapReadOf, statsOf, type MapShapes } from './fleet-map';
 
 // Spec 019's card from plain reads: the header and its numbers (AC-3), the arrows and lines (AC-4) and Stores delivered
 // (AC-5), and spec 020's view switch and the chosen depot's map (AC-6). A trip here needs only what the map reads of it:
@@ -77,7 +77,7 @@ const SHAPES: MapShapes = {
 const shareAlong = (points: readonly Point[], at: readonly [number, number]) =>
   Math.hypot(at[0] - points[0][0], at[1] - points[0][1]) / Math.hypot(points[40][0] - points[0][0], points[40][1] - points[0][1]);
 // The card as the dashboard draws it, inside the app's query client, which its view switch uses.
-const card = (day: OperationsDay, qc = new QueryClient()) => renderToStaticMarkup(<QueryClientProvider client={qc}><FleetMap day={day} /></QueryClientProvider>);
+const card = (day: OperationsDay, qc = new QueryClient()) => renderToStaticMarkup(<QueryClientProvider client={qc}><FleetMap read={mapReadOf(day)} /></QueryClientProvider>);
 // The wide card, as from 640 wide; the narrow one draws the same map again below it.
 const wide = (markup: string) => markup.slice(0, markup.indexOf('data-layout="narrow"'));
 const narrow = (markup: string) => markup.slice(markup.indexOf('data-layout="narrow"'));
@@ -90,20 +90,20 @@ describe('the card numbers', () => {
   it('AC-3 the header says Live at the read time and the stats come from the read', () => {
     const day = dayWith([{ vehicleId: 'VEH035', district: 'Colombo' }, { vehicleId: 'VEH004', district: 'Gampaha', status: 'ready' }]);
     expect(liveLine(day)).toBe('Live · 03:38');
-    expect(statsOf(day)).toEqual({ stores: '75 stores', vehicles: '38 vehicles', routes: '2 routes', active: '1 active' });
+    expect(statsOf(mapReadOf(day))).toEqual({ stores: '75 stores', vehicles: '38 vehicles', routes: '2 routes', active: '1 active' });
     const markup = wide(card(day));
     for (const words of ['Live · 03:38', 'Map view', '75 stores', '38 vehicles', '2 routes', '1 active', 'Stores delivered']) expect(markup).toContain(words);
   });
 
   it('AC-3 one route and one vehicle are singular', () => {
     const day = dayWith([{ vehicleId: 'VEH035', district: 'Colombo' }]);
-    expect(statsOf({ ...day, counts: { ...day.counts, vehiclesTotal: 1 } })).toMatchObject({ vehicles: '1 vehicle', routes: '1 route', active: '1 active' });
+    expect(statsOf(mapReadOf({ ...day, counts: { ...day.counts, vehiclesTotal: 1 } }))).toMatchObject({ vehicles: '1 vehicle', routes: '1 route', active: '1 active' });
   });
 });
 
 describe('the arrows and lines', () => {
   it('AC-4 one trip alone sits at 55% of its line, pointing away from the depot, and lights that line only', () => {
-    const drawing = drawingOf(dayWith([{ vehicleId: 'VEH035', district: 'Colombo' }]), SHAPES);
+    const drawing = drawingOf(mapReadOf(dayWith([{ vehicleId: 'VEH035', district: 'Colombo' }])), SHAPES);
     expect(drawing.lines.map((line) => [line.district, line.active])).toEqual([['Colombo', true], ['Gampaha', false]]);
     expect(drawing.arrows).toHaveLength(1);
     const [arrow] = drawing.arrows;
@@ -113,7 +113,7 @@ describe('the arrows and lines', () => {
   });
 
   it('AC-4 the read names the depot districts: they are filled as served and named at the design offsets', () => {
-    const drawing = drawingOf(dayWith([]), SHAPES);
+    const drawing = drawingOf(mapReadOf(dayWith([])), SHAPES);
     expect(drawing.districts.map((district) => [district.name, district.served])).toEqual([['Colombo', true], ['Gampaha', true], ['Ratnapura', false]]);
     expect(drawing.ends).toEqual([
       { name: 'Colombo', centre: [200, 100], label: [128, 99] },
@@ -127,7 +127,7 @@ describe('the arrows and lines', () => {
       { vehicleId: 'VEH035', district: 'Colombo' }, { vehicleId: 'VEH004', district: 'Colombo', tripNo: 2 }, { vehicleId: 'VEH010', district: 'Colombo' },
       { vehicleId: 'VEH020', district: 'Colombo', status: 'ready' }, { vehicleId: 'VEH030', district: 'Gampaha', earlier: true },
     ]);
-    const drawing = drawingOf(day, SHAPES);
+    const drawing = drawingOf(mapReadOf(day), SHAPES);
     const colombo = drawing.arrows.filter((arrow) => arrow.district === 'Colombo');
     expect(colombo.map((arrow) => [arrow.vehicleId, arrow.tripNo])).toEqual([['VEH004', 2], ['VEH010', 1], ['VEH035', 1]]);
     colombo.forEach((arrow, i) => expect(Math.abs(shareAlong(SHAPES.connections[0].points, arrow.at) - [0.24, 0.51, 0.78][i])).toBeLessThanOrEqual(0.011));
@@ -151,10 +151,10 @@ describe('the arrows and lines', () => {
 
   it('AC-4 with nothing out every line is muted, no arrow is drawn and the chip says 0 active', () => {
     const day = dayWith([{ vehicleId: 'VEH035', district: 'Colombo', status: 'ready' }]);
-    const drawing = drawingOf(day, SHAPES);
+    const drawing = drawingOf(mapReadOf(day), SHAPES);
     expect(drawing.arrows).toEqual([]);
     expect(drawing.lines.some((line) => line.active)).toBe(false);
-    expect(statsOf(day).active).toBe('0 active');
+    expect(statsOf(mapReadOf(day)).active).toBe('0 active');
   });
 
   it('AC-4 the card draws one arrow per trip on the road, the badge on a later trip, and orange only on its line', () => {
@@ -173,7 +173,7 @@ describe('the arrows and lines', () => {
     // Every Gampaha shop was archived while yesterday's truck is still out there: the chip counts it, so the map draws it.
     const day = dayWith([{ vehicleId: 'VEH030', district: 'Gampaha', earlier: true }]);
     const archived = { ...day, map: { shops: day.map.shops - 15, districts: day.map.districts.filter((row) => row.district !== 'Gampaha') } };
-    const drawing = drawingOf(archived, SHAPES);
+    const drawing = drawingOf(mapReadOf(archived), SHAPES);
     expect(drawing.lines.map((line) => [line.district, line.active])).toEqual([['Colombo', false], ['Gampaha', true]]);
     expect(drawing.arrows.map((arrow) => arrow.vehicleId)).toEqual(['VEH030']);
     expect(drawing.arrows).toHaveLength(archived.counts.vehiclesOut);
@@ -244,7 +244,7 @@ describe('the view switch and the chosen depot (spec 020)', () => {
     expect(views(narrow(markup))).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'greyed']]);
 
     const drawn = wide(markup);
-    const kandy = drawingOf(day, FLEET_MAP.Kandy);
+    const kandy = drawingOf(mapReadOf(day), FLEET_MAP.Kandy);
     for (const district of kandy.districts) expect(drawn).toContain(`d="${district.d}"`);
     expect(drawn).not.toContain(FLEET_MAP.Peliyagoda.districts.find((district) => district.name === 'Colombo')!.d);
     expect([...drawn.matchAll(/data-line="([^"]+)"/g)].map(([, district]) => district)).toEqual(['Badulla', 'Kandy', 'Kegalle', 'Matale', 'Nuwara Eliya']);
@@ -278,5 +278,33 @@ describe('the credit', () => {
     const markup = wide(card(dayWith([])));
     expect(markup).toContain('Schematic district routes · not GPS');
     expect(markup).toMatch(/<a[^>]*href="https:\/\/www\.openstreetmap\.org\/copyright"[^>]*>© OpenStreetMap contributors<\/a>/);
+  });
+});
+
+describe('both depots together (spec 021)', () => {
+  it('AC-5 the Both read adds the two depots up: shops by district, fleets, trips and trucks out, at the older read time', () => {
+    const peliyagoda = { ...dayWith([{ vehicleId: 'VEH035', district: 'Colombo' }], { Colombo: 2 }), readAt: '2026-06-24T22:08:00.000Z' };
+    const kandy = { ...dayWith([{ vehicleId: 'VEH045', district: 'Kandy', tripNo: 2 }], { Kandy: 3 }, 'Kandy'), readAt: '2026-06-24T22:05:00.000Z' };
+    const both = bothMapRead([peliyagoda, kandy]);
+    expect(both).toMatchObject({ view: 'Both', whose: 'Peliyagoda\'s and Kandy\'s', readAt: '2026-06-24T22:05:00.000Z', counts: { vehiclesTotal: 60, tripsTotal: 2, vehiclesOut: 2 } });
+    expect(statsOf(both)).toEqual({ stores: '120 stores', vehicles: '60 vehicles', routes: '2 routes', active: '2 active' });
+    expect(liveLine(both)).toBe('Live · 03:35');
+    expect(both.out.map((trip) => trip.vehicleId)).toEqual(['VEH035', 'VEH045']);
+    const list = deliveredList(both.map);
+    expect(list.total).toBe('5 of 120 stores');
+    expect(list.rows.map((row) => row.district)).toEqual(['Badulla', 'Colombo', 'Galle', 'Gampaha', 'Kalutara', 'Kandy', 'Kegalle', 'Kurunegala', 'Matale', 'Matara', 'Nuwara Eliya', 'Puttalam']);
+    // The Both view draws every district either depot serves, and both depots' trucks on their lines.
+    const drawing = drawingOf(both, FLEET_MAP.Both);
+    expect(drawing.lines.filter((line) => line.active).map((line) => line.district)).toEqual(['Colombo', 'Kandy']);
+    expect(drawing.arrows.map((arrow) => [arrow.vehicleId, arrow.tripNo])).toEqual([['VEH035', 1], ['VEH045', 2]]);
+    expect(drawing.depots.map((depot) => depot.name)).toEqual(['Peliyagoda', 'Kandy']);
+  });
+
+  it('AC-5 a district both depots serve adds up, and a count either did not record stays unknown', () => {
+    const one = dayWith([], { Colombo: 2 });
+    const other = { ...one, map: { shops: 4, districts: [{ district: 'Colombo', shops: 4, shopsDelivered: 1 }] } };
+    expect(bothMapRead([one, other]).map.districts.find((row) => row.district === 'Colombo')).toEqual({ district: 'Colombo', shops: 28, shopsDelivered: 3 });
+    const unrecorded = { ...one, map: { shops: 4, districts: [{ district: 'Colombo', shops: 4, shopsDelivered: null }] } };
+    expect(bothMapRead([one, unrecorded]).map.districts.find((row) => row.district === 'Colombo')).toEqual({ district: 'Colombo', shops: 28, shopsDelivered: null });
   });
 });
