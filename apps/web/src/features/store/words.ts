@@ -110,6 +110,24 @@ export const QUANTITY_LINE = 'Whole numbers from 0 to 999.';
 // When a change to the order could not be saved and the form can no longer try: signed out, or the form left (Q-04).
 export const NOT_KEPT = 'Your last change to the order was not saved. Check the draft before you place it.';
 
+// The note for the driver takes 200 characters at most, as the API checks it (Q-06).
+const NOTE_MOST = 200;
+export const NOTE_FULL = 'The note is full: 200 characters at most.';
+export const NOTE_REFUSED = 'The note takes 200 characters at most, so that was not added.';
+
+// A change to the note is taken whole or not at all: one that would make it longer is refused, never cut.
+export const noteFits = (note: string) => note.length <= NOTE_MOST;
+
+// The line under the note: how many characters are left once 40 or fewer are, that it is full, or that a change was
+// refused because it would have made the note too long.
+export function noteLine(length: number, refused: boolean): { words: string; refused: boolean } | null {
+  if (refused) return { words: NOTE_REFUSED, refused: true };
+  const left = NOTE_MOST - length;
+  if (left <= 0) return { words: NOTE_FULL, refused: false };
+  if (left <= 40) return { words: `${left} ${left === 1 ? 'character' : 'characters'} left`, refused: false };
+  return null;
+}
+
 export const ENTRANCE: Record<DockType, string> = { street: 'Street', rear_dock: 'Rear dock', mall_bay: 'Mall loading bay' };
 
 // "Fresh · Nugegoda", the way Help writes the shop. A shop's name is its brand and then its place (spec 003).

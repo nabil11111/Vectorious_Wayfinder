@@ -7,6 +7,7 @@ import { useDraftForm, type OpenOrder, type Saving } from './draft-form';
 import { useNextOrder } from './next-order';
 import { ORANGE } from './parts/actions';
 import { BottomBar } from './parts/BottomBar';
+import { DriverNote } from './parts/DriverNote';
 import { goodsIcon } from './parts/icons';
 import { LoadError, StaleNotice } from './parts/LoadError';
 import { NoOpenDay } from './parts/NextOrderCard';
@@ -121,16 +122,7 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
           </Panel>
 
           <Panel>
-            <label htmlFor="driver-note" className="block pt-0.5 text-xs leading-[15px] font-semibold text-muted-foreground">Note for the driver</label>
-            <textarea
-              id="driver-note"
-              rows={1}
-              maxLength={200}
-              value={form.values.note}
-              disabled={form.placing}
-              onChange={(event) => form.setNote(event.target.value)}
-              className="mt-2 block field-sizing-content min-h-[47px] w-full resize-none rounded-[10px] border border-input bg-card px-3 py-[11px] text-[13px] leading-4 outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:text-muted-foreground/65 pointer-coarse:text-base"
-            />
+            <DriverNote note={form.values.note} disabled={form.placing} onChange={form.setNote} />
           </Panel>
         </div>
 
