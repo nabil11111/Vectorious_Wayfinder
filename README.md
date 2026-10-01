@@ -184,8 +184,10 @@ At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements
 **A closed shop.** At step 14 choose "Shop closed" instead and press **Save attempt and move on**: Ruwan's card reads
 "Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Wasantha's next stop again, and delivering it ends
 at 117 of 118. **Bring them back** ends with "Hand them in; they go on the next run.", and Wellawatte's two orders are
-placed again for Friday's plan: they leave the shop's Today, and Orders reads "48 chilled cartons: brought back to the
-depot, waiting for the next plan" with no day until Friday's plan takes them.
+placed again for Friday's plan: they leave "Coming today", and the shop's Today says what happened to each under "Not
+coming today", "48 chilled cartons brought back to the depot · waiting for the next plan", with "planned for Fri 26 Jun"
+once Friday's plan takes it. Orders reads "48 chilled cartons: brought back to the depot, waiting for the next plan"
+with no day until then.
 
 **A second trip.** A truck the plan sends out twice, such as VEH057 at Kandy, gives its driver both trips. **I'm back at the
 depot** on trip 1 opens trip 2's Today's trip under "✓ Trip 1 closed · 4 of 4 stops · all records sent · checked in
@@ -369,8 +371,10 @@ Anything we built differently from our Designathon submission, and why.
 - **Today lists the deliveries still to confirm** when a shop had more than one, "2 deliveries to confirm" with a row
   and Confirm for each, until the last is confirmed: a shop that confirmed its chilled drop never heard its dry one
   waited. No frame draws it.
-- **A brought-back order leaves Today** and names no day until the next plan takes it: Thursday's window beside
-  "Coming today" told the shop to wait for cartons already back at the depot. No frame draws it.
+- **A brought-back order leaves "Coming today"** and names no day until the next plan takes it: Thursday's window
+  beside "Coming today" told the shop to wait for cartons already back at the depot. Today says instead, under "Not
+  coming today", that it was brought back and waits for the next plan, or the day the plan gave it, so a manager who
+  opens only Today still sees it did not come. No frame draws it.
 - **A card's answer lines name their cartons,** "3 expired chilled cartons: replacements come on Fri 26 Jun" beside "2
   missing chilled cartons: no replacement": no frame draws two answers on one order, and plain "No replacement is
   coming" under a refusal's replacements read as taking them back.

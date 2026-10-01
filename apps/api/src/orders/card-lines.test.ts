@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { problemLineOf, type ProblemLineFacts } from './card-lines';
+import { broughtBackLine, problemLineOf, type ProblemLineFacts } from './card-lines';
 
 // Q-36: each answer line on a shop's card names the cartons it is about, so a refusal answered with replacements and a
 // report answered with none no longer read as one contradicting the other. The server words them; the card lays them
@@ -48,5 +48,14 @@ describe('Q-36 a card\'s answer lines name their cartons', () => {
     expect(closed('try_again')).toBe('39 chilled cartons: the driver comes back after the other stops');
     // Q-41: brought back, it waits for the next plan, which gives it its new day.
     expect(closed('bring_back')).toBe('39 chilled cartons: brought back to the depot, waiting for the next plan');
+  });
+});
+
+describe('L-14 Today\'s line for an order brought back from a closed shop', () => {
+  it('names the cartons taken back, then that it waits for the next plan or the day the plan gave it', () => {
+    expect(broughtBackLine('Fresh', 'chilled', 48, null)).toBe('48 chilled cartons brought back to the depot · waiting for the next plan');
+    expect(broughtBackLine('Fresh', 'chilled', 48, FRI)).toBe('48 chilled cartons brought back to the depot · planned for Fri 26 Jun');
+    expect(broughtBackLine('Fresh', 'dry', 1, null)).toBe('1 dry carton brought back to the depot · waiting for the next plan');
+    expect(broughtBackLine('Style', 'dry', 12, FRI)).toBe('12 boxes brought back to the depot · planned for Fri 26 Jun');
   });
 });

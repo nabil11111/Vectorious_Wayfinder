@@ -203,6 +203,10 @@ export const StoreOrderList = z.object({
   // each with its stop and line, "3 dry cartons · Delivered 04:06 · VEH038 · Lahiru", worded by the server, until each
   // is confirmed. null on the other lists, and when one delivery or none waits alone.
   toConfirm: z.object({ title: z.string(), deliveries: z.array(z.object({ stopId: z.uuid(), line: z.string() })) }).nullable(),
+  // On Today, the orders a driver brought back from the shop when it was closed on today's plan (Q-41, L-14): "Not
+  // coming today", and for each what happened to it, "48 chilled cartons brought back to the depot · waiting for the
+  // next plan", or its new day once a sent plan takes it, worded by the server. null on the other lists, and when none.
+  broughtBack: z.object({ title: z.string(), orders: z.array(z.object({ orderId: z.uuid(), line: z.string() })) }).nullable(),
 });
 export type StoreOrderList = z.infer<typeof StoreOrderList>;
 
