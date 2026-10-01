@@ -94,7 +94,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
       </div>
 
       <div className="px-3.5 pt-3">
-        <Timeline times={times} problems={problems} onLeaveAt={(minutes) => change(setLeaveAt(draft, key, minutes))} />
+        <Timeline times={times} depot={board.depot} problems={problems} onLeaveAt={(minutes) => change(setLeaveAt(draft, key, minutes))} />
       </div>
 
       {undo && (
