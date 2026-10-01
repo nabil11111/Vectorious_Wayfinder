@@ -56,14 +56,14 @@ phone frames) and take the tablet frames' two columns from 1024 wide. Loading sh
 |  | No day left | No frame | "No delivery day is left." |
 |  | Could not load | No frame | "Could not load the trucks." and "Try again". |
 | Truck `/loader/trucks/:tripId` | Not started | No frame | The Load a truck layout with no stop loaded, and "Start loading VEH035" as its orange button. |
-|  | Loading | Loader · Load a truck, and · phone | "← Trucks". The card: the van, "Loading VEH035", "van reefer · Fresh · Colombo · 2 stops", "0 /118" with its bar, "leaves 04:36 · in 2 h 6 min" and "0.0 / 1.0 t · 0.0 / 7.0 m³", what is on so far over the vehicle's limits. "Load in this order": a row per stop, last stop first, with "stop 2", the shop and "94 cartons", "23 of 24" when short, "✓ 94 on" once loaded, or "23 on · 1 short" in red. The current stop is outlined. "Now loading · stop 2", "Fresh Wellawatte", and a row per line with a tick box: "48 cartons chilled", "46 cartons dry"; then stop 1's "12 cartons chilled", "8 cartons chilled", "4 cartons dry", with "1 short" in red on a flagged line. "Stop 2 loaded" in orange, "Flag a problem", and "Mark ready", greyed, and "Mark ready · 1 flag" while a flag is open. On a phone the three buttons sit at the bottom. |
-|  | Waiting for an answer | No frame | Under the lines, "Waiting for the dispatcher · flagged 02:33". |
+|  | Loading | Loader · Load a truck, and · phone | "← Trucks". The card: the van, "Loading VEH035", "van reefer · Fresh · Colombo · 2 stops", "0 /118" with its bar, "leaves 04:36 · in 2 h 6 min" and "0 / 1,040 kg · 0.0 / 7.0 m³", what is on so far over the vehicle's limits. "Load in this order": a row per stop, last stop first, with "stop 2", the shop and "94 cartons", "23 of 24" when short, "✓ 94 on" once loaded, or "23 on · 1 short" in red. The current stop is outlined. While the truck loads, a loaded stop's row opens a ⋮ menu: "Flag a problem" on that stop, and "Undo stop 2 loaded" on the stop loaded last. "Now loading · stop 2", "Fresh Wellawatte", and a row per line with a tick box: "48 cartons chilled", "46 cartons dry"; then stop 1's "12 cartons chilled", "8 cartons chilled", "4 cartons dry", with "1 short" in red on a flagged line. "Stop 2 loaded" in orange, "Flag a problem", and "Mark ready", greyed, and "Mark ready · 1 flag" while a flag is open. On a phone the three buttons sit at the bottom. |
+|  | Waiting for an answer | No frame | Under the flagged stop's lines while it is being loaded, and in its row of "Load in this order" once it is on: "Waiting for the dispatcher · flagged 02:33". |
 |  | All on | Loader · Load a truck · all on | "All stops loaded", "117 of 118 on, 1 short", each answer with the dispatcher's picture, "Ruwan, dispatcher · 02:35" and "Go with 1 dry carton short for Fresh Nugegoda.", and "Mark ready" in orange once no flag is open. |
 |  | Ready | Loader · Truck ready | A green tick and "VEH035 is ready", "117 of 118 on · 1 short, dispatcher told 02:35 · leaves 04:36", and, when something is short, "Dilshan sees the short carton on stop 1 before driving." Then "Back to trucks", and the Next list beside it, below it on a phone. |
 |  | Not on the list | No frame | "This truck is not on the list any more. The plan may have changed." and "Back to trucks". |
 |  | Saving and after | No frame | The pressed button says "Saving…" and every button waits. "Not saved. Check the connection and try again." with "Try again", which sends the same write. A refusal shows the server's sentence in red on top, and the truck is fetched again. |
-| Flag `/loader/trucks/:tripId/flag?stop=` | The form | Loader · Flag a problem, and · phone | "← VEH035". "Stop 1 · Fresh Nugegoda" and "VEH035 · leaves 04:36", then each line with its tick box and its count at the dock over its quantity: "4 / 4" in green, "3 / 4" in red. A tap picks a line, and a line already flagged is greyed. "What's wrong?" with "Short", "Damaged" and "Wrong item". The picked line's counter: "Dry" with the design's dry goods picture ("Chilled" with the chilled one, the item's name for Style and Tech), "at the dock", "−", "3", "/4", "+". A note, "What happened? (optional)". "Send to dispatcher" in orange once a count is lower. |
-|  | Sending and after | No frame | As on the truck. The form keeps what was entered. |
+| Flag `/loader/trucks/:tripId/flag?stop=` | The form | Loader · Flag a problem, and · phone | "← VEH035". "Stop 1 · Fresh Nugegoda" and "VEH035 · leaves 04:36", then each line with its tick box and its count at the dock over its quantity: "4 / 4" in green, "3 / 4" in red. A tap picks a line, and a line already flagged is greyed. "What's wrong?" with "Short", "Damaged", "Wrong item" and "Won't fit". The picked line's counter: "Dry" with the design's dry goods picture ("Chilled" with the chilled one, the item's name for Style and Tech), "at the dock" ("fit on the truck" for Won't fit), "−", "3", "/4", "+". The count can be typed: anything but a whole number from 0 to the line's quantity stays as typed, in red, with "Whole numbers from 0 to 4." under it, and Send waits. A note, "What happened? (optional)". "Send to dispatcher" in orange once a count is lower. |
+|  | Sending and after | No frame | As on the truck. The form keeps what was entered. Leaving the form while the flag is not sent asks first: "This flag is not sent. If you leave now, the dispatcher may never see it." with "Try again" and "Leave without sending". |
 | Live day `/dispatcher/live` | Loading | Dispatcher · Live day · loading, its right column | Grey blocks in the right column. |
 |  | A problem open | Dispatcher · Live day · issue open, its right column | "Needs you · 1", then a card per open problem, oldest first: the time it was raised, "02:33", the title "1 dry carton short", "Fresh Nugegoda · stop 1 · VEH035 · leaves 04:36", the rows "Loader · Kasun · 02:33", "At the dock · 3 of 4 dry cartons" and "Note · Only 3 dry cartons in the store", "What should the loader do?", the two answers as the design's option cards, "Go short" chosen ("The truck leaves with what is at the dock.") and "Load it all" ("The rest comes from stock and goes on."), and "Send to loader" in orange. |
 |  | Answer sent | Dispatcher · Live day · issue open · decision sent, its green card | "✓ Sent 02:35" and "VEH035 goes 1 dry carton short, Kasun told", kept until the next answer or a reload. |
@@ -99,7 +99,8 @@ where two stops are needed, VEH004 with OUT026 and OUT028 as in spec 010's AC-11
    *With VEH004's trip as well, VEH004 leaves at 03:30 and comes first, then VEH035 at 04:36.*
 3. **Starting (D-33).** "Start loading" makes a `planned` trip `loading`. It takes the planning locks of spec 010 and
    checks that the plan is still sent at the revision the loader's screen showed. From then on the plan cannot go back
-   to edit, and the board says so. A plan taken back to edit before that leaves the list, which then says no plan is
+   to edit, and View plan says so where "Back to edit" was: "Loading has started, so this plan cannot go back to edit."
+   A plan taken back to edit before that leaves the list, which then says no plan is
    out. The drawn "Plan changed" screens come with A7. *Ruwan takes Thursday's plan back at Wed 16:30: Kasun's list
    says no plan is out for Thu 25 Jun. Once Kasun has started VEH035, View plan has no "Back to edit" and an unsend is
    refused with `loading_started`.*
@@ -107,21 +108,27 @@ where two stops are needed, VEH004 with OUT026 and OUT028 as in spec 010's AC-11
    loaded. A stop is marked loaded whole, and only once every stop after it is loaded. *VEH004's stop 2, Fresh Kandana
    with 99 cartons, goes in before stop 1, Fresh Gampaha with 111. Marking stop 1 first is refused: "Load stop 2
    first."* The tick boxes beside a stop's lines are the loader's own checklist: they are not saved and a reload clears
-   them. "Stop 1 loaded" works once each line is ticked or flagged.
+   them. "Stop 1 loaded" works once each line is ticked or flagged. Until the truck is ready, the stop loaded last can
+   be taken off again, keeping its counts and flags, and a loaded stop can still be flagged. *With both of VEH004's
+   stops on, taking stop 2 off is refused: "Undo stop 1 first. The last stop loaded comes off first."*
 5. **What goes out (D-35).** A line goes out at its quantity, at the count the loader gave while its flag is open or
    after "Go short", and at its quantity again after "Load it all". A loaded stop's lines are on the truck. The screen
-   shows the units on over the truck's units, and the kilos and cubic metres on so far over the vehicle's limits.
+   shows the units on over the truck's units, and the kilos and cubic metres on so far over the vehicle's limits. The
+   weight never rounds up to look full: a vehicle under 2 t shows kilos, and a truck tonnes rounded down.
    *VEH035 carries 118 cartons. With stop 2 loaded, then Nugegoda's dry line flagged at 3 of 4 and stop 1 loaded, 117
-   of 118 are on: 807.3 kg and 4.329 m³, shown "0.8 / 1.0 t · 4.3 / 7.0 m³".*
-6. **Flags (D-36).** A loader flags lines of one stop while its truck is `loading`: a reason (short, damaged or wrong
-   item), the good units at the dock for each line it names, from 0 to one less than the line's quantity and at least
+   of 118 are on: 807.3 kg and 4.329 m³, shown "807 / 1,040 kg · 4.3 / 7.0 m³".*
+6. **Flags (D-36).** A loader flags lines of one stop while its truck is `loading`: a reason (short, damaged, wrong
+   item, or won't fit when the truck cannot take it all), the good units at the dock for each line it names (for won't
+   fit, the units that fit), from 0 to one less than the line's quantity and at least
    one line, and a note of up to 200 characters, which may be empty. A line is flagged once while its truck loads, so
    the answer about it is never in doubt. The flag stays open until the dispatcher answers it. *Kasun flags OUT001's
    dry line: short, 3 of 4, "Only 3 dry cartons in the store".*
 7. **The answer (D-37).** The dispatcher answers an open flag once: "Go short", and the truck leaves with what is at
    the dock, or "Load it all", and the rest comes from stock and goes on. The plan, the stops and the other lines stay
-   as they are. The loader sees who answered, when, and one sentence per answer. *With "Go short" the dry line goes
-   out at 3, and with "Load it all" at 4, as the loader adds the carton before marking the truck ready.*
+   as they are. The loader sees who answered, when, and one sentence per answer. A won't fit flag gets the same two
+   answers, said about room: "The truck leaves with what fits." and "Make room on the truck for the rest." *With "Go
+   short" the dry line goes out at 3, and with "Load it all" at 4, as the loader adds the carton before marking the
+   truck ready.*
 8. **Ready.** A truck is marked ready once every stop is loaded and no flag is open. It becomes `ready` at the app
    clock's time, each of its lines gets its loaded count, and each of its orders becomes `loaded`. An order whose lines
    all go out at 0 is still `loaded`, so the driver and the shop see it missing. *VEH035 ready: 48 and 46 cartons for
@@ -158,13 +165,13 @@ A refusal comes with one sentence (`plan.md`, Contracts), which the screen shows
   `stops_left`, `flag_open`, `not_loading` and `already_flagged`.
 
 ## Data in and out
-Seven endpoints under `/api/v1`, with shapes and steps in `plan.md`. For a loader: `GET /loading`, and `POST
-/loading/trips/:tripId/start`, `/stop-loaded`, `/flags` and `/ready`, each answering the loading day. For a dispatcher:
-`GET /issues` and `POST /issues/:issueId/decide`. They read the plan tables, orders and their lines, products, outlets,
-vehicles, users, the calendar and the problems, and write `trips`, `stops`, `order_lines`, `orders`, `issues`,
-`issue_lines` and `audit_log`. After each change commits, `loading` is announced to the depot (D-21). A start also
-announces `plans`, a flag and an answer also `issues`, and a ready `orders` to each shop on the truck and to the depot.
-Spec 010's send and unsend also announce `loading`.
+Eight endpoints under `/api/v1`, with shapes and steps in `plan.md`. For a loader: `GET /loading`, and `POST
+/loading/trips/:tripId/start`, `/stop-loaded`, `/undo-stop`, `/flags` and `/ready`, each answering the loading day.
+For a dispatcher: `GET /issues` and `POST /issues/:issueId/decide`. They read the plan tables, orders and their lines,
+products, outlets, vehicles, users, the calendar and the problems, and write `trips`, `stops`, `order_lines`, `orders`,
+`issues`, `issue_lines` and `audit_log`. After each change commits, `loading` is announced to the depot (D-21). A start
+also announces `plans`, a flag and an answer also `issues`, and a ready `orders` to each shop on the truck and to the
+depot. Spec 010's send and unsend also announce `loading`.
 
 ## Acceptance criteria
 API criteria are integration tests on the seeded day of a fresh database, clock set, each file ending with spec 008's
@@ -294,15 +301,15 @@ are examples.
 2. On a phone, sign in as `kasun`. Today's trucks: "Thu 25 Jun" and "1 truck". Next out: "VEH035 · leaves 04:36", "in 2
    h 6 min · van reefer", "Fresh · Colombo · 2 stops" and "0 of 118 cartons on", and under "Goes in first" "stop 2 ·
    Fresh Wellawatte · 94 cartons" above "stop 1 · Fresh Nugegoda · 24 cartons". Tap "Start loading VEH035".
-3. Loading VEH035: "0 /118", "leaves 04:36 · in 2 h 6 min" and "0.0 / 1.0 t · 0.0 / 7.0 m³". Now loading · stop 2 ·
+3. Loading VEH035: "0 /118", "leaves 04:36 · in 2 h 6 min" and "0 / 1,040 kg · 0.0 / 7.0 m³". Now loading · stop 2 ·
    Fresh Wellawatte: tick "48 cartons chilled" and "46 cartons dry" and tap "Stop 2 loaded": "94 /118" and
-   "0.6 / 1.0 t · 3.5 / 7.0 m³". Now loading · stop 1 · Fresh Nugegoda: "12 cartons chilled", "8 cartons chilled" and
-   "4 cartons dry".
+   "648 / 1,040 kg · 3.5 / 7.0 m³". Now loading · stop 1 · Fresh Nugegoda: "12 cartons chilled", "8 cartons chilled"
+   and "4 cartons dry".
 4. Tap "Flag a problem", tap the "4 cartons dry" row, keep "Short", tap − once to "3 /4", write "Only 3 dry cartons in
    the store" and tap "Send to dispatcher". Back on the truck: "1 short" on the dry line, "23 of 24" on stop 1, and
    "Mark ready · 1 flag" greyed.
-5. Tick the two chilled lines and tap "Stop 1 loaded": "All stops loaded", "117 of 118 on, 1 short" and "Waiting for
-   the dispatcher · flagged 02:33". The card reads "117 /118" and "0.8 / 1.0 t · 4.3 / 7.0 m³".
+5. Tick the two chilled lines and tap "Stop 1 loaded": "All stops loaded", "117 of 118 on, 1 short", and stop 1's row
+   says "Waiting for the dispatcher · flagged 02:33". The card reads "117 /118" and "807 / 1,040 kg · 4.3 / 7.0 m³".
 6. In a desktop browser, sign in as `ruwan`. The bell shows 1. Open Live day: "Live day · Thu 25 Jun", "1 needs you",
    and the card "1 dry carton short", "Fresh Nugegoda · stop 1 · VEH035 · leaves 04:36", "Kasun · 02:33", "3 of 4 dry
    cartons" and the note. Keep "Go short" and tap "Send to loader": "✓ Sent 02:35" and "VEH035 goes 1 dry carton short,

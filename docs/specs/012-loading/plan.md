@@ -23,7 +23,7 @@ The lead writes these into two new files, `packages/contracts/src/issues.ts` and
 
 | Shape | What it holds |
 | --- | --- |
-| `ISSUE_KINDS`, `ISSUE_STATUSES`, `FLAG_REASONS`, `LOADING_DECISIONS` | `['loading']`, `['open', 'decided']`, `['short', 'damaged', 'wrong_item']` and `['go_short', 'load_all']`, with their Zod enums. |
+| `ISSUE_KINDS`, `ISSUE_STATUSES`, `FLAG_REASONS`, `LOADING_DECISIONS` | `['loading']`, `['open', 'decided']`, `['short', 'damaged', 'wrong_item', 'wont_fit']` and `['go_short', 'load_all']`, with their Zod enums. `wont_fit` is a truck that cannot take it all, counted by what fits. |
 | `IssueLine` | `lineId`, `orderId`, `temp`, `productId`, `name`, `unit`, `quantity` and `counted`. |
 | `Issue` | `id`, `revision`, `kind`, `reason`, `status`, `raisedBy` (a name), `raisedAt`, `note` or null, `decision`, `decidedBy` (a name) and `decidedAt`, each null while open, `short` (the units the lines are short), `trip` (`id`, `vehicleId`, `tripNo`, `leavesAt`), `stop` (`id`, `seq`, `outletId`, `shopName`) and `lines`. |
 | `IssueList`, `DecideIssueRequest`, `DecideIssueResponse` | The list: `day` (the loader's day, or null) and `issues`. The answer: `revision` and `decision`. Its response: the list with `decided`, the problem just answered. |
@@ -39,7 +39,7 @@ New error codes, each with a sentence the screens show as it is:
 | --- | --- | --- | --- |
 | `plan_changed` | 409 | none | "The plan for Thu 25 Jun changed after this screen loaded it." |
 | `not_loading` | 409 | `TripDetails` (spec 010) | "VEH035 is not being loaded." |
-| `load_order` | 409 | `stopSeq`, the stop to load first | "Load stop 2 first. The last stop goes in first." |
+| `load_order` | 409 | `stopSeq`, the stop to load first, or to take off first | "Load stop 2 first. The last stop goes in first.", or "Undo stop 1 first. The last stop loaded comes off first." |
 | `already_flagged` | 409 | `lineId` | "The 4 dry cartons for Fresh Nugegoda are already flagged." |
 | `stops_left` | 409 | `stopSeqs` | "Stop 1 is not loaded yet." |
 | `flag_open` | 409 | `issueIds` | "The dispatcher has not answered the flag on VEH035 yet." |
@@ -55,7 +55,7 @@ when there is no loader's day at all ("No delivery day is left."), `stale` 409
 | `apps/api/src/loading/loader-day.ts` | `loaderDay(today, minutesNow, operatingDays)`: rule 1 on plain values, with `CUTOFF_MINUTES` from `orders/orderable-day.ts`. |
 | `apps/api/src/loading/going.ts` | `goingOf(quantity, flag)`: rule 5 on plain values. |
 | `apps/api/src/loading/day.ts` | `loadingDayOf(tx, depotId, at)`, which the GET and every loader write answer with. |
-| `apps/api/src/loading/writes.ts` | `startLoading`, `markStopLoaded`, `raiseFlag` and `markReady`, and `openTrip`, the steps they share. |
+| `apps/api/src/loading/writes.ts` | `startLoading`, `markStopLoaded`, `undoStopLoaded`, `raiseFlag` and `markReady`, and `openTrip`, the steps they share. |
 | `apps/api/src/issues/read.ts`, `issues/decide.ts` | `issuesOf(tx, where)`, a problem with its truck, stop and people, for the loading day and for the dispatcher. `listIssues` and `decideIssue`. |
 | `apps/api/src/lib/day-lock.ts` | `lockDay(tx)` and `lockDepotDay(tx, depotId)`: step 1 of spec 010's writes, moved here by the lead in T0 so both pieces take the same locks in the same order. Each answers the clock instant read from the locked `demo_day` row. |
 | `apps/api/src/routes/loading.ts`, `routes/issues.ts` | The routes behind `requireRole('loader')` or `requireRole('dispatcher')` and the depot check. The lead mounts them as `/loading` and `/issues`. |
@@ -94,6 +94,9 @@ the other instead of deadlocking over the other tables (added at spec 010's join
 - **Stop loaded.** The trip must be `loading` (`not_loading`) at the named revision (`stale`). The stop must be the
   trip's (`unknown_record`) and not loaded (`stale`), and every stop with a higher number loaded (`load_order`, naming
   the highest one that is not). `loaded_at` is the clock instant. Audit `stop.loaded`. Announce `loading`.
+- **Undo a stop** (`/undo-stop`, the stop-loaded request). The trip must be `loading` at the named revision, the stop
+  the trip's and loaded (`stale`), and no stop with a lower number loaded (`load_order`, naming the lowest). `loaded_at`
+  goes back to empty, and the stop's lines and flags stay. Audit `stop.load_undone`. Announce `loading`.
 - **Flag.** The trip must be `loading` at the named revision, and the stop the trip's. Every line named must be on an
   order of that stop (`unknown_record`), on no other loading problem (`already_flagged`), and counted from 0 to one
   below its quantity (`invalid_input`). Insert the problem, kind `loading`, raised by the caller at the clock instant,
@@ -132,12 +135,15 @@ column of the trip: a ready reads the problems under the trip's lock, so it sees
   "boxes" or "items", and "units" when the trip mixes brands. A line: "12 cartons chilled" for Fresh, and "10 boxes ·
   Folded clothing" or "2 pallets of 8 · Televisions" with the item's name for Style and Tech.
 - "leaves 04:36", "in 42 min", "in 2 h 6 min" and "12 min late", from `leavesAt` and the app clock on screen. The load
-  figure "0.2 / 1.0 t · 0.9 / 7.0 m³", tonnes and cubic metres to one decimal.
+  figure "165 / 1,040 kg · 0.9 / 7.0 m³" for a vehicle under 2 t, and "4.5 / 6.8 t · 21.0 / 33.4 m³" for a truck: the
+  weight rounded down and never at the limit's figure while weight is free, the cubic metres to one decimal.
 - A problem's title by reason: "1 dry carton short", "2 chilled cartons damaged", "1 dry carton was the wrong item",
-  and "3 items short" when its lines differ.
+  "4 chilled cartons won't fit", and "3 items short" when its lines differ.
 - The loader's answer line: "Ruwan, dispatcher · 02:35", then "Go with 1 dry carton short for Fresh Nugegoda." or
-  "Load it all for Fresh Nugegoda. The rest comes from stock." The dispatcher's sent line: "VEH035 goes 1 dry carton
-  short, Kasun told" or "VEH035 loads it all, Kasun told".
+  "Load it all for Fresh Nugegoda. The rest comes from stock.", and for won't fit "Go without the 4 chilled cartons
+  that won't fit for Fresh Mahaiyawa." or "Load it all for Fresh Mahaiyawa. Make room for the rest." The dispatcher's
+  sent line: "VEH035 goes 1 dry carton short, Kasun told", "VEH057 goes without the 4 chilled cartons that won't fit,
+  Sarath told" or "VEH035 loads it all, Kasun told".
 - Ready: "23 of 24 on · 1 short, dispatcher told 02:35 · leaves 04:36", and "Dilshan sees the short carton on stop 1
   before driving.", "The driver sees …" with no driver, and "cartons" and "stops 1 and 2" when there are more.
 - Icons from the design, in `assets/icons/`: the reefer lorry, lorry, van, chilled and dry goods pictures, the
