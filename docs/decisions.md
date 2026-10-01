@@ -429,3 +429,13 @@ driver together from one list sorted by fit, district last run and fuel. The "Un
 Unplanned orders the column. Sentences call a truck "Chaminda's dry truck". The plan board's and View plan's cards
 read "Chaminda · dry truck" with no vehicle number, which stays only where someone must find the actual truck (the
 loader, the driver, Fleet) (Nabil, 1 Oct, spec 026).
+
+**D-102 · 2 Oct · Before an order waits, the planner frees a run for it.** The planner places orders one at a time in
+priority order, so an earlier order can hold a run that a later one needed while its goods could have gone elsewhere.
+Kandy's seeded day left OUT088's last 5 boxes and OUT093's Tech order waiting, though a plan within the same checks
+carried both on the same 26 trips. Once every order has had its turn, each waiting one, in priority order, may take a
+run freed by moving goods the plan already carries: onto a run that already stops at the same shop, or whole onto a
+vehicle's free run. Nothing accepted waits, every move is checked with its vehicle's departures as they are, and the
+search is bounded (each vehicle's last run, the first that works), so the planner stays within its time limits. The
+pass runs after every order has had its turn rather than at each refusal: freeing a run at once for an earlier-ranked
+order took room later orders needed and left more waiting on Peliyagoda's seeded day (Nabil, 2 Oct, spec 011, AC-23).

@@ -10,6 +10,8 @@ import { effectiveWindow, isWaiting } from './priority';
 
 export type PlannerDeferralCode = Exclude<DeferralCode, 'dispatcher_choice'>;
 export type RejectionStage = 'over_capacity' | 'window' | 'fuel';
+// Where an order went and the rule that decided it, as a reason words it.
+export type Placement = Pick<CandidateAttempt, 'slot' | 'selectionReason'>;
 
 // How fully a reason is worded, from the fullest to the shortest. The planner keeps every reason within 200 characters
 // (spec 011) by taking the first wording that fits: whole sentences, then the short forms; then the tight form, which
@@ -172,7 +174,7 @@ export function priorityReason(input: PlannerInput, order: PlannerOrder, rank: n
 // The run an order joins or starts, the vehicle by the driver the planner's input gives it (spec 026) or else by its
 // kind and id, and only a second trip by its number (spec 024): "new run on Chaminda's dry truck to Gampaha", "joined
 // the dry truck VEH012 on its second trip to Gampaha".
-export function placementReason(input: PlannerInput, order: PlannerOrder, attempt: CandidateAttempt, wording: Wording = 'full'): string {
+export function placementReason(input: PlannerInput, order: PlannerOrder, attempt: Placement, wording: Wording = 'full'): string {
   const district = displayName(shopOf(input, order).district);
   const { vehicleId, tripNo, existing } = attempt.slot;
   const vehicle = lookup(input.vehicles, 'vehicle')(vehicleId);
@@ -188,6 +190,9 @@ export function placementReason(input: PlannerInput, order: PlannerOrder, attemp
       'more weight capacity broke the tie': 'higher weight limit',
       'uses less fuel per kilometre': 'less fuel per km',
       'vehicle ID breaks the tie': 'vehicle ID tie',
+      'shares a stop to free a run': 'shares a stop',
+      'moved to free a run': 'moved to free a run',
+      'takes a run freed for it': 'freed run',
     };
     const why = attempt.selectionReason ? shorter[attempt.selectionReason] ?? attempt.selectionReason : 'fits delivery limits';
     // The tightest wordings leave out the deciding rule, and only that.

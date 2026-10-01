@@ -92,7 +92,7 @@ describe('F8 the planner\'s quality on the seeded days', () => {
     expect(plan.plan.trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds)).sort()).toEqual(input.orders.map((o) => o.id).sort());
   });
 
-  it.fails('F1 the planner serves all of Kandy\'s seeded goods on 26 trips, with no new block or warning, within a second', async () => {
+  it('F1 the planner serves all of Kandy\'s seeded goods on 26 trips, with no new block or warning, within a second', async () => {
     const { input } = await kandyFixture();
     const run = measured(input);
     expect(run.deferrals).toBe(0);
@@ -131,10 +131,11 @@ describe('F8 the planner\'s quality on the seeded days', () => {
     expect(run.blocks).toBe(0);
   });
 
-  it.fails('F3 rebalances a split\'s two parts when the first remainder fits no truck', () => {
+  it('F1/F3 serves both parts of a split when the first remainder fits no truck', () => {
     // Two trucks of 1,000 kg, one of 10 m³ and one of 5 m³, and a shop open only long enough for one run each. The order
     // has two A items of 500 kg and 1 m³ and two B items of 100 kg and 4 m³. Both A items on the larger truck leave
-    // both B items, 8 m³, for the smaller one. Two parts that each fit their truck serve everything.
+    // both B items, 8 m³, for the smaller one. Two parts that each fit their truck serve everything: here the pass that
+    // frees a run moves the A items whole onto the smaller truck, and the B items take the larger.
     const products: EngineProduct[] = [
       { id: 'a', kgPerUnit: 500, m3PerUnit: 1, temp: 'dry', needsTailLift: false, keepUpright: false },
       { id: 'b', kgPerUnit: 100, m3PerUnit: 4, temp: 'dry', needsTailLift: false, keepUpright: false },

@@ -3,7 +3,7 @@ import { checkPlan } from '../check';
 import { computeLoad } from '../load';
 import { lookup } from '../lookup';
 import { cargoProblems } from '../rules/cargo';
-import type { EngineOrder, PlanInput } from '../types';
+import type { EngineOrder, EngineVehicle, PlanInput } from '../types';
 import { compare, effectiveWindow } from './priority';
 import type { RejectionStage } from './reasons';
 
@@ -17,20 +17,45 @@ export interface CandidateAttempt {
 }
 export interface CandidateSlots { slots: CandidateSlot[]; refusal?: 'no_reefer' | 'no_van' }
 
+// The vehicles that may carry an order at all: the depot's available ones, fridge ones for chilled goods and vans for a
+// van-only shop. With none of the kind it needs, the order is refused before any trial.
+export function compatibleFleet(input: PlanInput, order: EngineOrder): { fleet: EngineVehicle[]; refusal?: 'no_reefer' | 'no_van' } {
+  const shop = lookup(input.outlets, 'shop')(order.outletId);
+  let fleet = input.vehicles.filter((v) => v.available && v.depotId === input.depotId);
+  if (computeLoad(order.lines, input.products).needsReefer) {
+    fleet = fleet.filter((v) => v.temp === 'reefer');
+    if (!fleet.length) return { fleet, refusal: 'no_reefer' };
+  }
+  if (shop.parking === 'van_only') {
+    fleet = fleet.filter((v) => v.type === 'van');
+    if (!fleet.length) return { fleet, refusal: 'no_van' };
+  }
+  return { fleet };
+}
+
+// AC-6's structural tuple for an order's slots: no needless reefer, no needless van, an existing trip before a new one, a
+// first trip before a second, then volume, weight, km per litre and vehicle ID.
+export function slotOrder(input: PlanInput, order: EngineOrder): (a: CandidateSlot, b: CandidateSlot) => number {
+  const shop = lookup(input.outlets, 'shop')(order.outletId);
+  const load = computeLoad(order.lines, input.products);
+  const vehicleOf = lookup(input.vehicles, 'vehicle');
+  return (a, b) => {
+    const av = vehicleOf(a.vehicleId), bv = vehicleOf(b.vehicleId);
+    return Number(av.temp === 'reefer' && !load.needsReefer) - Number(bv.temp === 'reefer' && !load.needsReefer)
+      || Number(av.type === 'van' && shop.parking !== 'van_only') - Number(bv.type === 'van' && shop.parking !== 'van_only')
+      || Number(b.existing) - Number(a.existing)
+      || a.tripNo - b.tripNo
+      || bv.volumeCapM3 - av.volumeCapM3 || bv.weightCapKg - av.weightCapKg || bv.kmPerL - av.kmPerL
+      || compare(av.id, bv.id) || a.tripNo - b.tripNo;
+  };
+}
+
 // Structural selection is the planner's policy. Loads, timings and fuel remain the checker's rules.
 export function candidateSlots(input: PlanInput, order: EngineOrder): CandidateSlots {
   const shopOf = lookup(input.outlets, 'shop');
   const shop = shopOf(order.outletId);
-  const load = computeLoad(order.lines, input.products);
-  let fleet = input.vehicles.filter((v) => v.available && v.depotId === input.depotId);
-  if (load.needsReefer) {
-    fleet = fleet.filter((v) => v.temp === 'reefer');
-    if (!fleet.length) return { slots: [], refusal: 'no_reefer' };
-  }
-  if (shop.parking === 'van_only') {
-    fleet = fleet.filter((v) => v.type === 'van');
-    if (!fleet.length) return { slots: [], refusal: 'no_van' };
-  }
+  const { fleet, refusal } = compatibleFleet(input, order);
+  if (refusal) return { slots: [], refusal };
   const slots: CandidateSlot[] = [];
   for (const vehicle of fleet) {
     const trips = input.plan.trips.filter((t) => t.vehicleId === vehicle.id);
@@ -45,16 +70,7 @@ export function candidateSlots(input: PlanInput, order: EngineOrder): CandidateS
     const next = Math.max(0, ...trips.map((t) => t.tripNo)) + 1;
     if (next <= 2 && input.plan.trips.length < 76) slots.push({ vehicleId: vehicle.id, tripNo: next, existing: false });
   }
-  const vehicleOf = lookup(fleet, 'vehicle');
-  slots.sort((a, b) => {
-    const av = vehicleOf(a.vehicleId), bv = vehicleOf(b.vehicleId);
-    return Number(av.temp === 'reefer' && !load.needsReefer) - Number(bv.temp === 'reefer' && !load.needsReefer)
-      || Number(av.type === 'van' && shop.parking !== 'van_only') - Number(bv.type === 'van' && shop.parking !== 'van_only')
-      || Number(b.existing) - Number(a.existing)
-      || a.tripNo - b.tripNo
-      || bv.volumeCapM3 - av.volumeCapM3 || bv.weightCapKg - av.weightCapKg || bv.kmPerL - av.kmPerL
-      || compare(av.id, bv.id) || a.tripNo - b.tripNo;
-  });
+  slots.sort(slotOrder(input, order));
   return { slots };
 }
 

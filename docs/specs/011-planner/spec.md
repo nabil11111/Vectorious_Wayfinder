@@ -168,6 +168,21 @@ requires a stated override. The numbered priority above and the rules below are 
   10 measured runs after one warm-up, excluding fixture loading. Search bounds are input counts and quantities,
   never elapsed time; failure of this target requires work, not a different partial answer on a slower machine.
 
+### Before an order waits
+- [ ] **AC-23** When an order, or a split's second part, would still wait once every order has had its turn, the
+  system shall first try to free a run for it, taking the waiting orders in priority order (D-102). For each vehicle
+  that may carry it, in AC-6's order, only that vehicle's last run is tried: the waiting order must pass alone on it,
+  and the run's goods must all move without waiting, each stop's orders onto another run that already stops at that
+  shop (AC-6's order for those goods), or else the whole run onto a vehicle with a run free. Each move is checked by
+  007 with the vehicle's departures as they are, so nothing accepted is deferred, split, made late or made to leave
+  earlier; the first vehicle that works wins, and the whole plan is checked again at the end. A split whose two parts
+  end on one stop goes whole again. A moved order's reason says where it went now ("joined the reefer van VEH057 on its
+  second trip to Kandy, shares a stop to free a run", or "…, moved to free a run"), and the order on the freed run says
+  "takes a run freed for it". The pass never serves fewer goods than the loop left on trips. *Kandy's seeded day:
+  OUT082's dry cartons join its chilled ones on VEH057's second trip, OUT088's 34 boxes go whole on VEH060's second
+  trip and OUT093's Tech order takes VEH058's, so all 64 orders go on 26 trips with the same two time-budget
+  warnings.* The search is bounded by the fleet, never by elapsed time, and stays within AC-22.
+
 ## Out of scope
 Database reads or writes, endpoints, screens, `PlanBoard.suggestion`, future-day slot searches, changing a manual
 draft in place, global route optimisation, brand-mixing comparisons and a new deferral code. These need a later

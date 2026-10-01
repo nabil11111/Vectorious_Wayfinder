@@ -100,7 +100,9 @@ button. It creates no automatic send. Spec 010's Find a slot remains an append-o
 the planner's sorted stops and new trips are a separate search, sharing the checker rather than that route.
 
 ## Risks and test plan
-The greedy order may miss a better rearrangement. Explanations state the actual cause in the shop's words. The seed is short
+The greedy order may miss a better rearrangement; AC-23's pass recovers the ones where a run can be freed by sharing
+stops or moving a run whole, and `planner/quality.test.ts` measures served goods, deferrals and time together on the
+seeded days. Explanations state the actual cause in the shop's words. The seed is short
 of usable fridge runs, not aggregate m³: its comment is not evidence for a particular planner deferral count.
 Reconstruct its orders, workshop flags and fuel formulas in test-only `planner/demo-fixture.test.ts` from the
 shared rows and the written constants in `db/demo-day.ts`; never import that database module. Pin source facts
@@ -113,6 +115,7 @@ separately from planner outcomes, so fixture drift cannot silently become a new 
 | AC-13 to AC-16 | `planner/split.test.ts` |
 | AC-3, AC-17 | `planner/reasons.test.ts` |
 | AC-1, AC-18, AC-20 to AC-22 | `planner/build.test.ts`, `planner/demo-fixture.test.ts` |
+| AC-23 | `planner/repair.test.ts`, `planner/quality.test.ts` |
 
 Every criterion is written and seen to fail before implementation. Include empty input, every rejection stage,
 two equal split halves, 10/11-line and 999/1,000-unit split boundaries, multi-product conservation, exact capacity,

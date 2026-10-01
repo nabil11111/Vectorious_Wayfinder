@@ -259,8 +259,9 @@ describe('the exact seeded planner day without a database', () => {
 
   it('AC-22 bounds the checker runs of the seeded search', async () => {
     // Each placed order needs only its winner and the runner-up that names the deciding rule. Trying every
-    // candidate took 2,471 checker runs here and stopping after those two takes 305; the bound leaves room
-    // for small changes but fails if the search goes back to trying every candidate.
+    // candidate took 2,471 checker runs here and stopping after those two takes 305. Freeing a run for the six
+    // waiting orders (AC-23) adds 52, as one search of each run's moves serves every waiting order while the plan is
+    // unchanged. The bound leaves room for small changes but fails if the search goes back to trying every candidate.
     const { input } = await demoFixture();
     const runs = vi.spyOn(checker, 'checkPlan');
     try {

@@ -73,7 +73,8 @@ are depot time.
    back (rule 4), with each order's wanted day, how many sent plans deferred it and its original if it is a part. The
    day's vehicles with their workshop days and the fuel they used this week, the depot's shops, travel and unloading
    times, and "Mix brands" as the draft has it. Spec 011 decides every trip, stop, leaving time, split and deferral in
-   its priority order, and the board adds nothing to it. *102 orders: 98 placed for Thursday and the 4 carried over.
+   its priority order, and before any order waits it frees a run for it where goods the plan carries can move (spec
+   011, AC-23, D-102). The board adds nothing to it. *102 orders: 98 placed for Thursday and the 4 carried over.
    VEH003, VEH005 and VEH036 are in the workshop, and VEH001 has 40 of its 340 litres left this week.*
 3. **What a build replaces (D-51, D-52).** Every trip and deferral of the draft, in one transaction with the build: a
    refused build changes nothing. A vehicle the suggestion uses keeps the driver the draft gave it, and a driver on a
@@ -108,7 +109,9 @@ are depot time.
    for Puttalam wait for their windows, each a `late_order`, and no trip leaves early. With VEH035 in the workshop,
    Fresh Nugegoda's carried-over chilled cartons have no fridge van (`no_van`) and add a `waited_again`.*
 7. **why?** An order's reason is the planner's: it names the order's rank, its priority (waited since when, chilled or
-   dry, when its window closes) and what decided its trip, or why it waits (spec 011, AC-1 and AC-17). Both parts of a
+   dry, when its window closes) and what decided its trip, or why it waits (spec 011, AC-1 and AC-17). An order moved
+   to free a run for another says so ("shares a stop to free a run"), and the order on that run says "takes a run freed
+   for it" (AC-23). Both parts of a
    split show their original's. A part split by hand after the build has no "why?", since the planner never saw it.
    *Fresh Dickwella's chilled order, wanted Tue 23 Jun and deferred twice, is rank 1, and the three other carried-over
    orders are 2 to 4.*
