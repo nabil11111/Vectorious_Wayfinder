@@ -2,7 +2,7 @@
 
 ## Data changes
 **None.** No new table, column, migration, seed data, retained daily aggregate, receipt id, forecast, vehicle hire
-or booking record. All five new endpoints are GETs. This PR changes only this spec's documents and the three spec
+or booking record. The three aggregate endpoints and A8's proof endpoint are GETs. This PR changes only this spec's documents and the three spec
 indexes/decision records. Implementation follows the joined earlier pieces; it does not copy branches into this PR.
 
 ### Sources read for this draft
@@ -16,8 +16,8 @@ were inspected. Design dates, ids and figures are examples, not seed facts.
 | --- | --- | --- |
 | 013 | Spec/plan/tasks and D-43–50 on `origin/nabil/driver` at `4ec0a6e`; server PR #17 on `codex/driver` at `946ac64` | Joined driver fields, helpers, issues and photos, including the reviewed response-snapshot/retry/photo-header fixes. |
 | 014 | Spec/plan/tasks, D-51–55 and code on `origin/nabil/suggest` at `629b70a`; joined on main in `c4ec6af` during this draft | Read sent hand/suggested plans identically; never treat a saved suggestion as publication history. |
-| 015 | Spec/plan/tasks and decisions on `origin/nabil/receipt` at `a9897d7` | At inspection this has the receipt spec, not its implementation. T0 must join its actual receipt fields/readers first; no receipt stub or driver-count substitution. |
-| 016 | Spec/plan/tasks and decisions on `codex/live-spec` at `bbb5df2`, draft PR #18 | Its proof GET and shared live/helper seams are proposed, subject to lead review. T0 reconciles them once, before builders branch. |
+| 015 | Spec/plan/tasks and decisions on `origin/nabil/receipt` at `a9897d7` | History confirmations and replacement answers wait for its merged implementation. Orders and Fleet use no 015 fields/helpers and can start after 013, subject to T0's 016 gate. No receipt stub or driver-count substitution. |
+| 016 | Spec/plan/tasks and decisions on `codex/live-spec` at `eb8a703`, draft PR #18 after review | T0 starts only after 016 is merged. Its reviewed spec has no proof-photo route; A8 supplies its own through `routes/lookup.ts`, without writing into 016's files. |
 
 These commits identify evidence, not versions to force on later builders. Only D-56–62 and D-66–72 were present
 in the inspected receipt/live documents; the user's reserved ranges through D-65 and D-79 remain untouched.
@@ -32,11 +32,13 @@ Do not expose raw Drizzle rows, audit JSON, phone-write identities or image byte
 
 | Endpoint | Input | Output |
 | --- | --- | --- |
-| `GET /lookup/orders` | `date?`, `range=day\|four_weeks` (default day), `q?` (trimmed, at most 80 characters), `filter=all\|has_deferrals\|deferred\|split` (default all) | `LookupOrders`: scope, resolved inclusive dates, range totals, matched count and rows. With no date, use calendar today. |
-| `GET /lookup/orders/:orderId` | UUID; no arbitrary outlet/depot | `LookupOrderDetail`: submitted own-depot order, including a split parent reached from a part. A draft is always `unknown_record`, even in this depot. |
-| `GET /lookup/history` | `date?` only | `LookupHistory`: resolved date or null, latest three published dates, publication or null, day totals/coverage, groups/trips/stops and deferrals. Missing date resolves by spec rule 1. Browser filters use returned flags/brands; no other API aggregation. |
-| `GET /lookup/fleet` | No date/depot parameter | `LookupFleet`: calendar today, depot vehicles and current statuses, whole-week fuel, recent trip links and summary counts. Browser filters/sort use returned fields. |
-| `GET /lookup/fleet/availability` | No arbitrary range/depot | `LookupAvailability`: today through today+41, current inventory totals, 42 date entries and recorded off rows by vehicle/reason. Browser category selection uses returned category values. |
+| `GET /lookup/orders` | `date?`, `range=day\|four_weeks` (default day) | `LookupOrders`: scope, resolved dates or null when no default board day, summary, complete rows with inline detail, and Skipped lately. Missing date uses `boardDay`, not calendar today. No search/filter/matched-count parameters or fields. |
+| `GET /lookup/history` | `date?` only | `LookupHistory`: resolved date or null, latest three published dates, publication or null, counts, groups/trips/stops/attempts/receipts and deferrals. Browser filters use returned flags/brands. This page waits for 015's receipt implementation. |
+| `GET /lookup/fleet` | No date/depot parameter | `LookupFleet`: calendar today, inventory, current recorded states, weekly fuel and recent trips, active-only header counts. Browser filters/sort use returned fields. |
+| `GET /lookup/stops/:stopId/photo` | UUID | Owned sent stop's proof JPEG or existing absent-photo error. A8 owns this route and `lookup/photo.ts` because reviewed 016 has no proof route. If merged 016 already provides an equivalent route, reuse it without editing its files or adding a duplicate. |
+
+With no default board day, Orders returns null dates/summary/Skipped lately and an empty row list for the
+choose-date state; it does not report a zero workload.
 
 Unknown query keys and repeated scalar parameters are rejected, so `depot=...` cannot silently imply a switch.
 Shared scope is `depot {id,name}`, `readAt` and `demoDay` (the existing reset generation; nullable outside demo as in
@@ -46,90 +48,91 @@ for an authorized stop/issue without a photo. Invalid JSON/shape follows the exi
 
 | Shape | Fields and source |
 | --- | --- |
-| `LookupOrderRow` | `id`, `wantedDate`, `placedAt` or null, `outlet` id/name/brand/district/effective window, `temp`, current `status`, `load` from `computeLoad`, `splitFrom` or null, `hasDeferrals`, `deferralCount`, `replacementFor` or null, `latestSent` or null. `latestSent` names plan/date, vehicle/trip/stop, outcome and planned arrival (null for a genuine legacy missing schedule); it never calls a returned order currently assigned. |
-| `LookupOrderDetail` | Row plus typed lines (ordered/loaded/handedOver/received with nulls), driver note, split original and current parts' ids, published deferral rows (date/code/note), retained assignment links, current delivery/receipt facts and replacement source. No private draft, shop phone or synthetic WF number. |
-| `LookupOrders.summary` | `orders` = selected-range leaf rows; `planned` = current status planned; `deferred` = current status deferred; `splitParts` = splitFrom nonnull; `withDeferrals` = hasDeferrals. These predicates overlap except the status ones and are not summed. Summary precedes search/filter. |
-| `LookupHistory` | `date`, `publishedDates`, plan id/revision/publishedAt/detailRecorded, `counts`, typed groups, deferrals. A null plan is the no-publication state; a sent empty plan is different. Groups carry actual brands, including Mixed. |
-| `HistoryTrip` | plan/trip identity, vehicle identity/current archived flag, driver or null, brand/district, status, saved planned schedule/load/km or null, recorded left/ready/back times, current stops and problem records. `detailRecorded` separates genuine legacy missing schedules from corrupt current publications. Reuse joined 016/013 types where meanings match, without their current-day filtering or latest-50 event limit. |
-| `HistoryStop` | id/seq/shop, saved effective window, loaded/arrived/done times, outcome, typed lines and stage totals, `late`, `short`, `returnInstructed`, current receipt or null, `proof` metadata or null, problem records and `closedAttempts`. Unknown flags are nullable, not false certainty. |
-| `HistoryClosedAttempt` | Issue id, raisedAt, reason/note, actor, counted lines, own photo metadata, decision/decider/decidedAt, arrivalAt or null with `arrivalRecorded`. Arrival comes only from the exactly matched closed audit. No current stop times, current receipt or replacement delivery count substituted for this attempt. |
-| `HistoryReceipt` | `stopId`, confirmedAt, sentAt (nullable only where joined 015 permits), cold answer, order count, lines and received/receipt-short totals, optional report id and its photo/decision/replacement link. A confirmation without a report still has its stop identity. |
-| `HistoryCounts` | trips, stops, onPlanOrders, stopsDelivered, stopsFinished, partialStops, lateStops, shortStops, returnInstructedStops, deferredOrders, confirmedStops, receivedOrders, plus stage totals and recorded/total coverage for nullable measures. Spec rule 6 defines each predicate. No publication has no counts object; an empty sent plan has zero known counts. |
-| `LookupPhoto` | `{kind:'proof', stopId}` or `{kind:'issue', issueId}` with takenAt if recorded. No URL supplied by a database row, no binary and no implied receipt. Viewer resolves the two fixed authorized paths. |
-| `LookupVehicle` | id/type/temp/fuel type, weight/volume limits, km/L, weekly quota, archived boolean, today off reason or null, all currently out trip references and today's sent trip references, selected recorded driver/status, weekly ledger totals and Mon–Sat bars, sent trip count, planned km or null, latest five sent trip references. Out status includes earlier published dates. |
-| `LookupFleet.summary` | registered, active, archived, reefers, vans, recordedOut, notRecordedOut, activeOffToday, activeWithoutOffToday; fuel litres/quota/remaining/recordedCommittedPct/remainingPct or a null fuel object. The two percentages are also on per-vehicle fuel. Reefer/van figures describe all registered rows and overlap; working figures describe only active rows. |
-| `LookupAvailability` | start/end, active category totals, archived count, `days[]` with date, `operating: boolean\|null`, category active/off/withoutOff counts and off vehicles/reasons. Categories are reefers, dry trucks, dry vans. Null operating means Outside delivery calendar. |
+| `LookupOrderRow` | `id`, wanted date, placed time or null, outlet id/name/brand/district/window, temperature, current status, ordered load from `computeLoad`, ordered lines/note, split original/parts, published deferral history/count. `days[]` names each selected delivery day, carried-over flag and its own published assignment/deferral, with plan/date/vehicle/trip/stop/planned arrival where present. No `latestSent` shortcut, receipt quantities or replacement ancestry. Detail is part of this shape, not another endpoint. |
+| `LookupOrders.summary` | Distinct leaf order ids in the range; distinct planned ids and distinct deferred ids from its own published plans; distinct carried-over row ids (any selected day) and split leaf ids. Before a day's send there are no publication counts. Range planned/deferred sets may overlap across days; do not add them. Summary is unfiltered. |
+| `LookupOrders.skippedLately` | Start/end (D−27 to D), rows with outlet id/name/brand, distinct published-plan count, latest skipped date and distinct reasons from that shop's latest skipped plan. No separate endpoint or relation to the table's browser filters. |
+| `LookupHistory` | `date`, `publishedDates`, plan id/revision/publishedAt, counts, groups, trips and deferrals. Null publication is distinct from a publication with zero trips. Mixed-brand trips appear once. No `detailRecorded`/legacy flag. |
+| `HistoryTrip` | Plan/trip, vehicle/current archive flag, driver, brand/district, status, kept planned schedule/load/km, recorded left/ready/back times, stops and problems. Reuse 013's trip helpers/types where meanings match; do not impose its current-day filter. |
+| `HistoryStop` | id/seq/shop, kept effective window, loaded/arrived/done times, outcome, lines and stage totals/coverage, late/short/return-instructed flags, current receipt or null, proof metadata or null, problems and closed attempts. An unknown execution measure is null, not zero. |
+| `HistoryClosedAttempt` | Issue id, own raised time, reason/note, counted lines, photo metadata, decision/decider/decided time. No recovered arrival, current stop time or current receipt copied into an old attempt. |
+| `HistoryReceipt` | Joined 015 stop confirmation: stopId, confirmedAt, sentAt, cold answer, order count, received lines/receipt-short totals and optional report/photo/decision/replacement link. No new receipt id. Orders and Fleet contracts do not depend on these fields. |
+| `HistoryCounts` | Trips, distinct stops/on-plan orders, stops delivered/finished/partial/late/short/return-instructed, publication deferrals, confirmed stops and received orders; stage totals with known/total coverage. Spec rule 6 defines predicates. No publication has no counts object; a sent plan with no trips has zero trip/stop totals. |
+| `LookupPhoto` | `{kind:'proof', stopId}` or `{kind:'issue', issueId}`, with recorded photo time. Metadata only; viewer resolves fixed authorized routes, never a database-provided public URL. |
+| `LookupVehicle` | Vehicle limits/type/temp/quota, archive flag, today's workshop reason, currently out and today's trip references, selected status/driver, own weekly ledger/Mon–Sat bars, sent-trip count/planned km and latest five sent trips. An archived row retains its own ledger and links. |
+| `LookupFleet.summary` | `active`, `reefers`, `vans`, `recordedOut`, `notRecordedOut`, `activeOffToday`, `activeWithoutOffToday`, plus active-fleet litres/quota/remaining/percentages or null for an unknown week. Every header count uses only active vehicles. Reefer and van counts overlap (reefer vans), so never add them. Archived rows are labelled separately in the list. |
 
-Order lists return all matches within at most 28 wanted dates; there is no unbounded “all time” endpoint or silently
-truncated set. History reads one publication; fleet reads the depot's inventory and a fixed 42 dates. Details/photo
-bytes are fetched on selection. If real usage later needs pagination, specify its stable cursor/totals as a separate
-change instead of hiding rows to meet a render budget. There are no forecast, booked-hire or offline-presence fields.
+Orders returns every selected row, with no cap, server-side search/filter/matched count, wildcard escaping or
+second detail query. Day/range selection bounds the read to at most 28 delivery days (earlier wanted dates can
+enter through carriage or retained publication membership). History reads one publication; Fleet reads inventory,
+this week and recent trip links. Photo bytes load only on request. No availability, forecast or booked-hire shape.
 
 ## How it works
 
 | File | Responsibility |
 | --- | --- |
-| `apps/api/src/lookup/orders.ts` | Wanted-date selection, order/detail reads, deferral/split/replacement links. |
-| `lookup/history.ts` | Explicit published-date read and static trip/stop/receipt assembly. |
-| `lookup/attempts.ts` | Typed retained closed-attempt evidence, including the narrow audit match. |
-| `lookup/fleet.ts` | Inventory, recorded trip state, weekly ledger, recent sent trips. |
-| `lookup/availability.ts` | 42-date read, current inventory and recorded days off. |
-| `lookup/figures.ts`, `dates.ts` | Small pure functions for the new predicates/range/grouping; call existing load/driver/receipt/percent helpers, never fork those rules. |
-| `apps/api/src/routes/lookup.ts` | Five GETs under `requireRole('dispatcher')` and `requireDepot`, mounted by the lead in `app.ts`. |
-| `apps/web/src/features/lookup/api.ts`, `queries.ts` | Validated reads, scoped keys, abort signals, minute refresh and date/reset selection handling. |
-| `features/lookup/OrdersPage.tsx`, `OrderDetail.tsx` | Orders table/cards and selected record. |
-| `features/lookup/HistoryPage.tsx`, `HistoryDetail.tsx` | Static timeline/cards, attempts and receipts, existing photo viewer. |
-| `features/lookup/FleetPage.tsx`, `AvailabilityPage.tsx`, `VehicleDetail.tsx` | Today/read-only six-week views and vehicle detail. |
-| `features/lookup/parts/`, `words.ts` | Local presentational rows, filters, date control and labels; no duplicated business sums. |
+| `apps/api/src/lookup/orders.ts` | Delivery-day sets, inline order details, published deferrals and Skipped lately. |
+| `lookup/history.ts`, `attempts.ts` | Explicit published-date read, kept trips, loading, retained closed issues and joined 015 confirmations. No audit-log read. |
+| `lookup/fleet.ts` | Inventory, active header, recorded state, weekly ledger and recent sent trips. |
+| `lookup/photo.ts` | Scoped proof read owned by A8 when no equivalent route exists after 016 merges. |
+| `lookup/figures.ts`, `dates.ts` | Only the small new grouping/date predicates needed; reuse load, driver, receipt and percent helpers. |
+| `apps/api/src/routes/lookup.ts` | Dispatcher/depot checks, three aggregate GETs and A8's proof GET. Lead mounts it in `app.ts`. |
+| `apps/web/src/features/lookup/api.ts`, `queries.ts` | Validated reads, scoped keys, cancellation, minute fallback, dates/reset. |
+| `features/lookup/OrdersPage.tsx`, `OrderDetail.tsx`, `filters.ts` | Table, browser search/filters, detail from selected row and Skipped lately panel. |
+| `features/lookup/HistoryPage.tsx`, `HistoryDetail.tsx`, `PhotoViewer.tsx` | Static trip/attempt/receipt detail, on-demand photo viewer local to A8. |
+| `features/lookup/FleetPage.tsx`, `VehicleDetail.tsx` | Today and own vehicle records; no future view. |
+| `features/lookup/parts/`, `words.ts` | Small presentation/filter/date components, no duplicated business sums. |
 
 ### One snapshot per answer
-Every aggregate/detail GET uses `orders/store-orders.ts::snapshot`. Its first `orders ACCESS SHARE` lock precedes
+Every aggregate and proof GET uses `orders/store-orders.ts::snapshot`. Its first `orders ACCESS SHARE` lock precedes
 the first repeatable-read snapshot query, so a reset cannot deadlock or produce mixed generations. Read `readMoment(tx)`
 once, then dates and business records in that same transaction. Use `...Of(tx, authorizedRows)` helpers, not nested
 `getBoard`, `getDriverDay` or store-service transactions. No GET takes a new write lock, touches an audit row, runs
 the optimizer, changes `answered_at`, or emits an announcement. All existing writes keep their current lock order.
 
 ### Orders and every number on the page
-1. Resolve the wanted date/range. Use date arithmetic on explicit calendar-date values: day D, or D−27 through D
-   inclusive. No device timezone, inferred holiday or open-order cutoff affects this lookup. Return resolved dates.
-2. Join orders to outlets for `outlets.depot_id = caller.depotId`; exclude drafts and split parents. Keep archived
-   outlets/products in historical reads. Batch lines/products and call `computeLoad` for ordered units/kg/m³.
-   These per-line product descriptions/properties are current reference data, unlike the sent plan's kept total.
-3. Read published memberships via stop_orders → stops → trips → plans, scoped to the same depot. Keep all assignment
-   links in detail and select latest by plan date descending, trip number then id for deterministic ties. The UI
-   says Latest sent-plan record, not Assigned now, so a closed return cannot imply a promised future date.
-4. Read published deferrals on the order and its one split original. For each plan count one, preferring the leaf's
-   own row if both exist; preserve reason/note. Draft deferrals do not count. Has deferrals is the resulting count
-   above zero. A part has the original's wanted date and historical links, but only its own units enter totals.
-5. Add joined 015 facts through a transaction-local authorized helper where suitable, or batch the same typed
-   sources. Do not call the store endpoint or treat `readOrders`' outlet argument as a depot. Do not use a bare
-   `max(plan.date)` as proof an order is currently assigned. Replacements follow `replaces_issue_id` on the order
-   or its original, not a receipt-derived guess. Seed receipts without stop links remain order facts only.
-6. Compute the five range summary values before filter/search, then filter and sort by spec rule 3. Search `%` and
-   `_` literally if using SQL ILIKE: escape wildcard characters, use bound values, and validate length. Return
-   matched count and rows. Detail repeats depot/submitted checks, including for a split parent; a foreign, missing
-   or draft UUID all gets `unknown_record`. None of these reads includes arbitrary user/session fields.
+1. Read the moment and operating dates in the snapshot; use the existing pure `boardDay` for the implicit default.
+   Day is D; a range is D−27 through D inclusive. Return the resolved dates; null board day returns the explicit
+   choose-date state. An explicit valid date stays selectable even if no publication exists for it.
+2. Scope orders through the caller's depot outlets. For each selected day union wanted-that-day submitted leaves,
+   that day's published stop/deferral memberships, or (when not published) the board's current eligible earlier
+   placed/deferred orders. The eligibility predicate is the one in `plans/board.ts`, not a second cutoff rule.
+   Batch the range query and memberships instead of calling 28 nested board transactions. Deduplicate by order id;
+   original split records are detail, not extra leaves. Keep archived shops/products as historical references.
+3. Batch ordered lines/products and call `computeLoad` for units/kg/m³. Inline note, original/parts and published
+   deferral history: include a part's original's history, deduplicate by plan id, prefer its own deferral reason
+   when both exist. These are current reference properties; do not claim immutable historical product names.
+4. Each row's `days[]` records the delivery days that admitted it and marks wanted-earlier as Carried over. Only
+   that day's own published membership supplies its vehicle/trip/stop and kept planned arrival. A current order
+   status cannot select a later plan. Summary planned/deferred counts are the distinct stored order ids in those
+   selected publications, not current status counts or inherited history counted again. Detail names every plan
+   link's date; a range never silently chooses a latest unrelated assignment. No current receipt/replacement read.
+5. Order totals count distinct returned leaves; carried-over/split totals count their returned flags. Browser search
+   and All / Carried over / Deferred / Split filter these complete rows and show the resulting array length.
+   There are no API search/filter inputs, matched count, SQL substring/wildcard handling or order-detail handler.
+6. Independently read published deferrals on D−27 through D joined to their depot's outlets. Group **distinct
+   (outletId, planId)**, not number of deferral rows: one shop left out with two temperatures/parts is skipped once
+   on that plan. Count per shop, take latest plan date and its distinct code/reason pairs, sort count descending,
+   latest date descending, shop name/id. No cap or all-outlet zero rows. The seed's five pairs make four shops:
+   OUT060 Fresh Dickwella twice; OUT001 Fresh Nugegoda, OUT030 Fresh Ragama and OUT054 Fresh Unawatuna once each.
+   Later order status changes do not remove historical skips; withdrawing a plan removes its contribution.
 
 ### History, stage counts and attempts
 1. Select the one depot's published plan for the resolved date; select its current publication metadata, trips,
    stop membership and deferrals. Also return the newest three published dates for navigation. No publication is
    an ordinary empty state, even if a draft exists. Seeded Tue/Wed publications have deferrals and no trips.
-2. Validate `sent_check` with `PlanCheck`. A genuine legacy null check is handled before `driverTripsOf`, which
-   requires a kept trip schedule. No check plus a matching current `plan.sent` audit, an invalid check, or a kept
-   check missing a current trip is an invariant error. Do not re-run the checker against changed reference data.
+2. A zero-trip publication (including seeded Tue/Wed) needs no fabricated schedule. For actual trips, validate the
+   kept `sent_check` and use `driverTripsOf`'s required schedule. An invalid check or missing trip schedule is an
+   invariant error. There is no legacy-trip branch, `detailRecorded` state or `plan.sent` audit-log check; the app
+   has no path creating that hypothetical legacy trip. Never run today's checker to reconstruct past schedules.
 3. For recorded trips, reuse `driverTripsOf(tx, tripPlanRows)` selected by depot/date, plus batched loading times,
    all `issuesOf` records for those trips, photo existence and 015's receipt columns. Reuse `tripFigures`/receipt
    helpers for stage arithmetic where their meanings match; before ready preserve null final loads rather than
    converting ordered quantities into loads. JSON must not accidentally include `Issue.stop`'s current times as an
    earlier attempt's times. A closed current result uses its issue snapshot, including after reallocation.
-4. Build each closed attempt from its issue id and immutable `issue_lines.counted`. To recover a cleared arrival,
-   look only for `audit_log.action = stop.closed`, `entity = stop`, `entity_id = this existing stop.id`, with typed
-   `after.tripId = this authorized trip.id` and `after.writeId = this existing closed issue.id`. Validate
-   `after.keptAt` against that issue's recorded time and read ISO `before.arrivedAt`. No match/null arrival is explicit
-   unavailable evidence; malformed or contradictory matched evidence fails visibly. Never use `audit_log.at` or
-   attach audit by order id, actor/depot membership or “latest row”. Reset deletes the issue/stop/trip identities;
-   an orphan audit cannot populate this read, even when seeded order UUIDs are reused. A retained issue can have
-   no old arrival record; that does not erase its known counts, closed time or photo.
+4. Build each closed attempt from its retained issue and immutable `issue_lines.counted`, raised/decided times,
+   photo and answer. Never read audit to recover an old arrival. Never reuse the mutable stop's current arrival,
+   order receipt or newly loaded quantities for an old closed issue. Retry can create a new visit without changing
+   those facts; a later day's reallocation cannot add its receipt to this attempt. No event reconstruction needed.
 5. Current successful/refused stop receipt comes only from its own 015-confirmed orders and received lines. Check
    the shared confirmation-time/order-state invariant; partial receipt evidence is not a made-up complete receipt.
    `stopId` groups those orders into one confirmation. The report is optional. A previous closed attempt gets no
@@ -141,23 +144,22 @@ the optimizer, changes `answered_at`, or emits an announcement. All existing wri
    each stop once even if it has several qualifying issues. Distinct stop confirmation
    count differs from received-order count. Fold line totals only over comparable known stages; report coverage
    and null aggregate for an incompletely recorded measure. Return zero for a genuinely empty set, not a missing one.
-7. Group trips by actual brand/district (Mixed once), with deterministic kept-schedule order and legacy unknown
-   times last. Return flags for client filters; retain global totals and show a separate matched row count. Deferred
+7. Group trips by actual brand/district (Mixed once), with deterministic kept-schedule order. Return flags for client filters; retain global totals and show a separate matched row count. Deferred
    filter lists the published deferrals with their order/shop/reason, including those later fulfilled elsewhere.
    No general event feed, period analytics, latest-50 cap, replay slider or new photo gallery service is necessary.
 
-### Photo reads shared with 013/016
-Use `/operations/stops/:stopId/photo` for proof and `/issues/:issueId/photo` for problem images. T0 first resolves
-the outcome of 016's review; if its proof route is not yet implemented, the lead brings forward exactly that shared
-read, in its proposed `operations/photo.ts` / `routes/operations.ts`, rather than give A8 a competing endpoint.
-It checks stop → trip → published plan → caller depot before selecting an issue-null proof. Problem reads preserve
-013's depot check and work after a decision. A byte read uses the same snapshot approach as its metadata.
+### Proof owned by A8, problem photos reused from 013
+T0 starts after 016 merges. Its reviewed spec omits proof photos, so implement `lookup/photo.ts` and
+`GET /lookup/stops/:stopId/photo` through A8's `routes/lookup.ts`. If the merged code already has the equivalent
+read, reuse it unchanged and record that final path in the shared contract; **never edit 016's files**. Use
+`/issues/:issueId/photo` unchanged for problem images, including decided issues. No new table or gallery service.
 
-Both routes return `image/jpeg`, `Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff` and
-`Cross-Origin-Resource-Policy: same-origin`. No proof gives `not_found`; a foreign/absent stop or issue gives
-`unknown_record` without revealing whether bytes exist. Use the shared viewer if joined, otherwise a small local
-viewer: abort old fetches, verify current selection/generation before displaying, revoke object URLs on close,
-scope change or unmount, and never write photos into query persistence, local storage or service-worker caches.
+Scope stop → trip → published plan → caller depot before selecting the issue-null proof, inside a reset-safe
+snapshot. Return the JPEG using the existing binary-response/cache policy and app Helmet headers; no new header
+middleware or separate header test. Missing/foreign stop is `unknown_record`; an owned stop with no proof is
+`not_found`. AC-2 tests access and absent proof alongside depot isolation; the viewer is exercised by AC-29/31/34.
+A8's small viewer aborts old requests, guards scope/selection/generation and revokes object URLs on close/reset/
+sign-out/unmount. Do not put photos in persisted query data, local storage or service-worker caches.
 
 ### Fleet and fuel
 Read this depot's vehicle rows, including archived rows last; each row's limits come directly from vehicles.
@@ -167,44 +169,41 @@ latest five sent trips per vehicle. Never choose a driver's permanent vehicle fr
 Out now is a recorded `out` trip and wins the displayed trip status, even for an earlier date. Multiple out records
 sort by plan date, trip number and id ascending. Without one, select today's earliest unfinished trip by saved leave
 time, then trip number/id; otherwise the latest returned trip by backAt/trip number/id descending; otherwise No trip
-recorded today. Unknown legacy times sort last. Include all relevant trip references in detail so the choice
+recorded today. Include all relevant trip references in detail so the choice
 does not hide trip 2 being loaded while trip 1 is out. Archived and workshop badges are independent facts. One
-vehicle contributes one Out now count regardless of the number of matching records. Within each type group put
+active vehicle contributes one header Out now count regardless of matching records; an archived out vehicle
+keeps its own badge/driver/detail but is excluded from every header vehicle count. Within each type group put
 active rows before archived, then the chosen sort (unknown remaining fuel last), then vehicle id.
 
-Read the app date's `calendar_days.iso_year/iso_week` and join fuel rows to this depot's vehicles and calendar dates
-in that same ISO year/week with `dow` 0–5 (Mon–Sat). Read the whole week, including future committed rows; do not
-copy the planning board's earlier-than-plan-date ledger restriction. Each stored litre
-value is converted to tenths before summing. Per row and aggregate, remaining = quota − ledger litres,
-recordedCommittedPct = `percent(ledgerLitres, quota)`, remainingPct = `percent(remaining, quota)`; both percentages
-are null on a zero denominator. Clamp drawing widths only, never the returned quantity.
-All registered rows, archived included, form the labelled ledger denominator. Active/no-off figures separately
-exclude archived vehicles. Unknown week is a nullable fuel object. Weekly bars sum by ledger date Mon–Sat; a sent
-trip's estimate is already a ledger row and must not be added again. Count sent trips from trip/plan rows; sum
-planned km from each matching saved check exactly once. Missing legacy km gives null with known-trip coverage.
+Read the app date's `calendar_days.iso_year/iso_week` and join fuel rows to this depot's vehicles and calendar
+dates in that same ISO year/week with `dow` 0–5 (Mon–Sat). Read the whole week, including future committed rows;
+do not copy the planning board's earlier-than-plan-date ledger restriction. Each stored litre value is converted
+to tenths before summing. Per row and aggregate, remaining = quota − ledger litres, recordedCommittedPct =
+`percent(ledgerLitres, quota)`, remainingPct = `percent(remaining, quota)`; both percentages are null on a zero
+denominator. Clamp drawing widths only, never the returned quantity. The header sums active vehicles only, for
+its ledger numerator, quota denominator and every vehicle count, including reefers (trucks plus reefer vans),
+vans, Out now and workshop counts. Archived rows retain their own ledger/details outside that header. Archiving
+VEH003 changes 38/9/4 to **37 active / 8 reefers / 4 vans**, not 37/9/4; active workshop count becomes two and
+35 remain without an off row. Unknown week is a nullable fuel object. Weekly bars sum by ledger date Mon–Sat; a
+sent trip's estimate is already a ledger row and must not be added again. Count sent trips from trip/plan rows;
+sum planned km from each matching saved check exactly once. Unlinked fuel rows do not create trips or km.
 
 The seed has 111 historical fuel rows with no trip ids, 6,945 / 18,600 L for Peliyagoda (37% rounded), **zero recorded
 historic trips/km**, and VEH001 at 300 / 340 L (40 left). The manual VEH035 send adds 2.7 L: 6,947.7. Its unsend
 removes that commitment. The first number remains a ledger fact, not fuel measured after a completed route.
 Recent trips sort by published plan date and trip number descending, then id, to choose exactly five.
 
-### Forty-two dates without a forecast
-Calculate start = `depotDate(moment.at)`, end = start+41, with explicit date arithmetic. Read all vehicles belonging
-to this depot, the `vehicle_days_off` rows in this range and any existing calendar rows; join off records by vehicle
-id/date. Filter to active vehicles for the availability calculations, retaining archived metadata/off rows separately.
-The table's composite key means one off row per vehicle/date. Separate active reefers (including reefer vans),
-active dry trucks and active dry vans. For each date/category, `withoutOff = active − off`; an off row for an archived
-vehicle can be listed as archived but does not reduce active totals. Return the independent operating flag or null.
-Do not fabricate holiday, festival, payday or monsoon facts after the supplied calendar ends.
-
-There is no order forecast, trip-capacity divisor, scheduling call, availability reservation or future fuel model.
-The Thursday seed's three workshop vehicles leave six reefers with 140.7 m³ of nominal vehicle volume, but the view
-does not translate that into six trips that must fit: temperature, access, windows, fuel and actual plans still
-constrain them. No `Book` or `Tell shops` HTTP action is defined.
+### No six-week read
+No availability route, contract, helper, screen, query parameter or tests. The frames `112:80499` / `195:83482`
+show a forecast and hired-vehicle booking; neither has recorded evidence in this app. The calendar ends 28 June,
+so 38 of the 42 dates would be unknown even in the proposed availability substitute. Hide the toggle and document
+**no forecast and no hiring**. Fleet Today still reads existing workshop rows for its calendar date.
 
 ### Live updates, selection and screens
 Use the one existing `useLive` stream. T0 adds a small lookup fan-out, preserving each normal topic invalidation
 and whatever 016 joins for operations. No new live topic, write-side announce or second EventSource is needed.
+One accepted action can announce several topics: the guarantee is that the screen ends showing accepted facts,
+not exactly one refetch.
 
 | Incoming topic | Additional invalidation |
 | --- | --- |
@@ -212,11 +211,12 @@ and whatever 016 joins for operations. No new live topic, write-side announce or
 | `admin` | All `['lookup']`: archives, reference names/limits and depot assignment can affect each view. |
 | `clock`, `demo`, reconnect after a break | Existing all-query invalidation already includes lookup. |
 
-Use keys `['lookup', page, userId, depotId, validatedParameters]`. Detail keys include selected id. Keep the existing
-one-minute fallback, and invalidate implicit Today/latest defaults on a locally observed calendar-midnight change
-using the existing web clock. Explicit historical date choices stay pinned, including across a clock move; a reset
-clears selected entities/photos and refetches that date, which may now be empty. A first response resolves default
-dates server-side. Do not turn a default into a permanently pinned date just because its first answer named one.
+Use keys `['lookup', page, userId, depotId, validatedParameters]`. Order/vehicle detail comes from the selected
+row, not another query. Keep the existing one-minute fallback; refresh implicit Orders at the board's 03:30
+rollover and Today/latest defaults at calendar midnight using the existing web clock. Explicit historical date
+choices stay pinned, including across a clock move; a reset clears selected entities/photos and refetches that
+date, which may now be empty. A first response resolves default dates server-side. Do not turn a default into a
+permanently pinned date just because its first answer named one.
 
 Pass TanStack Query's AbortSignal to fetch and guard photo/selection responses by scope/request generation.
 Cancellation/generation, not `readAt`, orders results. On account/depot change discard that account's lookup cache
@@ -224,42 +224,44 @@ and visible image; on demo generation change discard selected identities and ima
 Never retain one date's data under a newly selected date heading as placeholder success. A same-scope failed refresh
 may retain its last successful view, with the spec's explicit warning and read time.
 
-`DispatcherHome.tsx` mounts the three pages through the existing routes and wide shell; Fleet uses the query
-parameter for its second view. T0 owns this file because 016 also edits it. No root-router rewrite or nav redesign.
-Links use browser `?date=YYYY-MM-DD&trip=<uuid>` for History; only `date` is sent to its aggregate API. The browser
-validates `trip` as a selection among the returned trips, never as a second fetch or arbitrary query key.
-A bad/stale trip selection clears detail while leaving
-the authorized day visible. History → issue navigation opens the existing Live day page; it does not create another
-decision form. Browser tests must verify account/date/reset transitions as well as the desktop/narrow layouts.
+`DispatcherHome.tsx` mounts the three pages through the existing routes and wide shell; Fleet has only Today. T0
+owns this file because 016 also edits it. No root-router rewrite or nav redesign. Links use browser
+`?date=YYYY-MM-DD&trip=<uuid>` for History; only `date` is sent to its aggregate API. The browser validates
+`trip` as a selection among the returned trips, never as a second fetch or arbitrary query key. A bad/stale trip
+selection clears detail while leaving the authorized day visible. History → issue navigation opens the existing
+Live day page; it does not create another decision form. Browser tests must verify account/date/reset
+transitions as well as the desktop/narrow layouts.
 
-## Changes to other specs
-- **004 / 008:** reuse vehicle archive and days off, calendar, clock, reset and stream. No new fleet command or seed
-  history. Today's archive remains a current fact, not a reconstructed demo-clock effective date.
-- **009 / 010 / 014:** no order or planner command changes. Wanted-date lookup is explicitly different from the
-  planning workload. Has deferrals reads published decisions, and a saved suggestion is not a past publication.
-- **012 / 013:** read all retained problems and attempts; retain lock/replay/photo guarantees. At join, point 013's
-  A8 exclusion at this static history/attempt/photo coverage, documenting that exhaustive replay is still deferred.
-- **015:** required for receipt counts, confirmation times and replacement links. Follow actual joined schemas,
-  including the driver-writes → phone-writes rename; don't introduce a parallel receipt record or pending-phone read.
-- **016:** coordinate proof read, optional typed projections/viewer, live invalidation and DispatcherHome in T0.
-  Its live feed remains current-day/latest-50; History is an explicit-date read. At join clarify its broad A8
-  audit-gallery promise with this spec's retained-attempt boundary. Review decisions may alter shared seam names.
-- **README / map / specs index:** this draft only adds 017 and A8 Spec plus D-80 onward. Implementation join adds
-  the actual walkthrough/departures, updates relevant exclusions and marks A8 Done only after its checks/review.
+## Changes to other specs and merge gates
+- **004 / 008:** read archives, today's workshop rows, calendar, clock/reset and live stream. No new fleet write,
+  archive semantics or seed. Every Fleet header count is active-only; an archive does not erase history.
+- **009 / 010 / 014:** no command changes. Orders adopts delivery-day membership and the board's default/earlier
+  eligibility, while keeping current status separate. Skipped lately reads published deferrals, not suggestions.
+- **012 / 013:** retain their lock/replay/photo guarantees. Narrow 013's promise to A8 explicitly: retain each closed
+  issue's own time, counts, photo and answer, but do not reconstruct earlier arrivals from audit or add full replay.
+  The lead records this boundary when joining 013's documentation. Orders and Fleet need merged 013; neither
+  reads 015 receipt fields nor waits for receipt implementation once T0 can start.
+- **015:** History's shop confirmations, receipt shortages and replacement/report links wait for its merged code.
+  Confirm the real columns/helpers before the History task; no substitute driver count or fake empty receipt.
+  This gate does not delay Orders/Fleet work. Follow the actual phone-writes naming without changing those files.
+- **016:** **T0 starts only after 016 is merged**, then integrates existing `lib/live.ts` and `DispatcherHome.tsx`
+  once without overwriting 016's behavior. Reviewed 016 supplies no proof GET; A8 supplies it in its own files.
+  No implementation task edits 016's operations/features files or documentation. Its current-day/latest-50 feed
+  remains distinct from explicit-date retained History. Record the narrowed A8 promise here for the lead's join.
+- **README / map / index:** this draft updates A8's reduced scope, still Spec. Implementation join records actual
+  walkthrough/departures and marks Done only after checks/review. It does not claim the two future frames are built.
 
 ## Risks
-- Forecast and booking are prominent in the submitted frames. Availability-only is an explicit scope/design pick,
-  not a claim to have implemented forecasting. Nabil may cut A8 rather than approve the departure.
-- Receipt/live work is still in flight. T0 must reconcile reviewed interfaces and reserved decisions before builder
-  assignments. If 015 isn't joined, defer A8 completion; do not represent missing received quantities as zero.
-- Mutable line counts and current `Issue.stop` timestamps can rewrite an old closed visit. AC-14/15 exercise both
-  retry and later-date reallocation with different counts; matching audit ids prevent old-run rows leaking on reset.
-- Historical master-data versions and every publication edit were never stored. Explicit missing/current-reference
-  labels are part of the product. Malformed new records are errors, not silently classified as legacy.
-- Fuel ledger rows are not actual consumption, and the seeded calendar ends in four days of the Thursday horizon.
-  Zero recorded future off days is not proof of available operating capacity; AC-25/26 enforce that boundary.
-- A8 can get large through optional tables, search analytics, replay or booking. The task file separates small reads
-  from their screens and keeps them after shared parts. No acceptance criterion authorizes an excluded write.
+- The prominent forecast and hire frames are cut entirely. This is a documented departure, not a claim that
+  availability supplies the forecast. A8 is still first to cut if the four-role journey needs time.
+- A delivery-day list and current status answer different questions: use dated memberships for counts/truck links.
+  A range can contain both an earlier deferral and later assignment of one order; label and never add those totals.
+- Reused current order/stop fields can rewrite earlier closed attempts. AC-14 tests cross-day reallocation with
+  `setClockForTests`; AC-15 tests retry issues. Neither needs audit reconstruction or a browser time travel test.
+- Seeded zero-trip publications are valid; missing required timing on an actual trip is an error, not a new state.
+  Current master-data names are not historical snapshots. A fuel ledger is not actual measured consumption.
+- Receipt code must join before History's confirmation/replacement work. T0 waits for merged 016; after that,
+  Orders and Fleet can proceed independently of 015. Keep file ownership explicit to avoid other builders' work.
 
 ## Test plan
 Write and run each automated criterion test failing before its implementation. Use existing pure helpers where
@@ -268,55 +270,57 @@ application test run is needed for this documents-only draft; its checks are sou
 
 | Criterion | One named test / check | File or evidence |
 | --- | --- | --- |
-| AC-1 | `lookup requires the existing dispatcher and depot checks` | `apps/api/tests/lookup-access.test.ts` |
-| AC-2 | `lookup cannot cross depot through lists details or photos` | Same file |
-| AC-3 | `lookup rejects malformed queries without side effects` | Same file |
-| AC-4 | `wanted Thursday is 98 then 100 and never the 104 workload` | `apps/api/tests/lookup-orders.test.ts` |
-| AC-5 | `four weeks means 28 inclusive wanted dates and 127 then 129 records` | Same file |
-| AC-6 | `order filters and literal search preserve range totals and stable order` | Same file |
-| AC-7 | `split and join count leaves and distinct inherited deferral plans` | Same file |
-| AC-8 | `returned orders retain historical assignments without a promised new date` | Same file |
-| AC-9 | `order receipts and replacement ancestry use the recorded sources` | Same file |
-| AC-10 | `history reads the manual sent schedule and its 99 deferrals` | `apps/api/tests/lookup-history.test.ts` |
-| AC-11 | `history keeps loading distinct from handover and receipt` | Same file |
-| AC-12 | `refusal records 115 handed over 2 refused and 1 depot short` | Same file |
-| AC-13 | `zero handover finishes a stop without delivering it` | Same file |
-| AC-14 | `Friday loading and receipt cannot rewrite Thursdays closed counts` | `apps/api/tests/lookup-attempts.test.ts` |
-| AC-15 | `retry attempts use their own issue and matched audit evidence` | Same file |
-| AC-16 | `three received orders make one confirmation and two distinct shortage stages` | `apps/api/tests/lookup-history.test.ts` |
-| AC-17 | `legacy seed publications expose recorded deferrals and missing detail honestly` | Same file |
-| AC-18 | `history filters keep stop order and attempt grains separate` | Same file |
-| AC-19 | `proof and decided problem images have scoped uncached JPEG reads` | `apps/api/tests/lookup-photos.test.ts` |
-| AC-20 | `Thursday fleet has 38 active 9 reefers 4 vans and 3 off` | `apps/api/tests/lookup-fleet.test.ts` |
-| AC-21 | `recorded out status takes precedence then hands over to trip two` | Same file |
-| AC-22 | `archived fleet retains history fuel and any out trip` | Same file |
-| AC-23 | `fuel reads history and publication commitments exactly once` | `apps/api/tests/lookup-fleet.test.ts` |
-| AC-24 | `fleet fuel distinguishes zero quota over quota and unknown week` | Same file |
-| AC-25 | `six weeks gives 42 dates and does not infer the missing calendar` | `apps/api/tests/lookup-availability.test.ts` |
-| AC-26 | `future off records and present archive do not promise available trips` | Same file |
-| AC-27 | `lookup snapshots race writes and reset without mixed generations` | `apps/api/tests/lookup-snapshot.test.ts` |
-| AC-28 | `existing live topics reconnect and fallback refresh lookup too` | `apps/web/src/lib/live.test.ts` |
-| AC-29 | `late reads and images cannot cross selection account or reset` | `apps/web/src/features/lookup/queries.test.ts` |
-| AC-30 | `orders desktop lookup` | Lead's written click-through record at join |
-| AC-31 | `history desktop lookup and proof` | Same record |
-| AC-32 | `fleet desktop records and future view` | Same record |
-| AC-33 | `lookup narrow layouts and boundary` | Same record at 390, 820, 1024 plus desktop 1440 |
-| AC-34 | `lookup failure empty legacy and session states` | Same record; unavailable calendar and legacy data also exercised by API fixtures |
-| AC-35 | `joined roles and offline sync update the lookups` | Same record with driver/shop phone tabs and Ruwan open |
+| AC-1 | `lookup requires dispatcher and depot checks` | `apps/api/tests/lookup-access.test.ts` |
+| AC-2 | `lists inline details and proof stay inside the depot` | Same file; includes owned proof absent/present and decided issue photo |
+| AC-3 | `lookup validates dates ranges and proof ids` | Same file |
+| AC-4 | `Thursday has 102 then 104 with its own five planned and 99 deferred` | `apps/api/tests/lookup-orders.test.ts`; includes board default/03:30 and Send/Back to edit |
+| AC-5 | `four weeks unions 28 delivery days without duplicate orders` | Same file; 127 → 129 and a cross-date membership fixture |
+| AC-6 | `Orders filters its returned rows without a new request` | `apps/web/src/features/lookup/filters.test.ts` |
+| AC-7 | `split and join count leaves and deduplicate inherited deferrals` | `apps/api/tests/lookup-orders.test.ts` |
+| AC-8 | `Thursday keeps its own membership when Friday is sent` | Same file |
+| AC-10 | `history reads the manual schedule and 99 deferrals` | `apps/api/tests/lookup-history.test.ts` |
+| AC-11 | `loading keeps 118 ordered 117 loaded and one depot short` | Same file |
+| AC-12 | `refusal records 115 handed over two refused and one depot short` | Same file |
+| AC-13 | `zero handover finishes without delivering` | Same file |
+| AC-14 | `Friday receipt cannot rewrite Thursdays 94 closed cartons` | `apps/api/tests/lookup-attempts.test.ts`, using `setClockForTests`; not a browser check |
+| AC-15 | `retry keeps each issues own time counts photo and answer` | Same file; no audit recovery fixture |
+| AC-16 | `three received orders make one confirmation with separate shortages` | `apps/api/tests/lookup-history.test.ts`; after 015 |
+| AC-17 | `seeded publications show one and four deferrals with zero trips` | Same file; no invented legacy-trip fixture |
+| AC-18 | `history filters keep stop order and attempt grains separate` | Same file; includes mixed trip and 015 send_replacements |
+| AC-20 | `Thursday fleet has 38 active nine reefers four vans and three off` | `apps/api/tests/lookup-fleet.test.ts` |
+| AC-21 | `out status wins then passes to trip two` | Same file; includes earlier-day out trip |
+| AC-22 | `archiving VEH003 gives 37 active eight reefers and four vans` | Same file; retained own ledger/history/out state, active header sums |
+| AC-23 | `fuel reads commitments once across Send and Back to edit` | Same file; 6,945 → 6,947.7 → 6,945 |
+| AC-24 | `fuel distinguishes zero quota over quota and unknown week` | Same file |
+| AC-27 | `lookup snapshots race writes and reset without mixed records` | `apps/api/tests/lookup-snapshot.test.ts` |
+| AC-28 | `existing topics reconnect and fallback refresh lookup too` | `apps/web/src/lib/live.test.ts` |
+| AC-29 | `late reads and photos cannot cross selection account or reset` | `apps/web/src/features/lookup/queries.test.ts` |
+| AC-30 | `orders desktop lookup` | Lead's written visible-Chrome click-through at join |
+| AC-31 | `history desktop lookup and proof` | Same record, after 015 |
+| AC-32 | `fleet desktop Today only` | Same record |
+| AC-33 | `lookup narrow tables and boundary` | Same record at 390, 820, 1024, plus desktop 1440 |
+| AC-34 | `lookup failure empty and session states` | Same record; unavailable fuel week also tested in API |
+| AC-35 | `joined roles and offline sync end showing accepted facts` | Same record; several announcements/refetches are allowed |
 | AC-36 | `source and scope review` | Independent reviewer at join |
+| AC-37 | `Skipped lately counts shop plan pairs and respects withdrawal` | `apps/api/tests/lookup-orders.test.ts`; seed four shops/five skips, multiple orders/parts counted once |
 
-One scenario may be parameterized (for example each unauthorized role/route), but no criterion is replaced by a broad
-green smoke test. Each file signs in once per account, uses the builder's private freshly migrated/seeded database
-and resets the day at its end, restoring the clock. Compose `loading-plan.ts`, `driver-plan.ts` and the joined 015
-receipt helpers in `tests/lookup-plan.ts`; keep exact assertions on the seed above. Kandy rows, missing legacy detail,
-zero/over-quota vehicles, a future off day and concurrency barriers are **test-only** fixtures, never seed changes.
+There are 33 retained criteria. AC-9/19/25/26 are removed (Orders ancestry, duplicate photo-header test and the
+six-week view), not skipped tests. AC-6 now belongs to screens; AC-37 covers the frame's small Skipped lately read.
+Each automated test is written and run failing before implementation. A parameterized scenario may cover roles
+or routes; no criterion is replaced by a green smoke test.
 
-The snapshot race pauses between stops and issue/receipt reads while another transaction commits; it must see a
-whole before or whole after result. Reset tests include surviving audit with reused seeded order ids, and date/id
-selectors from a now-deleted trip. Validate GET side effects with before/after business rows and no announcement.
-Browser request-order tests include equal app instants, reset backward, parameter changes and late photo bytes.
+Each integration file signs in once per account, uses the builder's private freshly migrated/seeded database,
+restores the day at file end and restores the app clock. Compose `loading-plan.ts`, `driver-plan.ts` and (for History)
+015's joined receipt helpers in `tests/lookup-plan.ts`. Kandy isolation, multiple deferrals per shop, zero/over-quota
+vehicles and concurrency barriers are test-only fixtures. No seed changes or legacy-trip/audit-arrival fixtures.
 
-Implementation join: private database, fresh migrate/seed, typecheck, full tests and both builds, then the built-app
-click-through against all five exports at the four widths. Do not use ports 3000/5173 or another builder's database.
-Record actual API/web totals, failures fixed and every browser result; these are future completion gates, not
-claims made by this documents-only PR.
+Pause the snapshot race between stop and issue/receipt reads while a write commits; it must see one whole before
+or after result. Race a reset too and reject deleted selections/photos. GETs cause no business writes or announce.
+Use `setClockForTests` to reallocate/receive on Friday in AC-14 and return to Thursday to assert its retained attempt;
+restore it afterwards. Browser checks do not claim that unsupported cross-day test. Browser response-order tests
+include equal app instants, reset backward, parameter/account changes and late photo bytes.
+
+Implementation join: private database, fresh migrate/seed, typecheck, full tests and builds, then click through the
+**built app in Nabil's visible Chrome**, using the three built frames and recording the two future frames as excluded.
+Check the four widths, record actual API/web totals and each browser result. Never use ports 3000/5173 or another
+builder's database. These are future completion gates; this documents-only PR checks facts, references and coverage.
