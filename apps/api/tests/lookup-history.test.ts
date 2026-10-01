@@ -1,13 +1,13 @@
-import { PlanCheck } from '@wayfinder/contracts';
+import { PlanCheck, tripFigures } from '@wayfinder/contracts';
 import { eq } from 'drizzle-orm';
 import { expect, it, vi } from 'vitest';
 import { db } from '../src/db/client';
 import { orderLines, orders, outlets, plans, stops } from '../src/db/schema';
 import { depotInstant } from '../src/lib/clock';
-import { driverStop, heldDriverRows } from './driver-plan';
+import { driverStop, driverTrip, heldDriverRows } from './driver-plan';
 import { sendWalkthroughPlan, THU, WED } from './loading-plan';
 import { lookupHarness } from './lookup-plan';
-import { decide, FRI, photo } from './operations-plan';
+import { decide, FRI, operations, photo, shownTrip } from './operations-plan';
 import { deliveredWalkthrough, receiptOf, shopScreen } from './receipt-plan';
 const clock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async original => {
@@ -68,6 +68,23 @@ it('L-13 counts a closed shop as nothing handed over, received or short on the r
   expect(day.counts).toMatchObject({ delivered: 1, finished: 2, confirmations: 1, stages: whole });
   // The closed shop is still not delivered, and has no receipt or proof to wait for.
   expect(closed).toMatchObject({ receipt: null, proof: null, flags: { short: false } });
+});
+// Q-43: Kandy's VEH057 trip 1, with Mulgampola closed and its cartons brought back, read "Handed over not recorded · 4 of
+// 5 lines" in History while the driver's Trip done said 105 of 148 delivered. A closed stop counts as nothing handed
+// over on every page, so History, Live day and the driver's phone read the same whole figure for the trip and the day.
+it('Q-43 a trip with a closed shop brought back reads the same whole handed over in History, Live day and on the phone', async () => {
+  let trip = await h.road.write(await h.road.wellawatte(), 'closed', 228, 2, { photo });
+  await decide(h.ruwan, trip.problems.find(row => row.kind === 'closed')!.id, 'bring_back');
+  trip = await h.road.write(driverTrip(await h.road.driver.read()), 'finish', 235);
+  const phone = tripFigures(trip), live = shownTrip(await operations(h.ruwan)).figures, day = await read();
+  expect([phone.delivered, live.delivered]).toEqual([23, 23]);
+  expect(day.trips[0]!.stages.handedOver).toEqual({ units: 23, known: 5, total: 5 });
+  expect(day.counts!.stages.handedOver).toEqual(day.trips[0]!.stages.handedOver);
+  expect(day.trips[0]!.stages.notDelivered.units).toBe(phone.notDelivered);
+  // The closed shop's lines read nothing handed over, never a dash, beside its not-delivered cartons.
+  const closed = day.trips[0]!.stops[1]!;
+  expect(closed.lines.map(line => [line.loaded, line.delivered, line.notDelivered])).toEqual([[48, 0, 48], [46, 0, 46]]);
+  expect(closed.attempts).toMatchObject([{ notDelivered: 94, decision: 'bring_back' }]);
 });
 it('AC-16 three received orders make one confirmation, 22 cartons and separate receipt and depot shortages', async () => {
   const trip = await deliveredWalkthrough(h, { wellawatte: 'refused' });

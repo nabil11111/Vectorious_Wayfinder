@@ -124,7 +124,8 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    received. Do not add a receipt's total order shortfall to those differences again. For an old closed attempt,
    loaded/not delivered comes from its `issue_lines.counted`. A closed stop was handed nothing: its handed over,
    received and receipt short are recorded zeros, never the orders' later counts, even if the orders later travel on
-   Friday, so a trip with a closed shop still reads whole figures (L-13). Use the existing calculators/helpers on the server; screens format, filter by returned
+   Friday, so a trip with a closed shop still reads whole figures, the same handed over as Live day and the driver's
+   Trip done (L-13, Q-43). Use the existing calculators/helpers on the server; screens format, filter by returned
    flags and draw, without calculating business figures.
 
    | History figure | Exact meaning |
