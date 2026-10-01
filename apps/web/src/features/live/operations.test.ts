@@ -42,10 +42,13 @@ beforeEach(() => {
     });
   }));
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  // Mounted as the app's provider mounts it, so going back online resumes a held read.
+  client.mount();
 });
 afterEach(() => {
   onlineManager.setOnline(true);
   stop();
+  client.unmount();
   client.clear();
   vi.unstubAllGlobals();
 });
