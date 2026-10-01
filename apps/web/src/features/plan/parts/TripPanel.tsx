@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import type { BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
+import type { BoardDriver, BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { splitOrder, type BoardScreen, type Undo } from '../board';
@@ -68,9 +68,9 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
     change(defer(draft, deferrals));
     setForm(null);
   };
-  // One change of the draft, with Undo when the driver came from another vehicle and the two swapped (spec 022).
-  const chooseDriver = (driverId: string | null) => {
-    const chosen = driverChange(draft, key, trip.vehicleId, driverId);
+  // One change of the draft, with Undo when the driver came from another vehicle, which he leaves with none (spec 026).
+  const chooseDriver = (driver: BoardDriver | null) => {
+    const chosen = driverChange(draft, key, trip.vehicleId, driver);
     change(chosen.plan, chosen.undo);
   };
   // Drag and drop (spec 023): the stops as a sortable list, outlined as one place while something that can land there is

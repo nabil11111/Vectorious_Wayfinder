@@ -337,7 +337,7 @@ it('D-95 a write waiting its turn names the depot it was made for, not the one t
   }
 });
 
-it('spec 022 AC-5 a driver swap goes out as one save of the draft, and Undo puts both drivers back with one more', async () => {
+it('spec 026 rule 2 a driver moved in the menu goes out as one save of the draft, and Undo puts him back with one more', async () => {
   signedIn(RUWAN);
   const [dilshan, sanjeewa] = ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'];
   const day: DraftPlan = { mixBrands: false, deferrals: [], trips: [
@@ -350,18 +350,18 @@ it('spec 022 AC-5 a driver swap goes out as one save of the draft, and Undo puts
   // The trips each save sent, with their drivers.
   const sent = () => vi.mocked(fetch).mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { plan: DraftPlan }).plan.trips.map((t) => [t.vehicleId, t.driverId]));
 
-  const { plan, undo } = driverChange(day, 'VEH035-1', 'VEH035', dilshan);
+  const { plan, undo } = driverChange(day, 'VEH035-1', 'VEH035', { id: dilshan, name: 'Dilshan' });
   saver.change(plan, undo);
   await settled();
-  expect(sent()).toEqual([[['VEH001', sanjeewa], ['VEH035', dilshan]]]);
+  expect(sent()).toEqual([[['VEH001', null], ['VEH035', dilshan]]]);
   answer(Response.json({ ...board, plan: { ...board.plan, ...plan, revision: 2 } }));
   await settled();
-  expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: { line: 'Drivers of VEH035 and VEH001 swapped', tripKey: 'VEH035-1', revision: 2 } });
+  expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: { line: 'Dilshan moved from VEH001, which has no driver now', tripKey: 'VEH035-1', revision: 2 } });
 
-  // Undo, as the trip's green line does it: the draft before, both drivers back, in one more save.
+  // Undo, as the trip's green line does it: the draft before, Dilshan back on VEH001, in one more save.
   saver.change(saver.snapshot()!.undo!.before);
   await settled();
-  expect(sent()).toEqual([[['VEH001', sanjeewa], ['VEH035', dilshan]], [['VEH001', dilshan], ['VEH035', sanjeewa]]]);
+  expect(sent()).toEqual([[['VEH001', null], ['VEH035', dilshan]], [['VEH001', dilshan], ['VEH035', sanjeewa]]]);
   answer(Response.json({ ...board, plan: { ...board.plan, revision: 3 } }));
   await settled();
   expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: null });

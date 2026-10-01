@@ -108,7 +108,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
 
   const chooseTruck = (pick: Pick, vehicleId: string) => {
     if (pick.kind === 'swap') {
-      const moved = swapTruck(draft, pick.key, vehicleId);
+      const moved = swapTruck(draft, pick.key, { vehicleId, driverId: null });
       if (!moved) return;
       change(moved.plan);
       const group = startedFrom[pick.key];
@@ -116,7 +116,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
       openTrip(moved.key);
       return;
     }
-    const started = startTrip(draft, vehicleId, pick.startWith);
+    const started = startTrip(draft, { vehicleId, driverId: null }, pick.startWith);
     if (!started) return;
     change(started.plan, startUndo(pick, draft, started));
     const group = pick.group;

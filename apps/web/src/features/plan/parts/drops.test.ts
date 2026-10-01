@@ -48,10 +48,10 @@ it('spec 023 AC-4 an order dropped in the empty middle opens the truck picker fo
 
 it('spec 023 AC-5 a trip a drop started is one change with its Undo, naming the truck the picker gave it', () => {
   const pick = { kind: 'start' as const, group: COLOMBO, orders: dehiwala.orders, startWith: dehiwala.orders, dropped: 'Fresh Dehiwala' };
-  const started = startTrip(PLAN, 'VEH004', pick.startWith)!;
+  const started = startTrip(PLAN, { vehicleId: 'VEH004', driverId: null }, pick.startWith)!;
   expect(startUndo(pick, PLAN, started)).toEqual({ before: PLAN, line: 'Fresh Dehiwala added to VEH004', tripKey: 'VEH004-1' });
   // A second trip, as its card names it.
-  const second = startTrip(PLAN, 'VEH035', pick.startWith)!;
+  const second = startTrip(PLAN, { vehicleId: 'VEH035', driverId: null }, pick.startWith)!;
   expect(startUndo(pick, PLAN, second)).toMatchObject({ line: 'Fresh Dehiwala added to VEH035 trip 2', tripKey: 'VEH035-2' });
   // A trip started from a button has no Undo, as before.
   const { dropped: _dropped, ...button } = pick;

@@ -21,9 +21,6 @@ export function freeTripNo(plan: DraftPlan, vehicleId: string): 1 | 2 | null {
   return !taken.has(1) ? 1 : !taken.has(2) ? 2 : null;
 }
 
-// The driver chosen for a vehicle, from any of its trips (rule 6).
-export const driverOf = (plan: DraftPlan, vehicleId: string) => plan.trips.find((trip) => trip.vehicleId === vehicleId)?.driverId ?? null;
-
 // Takes orders off their stops, a stop left with no order going too.
 function offStops(trips: DraftTrip[], ids: Set<string>): DraftTrip[] {
   return trips.map((trip) => ({
@@ -60,14 +57,27 @@ function renumber(trips: DraftTrip[], vehicleId: string): DraftTrip[] {
   return trips.map((trip) => (trip.vehicleId === vehicleId && trip.tripNo === 2 ? { ...trip, tripNo: 1 } : trip));
 }
 
-// Starts a trip on a vehicle, as its lowest free trip number, with the driver it already has, leaving at the
-// usual time. It holds the orders given, if any. null when the vehicle runs two trips already.
-export function startTrip(plan: DraftPlan, vehicleId: string, orders: OrderRef[] = []): { plan: DraftPlan; key: TripKey } | null {
-  const tripNo = freeTripNo(plan, vehicleId);
+// A crew (spec 026): a truck and the driver picked with it, or null when it has none.
+export interface CrewRef { vehicleId: string; driverId: string | null }
+
+// Puts a driver on every trip of a vehicle (rule 6). A driver who drives another vehicle moves: that vehicle's trips
+// are left with no driver, so nobody drives two (spec 026, rule 2).
+function drivenBy(trips: DraftTrip[], vehicleId: string, driverId: string | null): DraftTrip[] {
+  return trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId } : driverId !== null && trip.driverId === driverId ? { ...trip, driverId: null } : trip));
+}
+
+// The crew's driver on its truck, or, for a crew with none, the driver the truck already has.
+const crewDriver = (trips: DraftTrip[], crew: CrewRef) => crew.driverId ?? trips.find((trip) => trip.vehicleId === crew.vehicleId && trip.driverId !== null)?.driverId ?? null;
+
+// Starts a trip on a crew (spec 026, rule 1): on its truck, as the truck's lowest free trip number, leaving at the
+// usual time, with the crew's driver on every trip of the truck, in one change. It holds the orders given, if any. null
+// when the truck runs two trips already.
+export function startTrip(plan: DraftPlan, crew: CrewRef, orders: OrderRef[] = []): { plan: DraftPlan; key: TripKey } | null {
+  const tripNo = freeTripNo(plan, crew.vehicleId);
   if (tripNo === null) return null;
   const rest = without(plan, new Set(orders.map((order) => order.id)));
-  const trip = onto({ vehicleId, tripNo, leaveAt: null, driverId: driverOf(plan, vehicleId), stops: [] }, orders);
-  return { plan: { ...rest, trips: [...rest.trips, trip] }, key: keyOf(trip) };
+  const trip = onto({ vehicleId: crew.vehicleId, tripNo, leaveAt: null, driverId: null, stops: [] }, orders);
+  return { plan: { ...rest, trips: drivenBy([...rest.trips, trip], crew.vehicleId, crewDriver(rest.trips, crew)) }, key: keyOf(trip) };
 }
 
 // Puts orders on a trip, new stops at the end or, for a drop, before stop `at`. An order the draft had elsewhere, on
@@ -103,16 +113,17 @@ export function moveStop(plan: DraftPlan, key: TripKey, index: number, by: numbe
   };
 }
 
-// Moves a trip and its stops to another vehicle, as that vehicle's lowest free trip number and with that
-// vehicle's driver (rule 4). A trip 2 the move leaves alone becomes trip 1. null when the vehicle runs two trips.
-export function swapTruck(plan: DraftPlan, key: TripKey, vehicleId: string): { plan: DraftPlan; key: TripKey } | null {
+// Moves a trip and its stops to a crew (rule 4, spec 026): onto its truck, as the truck's lowest free trip number, with
+// the crew's driver on every trip of the truck, in one change. A trip 2 the move leaves alone becomes trip 1. null when
+// the truck runs two trips.
+export function swapTruck(plan: DraftPlan, key: TripKey, crew: CrewRef): { plan: DraftPlan; key: TripKey } | null {
   const trip = tripOf(plan, key);
   if (!trip) return null;
   const rest: DraftPlan = { ...plan, trips: renumber(plan.trips.filter((t) => keyOf(t) !== key), trip.vehicleId) };
-  const tripNo = freeTripNo(rest, vehicleId);
+  const tripNo = freeTripNo(rest, crew.vehicleId);
   if (tripNo === null) return null;
-  const moved: DraftTrip = { ...trip, vehicleId, tripNo, driverId: driverOf(rest, vehicleId) };
-  return { plan: { ...rest, trips: [...rest.trips, moved] }, key: keyOf(moved) };
+  const moved: DraftTrip = { ...trip, vehicleId: crew.vehicleId, tripNo, driverId: null };
+  return { plan: { ...rest, trips: drivenBy([...rest.trips, moved], crew.vehicleId, crewDriver(rest.trips, crew)) }, key: keyOf(moved) };
 }
 
 // Sets a trip's leaving time in minutes after midnight, or null for the usual time (rule 5).
@@ -124,15 +135,8 @@ export const vehicleOfDriver = (plan: DraftPlan, driverId: string, besides: stri
   plan.trips.find((trip) => trip.driverId === driverId && trip.vehicleId !== besides)?.vehicleId ?? null;
 
 // Chooses a vehicle's driver, written on both its trips, or null for none (rule 6). A driver who drives another
-// vehicle swaps: that vehicle takes this one's driver, or none, on every trip of each, so nobody drives two (D-97).
-export function setDriver(plan: DraftPlan, vehicleId: string, driverId: string | null): DraftPlan {
-  const other = driverId === null ? null : vehicleOfDriver(plan, driverId, vehicleId);
-  const before = driverOf(plan, vehicleId);
-  return {
-    ...plan,
-    trips: plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId } : trip.vehicleId === other ? { ...trip, driverId: before } : trip)),
-  };
-}
+// vehicle moves here, and that vehicle is left with no driver (spec 026, rule 2).
+export const setDriver = (plan: DraftPlan, vehicleId: string, driverId: string | null): DraftPlan => ({ ...plan, trips: drivenBy(plan.trips, vehicleId, driverId) });
 
 // Defers orders, each with its own code and reason (rule 7). A deferred order leaves its stop.
 export function defer(plan: DraftPlan, deferrals: DraftDeferral[]): DraftPlan {

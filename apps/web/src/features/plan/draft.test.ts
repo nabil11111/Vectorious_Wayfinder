@@ -1,9 +1,10 @@
 import type { DraftPlan } from '@wayfinder/contracts';
 import { expect, it } from 'vitest';
-import { addOrders, moveStop } from './draft';
+import { addOrders, moveStop, setDriver, startTrip, swapTruck, vehicleOfDriver } from './draft';
 
 // The draft changes a drop shares with the board's buttons and menus (spec 023): a new stop put where an order is
-// dropped, and a stop moved more than one place. The buttons' own changes stay as they were.
+// dropped, and a stop moved more than one place. The buttons' own changes stay as they were. Spec 026's crews: a truck
+// and its driver set together, and a driver who moves leaving his truck with none.
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const stop = (outletId: string, n: number) => ({ outletId, orderIds: [uuid(n)] });
@@ -34,4 +35,57 @@ it('spec 023 AC-3 moves a stop any number of places, and one place is the menu\'
   expect(moveStop(PLAN, 'VEH035-1', 0, -1)).toEqual(PLAN);
   expect(moveStop(PLAN, 'VEH035-1', 2, 1)).toEqual(PLAN);
   expect(moveStop(PLAN, 'VEH035-1', 1, 0)).toEqual(PLAN);
+});
+
+// Spec 026: a crew is a truck and its driver, picked as one. VEH004 runs two trips with Chaminda, and VEH035 one with
+// nobody; Dilshan drives VEH001.
+const [CHAMINDA, DILSHAN] = [uuid(91), uuid(92)];
+const CREWS: DraftPlan = {
+  mixBrands: false, deferrals: [],
+  trips: [
+    { vehicleId: 'VEH004', tripNo: 1, leaveAt: null, driverId: CHAMINDA, stops: [stop('OUT026', 26)] },
+    { vehicleId: 'VEH004', tripNo: 2, leaveAt: null, driverId: CHAMINDA, stops: [stop('OUT028', 28)] },
+    { vehicleId: 'VEH001', tripNo: 1, leaveAt: null, driverId: DILSHAN, stops: [stop('OUT006', 6)] },
+    { vehicleId: 'VEH035', tripNo: 1, leaveAt: null, driverId: null, stops: [stop('OUT001', 1)] },
+  ],
+};
+const crewsOf = (plan: DraftPlan) => plan.trips.map((t) => [t.vehicleId, t.tripNo, t.driverId]);
+
+it('spec 026 rule 1 starts a trip on a crew, the truck and its driver in one change', () => {
+  const started = startTrip(CREWS, { vehicleId: 'VEH002', driverId: DILSHAN }, [{ id: uuid(51), outletId: 'OUT051' }])!;
+  expect(started.key).toBe('VEH002-1');
+  // Dilshan leaves VEH001, which is left with no driver (rule 2).
+  expect(crewsOf(started.plan)).toEqual([['VEH004', 1, CHAMINDA], ['VEH004', 2, CHAMINDA], ['VEH001', 1, null], ['VEH035', 1, null], ['VEH002', 1, DILSHAN]]);
+  expect(started.plan.trips.at(-1)!.stops).toEqual([stop('OUT051', 51)]);
+  // A second trip of a truck: the crew's driver is on both its trips.
+  const second = startTrip(CREWS, { vehicleId: 'VEH035', driverId: CHAMINDA })!;
+  expect(second.key).toBe('VEH035-2');
+  expect(crewsOf(second.plan)).toEqual([['VEH004', 1, null], ['VEH004', 2, null], ['VEH001', 1, DILSHAN], ['VEH035', 1, CHAMINDA], ['VEH035', 2, CHAMINDA]]);
+  // A crew with no driver keeps whatever driver its truck has, and a truck on two trips takes no third.
+  expect(crewsOf(startTrip({ ...CREWS, trips: CREWS.trips.filter((t) => t.tripNo === 1) }, { vehicleId: 'VEH004', driverId: null })!.plan).at(-1)).toEqual(['VEH004', 2, CHAMINDA]);
+  expect(startTrip(CREWS, { vehicleId: 'VEH004', driverId: DILSHAN })).toBeNull();
+});
+
+it('spec 026 rule 1 swaps a trip onto a crew, the truck and its driver in one change', () => {
+  // VEH001's trip goes to VEH002 with Chaminda, who leaves VEH004's two trips with no driver.
+  const moved = swapTruck(CREWS, 'VEH001-1', { vehicleId: 'VEH002', driverId: CHAMINDA })!;
+  expect(moved.key).toBe('VEH002-1');
+  expect(crewsOf(moved.plan)).toEqual([['VEH004', 1, null], ['VEH004', 2, null], ['VEH035', 1, null], ['VEH002', 1, CHAMINDA]]);
+  expect(moved.plan.trips.at(-1)!.stops).toEqual([stop('OUT006', 6)]);
+  // Moving VEH004's second trip to VEH035 with Chaminda leaves trip 1 on VEH004 with no driver.
+  expect(crewsOf(swapTruck(CREWS, 'VEH004-2', { vehicleId: 'VEH035', driverId: CHAMINDA })!.plan))
+    .toEqual([['VEH004', 1, null], ['VEH001', 1, DILSHAN], ['VEH035', 1, CHAMINDA], ['VEH035', 2, CHAMINDA]]);
+  // Moving his own truck's only trip to his usual truck takes nobody else's driver away.
+  const only = { ...CREWS, trips: CREWS.trips.filter((t) => t.vehicleId !== 'VEH004') };
+  expect(crewsOf(swapTruck(only, 'VEH001-1', { vehicleId: 'VEH006', driverId: DILSHAN })!.plan)).toEqual([['VEH035', 1, null], ['VEH006', 1, DILSHAN]]);
+  expect(swapTruck(CREWS, 'VEH001-1', { vehicleId: 'VEH004', driverId: CHAMINDA })).toBeNull();
+});
+
+it('spec 026 rule 2 moves a driver chosen in the driver menu, leaving the truck he drove with no driver', () => {
+  expect(crewsOf(setDriver(CREWS, 'VEH035', CHAMINDA))).toEqual([['VEH004', 1, null], ['VEH004', 2, null], ['VEH001', 1, DILSHAN], ['VEH035', 1, CHAMINDA]]);
+  // Not a swap: VEH004 does not take Dilshan.
+  expect(crewsOf(setDriver(CREWS, 'VEH001', CHAMINDA))).toEqual([['VEH004', 1, null], ['VEH004', 2, null], ['VEH001', 1, CHAMINDA], ['VEH035', 1, null]]);
+  expect(crewsOf(setDriver(CREWS, 'VEH001', null))).toEqual([['VEH004', 1, CHAMINDA], ['VEH004', 2, CHAMINDA], ['VEH001', 1, null], ['VEH035', 1, null]]);
+  expect(vehicleOfDriver(CREWS, CHAMINDA, 'VEH035')).toBe('VEH004');
+  expect(vehicleOfDriver(CREWS, CHAMINDA, 'VEH004')).toBeNull();
 });
