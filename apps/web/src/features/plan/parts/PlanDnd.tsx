@@ -9,12 +9,12 @@ import {
 } from './dragging';
 import type { Dragged, DragData } from './drops';
 import type { BoardIndex } from './lookup';
-import type { Pick } from './PickTruck';
+import type { Pick } from './crews';
 
 // The plan board's drag and drop (spec 023): the board's columns inside one drag context. The pointer picks a row up
 // once it has moved a few pixels, so a click and the rows' menus work as before, and the keyboard picks it up from its
 // handle with Space or Enter. A finished drag is the change its button makes, sent through the board's own change
-// with its Undo, and an order dropped in the empty middle opens the truck picker.
+// with its Undo, and an order dropped in the empty middle opens the crew picker.
 export function PlanDnd({ screen, index, change, onStartTrip, children }: {
   screen: BoardScreen;
   index: BoardIndex;

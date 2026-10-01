@@ -74,10 +74,11 @@ export function MenuRoot(props: Menu.Root.Props) {
 export function MenuTrigger(props: Menu.Trigger.Props) {
   return <Menu.Trigger {...props} />;
 }
-export function MenuPopup({ className, align = 'end', children }: { className?: string; align?: 'start' | 'center' | 'end'; children: ReactNode }) {
+// anchor places it at another element than its trigger, such as the drop area of the crew picker (spec 026).
+export function MenuPopup({ className, align = 'end', anchor, children }: { className?: string; align?: 'start' | 'center' | 'end'; anchor?: Menu.Positioner.Props['anchor']; children: ReactNode }) {
   return (
     <Menu.Portal>
-      <Menu.Positioner className="z-50 outline-none" sideOffset={6} align={align}>
+      <Menu.Positioner className="z-50 outline-none" sideOffset={6} align={align} anchor={anchor}>
         <Menu.Popup className={cn('max-h-[var(--available-height)] min-w-44 overflow-y-auto rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none', className)}>
           {children}
         </Menu.Popup>

@@ -1,7 +1,7 @@
 import type { BoardOrder, Brand, DraftPlan, DraftTrip } from '@wayfinder/contracts';
 import type { Undo } from '../board';
 import { addOrders, moveStop, takeOff, tripOf, type TripKey } from '../draft';
-import type { Pick } from './PickTruck';
+import type { Pick } from './crews';
 
 // Drag and drop on the plan board (spec 023, D-98). What can be dragged, where it can land, and the change each drop
 // is: always the change the board's button or menu for it makes, from draft.ts, as one change of the draft with a line
@@ -21,7 +21,7 @@ export type Landing =
   | { kind: 'unplanned' }
   | { kind: 'middle' };
 
-// A drop: a change of the draft with its Undo, or the truck picker for orders dropped in the empty middle.
+// A drop: a change of the draft with its Undo, or the crew picker for orders dropped in the empty middle (spec 026).
 export type Drop = { kind: 'change'; plan: DraftPlan; undo: Undo } | { kind: 'start'; pick: Pick };
 
 // What a draggable carries, and what a place to land carries: its landing, and its name for the announcements.
@@ -39,19 +39,11 @@ export function canLand(dragged: Dragged, landing: Landing): boolean {
 // (spec 026). The board index's called gives it.
 export type Called = (trip: DraftTrip) => string;
 
-// The Undo of a trip an order dropped in the empty middle started, once the picker has given it a truck: the drop is
-// one change of the draft, undone in one (rule 1). A trip started from a button has none, as before.
-export function startUndo(pick: Pick, before: DraftPlan, started: { plan: DraftPlan; key: TripKey }, called: Called): Undo | undefined {
-  if (pick.kind !== 'start' || pick.dropped === undefined) return undefined;
-  const trip = tripOf(started.plan, started.key);
-  return trip ? { before, line: `${pick.dropped} added to ${called(trip)}`, tripKey: started.key } : undefined;
-}
-
 // The drop as a change of the draft, or null when it lands where it cannot or changes nothing.
 export function dropOf(plan: DraftPlan, dragged: Dragged, landing: Landing, called: Called): Drop | null {
   if (!canLand(dragged, landing)) return null;
   if (dragged.kind === 'orders') {
-    // In the empty middle, its group's "Start a trip": pick a truck, and the trip starts with these orders.
+    // In the empty middle, its group's "Start a trip": pick a crew, and the trip starts with these orders.
     if (landing.kind === 'middle') {
       return { kind: 'start', pick: { kind: 'start', group: dragged.group, orders: dragged.orders, startWith: dragged.orders, dropped: dragged.label } };
     }

@@ -5,8 +5,10 @@ import type { BoardDriver, BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTri
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { splitOrder, type BoardScreen, type Undo } from '../board';
-import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeOff, tripOf } from '../draft';
+import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeOff, tripOf, type CrewRef } from '../draft';
 import { countOf, cubic, figure, hhmm, litres, orderAmount, ordersAmount, tonnes, truckKind } from '../words';
+import { CrewMenu } from './CrewMenu';
+import type { Pick } from './crews';
 import { DeferForm } from './DeferForm';
 import { DepotRow } from './DepotRow';
 import { draggedOf, landingLook, movable, useLanding } from './dragging';
@@ -27,14 +29,15 @@ type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>) => Promise<
 // The open trip (Edit plan): its vehicle, driver, brand, district and leaving time, the checker's figures, the
 // timeline with the trip's problems and their fixes, the stops in order, "+ Add a stop" and "Mark trip done".
 // The numbers are the last answer's, shown only while they are for the trip on screen.
-export function TripPanel({ screen, index, trip, group, change, act, onSwap, onRemoved, onDone, onAddStop, onJoin }: {
+export function TripPanel({ screen, index, trip, group, change, act, onCrew, onRemoved, onDone, onAddStop, onJoin }: {
   screen: BoardScreen;
   index: BoardIndex;
   trip: DraftTrip;
   group: { brand: Brand; district: string } | null;
   change: (next: DraftPlan, undo?: Undo) => void;
   act: Act;
-  onSwap: () => void;
+  // A crew picked from "Swap truck" (spec 026).
+  onCrew: (pick: Pick, crew: CrewRef) => void;
   onRemoved: () => void;
   onDone: () => void;
   onAddStop: () => void;
@@ -118,7 +121,12 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
             back {hhmm(times.backAt)} · {countOf(trip.stops.length, 'stop')} · {figure(times.km)} km
           </span>
         )}
-        <Button variant="outline" className={plainButton('ml-auto h-7 px-3 text-xs')} onClick={onSwap}>Swap truck</Button>
+        <span className="ml-auto">
+          <CrewMenu
+            screen={screen} index={index} pick={{ kind: 'swap', key }} title={`Swap truck · ${index.crew(trip)}`}
+            trigger="Swap truck" triggerClassName={plainButton('h-7 px-3 text-xs')} onPick={(crew) => onCrew({ kind: 'swap', key }, crew)}
+          />
+        </span>
       </div>
 
       <div className="px-3.5 pt-3">

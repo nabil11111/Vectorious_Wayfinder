@@ -49,7 +49,7 @@ const doneList = (board: PlanBoard) => renderToStaticMarkup(<DoneList screen={sc
 const tripPanel = (board: PlanBoard, vehicleId: string) => renderToStaticMarkup(
   <TripPanel
     screen={screenOf(board)} index={indexOf(board)} trip={board.plan.trips.find((t) => t.vehicleId === vehicleId)!} group={null}
-    change={() => undefined} act={async () => null} onSwap={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+    change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
   />,
 );
 
@@ -76,7 +76,7 @@ it('spec 026 AC-3 the open trip\'s header names the truck by its driver, whose n
   const markup = renderToStaticMarkup(
     <TripPanel
       screen={screenOf(second)} index={indexOf(second)} trip={second.plan.trips[1]!} group={null}
-      change={() => undefined} act={async () => null} onSwap={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+      change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
     />,
   );
   expect(markup).toMatch(/<h2 class="[^"]*">Planning · <button[^>]*>Chaminda<\/button> · reefer truck · trip 2<\/h2>/);

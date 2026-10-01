@@ -1,8 +1,8 @@
 import type { BoardOrder, DraftPlan } from '@wayfinder/contracts';
 import { expect, it } from 'vitest';
-import { addOrders, moveStop, startTrip, takeOff } from '../draft';
+import { addOrders, moveStop, takeOff } from '../draft';
 import { truckCalled } from '../words';
-import { canLand, dropOf, startUndo, type Called, type Dragged, type Landing } from './drops';
+import { canLand, dropOf, type Called, type Dragged, type Landing } from './drops';
 
 // Spec 023: every drop on the plan board is the change its button or menu makes, one change of the draft with a line
 // naming it for Undo (rule 1), and nothing here judges the plan: the checker does, after the drop (rule 2). The day is
@@ -48,21 +48,8 @@ it('spec 023 AC-1 an order dropped on a trip\'s card in Done joins that trip at 
   expect(dropOf(second, dehiwala, { kind: 'card', tripKey: 'VEH002-2' }, called)).toMatchObject({ undo: { line: 'Fresh Dehiwala added to the second trip of Chaminda\'s dry truck', tripKey: 'VEH002-2' } });
 });
 
-it('spec 023 AC-4 an order dropped in the empty middle opens the truck picker for its group, starting with it', () => {
+it('spec 023 AC-4 an order dropped in the empty middle opens the crew picker for its group, starting with it (spec 026)', () => {
   expect(dropOf(PLAN, dehiwala, { kind: 'middle' }, called)).toEqual({ kind: 'start', pick: { kind: 'start', group: COLOMBO, orders: dehiwala.orders, startWith: dehiwala.orders, dropped: 'Fresh Dehiwala' } });
-});
-
-it('spec 023 AC-5 a trip a drop started is one change with its Undo, naming the truck the picker gave it', () => {
-  const pick = { kind: 'start' as const, group: COLOMBO, orders: dehiwala.orders, startWith: dehiwala.orders, dropped: 'Fresh Dehiwala' };
-  const started = startTrip(PLAN, { vehicleId: 'VEH004', driverId: null }, pick.startWith)!;
-  expect(startUndo(pick, PLAN, started, called)).toEqual({ before: PLAN, line: 'Fresh Dehiwala added to the reefer truck VEH004', tripKey: 'VEH004-1' });
-  // A second trip, as its card names it.
-  const second = startTrip(PLAN, { vehicleId: 'VEH035', driverId: null }, pick.startWith)!;
-  expect(startUndo(pick, PLAN, second, called)).toMatchObject({ line: 'Fresh Dehiwala added to the second trip of Wasantha\'s reefer van', tripKey: 'VEH035-2' });
-  // A trip started from a button has no Undo, as before.
-  const { dropped: _dropped, ...button } = pick;
-  expect(startUndo(button, PLAN, started, called)).toBeUndefined();
-  expect(startUndo({ kind: 'swap', key: 'VEH035-1' }, PLAN, started, called)).toBeUndefined();
 });
 
 it('spec 023 AC-3 a stop dragged up or down is the menu\'s move, by as many places as it went', () => {

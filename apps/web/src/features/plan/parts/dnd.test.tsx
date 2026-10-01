@@ -48,12 +48,12 @@ const INDEX = indexOf(BOARD);
 const screenOf = (board: PlanBoard, change: Partial<BoardScreen> = {}): BoardScreen => ({ board, draft: planOf(board), saving: 'saved', refused: null, acting: false, undo: null, ...change });
 
 const orderLists = (screen: BoardScreen, open: DraftTrip | null = null) => renderToStaticMarkup(
-  <OrderLists screen={screen} index={INDEX} places={placesOf(screen.draft)} open={open} outlined={null} change={() => undefined} onStartTrip={() => undefined} onFindSlot={() => undefined} onJoin={() => undefined} />,
+  <OrderLists screen={screen} index={INDEX} places={placesOf(screen.draft)} open={open} outlined={null} change={() => undefined} onCrew={() => undefined} onFindSlot={() => undefined} onJoin={() => undefined} />,
 );
 const tripPanel = (screen: BoardScreen) => renderToStaticMarkup(
   <TripPanel
     screen={screen} index={INDEX} trip={screen.draft.trips[0]!} group={null}
-    change={() => undefined} act={async () => null} onSwap={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+    change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
   />,
 );
 // Each draggable's handle by its name: "draggable" for an order, "sortable" for a stop in its list.
@@ -78,7 +78,7 @@ it('spec 023 AC-6 lets nothing be dragged while the board holds still or the pla
 
 it('spec 023 AC-4 the empty middle offers the build and a drop area in place of "Start a blank trip"', () => {
   const empty = boardWith([]);
-  const markup = renderToStaticMarkup(<MemoryRouter><BuildPanel screen={screenOf(empty)} act={async () => null} onBuilding={() => undefined} /></MemoryRouter>);
+  const markup = renderToStaticMarkup(<MemoryRouter><BuildPanel screen={screenOf(empty)} act={async () => null} onBuilding={() => undefined} index={indexOf(empty)} dropped={null} onCrew={() => undefined} onDropClose={() => undefined} /></MemoryRouter>);
   expect(markup).toContain('>Build the suggested plan</button>');
   expect(markup).toContain('or drag an order here to start a trip');
   expect(markup).not.toContain('Start a blank trip');
@@ -87,7 +87,7 @@ it('spec 023 AC-4 the empty middle offers the build and a drop area in place of 
 const dehiwala: Dragged = { kind: 'orders', orders: [BOARD.orders[3]!], group: { brand: 'Fresh', district: 'Colombo' }, label: 'Fresh Dehiwala', detail: '12 cartons chilled' };
 const stopTwo: Landing = { kind: 'stops', tripKey: 'VEH035-1', at: 1 };
 
-it('spec 023 AC-1 makes a finished drag its change of the draft, with its Undo, or opens the truck picker', () => {
+it('spec 023 AC-1 makes a finished drag its change of the draft, with its Undo, or opens the crew picker', () => {
   const change = vi.fn();
   const start = vi.fn();
   landDrop(planOf(BOARD), dehiwala, stopTwo, { change, start, called: INDEX.called });
@@ -187,4 +187,10 @@ it('spec 023 AC-5 shows the Undo line of a drop on a trip\'s card in that card',
   const screen = screenOf(BOARD, { undo: { before: plan, line: 'Fresh Dehiwala added to VEH002', tripKey: 'VEH002-1', seq: 1, revision: 4 } });
   const markup = renderToStaticMarkup(<BoardChange.Provider value={() => undefined}><DoneList screen={screen} index={INDEX} openKey="VEH035-1" onOpen={() => undefined} /></BoardChange.Provider>);
   expect(markup).toMatch(/<div role="status"[^>]*><p[^>]*>Fresh Dehiwala added to VEH002<\/p><button[^>]*>Undo<\/button><\/div>/);
+});
+
+it('spec 026 AC-1 opens the crew picker as a dropdown from a group\'s "Start a trip" and from "Swap truck"', () => {
+  const menuButton = (name: string) => new RegExp(`<button[^>]*aria-haspopup="menu"[^>]*>${name}</button>`);
+  expect(orderLists(screenOf(BOARD))).toMatch(menuButton('Start a trip'));
+  expect(tripPanel(screenOf(BOARD))).toMatch(menuButton('Swap truck'));
 });

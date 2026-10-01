@@ -6,10 +6,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardScreen } from '../board';
+import type { CrewRef } from '../draft';
 import { BUILD, BUILDING, buildingLine, KEEP_DRAFT, REPLACE_TITLE, replaceLine, suggestedAt, toMake } from '../words';
 import { buildPlan, type BuildAct } from './build';
+import { CrewMenu } from './CrewMenu';
+import type { Pick } from './crews';
 import { useLanding } from './dragging';
 import { ICON } from './icons';
+import type { BoardIndex } from './lookup';
 import { orangeButton, plainButton } from './look';
 
 // The empty middle's drop area, in place of "Start a blank trip" (spec 023, with the trucks panel going in spec 026).
@@ -21,12 +25,22 @@ const DROP_HERE = 'or drag an order here to start a trip';
 // and the board holds still. A refusal shows the server's sentence in red with Try again, and one that loads the board
 // again says so in spec 010's line. After a build, the line says when it was suggested and how many of the planner's
 // decisions are still to make.
-export function BuildPanel({ screen, act, onBuilding }: { screen: BoardScreen; act: BuildAct; onBuilding: () => void }) {
+export function BuildPanel({ screen, act, onBuilding, index, dropped, onCrew, onDropClose }: {
+  screen: BoardScreen;
+  act: BuildAct;
+  onBuilding: () => void;
+  index: BoardIndex;
+  // An order dropped here, for which the crew picker opens at the drop area; Escape or a click outside starts nothing.
+  dropped: Pick | null;
+  onCrew: (pick: Pick, crew: CrewRef) => void;
+  onDropClose: () => void;
+}) {
   const { board, draft } = screen;
   const [asking, setAsking] = useState(false);
   const [building, setBuilding] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
   const navigate = useNavigate();
+  const dropArea = useRef<HTMLParagraphElement>(null);
   // The whole empty middle takes the drop. Its dashed area says so and shows the drag over it.
   const { setNodeRef: middleRef, look: middleLook } = useLanding('middle', { kind: 'middle' }, 'the middle, to start a trip');
   // The rows View plan lists as open: the screen counts them, nothing else.
@@ -70,7 +84,13 @@ export function BuildPanel({ screen, act, onBuilding }: { screen: BoardScreen; a
       <div className="mt-3.5 flex flex-wrap justify-center gap-2.5">
         <Button className={orangeButton('h-11 px-6 text-sm')} disabled={screen.acting} focusableWhenDisabled onClick={press}>{BUILD}</Button>
         {/* While an order is dragged, the drag's outline takes the place of the area's own dashed line. */}
-        <p className={cn('flex h-11 items-center rounded-[10px] border-[1.5px] border-dashed px-5 text-sm text-muted-foreground', middleLook ? 'border-transparent' : 'border-mute', middleLook)}>{DROP_HERE}</p>
+        <p ref={dropArea} className={cn('flex h-11 items-center rounded-[10px] border-[1.5px] border-dashed px-5 text-sm text-muted-foreground', middleLook ? 'border-transparent' : 'border-mute', middleLook)}>{DROP_HERE}</p>
+        {dropped && (
+          <CrewMenu
+            screen={screen} index={index} pick={dropped} title={`Start a trip · ${dropped.kind === 'start' && dropped.dropped !== undefined ? dropped.dropped : ''}`}
+            anchor={dropArea} open onOpenChange={(open) => { if (!open) onDropClose(); }} onPick={(crew) => onCrew(dropped, crew)}
+          />
+        )}
       </div>
       {refused && (
         <p role="alert" className="mt-4 flex max-w-md items-center gap-3 rounded-[10px] bg-bad-tint px-3 py-[7px] text-left text-xs leading-[15px] font-semibold text-bad">
