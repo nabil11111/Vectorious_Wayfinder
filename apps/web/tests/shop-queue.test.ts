@@ -82,7 +82,7 @@ const LINE = '9c000000-0000-4000-8000-000000000001';
 const delivery: StoreDelivery = {
   stopId: STOP, revision: 2, day: '2026-06-25', vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: '2026-06-24T22:04:00.000Z', doneAt: '2026-06-24T22:08:00.000Z',
   outcome: 'delivered', late: false, refusalReason: null, receipt: null,
-  lines: [{ lineId: LINE, orderId: '9d000000-0000-4000-8000-000000000001', temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', ordered: 12, loaded: 12, delivered: 12, received: null }],
+  lines: [{ lineId: LINE, orderId: '9d000000-0000-4000-8000-000000000001', temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', ordered: 12, loaded: 12, wontFit: 0, delivered: 12, received: null }],
 };
 const deliveriesFor = (applied: string[], userId: string): StoreDeliveries => ({
   outlet: { id: 'OUT001', name: 'Fresh Nugegoda', brand: 'Fresh', windowOpen: '05:00', windowClose: '07:30', dockType: 'street' },

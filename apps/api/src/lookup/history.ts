@@ -82,14 +82,16 @@ export function getLookupHistory(caller: DepotCaller, query: LookupHistoryQuery)
         const lines: HistoryLine[] = stop.lines.map(line => {
           const counted = lineCounts.find(row => row.lineId === line.lineId)!, confirmed = delivery?.byLine.find(row => row.lineId === line.lineId);
           return { ...line, loaded: loaded ? line.loaded : null, delivered: handed ? line.delivered : closed ? 0 : null,
-            received: receipt ? confirmed!.received : closed ? 0 : null, depotShort: loaded && line.loaded !== null ? counted.short : null,
+            // What did not fit on the truck is not short of stock (L-21).
+            received: receipt ? confirmed!.received : closed ? 0 : null, depotShort: loaded && line.loaded !== null ? counted.short - counted.wontFit : null,
+            wontFit: loaded && line.loaded !== null ? counted.wontFit : 0,
             refused: completed ? counted.refused : null, receiptShort: receipt ? confirmed!.short : closed ? 0 : null, notDelivered: completed ? counted.notDelivered : null };
         });
         const stages = stagesOf(lines);
         return { id: stop.id, seq: stop.seq, outlet: member.shop, orderIds: ownOrders.map(row => row.id).sort(),
           plannedArrival: depotInstant(plan.date, time.arriveAt).toISOString(), plannedDeparture: depotInstant(plan.date, time.leaveAt).toISOString(), windowOpen, windowClose,
           loadedAt: member.stop.loadedAt?.toISOString() ?? null, arrivedAt: stop.arrivedAt, doneAt: stop.doneAt, outcome: stop.outcome, lines, stages,
-          flags: { late, short: lines.some(line => (line.depotShort ?? 0) > 0 || (line.refused ?? 0) > 0 || (line.receiptShort ?? 0) > 0),
+          flags: { late, short: lines.some(line => (line.depotShort ?? 0) > 0 || line.wontFit > 0 || (line.refused ?? 0) > 0 || (line.receiptShort ?? 0) > 0),
             returned: ownProblems.some(row => (row.kind === 'closed' && row.decision === 'bring_back') || (row.kind === 'refused' && ['bring_back', 'send_replacements'].includes(row.decision ?? ''))) },
           receipt, proof: photoOf(pictures.find(row => row.stopId === stop.id && row.issueId === null)), problems: ownProblems.map(row => problemOf(row, lines, pictures)), attempts: attemptsOf(ownProblems, pictures) };
       });

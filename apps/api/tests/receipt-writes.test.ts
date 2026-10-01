@@ -213,7 +213,7 @@ it('AC-10 refuses a receipt for a stop not handed over, or a closed one, with no
     const stop1 = driverStop(tripNow, 1);
     return { stopId: stop1.id, revision: stop1.revision, day: THU, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: stop1.arrivedAt!, doneAt: stop1.arrivedAt!, outcome: 'delivered', late: false,
       refusalReason: null, receipt: null, lines: stop1.lines.map((line) => ({ lineId: line.lineId, orderId: line.orderId, temp: line.temp, productId: line.productId, name: line.name,
-        unit: line.unit, ordered: line.quantity, loaded: line.loaded!, delivered: line.loaded!, received: null })) };
+        unit: line.unit, ordered: line.quantity, loaded: line.loaded!, wontFit: line.wontFit, delivered: line.loaded!, received: null })) };
   };
   const arrived = await refused(receiptOf(asDelivery(trip), [12, 8, 3]), 409, 'not_delivered', 'This delivery has not been handed over.');
   expect(arrived.body.error.details).toBeUndefined();

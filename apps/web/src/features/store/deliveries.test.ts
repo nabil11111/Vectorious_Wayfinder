@@ -13,7 +13,7 @@ const outlet: StoreOutlet = { id: 'OUT001', name: 'Fresh Nugegoda', brand: 'Fres
 
 const line = (n: number, temp: 'chilled' | 'dry', ordered: number, loaded: number) => ({
   lineId: `9c000000-0000-4000-8000-00000000000${n}`, orderId: `9d000000-0000-4000-8000-00000000000${n}`, temp, productId: `fresh-${temp}-carton`,
-  name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', ordered, loaded, delivered: loaded, received: null,
+  name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', ordered, loaded, wontFit: 0, delivered: loaded, received: null,
 });
 const delivery: StoreDelivery = {
   stopId: STOP, revision: 3, day: '2026-06-25', vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: '2026-06-24T22:04:00.000Z', doneAt: '2026-06-24T22:08:00.000Z',

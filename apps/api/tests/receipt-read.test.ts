@@ -79,9 +79,9 @@ it('AC-1 answers Nugegoda\'s delivery to confirm at Thu 08:30, with its lines in
       stopId: driverStop(trip, 1).id, revision: 2, day: THU, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at(3 * 60 + 34).toISOString(), doneAt: at(HANDED_OVER).toISOString(),
       outcome: 'delivered', late: false, refusalReason: null, receipt: null,
       lines: [
-        { ...twelve, temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', ordered: 12, loaded: 12, delivered: 12, received: null },
-        { ...eight, temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', ordered: 8, loaded: 8, delivered: 8, received: null },
-        { ...dry, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', ordered: 4, loaded: 3, delivered: 3, received: null },
+        { ...twelve, temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', ordered: 12, loaded: 12, wontFit: 0, delivered: 12, received: null },
+        { ...eight, temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', ordered: 8, loaded: 8, wontFit: 0, delivered: 8, received: null },
+        { ...dry, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', ordered: 4, loaded: 3, wontFit: 0, delivered: 3, received: null },
       ],
     }],
   });

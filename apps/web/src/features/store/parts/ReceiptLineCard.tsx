@@ -6,7 +6,7 @@ import { Chip } from '@/components/ui/chip';
 import { countLine } from '@/features/loader/words';
 import { cn } from '@/lib/utils';
 import { receiptBox } from '../receipt-counts';
-import { countOf, expectedWords, lineGoods, overLine, receiptLineName, refusedAtDoorLine, SHORT_REASON_WORDS, shortChip, shortFromDepotLine } from '../words';
+import { countOf, expectedWords, lineGoods, overLine, receiptLineName, refusedAtDoorLine, SHORT_REASON_WORDS, shortChip, shortFromDepotLine, wontFitLine } from '../words';
 import { Choice } from './Choice';
 import { goodsIcon } from './icons';
 import { Panel } from './Panel';
@@ -116,6 +116,7 @@ export function CountCard({ brand, line, figures, count, text, reason, disabled,
         </div>
       )}
       {figures.shortFromDepot > 0 && <Note icon={shortfall}>{shortFromDepotLine(figures.shortFromDepot)}</Note>}
+      {figures.wontFit > 0 && <Note icon={shortfall}>{wontFitLine(figures.wontFit)}</Note>}
       {figures.refused > 0 && <Note icon={damaged}>{refusedAtDoorLine(figures.refused)}</Note>}
     </Panel>
   );

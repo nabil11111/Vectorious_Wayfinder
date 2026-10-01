@@ -54,6 +54,21 @@ export async function replacementsOf(on: Reader, issueIds: string[]): Promise<Ma
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
+// The order lines the loader flagged at each stop as not fitting on the truck, as `${stopId}:${lineId}`. What such a line
+// is short did not fit, as the driver's day reads it, not short of stock (L-09, L-21).
+export async function notFittingAt(on: Reader, stopIds: string[]): Promise<Set<string>> {
+  if (!stopIds.length) return new Set();
+  const rows = await on.select({ stopId: issues.stopId, lineId: issueLines.orderLineId }).from(issues).innerJoin(issueLines, eq(issueLines.issueId, issues.id))
+    .where(and(inArray(issues.stopId, stopIds), eq(issues.kind, 'loading'), eq(issues.reason, 'wont_fit')));
+  return new Set(rows.map((row) => `${row.stopId}:${row.lineId}`));
+}
+
+// A line's units short at the depot, split into those that did not fit on the truck and those short of stock.
+export const shortOf = (flagged: boolean, ordered: number, loaded: number) => {
+  const wontFit = flagged ? ordered - loaded : 0;
+  return { wontFit, shortFromDepot: ordered - loaded - wontFit };
+};
+
 export async function factsOf(on: Reader, outletId: string, orderIds: string[]): Promise<Map<string, OrderFacts>> {
   const facts = new Map<string, OrderFacts>();
   if (!orderIds.length) return facts;
@@ -79,6 +94,7 @@ export async function factsOf(on: Reader, outletId: string, orderIds: string[]):
     .where(and(inArray(issues.stopId, stopIds), inArray(issues.kind, ['refused', 'closed', 'receipt']))).orderBy(issues.raisedAt, issues.id) : [];
   const counted = problems.length ? await on.select().from(issueLines).where(inArray(issueLines.issueId, problems.map((problem) => problem.id))) : [];
   const replacements = await replacementsOf(on, problems.map((problem) => problem.id));
+  const notFitting = await notFittingAt(on, stopIds);
 
   // The day of the delivery each replacement replaces: its problem's plan. A part reaches it through its original.
   const answered = [...new Set(rows.flatMap((row) => row.replacesIssueId ?? row.originalReplaces ?? []))];
@@ -92,7 +108,7 @@ export async function factsOf(on: Reader, outletId: string, orderIds: string[]):
     const countedHere = (problemId: string) => counted.filter((line) => line.issueId === problemId && own.some((mine) => mine.lineId === line.orderLineId));
     const issueId = row.replacesIssueId ?? row.originalReplaces;
     facts.set(row.id, {
-      delivery: visit ? deliveryOf(visit, own, atStop, counted, shop) : null,
+      delivery: visit ? deliveryOf(visit, own, atStop, counted, shop, notFitting) : null,
       receipt: row.status === 'received' && row.receivedAt && own.length && own.every((line) => line.received !== null) ? {
         at: row.receivedAt.toISOString(), sentAt: row.sentAt?.toISOString() ?? null,
         units: sum(own.map((line) => line.received!)), short: sum(own.map((line) => line.quantity - line.received!)),
@@ -122,7 +138,7 @@ type Line = { lineId: string; quantity: number; loaded: number | null; delivered
 
 // What happened at the stop, once it is done. A closed stop's counts are its attempt's, from its problem, as spec
 // 013's day reads them, whatever later happened to the order.
-function deliveryOf(visit: Visit, own: Line[], atStop: (typeof issues.$inferSelect)[], counted: (typeof issueLines.$inferSelect)[], shop: { windowClose: string; mallWindow: string | null }): OrderDelivery | null {
+function deliveryOf(visit: Visit, own: Line[], atStop: (typeof issues.$inferSelect)[], counted: (typeof issueLines.$inferSelect)[], shop: { windowClose: string; mallWindow: string | null }, notFitting: Set<string>): OrderDelivery | null {
   const { stop } = visit;
   if (stop.outcome === null) return null;
   if (!stop.arrivedAt || !stop.doneAt) throw new Error(`Stop ${stop.id} is done with no arrival.`);
@@ -134,17 +150,17 @@ function deliveryOf(visit: Visit, own: Line[], atStop: (typeof issues.$inferSele
     const loaded = own.map((line) => {
       const found = counted.find((each) => each.issueId === attempt.id && each.orderLineId === line.lineId);
       if (!found) throw new Error(`Closed attempt ${attempt.id} has no count for ${line.lineId}.`);
-      return { quantity: line.quantity, loaded: found.counted };
+      return shortOf(notFitting.has(`${stop.id}:${line.lineId}`), line.quantity, found.counted);
     });
-    return { ...base, delivered: null, shortFromDepot: sum(loaded.map((line) => line.quantity - line.loaded)), refused: 0, refusalReason: null };
+    return { ...base, delivered: null, shortFromDepot: sum(loaded.map((line) => line.shortFromDepot)), wontFit: sum(loaded.map((line) => line.wontFit)), refused: 0, refusalReason: null };
   }
   const handed = own.map((line) => {
     if (line.loaded === null || line.delivered === null) throw new Error(`Line ${line.lineId} of stop ${stop.id} has no handed over count.`);
-    return { quantity: line.quantity, loaded: line.loaded, delivered: line.delivered };
+    return { loaded: line.loaded, delivered: line.delivered, ...shortOf(notFitting.has(`${stop.id}:${line.lineId}`), line.quantity, line.loaded) };
   });
   const refusal = atStop.find((problem) => problem.kind === 'refused');
   return {
-    ...base, delivered: sum(handed.map((line) => line.delivered)), shortFromDepot: sum(handed.map((line) => line.quantity - line.loaded)),
+    ...base, delivered: sum(handed.map((line) => line.delivered)), shortFromDepot: sum(handed.map((line) => line.shortFromDepot)), wontFit: sum(handed.map((line) => line.wontFit)),
     refused: sum(handed.map((line) => line.loaded - line.delivered)),
     refusalReason: stop.outcome === 'refused' && refusal ? RefusalReason.parse(refusal.reason) : null,
   };

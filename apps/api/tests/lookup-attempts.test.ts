@@ -7,7 +7,7 @@ import { driverStop, driverTrip } from './driver-plan';
 import { answeredTruck, answerFlag, loaderScreen, sendWalkthroughPlan, THU, truckOf } from './loading-plan';
 import { lookupHarness } from './lookup-plan';
 import { decide, FRI, photo } from './operations-plan';
-import { jpeg, receiptOf, shopScreen } from './receipt-plan';
+import { deliveredWalkthrough, jpeg, receiptOf, shopScreen } from './receipt-plan';
 const clock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async original => {
   const actual = await original<typeof import('../src/lib/clock')>();
@@ -147,4 +147,14 @@ it('AC-15 retry keeps each issues own time counts photo and answer without audit
   const answer = await h.ruwan.get('/api/v1/issues/' + second.id + '/photo');
   expect(answer.status).toBe(200);
   expect(answer.body).toEqual(different);
+});
+it('L-21 counts the dry carton that did not fit on the truck as won\'t fit, not short from the depot', async () => {
+  await deliveredWalkthrough(h, { wellawatte: 'refused', reason: 'wont_fit' });
+  const day = await read(), stop = day.trips[0]!.stops[0]!;
+  expect(day.counts!.stages).toMatchObject({ depotShort: { units: 0, known: 5, total: 5 }, wontFit: { units: 1, known: 5, total: 5 } });
+  expect(day.trips[0]!.stages).toMatchObject({ depotShort: { units: 0 }, wontFit: { units: 1 } });
+  expect(stop.stages).toMatchObject({ depotShort: { units: 0 }, wontFit: { units: 1 } });
+  expect(stop.lines.find(line => line.temp === 'dry')).toMatchObject({ quantity: 4, loaded: 3, depotShort: 0, wontFit: 1 });
+  // The shop still got less than it ordered.
+  expect(stop.flags.short).toBe(true);
 });

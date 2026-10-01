@@ -90,9 +90,11 @@ export const OrderDelivery = z.object({
   late: z.boolean(),
   // This order's units handed over, null when nobody was at the shop.
   delivered: Count.nullable(),
-  // This order's units the depot sent short (ordered less loaded) and the shop refused at the door (loaded less
-  // handed over). A closed stop's are its attempt's, as the driver's day reads them.
+  // This order's units the depot sent short of stock, the units the loader flagged as not fitting on the truck (together,
+  // ordered less loaded; L-21), and the shop refused at the door (loaded less handed over). A closed stop's are its
+  // attempt's, as the driver's day reads them.
   shortFromDepot: Count,
+  wontFit: Count,
   refused: Count,
   // The driver's reason for a refusal, else null.
   refusalReason: RefusalReason.nullable(),

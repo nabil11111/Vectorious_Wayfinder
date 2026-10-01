@@ -17,7 +17,8 @@ const Id = z.uuid().transform((id) => id.toLowerCase());
 export const MAX_STOP_LINES = MAX_STOP_ORDERS * MAX_ORDER_LINES;
 
 // A line of a delivery, in spec 012's order: what was ordered, loaded, handed over by the driver, and what the shop
-// counted, null until it confirms.
+// counted, null until it confirms. wontFit is the part of what was ordered and not loaded that the loader flagged as not
+// fitting on the truck (L-21).
 export const StoreDeliveryLine = z.object({
   lineId: z.uuid(),
   orderId: z.uuid(),
@@ -27,6 +28,7 @@ export const StoreDeliveryLine = z.object({
   unit: z.string(),
   ordered: Count,
   loaded: Count,
+  wontFit: Count,
   delivered: Count,
   received: Count.nullable(),
 });
@@ -117,8 +119,9 @@ export const ReceiptWrite = z.object({
 export type ReceiptWrite = z.infer<typeof ReceiptWrite>;
 
 // The numbers of a delivery (rule 13): per line what the shop counts against, the units handed over (expected), what it
-// received, null until it confirms, the units short of that (0 until it confirms), the units the depot sent short
-// (ordered less loaded) and the units refused at the door (loaded less handed over); the totals; and whether a chilled
+// received, null until it confirms, the units short of that (0 until it confirms), the units the depot sent short of
+// stock and the units that did not fit on the truck (together, ordered less loaded; L-21), and the units refused at the
+// door (loaded less handed over); the totals; and whether a chilled
 // line came with something on it, which decides the cold check on the phone and on the server.
 export function deliveryFigures(delivery: StoreDelivery) {
   const byLine = delivery.lines.map((line) => ({
@@ -126,16 +129,18 @@ export function deliveryFigures(delivery: StoreDelivery) {
     expected: line.delivered,
     received: line.received,
     short: line.received === null ? 0 : line.delivered - line.received,
-    shortFromDepot: line.ordered - line.loaded,
+    shortFromDepot: line.ordered - line.loaded - line.wontFit,
+    wontFit: line.wontFit,
     refused: line.loaded - line.delivered,
   }));
-  const total = (key: 'expected' | 'short' | 'shortFromDepot' | 'refused') => byLine.reduce((sum, line) => sum + line[key], 0);
+  const total = (key: 'expected' | 'short' | 'shortFromDepot' | 'wontFit' | 'refused') => byLine.reduce((sum, line) => sum + line[key], 0);
   return {
     byLine,
     expected: total('expected'),
     received: delivery.receipt === null ? null : byLine.reduce((sum, line) => sum + (line.received ?? 0), 0),
     short: total('short'),
     shortFromDepot: total('shortFromDepot'),
+    wontFit: total('wontFit'),
     refused: total('refused'),
     chilled: delivery.lines.some((line) => line.temp === 'chilled' && line.delivered > 0),
   };

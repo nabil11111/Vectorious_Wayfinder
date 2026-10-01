@@ -14,9 +14,9 @@ const tech: StoreDelivery = {
   stopId: id(900), revision: 2, day: '2026-06-25', vehicleId: 'VEH045', driver: 'Saman', arrivedAt: '2026-06-24T23:10:00.000Z', doneAt: '2026-06-24T23:20:00.000Z',
   outcome: 'delivered', late: false, refusalReason: null, receipt: null,
   lines: [
-    { lineId: id(1), orderId: id(11), temp: 'dry', productId: 'tech-fridge', name: 'Refrigerators', unit: 'crate of 2', ordered: 2, loaded: 2, delivered: 2, received: null },
-    { lineId: id(2), orderId: id(11), temp: 'dry', productId: 'tech-small', name: 'Small appliances', unit: 'pallet', ordered: 2, loaded: 2, delivered: 2, received: null },
-    { lineId: id(3), orderId: id(11), temp: 'dry', productId: 'tech-tv', name: 'Televisions', unit: 'box', ordered: 3, loaded: 3, delivered: 3, received: null },
+    { lineId: id(1), orderId: id(11), temp: 'dry', productId: 'tech-fridge', name: 'Refrigerators', unit: 'crate of 2', ordered: 2, loaded: 2, wontFit: 0, delivered: 2, received: null },
+    { lineId: id(2), orderId: id(11), temp: 'dry', productId: 'tech-small', name: 'Small appliances', unit: 'pallet', ordered: 2, loaded: 2, wontFit: 0, delivered: 2, received: null },
+    { lineId: id(3), orderId: id(11), temp: 'dry', productId: 'tech-tv', name: 'Televisions', unit: 'box', ordered: 3, loaded: 3, wontFit: 0, delivered: 3, received: null },
   ],
 };
 const figures = deliveryFigures(tech).byLine;

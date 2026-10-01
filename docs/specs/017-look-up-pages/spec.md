@@ -123,8 +123,10 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    publication, not a browsable sequence of deleted draft trips. The page offers no animated replay or raw audit log.
 6. **Counts say their stage (D-83).** Per line: ordered = quantity; loaded = final loaded count once recorded;
    handed over = delivered count; received = the shop's received count. Zero is a recorded zero, null is unknown.
-   Depot short = ordered − loaded; refused = loaded − handed over on a refusal; receipt short = handed over −
-   received. Do not add a receipt's total order shortfall to those differences again. For an old closed attempt,
+   Depot short = ordered − loaded, less what the loader flagged as won't fit; didn't fit on the truck = ordered −
+   loaded on a line flagged won't fit, its own stage, shown when some did not fit ("Didn't fit on the truck 4", "4
+   cartons didn't fit on the truck" on the stop), never called short from the depot (L-21); refused = loaded − handed
+   over on a refusal; receipt short = handed over − received. Do not add a receipt's total order shortfall to those differences again. For an old closed attempt,
    loaded/not delivered comes from its `issue_lines.counted`. A closed stop was handed nothing: its handed over,
    received and receipt short are recorded zeros, never the orders' later counts, even if the orders later travel on
    Friday, so a trip with a closed shop still reads whole figures, the same handed over as Live day and the driver's
@@ -138,7 +140,7 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    | Finished / partial | Stops with a current outcome / delivered stops with a refusal quantity above zero. |
    | None delivered / closed | Delivered or refused stops with nothing handed over / stops whose current outcome is closed. The header says them beside stops delivered as Live day and the Dashboard do, "8 / 64 stops delivered · 1 partial · 1 closed" (Q-45). |
    | Late | Current recorded arrival strictly after the saved effective window close; no arrival is unknown, never late from elapsed time alone. |
-   | Short | Distinct current stops with any known depot short, refused quantity or receipt short above zero. A not-cold report with no count difference is a problem, not a short quantity. |
+   | Short | Distinct current stops with any known depot short, cartons that did not fit on the truck, refused quantity or receipt short above zero. A not-cold report with no count difference is a problem, not a short quantity. |
    | Returned | Distinct stops with a closed problem answered Bring them back, or a refusal answered Bring them back or Send replacements (015 still sends the refused goods back). Label “Return instructed”; this is not a depot return scan. Earlier retry attempts alone do not make it returned. |
    | Deferred | Distinct orders in this publication's deferrals, independent of what they do on a later plan. No promised next date. |
    | Shop confirmations | Distinct current delivered/refused stops whose orders were confirmed through 015. Three orders at Nugegoda make one confirmation. |

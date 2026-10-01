@@ -1,5 +1,5 @@
 import { hash } from '@node-rs/argon2';
-import { IssueList, StoreNextOrder, type StoreOrder } from '@wayfinder/contracts';
+import { deliveryFigures, IssueList, StoreNextOrder, type StoreOrder } from '@wayfinder/contracts';
 import { eq, inArray } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
@@ -89,7 +89,7 @@ it('AC-31 gives Nadeesha\'s three orders, before the receipt, their handover at 
   const trip = await deliveredWalkthrough(walk);
   const handedOver = (delivered: number, shortFromDepot: number) => ({
     delivery: { stopId: driverStop(trip, 1).id, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at(3 * 60 + 34).toISOString(), doneAt: at(HANDED_OVER).toISOString(),
-      outcome: 'delivered', late: false, delivered, shortFromDepot, refused: 0, refusalReason: null },
+      outcome: 'delivered', late: false, delivered, shortFromDepot, wontFit: 0, refused: 0, refusalReason: null },
     receipt: null, problems: [], replacementFor: null,
   });
   for (const name of ['today', 'open'] as const) {
@@ -107,7 +107,7 @@ it('AC-31 gives Nadeesha\'s orders, after her receipt and Ruwan\'s answer, 11, 8
   expect((await nugegodaShop.send(write)).status).toBe(200);
   await answer(1, 'send_replacements', 8 * 60 + 35);
   const handedOver = (delivered: number, shortFromDepot: number) => ({ stopId: driverStop(trip, 1).id, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at(3 * 60 + 34).toISOString(),
-    doneAt: at(HANDED_OVER).toISOString(), outcome: 'delivered', late: false, delivered, shortFromDepot, refused: 0, refusalReason: null });
+    doneAt: at(HANDED_OVER).toISOString(), outcome: 'delivered', late: false, delivered, shortFromDepot, wontFit: 0, refused: 0, refusalReason: null });
   const received = (units: number, short: number) => ({ at: at(8 * 60 + 31).toISOString(), sentAt: at(8 * 60 + 33).toISOString(), units, short });
   const expected = [
     { delivery: handedOver(12, 0), receipt: received(11, 1), problems: [{ id: write.writeId, kind: 'receipt', units: 1, decision: 'send_replacements', replacementDay: FRI, line: '1 missing chilled carton: a replacement comes on Fri 26 Jun' }], replacementFor: null },
@@ -134,12 +134,22 @@ it('AC-31 gives the seeded history its receipt and nothing else, Wednesday\'s 6 
   expect(past.every((order) => order.delivery === null && order.problems.length === 0 && order.replacementFor === null && order.receipt?.sentAt === null)).toBe(true);
 });
 
+it('L-21 gives the dry carton that did not fit on the truck as won\'t fit, not short from the depot, on the card and the delivery', async () => {
+  const trip = await deliveredWalkthrough(walk, { reason: 'wont_fit' });
+  const list = (await nugegodaShop.list('today')).orders;
+  expect(byId(list, NUGEGODA.dry).delivery).toMatchObject({ delivered: 3, shortFromDepot: 0, wontFit: 1 });
+  expect(byId(list, NUGEGODA.eight).delivery).toMatchObject({ delivered: 8, shortFromDepot: 0, wontFit: 0 });
+  const delivery = await nugegodaShop.one(driverStop(trip, 1).id);
+  expect(delivery.lines.find((line) => line.temp === 'dry')).toMatchObject({ ordered: 4, loaded: 3, delivered: 3, wontFit: 1 });
+  expect(deliveryFigures(delivery)).toMatchObject({ shortFromDepot: 0, wontFit: 1 });
+});
+
 it('AC-32 gives Wellawatte\'s chilled order 46 delivered, 2 refused and damaged, and the refusal with its answer, and its dry one neither', async () => {
   const trip = await deliveredWalkthrough(walk, { wellawatte: 'refused' });
   const refusal = trip.problems[0]!;
   const refused = {
     stopId: driverStop(trip, 2).id, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at(3 * 60 + 45).toISOString(), doneAt: at(3 * 60 + 48).toISOString(),
-    outcome: 'refused', late: false, shortFromDepot: 0, refusalReason: 'damaged',
+    outcome: 'refused', late: false, shortFromDepot: 0, wontFit: 0, refusalReason: 'damaged',
   };
   let list = (await wellawatteShop.list('today')).orders;
   expect(factsOf(byId(list, WELLAWATTE.chilled))).toEqual({ delivery: { ...refused, delivered: 46, refused: 2 }, receipt: null,
@@ -154,7 +164,7 @@ it('AC-32 gives a closed shop\'s orders the attempt and an open problem, then af
   const trip = await deliveredWalkthrough(walk, { wellawatte: 'closed' });
   const closed = trip.problems[0]!;
   const attempt = { stopId: driverStop(trip, 2).id, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at(3 * 60 + 45).toISOString(), doneAt: at(3 * 60 + 48).toISOString(),
-    outcome: 'closed', late: false, delivered: null, shortFromDepot: 0, refused: 0, refusalReason: null };
+    outcome: 'closed', late: false, delivered: null, shortFromDepot: 0, wontFit: 0, refused: 0, refusalReason: null };
   let list = (await wellawatteShop.list('open')).orders;
   expect([WELLAWATTE.chilled, WELLAWATTE.dry].map((id) => factsOf(byId(list, id)))).toEqual([
     { delivery: attempt, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: null, replacementDay: null, line: '48 chilled cartons: the depot decides, today or another day' }], replacementFor: null },
@@ -177,7 +187,7 @@ it('AC-32 gives a closed shop\'s orders, once brought back and placed again, the
   expect(chilled.status).toBe('placed');
   expect(factsOf(chilled)).toEqual({
     delivery: { stopId: driverStop(trip, 2).id, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at(3 * 60 + 45).toISOString(), doneAt: at(3 * 60 + 48).toISOString(),
-      outcome: 'closed', late: false, delivered: null, shortFromDepot: 0, refused: 0, refusalReason: null },
+      outcome: 'closed', late: false, delivered: null, shortFromDepot: 0, wontFit: 0, refused: 0, refusalReason: null },
     receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: 'bring_back', replacementDay: null, line: '48 chilled cartons: brought back to the depot, waiting for the next plan' }], replacementFor: null,
   });
 });

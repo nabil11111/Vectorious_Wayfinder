@@ -284,8 +284,10 @@ function summaryOf(c: HistoryCounts): Figure[] {
 const SO_FAR = new Set(['loaded', 'handed over']);
 function stagesOf(counts: HistoryCounts) {
   const s = counts.stages;
+  // What did not fit on the truck is said apart from the depot's shortage, when some did not (L-21).
   const stages: [string, typeof s.loaded][] = [
     ['loaded', s.loaded], ['handed over', s.handedOver], ['received', s.received], ['short from the depot', s.depotShort],
+    ...(s.wontFit.units ? [['didn\'t fit on the truck', s.wontFit] as [string, typeof s.loaded]] : []),
     ['refused', s.refused], ['short on receipts', s.receiptShort], ['not delivered', s.notDelivered],
   ];
   const figures: Figure[] = [

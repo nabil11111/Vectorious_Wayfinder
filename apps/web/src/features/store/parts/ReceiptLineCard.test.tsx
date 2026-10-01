@@ -11,9 +11,9 @@ import { CountCard } from './ReceiptLineCard';
 
 const kotahena: StoreDeliveryLine = {
   lineId: '9c000000-0000-4000-8000-000000000001', orderId: '9d000000-0000-4000-8000-000000000001', temp: 'chilled', productId: 'fresh-chilled-carton',
-  name: 'Chilled carton', unit: 'carton', ordered: 53, loaded: 53, delivered: 50, received: null,
+  name: 'Chilled carton', unit: 'carton', ordered: 53, loaded: 53, wontFit: 0, delivered: 50, received: null,
 };
-const figures = { lineId: kotahena.lineId, orderId: kotahena.orderId, temp: 'chilled' as const, expected: 50, received: null, short: 0, shortFromDepot: 0, refused: 3 };
+const figures = { lineId: kotahena.lineId, orderId: kotahena.orderId, temp: 'chilled' as const, expected: 50, received: null, short: 0, shortFromDepot: 0, wontFit: 0, refused: 3 };
 const card = (text?: string, count = 50) => renderToStaticMarkup(
   <CountCard brand="Fresh" line={kotahena} figures={figures} count={count} text={text} reason="missing" disabled={false}
     onStep={() => {}} onType={() => {}} onLeave={() => {}} onReason={() => {}} />,
@@ -86,5 +86,17 @@ describe('Q-38 the receipt\'s count box', () => {
     expect(over.countAt(0)).toBe(5);
     expect(receiptCounts(lines, { a: 48 }, { b: '-2' }).canConfirm).toBe(false);
     expect(receiptCounts(lines, { a: 48 }, { b: '-2' }).wrongOf('b')).toBe('whole');
+  });
+});
+
+// L-21: on Confirm delivery, a line the loader flagged as won't fit says so, not that the depot was short.
+describe('L-21 a line with cartons that did not fit on the truck', () => {
+  it('says they did not fit on the truck', () => {
+    const html = renderToStaticMarkup(
+      <CountCard brand="Fresh" line={{ ...kotahena, loaded: 49, wontFit: 4, delivered: 49 }} figures={{ ...figures, expected: 49, shortFromDepot: 0, wontFit: 4, refused: 0 }} count={49} text={undefined} reason="missing" disabled={false}
+        onStep={() => {}} onType={() => {}} onLeave={() => {}} onReason={() => {}} />,
+    ).replaceAll('&#x27;', '\'');
+    expect(html).toContain('4 didn\'t fit on the truck');
+    expect(html).not.toContain('short from the depot');
   });
 });

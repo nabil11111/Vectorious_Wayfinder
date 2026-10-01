@@ -60,8 +60,10 @@ export function HistoryDetail({ trip, brand, viewer, anchor, onClose }: { trip: 
 // The stage totals of a set of lines: ordered, then each later stage as recorded, or not recorded with how many of its
 // lines are still missing (Q-44).
 function Stages({ stages, brand, className }: { stages: HistoryStages; brand: Brand | null; className?: string }) {
+  // What did not fit on the truck is its own row, there only when some did not (L-21).
   const rows: [string, HistoryMeasure][] = [
     ['Loaded', stages.loaded], ['Handed over', stages.handedOver], ['Received', stages.received], ['Short from the depot', stages.depotShort],
+    ...(stages.wontFit.units ? [['Didn\'t fit on the truck', stages.wontFit] as [string, HistoryMeasure]] : []),
     ['Refused', stages.refused], ['Short on the receipt', stages.receiptShort], ['Not delivered', stages.notDelivered],
   ];
   return (
@@ -92,7 +94,7 @@ function StopBlock({ stop, viewer, other }: { stop: HistoryStop; viewer: Viewer;
     stop.arrivedAt && `arrived ${clockTime(stop.arrivedAt)}`,
     stop.doneAt && `${stop.outcome ? OUTCOME_WORDS[stop.outcome] : 'done'} ${clockTime(stop.doneAt)}`,
   ].filter(Boolean);
-  const differences = ([['short from the depot', stop.stages.depotShort], ['refused', stop.stages.refused], ['short on the receipt', stop.stages.receiptShort], ['not delivered', stop.stages.notDelivered]] as const)
+  const differences = ([['short from the depot', stop.stages.depotShort], ['didn\'t fit on the truck', stop.stages.wontFit], ['refused', stop.stages.refused], ['short on the receipt', stop.stages.receiptShort], ['not delivered', stop.stages.notDelivered]] as const)
     .filter(([, measure]) => measure.units === null ? measure.known > 0 : measure.units > 0)
     .map(([label, measure]) => (measure.units === null ? `${label} ${measureWords(measure)}` : `${unitsWords(brand, measure.units)} ${label}`));
   // A closed visit is listed as its attempt and the shop's report inside its confirmation, each once.

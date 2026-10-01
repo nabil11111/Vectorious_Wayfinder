@@ -8,7 +8,7 @@ import { HttpError } from '../lib/errors';
 import { appliedWriteIdsOf } from '../lib/phone-writes';
 import { byLoadOrder } from '../loading/loader-day';
 import { readMoment } from '../plans/board';
-import { arrivedLate, replacementsOf } from './order-facts';
+import { arrivedLate, notFittingAt, replacementsOf, shortOf } from './order-facts';
 import { readShop, snapshot, type Caller, type Shop } from './store-orders';
 
 // The deliveries a shop confirms (spec 015, rules 1 and 2, D-56): the stops of sent plans at the shop that the driver
@@ -42,6 +42,7 @@ export async function deliveriesAt(on: Reader, outletId: string, where?: SQL): P
   const reports = problems.filter((problem) => problem.kind === 'receipt');
   const counted = reports.length ? await on.select().from(issueLines).where(inArray(issueLines.issueId, reports.map((report) => report.id))) : [];
   const replacements = await replacementsOf(on, reports.map((report) => report.id));
+  const notFitting = await notFittingAt(on, stopIds);
 
   return rows.map(({ stop, vehicleId, day, driver: driverName }): StoreDelivery => {
     const own = lines.filter((line) => line.stopId === stop.id).sort(byLoadOrder);
@@ -57,7 +58,7 @@ export async function deliveriesAt(on: Reader, outletId: string, where?: SQL): P
       outcome: stop.outcome, late: arrivedLate(day, stop.arrivedAt, shop), refusalReason: refusal ? RefusalReason.parse(refusal.reason) : null,
       lines: own.map(({ lineId, orderId, temp, productId, name, unit, ordered, loaded, delivered, received }) => {
         if (loaded === null || delivered === null) throw new Error(`Line ${lineId} of stop ${stop.id} has no handed over count.`);
-        return { lineId, orderId, temp, productId, name, unit, ordered, loaded, delivered, received };
+        return { lineId, orderId, temp, productId, name, unit, ordered, loaded, wontFit: shortOf(notFitting.has(`${stop.id}:${lineId}`), ordered, loaded).wontFit, delivered, received };
       }),
       receipt: confirmed && first?.receivedAt ? {
         at: first.receivedAt.toISOString(),
