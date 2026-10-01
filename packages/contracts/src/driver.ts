@@ -29,7 +29,9 @@ export const DriverTrip = z.object({
   leavesAt: Moment, backBy: Moment, readyAt: Moment.nullable(), leftAt: Moment.nullable(), backAt: Moment.nullable(), stops: z.array(DriverStop), problems: z.array(DriverProblem),
 });
 export type DriverTrip = z.infer<typeof DriverTrip>;
-export const DriverDay = z.object({ depot: z.string(), driver: z.string(), day: z.iso.date().nullable(), planSent: z.boolean(), appliedWriteIds: z.array(z.uuid()), trips: z.array(DriverTrip) });
+// driverId is the signed-in account, so a phone holding one driver's writes can tell another account apart even when
+// the two share a display name.
+export const DriverDay = z.object({ depot: z.string(), driver: z.string(), driverId: z.uuid(), day: z.iso.date().nullable(), planSent: z.boolean(), appliedWriteIds: z.array(z.uuid()), trips: z.array(DriverTrip) });
 export type DriverDay = z.infer<typeof DriverDay>;
 const Photo = z.string().max(700_000).regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/);
 const BaseWrite = z.object({ writeId: z.uuid().transform(id => id.toLowerCase()), tripId: z.uuid().transform(id => id.toLowerCase()), at: Moment, revision: Count });
