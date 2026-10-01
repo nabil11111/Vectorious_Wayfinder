@@ -13,6 +13,7 @@ import { adminRouter } from './routes/admin';
 import { authRouter } from './routes/auth';
 import { clockRouter, demoClockRouter } from './routes/clock';
 import { demoResetRouter } from './routes/demo-reset';
+import { demoSampleOrdersRouter } from './routes/demo-sample-orders';
 import { driverRouter } from './routes/driver';
 import { eventsRouter } from './routes/events';
 import { healthRouter } from './routes/health';
@@ -72,6 +73,7 @@ export function createApp() {
   if (config.DEMO_MODE) {
     api.use('/demo/clock', demoClockRouter);
     api.use('/demo/reset', demoResetRouter);
+    api.use('/demo/sample-orders', demoSampleOrdersRouter);
   }
   api.use(notFound);
   app.use('/api/v1', api);

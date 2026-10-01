@@ -50,3 +50,30 @@ export type MoveClockRequest = z.infer<typeof MoveClockRequest>;
 // person something their role may not read.
 export const LiveEvent = z.strictObject({ topic: z.string().min(1).max(40), id: z.string().max(80).optional() });
 export type LiveEvent = z.infer<typeof LiveEvent>;
+
+// Sample shop orders from the demo control (spec 028): while orders are open, the dispatcher has 10, 25 or every shop
+// of the depot on show that has not ordered place its own order for the open day.
+export const SAMPLE_SHOP_CHOICES = [10, 25, 'all'] as const;
+export const SampleOrdersRequest = z.strictObject({ shops: z.union([z.literal(10), z.literal(25), z.literal('all')]) });
+export type SampleOrdersRequest = z.infer<typeof SampleOrdersRequest>;
+
+// Before the press: for each depot of the session, its shops and how many may still order.
+export const SampleOrdersPreview = z.object({
+  // The day the orders would be for, such as '2026-06-25'. null when no delivery day is open.
+  deliveryDate: z.string().nullable(),
+  depots: z.array(z.object({ depotId: z.string(), shops: z.number().int(), canOrder: z.number().int() })),
+});
+export type SampleOrdersPreview = z.infer<typeof SampleOrdersPreview>;
+
+// After the press, for each depot: the orders placed and the shops that placed them, the shops that already had an
+// order or a draft, and the shops with no store manager or nothing on their list to order.
+export const SampleOrdersDepot = z.object({
+  depotId: z.string(),
+  orders: z.number().int(),
+  outletIds: z.array(z.string()),
+  alreadyHad: z.number().int(),
+  cannotOrder: z.number().int(),
+});
+export type SampleOrdersDepot = z.infer<typeof SampleOrdersDepot>;
+export const SampleOrdersResult = z.object({ deliveryDate: z.string(), depots: z.array(SampleOrdersDepot) });
+export type SampleOrdersResult = z.infer<typeof SampleOrdersResult>;

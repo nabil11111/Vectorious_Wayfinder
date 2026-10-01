@@ -21,22 +21,23 @@ const WED = DEMO_DAY.orderDay;
 const THU = DEMO_DAY.deliveryDay;
 const dayBefore = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) - 24 * 60 * 60_000).toISOString().slice(0, 10);
 
-// The number in one of the booklet's ids: OUT026 is 26 and VEH002 is 2.
-const numberOf = (id: string) => Number(id.slice(3));
+// The number in one of the booklet's ids: OUT026 is 26 and VEH002 is 2. Spec 028's sample orders size each shop's order
+// from the rules below as well, so they are exported.
+export const numberOf = (id: string) => Number(id.slice(3));
 
-type Line = [product: (typeof PRODUCTS)[number]['id'], quantity: number];
+export type Line = [product: (typeof PRODUCTS)[number]['id'], quantity: number];
 
 // Orders placed for Thursday, by Peliyagoda's shops. n is the number in the shop's id, so OUT026 is 26. The
 // sizes are a little above an ordinary day, because the calendar marks Thu 25 Jun as a payday.
 
 // Every Fresh shop orders dry cartons, 45 to 65 of them. OUT026: 45 + (286 mod 21) = 58.
-const dryCartons = (n: number) => 45 + ((11 * n) % 21);
+export const dryCartons = (n: number) => 45 + ((11 * n) % 21);
 // A Fresh shop whose number does not end in 0, 4 or 7 orders chilled cartons as well, 38 to 60.
-const ordersChilled = (n: number) => ![0, 4, 7].includes(n % 10);
-const chilledCartons = (n: number) => 38 + ((5 * n) % 23);
+export const ordersChilled = (n: number) => ![0, 4, 7].includes(n % 10);
+export const chilledCartons = (n: number) => 38 + ((5 * n) % 23);
 // Thursday is Style's big day: every Style shop whose number is not a multiple of 5 orders.
 const ordersStyle = (n: number) => n % 5 !== 0;
-const styleLines = (n: number): Line[] => [
+export const styleLines = (n: number): Line[] => [
   ['style-folded', 10 + ((4 * n) % 9)],
   ['style-hanging', 6 + ((5 * n) % 7)],
   ['style-shoes', 4 + (n % 6)],
@@ -49,7 +50,7 @@ const BIG_STYLE_ORDER: { outletId: string; lines: Line[] } = {
   lines: [['style-folded', 50], ['style-hanging', 45], ['style-shoes', 25], ['style-bags', 15]],
 };
 // Tech orders by the pallet and the crate, so its four orders are written out. The last three need a tail lift.
-const TECH_ORDERS: { outletId: string; lines: Line[] }[] = [
+export const TECH_ORDERS: { outletId: string; lines: Line[] }[] = [
   { outletId: 'OUT022', lines: [['tech-tv', 2], ['tech-small', 1]] },
   { outletId: 'OUT039', lines: [['tech-fridge', 3]] },
   { outletId: 'OUT058', lines: [['tech-washer', 2], ['tech-small', 2]] },
@@ -131,7 +132,7 @@ const receivedAt = (wantedFor: string) => (wantedFor === WED ? depotInstant(WED,
 // lift (D-24), so nothing in its order needs one. Kandy has no earlier plan, no order that waited and nothing in the
 // workshop, and its fuel week starts full.
 const KANDY = 'Kandy';
-const KANDY_TECH_ORDERS: { outletId: string; lines: Line[] }[] = [
+export const KANDY_TECH_ORDERS: { outletId: string; lines: Line[] }[] = [
   { outletId: 'OUT093', lines: [['tech-tv', 2], ['tech-small', 1]] },
   { outletId: 'OUT094', lines: [['tech-fridge', 2]] },
   { outletId: 'OUT095', lines: [['tech-washer', 2], ['tech-small', 1]] },
