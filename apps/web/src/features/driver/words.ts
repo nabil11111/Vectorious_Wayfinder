@@ -38,6 +38,10 @@ const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 // "1 h 5 min", "3 min".
 const span = (minutes: number) => (minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60} min` : ''}`);
 
+// A brand's unit, one and many.
+const UNIT: Record<Brand, [string, string]> = { Fresh: ['carton', 'cartons'], Style: ['box', 'boxes'], Tech: ['item', 'items'] };
+const unitOf = (brand: Brand | null, n: number) => (brand ? UNIT[brand] : ['unit', 'units'] as const)[n === 1 ? 0 : 1];
+
 // ── Today's trip ─────────────────────────────────────────────────────────────────────────────────────────────
 
 // "Thu 25 Jun · trip 1", on the day the trip leaves.
@@ -114,6 +118,15 @@ export const lineName = (line: DriverLine, brand: Brand | null) => (brand === 'F
 
 // "Loader flagged 1 carton short at the depot"
 export const loaderShortLine = (line: DriverLine, counts: LineFigures) => `Loader flagged ${amountOf(counts.short, line.unit)} short at the depot`;
+
+// Under a count box that holds a minus, a fraction or anything but a whole number, and under a refusal's box that holds
+// more than was loaded (Q-25): "Counts are whole numbers from 0 to the 12 loaded."
+export const wholeCountsLine = (loaded: number) => `Counts are whole numbers from 0 to the ${whole(loaded)} loaded.`;
+
+// Under an unload box that holds more than was loaded. One more at the door than left the depot means something of
+// another shop's is in the stack (Q-25): "15 is more than the 12 loaded. Check the stack for another shop's cartons."
+export const overLoadedLine = (count: number, loaded: number, brand: Brand | null) =>
+  `${whole(count)} is more than the ${whole(loaded)} loaded. Check the stack for another shop's ${unitOf(brand, 2)}.`;
 
 // A line to pick for a refusal, by what is on the truck: "48 cartons chilled", or "10 boxes · Folded clothing".
 export const pickLine = (line: DriverLine, counts: LineFigures, brand: Brand | null) =>
@@ -192,10 +205,6 @@ export const NOTHING_SENT_UNTIL_READ = 'Nothing is sent or saved until it is rea
 // ── Trip done and Day done ──────────────────────────────────────────────────────────────────────────────────
 
 export const headBackLine = (day: DriverDay, trip: DriverTrip) => `Head back to ${day.depot} · back by ${clockTime(trip.backBy)}`;
-
-// A brand's unit, one and many.
-const UNIT: Record<Brand, [string, string]> = { Fresh: ['carton', 'cartons'], Style: ['box', 'boxes'], Tech: ['item', 'items'] };
-const unitOf = (brand: Brand | null, n: number) => (brand ? UNIT[brand] : ['unit', 'units'] as const)[n === 1 ? 0 : 1];
 
 // "Cartons delivered", "Boxes delivered", "Units delivered" for a trip of several brands.
 export const deliveredLabel = (trip: DriverTrip) => `${capital(unitOf(trip.brand, 2))} delivered`;

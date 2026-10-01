@@ -374,7 +374,8 @@ Anything we built differently from our Designathon submission, and why.
 - **A closed shop is answered with "Try again on this trip" or "Bring them back";** no frame draws them.
 - **"Nothing to hand back"** says the short carton never left the depot, without "It goes on Monday's run".
 - **"Done unloading" stays grey until every line is counted,** where the frame draws it orange at 2 of 6: a stop that
-  cannot be counted in full goes through "Something's wrong".
+  cannot be counted in full goes through "Something's wrong". A typed count stays as it was typed and says under the box
+  when it is not a whole number or is more than was loaded, rather than being changed.
 - **The driver's bell has no count.**
 - **The top bar carries the demo chip,** as "Demo" alone beside the status chip on a phone, and the status chip hides its
   words below 380 px wide so both fit.
