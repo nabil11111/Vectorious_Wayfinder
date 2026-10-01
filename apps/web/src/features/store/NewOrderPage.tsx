@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import type { StoreNextOrder, StoreProduct } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -7,13 +8,17 @@ import { useDraftForm, type OpenOrder, type Saving } from './draft-form';
 import { useNextOrder } from './next-order';
 import { ORANGE } from './parts/actions';
 import { BottomBar } from './parts/BottomBar';
+import { DriverNote } from './parts/DriverNote';
 import { goodsIcon } from './parts/icons';
 import { LoadError, StaleNotice } from './parts/LoadError';
 import { NoOpenDay } from './parts/NextOrderCard';
 import { PageHeader } from './parts/PageHeader';
 import { Panel } from './parts/Panel';
-import { QuantityStepper } from './parts/QuantityStepper';
-import { ENTRANCE, TEMP_NAME, brandList, brandUnits, clockTime, cubic, cutoffTime, inListOrder, itemFigures, kilos, lineWords, plural, shortDay, windowWords } from './words';
+import { QuantityStepper, type QuantityBox } from './parts/QuantityStepper';
+import {
+  ENTRANCE, PLACED_ELSEWHERE, PLACED_ELSEWHERE_LOST, TEMP_NAME, brandList, brandUnits, clockTime, cubic, cutoffTime, inListOrder, itemFigures, kilos, lineWords, plural,
+  shortDay, windowWords,
+} from './words';
 
 // New order (Shop · New orders, and its Style, Tech and desktop frames). The shop orders from its brand's
 // fixed list, the form saves itself as a draft, and one tap places it.
@@ -53,6 +58,17 @@ const Notice = ({ children }: { children: ReactNode }) => (
   <p role="status" className="rounded-[10px] bg-warn-tint px-3 pt-2.5 pb-2 text-xs leading-[15px] font-semibold text-warn-ink">{children}</p>
 );
 
+// The drafts on this form were placed from another screen (Q-07). The yellow line says so and opens the
+// confirmation, so nobody types the same order in again.
+export function PlacedElsewhere({ lost }: { lost: boolean }) {
+  return (
+    <p role="status" className="flex items-center justify-between gap-3 rounded-[10px] bg-warn-tint px-3 pt-2.5 pb-2 text-xs leading-[15px] font-semibold text-warn-ink">
+      {lost ? PLACED_ELSEWHERE_LOST : PLACED_ELSEWHERE}
+      <Link to="/store/orders/placed" className="-my-3.5 shrink-0 py-3.5 underline underline-offset-2">View confirmation</Link>
+    </p>
+  );
+}
+
 function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
   const form = useDraftForm(next);
   const { outlet, products, draft, deliveryDate, cutoffAt } = next;
@@ -62,6 +78,13 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
   const closedDay = form.closedDay ?? next.movedFrom;
 
   const checkout = <Checkout next={next} saving={form.saving} placing={form.placing} refused={form.refused} onPlace={() => { void form.place(); }} />;
+  const box = (productId: string): QuantityBox => ({
+    value: form.values.quantities[productId] ?? 0,
+    text: form.typed[productId],
+    onStep: (quantity) => form.setQuantity(productId, quantity),
+    onType: (text) => form.typeQuantity(productId, text),
+    onLeave: () => form.leaveQuantity(productId),
+  });
 
   return (
     <Page>
@@ -77,12 +100,13 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
             <Notice>Orders for {shortDay(closedDay)} closed at {clockTime(cutoffAt)}. This order is now for {shortDay(deliveryDate)}.</Notice>
           )}
           {form.changedElsewhere && <Notice>This order was changed somewhere else. These are the latest numbers.</Notice>}
+          {form.placedElsewhere && <PlacedElsewhere lost={form.placedElsewhere.lost} />}
 
           {/* From the tap on Place until it settles, nothing on the form can change (see draft-form.ts). */}
           {fresh ? (
             <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-3.5">
               {products.map((product) => (
-                <FreshItem key={product.id} product={product} quantity={form.values.quantities[product.id] ?? 0} disabled={form.placing} onChange={(quantity) => form.setQuantity(product.id, quantity)} />
+                <FreshItem key={product.id} product={product} box={box(product.id)} disabled={form.placing} />
               ))}
             </div>
           ) : (
@@ -93,7 +117,7 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
                 <p className="ml-auto text-[11px] leading-[14px] text-muted-foreground/65">{[...new Set(products.map((p) => p.temp))].join(' and ')} · per unit</p>
               </div>
               {products.map((product) => (
-                <ListItem key={product.id} product={product} quantity={form.values.quantities[product.id] ?? 0} disabled={form.placing} onChange={(quantity) => form.setQuantity(product.id, quantity)} />
+                <ListItem key={product.id} product={product} box={box(product.id)} disabled={form.placing} />
               ))}
             </Panel>
           )}
@@ -114,16 +138,7 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
           </Panel>
 
           <Panel>
-            <label htmlFor="driver-note" className="block pt-0.5 text-xs leading-[15px] font-semibold text-muted-foreground">Note for the driver</label>
-            <textarea
-              id="driver-note"
-              rows={1}
-              maxLength={200}
-              value={form.values.note}
-              disabled={form.placing}
-              onChange={(event) => form.setNote(event.target.value)}
-              className="mt-2 block field-sizing-content min-h-[47px] w-full resize-none rounded-[10px] border border-input bg-card px-3 py-[11px] text-[13px] leading-4 outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:text-muted-foreground/65 pointer-coarse:text-base"
-            />
+            <DriverNote note={form.values.note} disabled={form.placing} onChange={form.setNote} />
           </Panel>
         </div>
 
@@ -153,32 +168,33 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
   );
 }
 
-// The Fresh form: a card for each of its two items, named by temperature.
-function FreshItem({ product, quantity, disabled, onChange }: { product: StoreProduct; quantity: number; disabled: boolean; onChange: (quantity: number) => void }) {
+// The Fresh form: a card for each of its two items, named by temperature. The card wraps, so a box's line takes a
+// row of its own under the stepper (Q-01).
+function FreshItem({ product, box, disabled }: { product: StoreProduct; box: QuantityBox; disabled: boolean }) {
   const name = TEMP_NAME[product.temp];
   return (
-    <Panel className="flex items-center gap-3">
+    <Panel className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
       <img src={goodsIcon('Fresh', product.temp)} alt="" className="size-9" />
       <div className="min-w-0 flex-1">
-        <h2 className={cn('text-lg leading-[25px] font-bold', quantity === 0 && 'text-muted-foreground')}>{name}</h2>
+        <h2 className={cn('text-lg leading-[25px] font-bold', box.value === 0 && 'text-muted-foreground')}>{name}</h2>
         <p className="text-xs leading-[15px] text-muted-foreground">{plural(product.unit)}</p>
       </div>
-      <QuantityStepper size="lg" name={`${name} ${plural(product.unit)}`} value={quantity} disabled={disabled} onChange={onChange} />
+      <QuantityStepper size="lg" name={`${name} ${plural(product.unit)}`} box={box} disabled={disabled} />
     </Panel>
   );
 }
 
 // A row of the Style and Tech lists: the item, its unit with kilos and cubic metres, and the stepper. An item
 // at 0 is greyed.
-function ListItem({ product, quantity, disabled, onChange }: { product: StoreProduct; quantity: number; disabled: boolean; onChange: (quantity: number) => void }) {
+function ListItem({ product, box, disabled }: { product: StoreProduct; box: QuantityBox; disabled: boolean }) {
   return (
-    <div className="flex min-h-14 items-center gap-1.5 border-t py-2">
+    <div className="flex min-h-14 flex-wrap items-center gap-x-1.5 gap-y-1 border-t py-2">
       {/* The longest line of the product list fits a 390 px phone to the pixel, so it may use 4 px of the gap. */}
       <div className="-mr-1 min-w-0 flex-1">
-        <h3 className={cn('font-sans text-sm leading-[17px] font-semibold', quantity === 0 && 'text-muted-foreground')}>{product.name}</h3>
+        <h3 className={cn('font-sans text-sm leading-[17px] font-semibold', box.value === 0 && 'text-muted-foreground')}>{product.name}</h3>
         <p className="mt-1 font-mono text-[11px] leading-[14px] text-muted-foreground/65">{itemFigures(product)}</p>
       </div>
-      <QuantityStepper size="md" name={product.name} value={quantity} disabled={disabled} onChange={onChange} />
+      <QuantityStepper size="md" name={product.name} box={box} disabled={disabled} />
     </div>
   );
 }
@@ -187,25 +203,30 @@ const SAVE_WORDS: Record<Exclude<Saving, 'saved'>, ReactNode> = {
   saving: 'saving…',
   retrying: <span className="text-warn-ink">not saved · trying again</span>,
   refused: <span className="text-warn-ink">not saved</span>,
+  // A box holds something that is not a whole number from 0 to 999, and its line says so (Q-01).
+  held: <span className="text-warn-ink">not saved · check the numbers</span>,
 };
 
 // The foot of the form: what the last save came to, whether it is saved, and the button that places it. The
-// totals are the server's, from the last save (AC-37). The button is off until the form is saved, so what is
-// placed is always what was saved. It shows twice: in the bar on a phone, in "Your order" on a desktop.
-function Checkout({ next, saving, placing, refused, onPlace }: { next: StoreNextOrder; saving: Saving; placing: boolean; refused: string | null; onPlace: () => void }) {
+// totals are the server's, from the last save (AC-37). A press while a change is still saving is taken: the place
+// waits for that save and places what it saved (Q-08), so what is placed is always what was saved. The button is
+// off only with nothing added, while a box holds something that is not a whole number, and while placing. It
+// shows twice: in the bar on a phone, in "Your order" on a desktop.
+export function Checkout({ next, saving, placing, refused, onPlace }: { next: StoreNextOrder; saving: Saving; placing: boolean; refused: string | null; onPlace: () => void }) {
   const { draft } = next;
   const { brand } = next.outlet;
   const totals = draft && [brandUnits(brand, draft.summary.units), ...(brand === 'Fresh' ? [] : [kilos(draft.summary.kg), cubic(draft.summary.m3)])];
   const saved = saving === 'saved' ? (draft ? `draft saved ${clockTime(draft.savedAt)}` : 'Nothing added yet') : SAVE_WORDS[saving];
   // One order per temperature (D-05), so a draft with both is two orders.
   const two = Boolean(draft?.refs.chilled && draft.refs.dry);
+  const nothingAdded = !draft && saving === 'saved';
   return (
     <>
       <p className="text-xs leading-[15px] text-muted-foreground" aria-live="polite">{totals && `${totals.join(' · ')} · `}{saved}</p>
       {refused && <p role="alert" className="mt-2 text-xs leading-[15px] font-semibold text-bad">{refused}</p>}
       <Button
         className={cn(ORANGE, 'mt-2.5 h-14 w-full text-[17px] lg:mt-3', placing && 'disabled:bg-primary disabled:text-primary-foreground')}
-        disabled={!draft || saving !== 'saved' || placing}
+        disabled={nothingAdded || saving === 'held' || placing}
         focusableWhenDisabled={placing}
         onClick={onPlace}
       >

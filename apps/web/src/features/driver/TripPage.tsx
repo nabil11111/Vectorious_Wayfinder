@@ -18,14 +18,16 @@ import {
 // Driver · Today's trip at /driver (spec 013): the trip and its stops in plan order, and "Start trip" once the loader
 // has marked the truck ready. Until then the chip says "Not loaded yet" or "Being loaded" and the button waits.
 export function TodaysTrip({ view, trip, figures }: { view: DriverView; trip: DriverTrip; figures: Figures }) {
-  const { at } = useAppClock();
+  const { at, readNow } = useAppClock();
   const { save, saving, failed } = useSave();
   const ready = trip.status === 'ready';
 
-  // "Start trip" makes the ready trip out, at the app clock's time, naming the trip's revision on screen (rule 3).
+  // "Start trip" makes the ready trip out, at the app clock's time at the press, naming the trip's revision on screen
+  // (rule 3).
   const start = () => {
-    if (at === null) return;
-    void save({ kind: 'start', writeId: newWriteId(), tripId: trip.tripId, at: new Date(at).toISOString(), revision: trip.revision }, aboutTrip(trip, 'start'));
+    const now = readNow();
+    if (now === null) return;
+    void save({ kind: 'start', writeId: newWriteId(), tripId: trip.tripId, at: new Date(now).toISOString(), revision: trip.revision }, aboutTrip(trip, 'start'));
   };
 
   return (

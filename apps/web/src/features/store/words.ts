@@ -104,6 +104,38 @@ export function lineWords(brand: Brand, line: OrderLine, products: StoreProduct[
 // An item's own figures under its name: "box · 12 kg · 0.20 m³".
 export const itemFigures = (product: StoreProduct) => `${product.unit} · ${kilos(product.kgPerUnit)} · ${CUBIC_EACH.format(product.m3PerUnit)} m³`;
 
+// Under a quantity box that holds anything but a whole number from 0 to 999: a minus, a fraction or more (Q-01, Q-02).
+export const QUANTITY_LINE = 'Whole numbers from 0 to 999.';
+
+// On the form when the drafts it showed were placed from another screen (Q-07), with or without a change made here.
+export const PLACED_ELSEWHERE = 'This order was placed from another screen.';
+export const PLACED_ELSEWHERE_LOST = 'This order was placed from another screen, without your last change.';
+
+// When a change to the order could not be saved and the form can no longer try: signed out, or the form left (Q-04).
+export const NOT_KEPT = 'Your last change to the order was not saved. Check the draft before you place it.';
+// When a sign-out could not wait any longer for a save or a place that had not answered: it may or may not have
+// gone through.
+export const NOT_CONFIRMED = 'Your last change to the order could not be confirmed. Check the draft before you place it.';
+export const PLACE_NOT_CONFIRMED = 'Your order could not be confirmed as placed. Check Today before you order again.';
+
+// The note for the driver takes 200 characters at most, as the API checks it (Q-06).
+const NOTE_MOST = 200;
+export const NOTE_FULL = 'The note is full: 200 characters at most.';
+export const NOTE_REFUSED = 'The note takes 200 characters at most, so that was not added.';
+
+// A change to the note is taken whole or not at all: one that would make it longer is refused, never cut.
+export const noteFits = (note: string) => note.length <= NOTE_MOST;
+
+// The line under the note: how many characters are left once 40 or fewer are, that it is full, or that a change was
+// refused because it would have made the note too long.
+export function noteLine(length: number, refused: boolean): { words: string; refused: boolean } | null {
+  if (refused) return { words: NOTE_REFUSED, refused: true };
+  const left = NOTE_MOST - length;
+  if (left <= 0) return { words: NOTE_FULL, refused: false };
+  if (left <= 40) return { words: `${left} ${left === 1 ? 'character' : 'characters'} left`, refused: false };
+  return null;
+}
+
 export const ENTRANCE: Record<DockType, string> = { street: 'Street', rear_dock: 'Rear dock', mall_bay: 'Mall loading bay' };
 
 // "Fresh · Nugegoda", the way Help writes the shop. A shop's name is its brand and then its place (spec 003).
