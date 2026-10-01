@@ -97,7 +97,7 @@ const fleetRead = (demoDay: number, depot: Depot = 'Peliyagoda', fuel: ReturnTyp
   ...scope(demoDay, depot), today: THU,
   summary: { active: 1, reefers: 1, vans: depot === 'Kandy' ? 0 : 1, recordedOut: 0, notRecordedOut: 1, activeOffToday: 0, activeWithoutOffToday: 1, fuel },
   vehicles: [{ id: OWN[depot].vehicle, type: depot === 'Kandy' ? 'truck' : 'van', temp: 'reefer', group: depot === 'Kandy' ? 'reefer_trucks' : 'vans', weightCapKg: 1040,
-    volumeCapM3: 7, fuelType: 'diesel', kmPerL: 10.3, weeklyFuelQuotaL: 480, archivedAt: null, offReason: null, recordedOut: false, selectedTrip: null,
+    volumeCapM3: 7, fuelType: 'diesel', kmPerL: 10.3, weeklyFuelQuotaL: 480, archivedAt: null, offReason: null, recordedOut: false, notRecordedOut: false, selectedTrip: null,
     outTrips: [], todayTrips: [], recentTrips: [], fuel: null }],
 });
 

@@ -29,14 +29,14 @@ it('History filters keep whole trips by their returned flags and brands, and Def
 });
 
 it('Fleet groups reefer trucks, dry trucks and vans, puts archived rows and unknown fuel last, and lets Reefer and Van overlap', () => {
-  const vehicle = (id: string, type: 'truck' | 'van', temp: 'reefer' | 'ambient', remaining: number | null, extra: { archived?: boolean; out?: boolean; off?: string } = {}) => ({
+  const vehicle = (id: string, type: 'truck' | 'van', temp: 'reefer' | 'ambient', remaining: number | null, extra: { archived?: boolean; out?: boolean; off?: string; overdue?: boolean } = {}) => ({
     id, type, temp, group: type === 'van' ? 'vans' as const : temp === 'reefer' ? 'reefer_trucks' as const : 'dry_trucks' as const,
-    archivedAt: extra.archived ? '2026-06-24T10:00:00.000Z' : null, offReason: extra.off ?? null, recordedOut: extra.out ?? false,
+    archivedAt: extra.archived ? '2026-06-24T10:00:00.000Z' : null, offReason: extra.off ?? null, recordedOut: extra.out ?? false, notRecordedOut: extra.overdue ?? false,
     fuel: remaining === null ? null : { remaining },
   });
   const fleet = [
     vehicle('VEH035', 'van', 'reefer', 252, { out: true }), vehicle('VEH003', 'truck', 'reefer', 404, { archived: true }), vehicle('VEH001', 'truck', 'reefer', 40),
-    vehicle('VEH030', 'truck', 'ambient', 198, { off: 'Brake service' }), vehicle('VEH037', 'van', 'ambient', null), vehicle('VEH038', 'van', 'ambient', 238),
+    vehicle('VEH030', 'truck', 'ambient', 198, { off: 'Brake service' }), vehicle('VEH037', 'van', 'ambient', null), vehicle('VEH038', 'van', 'ambient', 238, { overdue: true }),
     vehicle('VEH002', 'truck', 'reefer', 40),
   ];
   const ids = (state: 'all' | 'out' | 'not_out' | 'workshop', type: 'all' | 'reefer' | 'dry' | 'van', sort: 'fuel' | 'id' = 'fuel') =>
@@ -53,7 +53,10 @@ it('Fleet groups reefer trucks, dry trucks and vans, puts archived rows and unkn
   expect(ids('all', 'dry')).toEqual([['dry_trucks', ['VEH030']], ['vans', ['VEH038', 'VEH037']]]);
   expect(ids('out', 'all')).toEqual([['vans', ['VEH035']]]);
   expect(ids('workshop', 'all')).toEqual([['dry_trucks', ['VEH030']]]);
-  expect(ids('not_out', 'van')).toEqual([['vans', ['VEH038', 'VEH037']]]);
+  // Not recorded out is the server's flag (Q-42): a vehicle past its leave time that never left, not every vehicle that
+  // is not out at this moment.
+  expect(ids('not_out', 'van')).toEqual([['vans', ['VEH038']]]);
+  expect(ids('not_out', 'all')).toEqual([['vans', ['VEH038']]]);
 });
 
 it('Fleet words keep an over quota, a zero quota and an unknown week apart, and never say where a vehicle is', () => {

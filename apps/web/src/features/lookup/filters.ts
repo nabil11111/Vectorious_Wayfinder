@@ -103,14 +103,15 @@ export type VehicleSort = 'fuel' | 'id';
 export interface VehicleFilters { state: VehicleState; type: VehicleType; sort: VehicleSort }
 export const NO_VEHICLE_FILTERS: VehicleFilters = { state: 'all', type: 'all', sort: 'fuel' };
 
-// Reefer is every fridge vehicle, vans included, and Dry every other; Van is every van of either kind. So Reefer and
-// Van overlap, and their totals are never added.
-type VehicleFacts = Pick<LookupVehicle, 'id' | 'type' | 'temp' | 'group' | 'archivedAt' | 'offReason' | 'recordedOut'> & { fuel: Pick<NonNullable<LookupVehicle['fuel']>, 'remaining'> | null };
+// Out now and Not recorded out are the server's flags (Q-42): Not recorded out is a vehicle on today's plan past its
+// leave time that never left, never one that went out and came back. Reefer is every fridge vehicle, vans included,
+// and Dry every other; Van is every van of either kind. So Reefer and Van overlap, and their totals are never added.
+type VehicleFacts = Pick<LookupVehicle, 'id' | 'type' | 'temp' | 'group' | 'archivedAt' | 'offReason' | 'recordedOut' | 'notRecordedOut'> & { fuel: Pick<NonNullable<LookupVehicle['fuel']>, 'remaining'> | null };
 
 export function matchesVehicle(vehicle: VehicleFacts, filters: Pick<VehicleFilters, 'state' | 'type'>) {
   const state = filters.state === 'all'
     || (filters.state === 'out' && vehicle.recordedOut)
-    || (filters.state === 'not_out' && !vehicle.recordedOut)
+    || (filters.state === 'not_out' && vehicle.notRecordedOut)
     || (filters.state === 'workshop' && vehicle.offReason !== null);
   const type = filters.type === 'all'
     || (filters.type === 'reefer' && vehicle.temp === 'reefer')

@@ -49,9 +49,11 @@ export function getLookupFleet(caller: DepotCaller): Promise<LookupFleet> {
       const outTrips = own.filter(row => row.status === 'out').sort((a, b) => a.date.localeCompare(b.date) || a.tripNo - b.tripNo || a.tripId.localeCompare(b.tripId));
       const todayTrips = own.filter(row => row.date === today).sort((a, b) => a.leavesAt.localeCompare(b.leavesAt) || a.tripNo - b.tripNo || a.tripId.localeCompare(b.tripId));
       const returned = todayTrips.filter(row => row.status === 'done').sort((a, b) => (b.backAt ?? '').localeCompare(a.backAt ?? '') || b.tripNo - a.tripNo || b.tripId.localeCompare(a.tripId));
+      // A trip of today's that should have left by now and never did (Q-42): one that went out and came back is not it.
+      const overdue = todayTrips.some(row => ['planned', 'loading', 'ready'].includes(row.status) && Date.parse(row.leavesAt) <= moment.at.getTime());
       return { ...vehicle, volumeCapM3: Number(vehicle.volumeCapM3), kmPerL: Number(vehicle.kmPerL), archivedAt: vehicle.archivedAt?.toISOString() ?? null,
         group: vehicle.type === 'van' ? 'vans' : vehicle.temp === 'reefer' ? 'reefer_trucks' : 'dry_trucks', offReason: off.find(row => row.vehicleId === vehicle.id)?.reason ?? null,
-        recordedOut: outTrips.length > 0, selectedTrip: outTrips[0] ?? todayTrips.find(row => row.status !== 'done') ?? returned[0] ?? null, outTrips, todayTrips,
+        recordedOut: outTrips.length > 0, notRecordedOut: outTrips.length === 0 && overdue, selectedTrip: outTrips[0] ?? todayTrips.find(row => row.status !== 'done') ?? returned[0] ?? null, outTrips, todayTrips,
         recentTrips: [...own].sort((a, b) => b.date.localeCompare(a.date) || b.tripNo - a.tripNo || a.tripId.localeCompare(b.tripId)).slice(0, 5), fuel: fuelOf([vehicle]) };
     });
     const groups = ['reefer_trucks', 'dry_trucks', 'vans'];
@@ -59,7 +61,7 @@ export function getLookupFleet(caller: DepotCaller): Promise<LookupFleet> {
       || (a.fuel?.remaining ?? Infinity) - (b.fuel?.remaining ?? Infinity) || a.id.localeCompare(b.id));
     const active = shown.filter(row => row.archivedAt === null), activeOut = active.filter(row => row.recordedOut).length, activeOff = active.filter(row => row.offReason !== null).length;
     return LookupFleet.parse({ ...scope, today, vehicles: shown, summary: { active: active.length, reefers: active.filter(row => row.temp === 'reefer').length,
-      vans: active.filter(row => row.type === 'van').length, recordedOut: activeOut, notRecordedOut: active.length - activeOut,
+      vans: active.filter(row => row.type === 'van').length, recordedOut: activeOut, notRecordedOut: active.filter(row => row.notRecordedOut).length,
       activeOffToday: activeOff, activeWithoutOffToday: active.length - activeOff, fuel: fuelOf(fleet.filter(row => row.archivedAt === null)) } });
   });
 }

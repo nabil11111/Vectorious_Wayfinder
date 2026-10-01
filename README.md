@@ -414,7 +414,8 @@ Anything we built differently from our Designathon submission, and why.
   per vehicle, and says "Shop confirmations" where the frame says "Receipts" and "Signed": there is no signature (D-47).
   Deferrals have their own card and filter, apart from "Not delivered", and there is no receipt-count column.
 - **Fleet** says "Not recorded out" where the frame says "At the depot": the app knows whether a truck has a trip out,
-  not where it stands (D-85). Fuel is "recorded and committed" this week (D-86), and there are no no-signal, minutes-late
+  not where it stands (D-85). It lists the vehicles on today's plan past their leave time with no departure recorded,
+  never one that went out and came back. Fuel is "recorded and committed" this week (D-86), and there are no no-signal, minutes-late
   or "about N km more" chips.
 - **States the design lacks:** loading, could not load, could not update, no connection, sign in again, a date or trip
   link that does not exist, no photo recorded and a photo that will not open.

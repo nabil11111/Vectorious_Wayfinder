@@ -168,7 +168,9 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    date then trip number/id and show all in detail. Otherwise use today's first unfinished trip by saved leave time
    then trip number/id, else today's latest returned trip by back time then trip number/id descending, else No trip
    recorded today. Say Planned, Loading, Ready or Returned with its recorded time
-   as applicable. “Not recorded out” means no such out trip, not physically at the depot. Never guess a permanent
+   as applicable. “Not recorded out” means a vehicle on today's sent plan with a trip past its saved leave time that
+   never left, and no out trip (Q-42): never one that went out and came back, nor one with no trip today, and never a
+   claim that it stands at the depot. Never guess a permanent
    driver. Today's workshop reason is independent of trip state; an out trip remains visible even if someone
    archived its vehicle. No no-signal minutes or ETA.
 10. **Fuel (D-86).** The selected calendar day's ISO year/week picks Mon–Sat `fuel_log` rows for those vehicle ids.

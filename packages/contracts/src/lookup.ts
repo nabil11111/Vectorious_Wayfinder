@@ -108,6 +108,9 @@ export type LookupFuel = z.infer<typeof LookupFuel>;
 export const LookupVehicle = z.object({ id: z.string(), type: z.enum(['truck', 'van']), temp: z.enum(['reefer', 'ambient']),
   group: z.enum(['reefer_trucks', 'dry_trucks', 'vans']), weightCapKg: z.number(), volumeCapM3: z.number(), fuelType: z.string(),
   kmPerL: z.number(), weeklyFuelQuotaL: z.number(), archivedAt: Moment.nullable(), offReason: z.string().nullable(), recordedOut: z.boolean(),
+  // Not recorded out (Q-42): on today's sent plan with a trip past its leave time that never left, and not out now. A
+  // vehicle that went out and came back, or has no trip today, is not one.
+  notRecordedOut: z.boolean(),
   selectedTrip: LookupTripRef.nullable(), outTrips: z.array(LookupTripRef), todayTrips: z.array(LookupTripRef), recentTrips: z.array(LookupTripRef),
   fuel: LookupFuel.nullable() });
 export type LookupVehicle = z.infer<typeof LookupVehicle>;

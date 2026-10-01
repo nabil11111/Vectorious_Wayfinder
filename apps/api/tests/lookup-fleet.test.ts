@@ -14,11 +14,16 @@ vi.mock('../src/lib/clock', async original => {
   return { ...actual, demoClockAt: (...args: Parameters<typeof actual.demoClockAt>) => ({ ...actual.demoClockAt(...args), now: clock.at || actual.demoClockAt(...args).now }) };
 });
 const h = await lookupHarness(clock);
+// The clock a given number of minutes after an instant, in depot time.
+const clockAfter = (instant: string, minutes: number) => {
+  const at = new Date(Date.parse(instant) + minutes * 60_000);
+  h.freeze(THU, Math.round((at.getTime() - depotInstant(THU, 0).getTime()) / 60_000));
+};
 
 it('AC-20 fleet uses the calendar day and counts active reefers, vans and days off', async () => {
   h.freeze(THU, 600);
   const day = await h.fleet();
-  expect(day).toMatchObject({ today: THU, summary: { active: 38, reefers: 9, vans: 4, recordedOut: 0, notRecordedOut: 38, activeOffToday: 3, activeWithoutOffToday: 35 } });
+  expect(day).toMatchObject({ today: THU, summary: { active: 38, reefers: 9, vans: 4, recordedOut: 0, notRecordedOut: 0, activeOffToday: 3, activeWithoutOffToday: 35 } });
   expect(day.vehicles.filter(row => row.offReason).map(row => row.id).sort()).toEqual(['VEH003', 'VEH005', 'VEH036']);
   expect(day.vehicles.filter(row => row.type === 'van').every(row => row.group === 'vans')).toBe(true);
   expect(day.vehicles.every(row => row.selectedTrip === null && row.recentTrips.length === 0)).toBe(true);
@@ -61,9 +66,28 @@ it('AC-22 archiving excludes only the header while keeping the vehicles fuel and
   try {
     await db.update(vehicles).set({ archivedAt: depotInstant(THU, 600) }).where(eq(vehicles.id, 'VEH003'));
     const day = await h.fleet();
-    expect(day.summary).toMatchObject({ active: 37, reefers: 8, vans: 4, activeOffToday: 2, activeWithoutOffToday: 35, recordedOut: 0, notRecordedOut: 37, fuel: { recordedCommitted: 6871.7, quota: 18120 } });
+    expect(day.summary).toMatchObject({ active: 37, reefers: 8, vans: 4, activeOffToday: 2, activeWithoutOffToday: 35, recordedOut: 0, notRecordedOut: 0, fuel: { recordedCommitted: 6871.7, quota: 18120 } });
     expect(day.vehicles.find(row => row.id === 'VEH003')).toMatchObject({ archivedAt: depotInstant(THU, 600).toISOString(), recordedOut: true, selectedTrip: { tripId: trip.tripId }, fuel: { recordedCommitted: 76, quota: 480, remaining: 404 } });
   } finally { await db.update(vehicles).set({ archivedAt: null }).where(eq(vehicles.id, 'VEH003')); }
+});
+it('Q-42 not recorded out names only todays planned vehicles past their leave time, never one that went out and came back', async () => {
+  await sendWalkthroughPlan(h, { withVeh004: true });
+  const tripOf = async (vehicleId: string) => (await db.select().from(trips).where(eq(trips.vehicleId, vehicleId)))[0]!;
+  const leaves = (await h.fleet()).vehicles.find(row => row.id === 'VEH004')!.todayTrips[0]!.leavesAt;
+  const notOut = (day: Awaited<ReturnType<typeof h.fleet>>) => day.vehicles.filter(row => row.notRecordedOut).map(row => row.id);
+  h.freeze(THU, 120);
+  let day = await h.fleet();
+  expect([day.summary.notRecordedOut, notOut(day)]).toEqual([0, []]);
+  // VEH035 went out and came back before VEH004's leave time passed with nobody loading it.
+  await db.update(trips).set({ status: 'done', leftAt: depotInstant(THU, 215), backAt: depotInstant(THU, 400) }).where(eq(trips.id, (await tripOf('VEH035')).id));
+  clockAfter(leaves, 1);
+  day = await h.fleet();
+  expect([day.summary.notRecordedOut, notOut(day)]).toEqual([1, ['VEH004']]);
+  expect(day.vehicles.find(row => row.id === 'VEH035')).toMatchObject({ recordedOut: false, notRecordedOut: false });
+  // Once it is out it is out now, not "not recorded out".
+  await db.update(trips).set({ status: 'out', leftAt: depotInstant(THU, 300) }).where(eq(trips.id, (await tripOf('VEH004')).id));
+  day = await h.fleet();
+  expect([day.summary, notOut(day)]).toMatchObject([{ recordedOut: 1, notRecordedOut: 0 }, []]);
 });
 it('AC-23 ledger fuel includes the full ISO week once and sent trips only supply km and links', async () => {
   h.freeze(THU, 150);
