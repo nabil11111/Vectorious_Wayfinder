@@ -21,7 +21,7 @@ export const operationsOptions = (me: Pick<Me, 'id' | 'depotId'> | null | undefi
 
 // The watched day changes at 16:00 (D-66), which the read names as dayChangesAt. From then on the app clock has
 // passed it, and the day on screen is the old one.
-export const dayHasChanged = (day: Pick<OperationsDay, 'dayChangesAt'> | undefined, at: number | null) =>
+export const dayHasChanged = (day: OperationsDay | undefined, at: number | null) =>
   Boolean(day?.dayChangesAt) && at !== null && at >= Date.parse(day!.dayChangesAt!);
 
 // Asks for the new day at once. A read still out for the old day is cancelled, so it cannot land after the new one.
