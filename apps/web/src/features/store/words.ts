@@ -107,6 +107,10 @@ export const itemFigures = (product: StoreProduct) => `${product.unit} · ${kilo
 // Under a quantity box that holds anything but a whole number from 0 to 999: a minus, a fraction or more (Q-01, Q-02).
 export const QUANTITY_LINE = 'Whole numbers from 0 to 999.';
 
+// On the form when the drafts it showed were placed from another screen (Q-07), with or without a change made here.
+export const PLACED_ELSEWHERE = 'This order was placed from another screen.';
+export const PLACED_ELSEWHERE_LOST = 'This order was placed from another screen, without your last change.';
+
 // When a change to the order could not be saved and the form can no longer try: signed out, or the form left (Q-04).
 export const NOT_KEPT = 'Your last change to the order was not saved. Check the draft before you place it.';
 

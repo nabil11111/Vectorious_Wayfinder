@@ -52,6 +52,9 @@ export interface Screen {
   placing: boolean;
   // The draft was changed somewhere else and the form now shows the latest.
   changedElsewhere: boolean;
+  // The drafts the form showed were placed from another screen, and the form is ready for another order. lost: a
+  // change made here was on its way and is not in what was placed (Q-07).
+  placedElsewhere: { lost: boolean } | null;
   // The day the form was showing when its cut-off passed.
   closedDay: string | null;
   // Why the server refused, shown in red above the button.
@@ -97,6 +100,8 @@ export class DraftForm {
   // The last save failed, or found the session gone. Waiting for the form stops there (Q-04).
   private failed = false;
   private placing = false;
+  // The drafts the last place from this form named, so a place whose answer was lost is known as its own (Q-07).
+  private tried: DraftRefs | null = null;
   private timer = 0;
   private retryTimer = 0;
   private tries = 0;
@@ -145,6 +150,12 @@ export class DraftForm {
       driverNote: this.values.note,
       refs: this.base.refs,
     };
+  }
+
+  // The orders placed for the day that were the drafts this form shows. A draft keeps its id when it is placed.
+  private placedOf(latest: StoreNextOrder) {
+    const { chilled, dry } = this.base.refs;
+    return latest.placed?.orders.filter((order) => order.id === chilled?.id || order.id === dry?.id) ?? [];
   }
 
   private takeOver(latest: StoreNextOrder) {
@@ -201,8 +212,11 @@ export class DraftForm {
       this.tell({ refused: reasonOf(error) });
       void this.flush();
     } else {
+      // The drafts this form was saving were placed from another screen, without the change it was saving (Q-07).
+      const placedThere = code === 'stale' && !whilePlacing && this.placedOf(latest).length > 0;
       this.showLatest(latest);
-      this.tell(code === 'stale' ? { changedElsewhere: whilePlacing || !sameValues(held, shown) } : { refused: reasonOf(error) });
+      if (placedThere) this.tell({ placedElsewhere: { lost: true } });
+      else this.tell(code === 'stale' ? { changedElsewhere: whilePlacing || !sameValues(held, shown) } : { refused: reasonOf(error) });
     }
   }
 
@@ -297,7 +311,7 @@ export class DraftForm {
     this.seq += 1;
     // A box that holds something else holds the save until it is fixed, so what is saved is what the form shows.
     const held = this.invalid();
-    this.tell({ values, typed: this.typed, saving: held ? 'held' : 'saving', changedElsewhere: false, refused: null });
+    this.tell({ values, typed: this.typed, saving: held ? 'held' : 'saving', changedElsewhere: false, placedElsewhere: null, refused: null });
     window.clearTimeout(this.retryTimer);
     window.clearTimeout(this.timer);
     this.timer = held ? 0 : window.setTimeout(this.flush, SAVE_AFTER_MS);
@@ -340,6 +354,7 @@ export class DraftForm {
     this.tell({ placing: true, refused: null });
     try {
       await this.qc.cancelQueries({ queryKey: nextOrderKey });
+      this.tried = this.base.refs;
       const answer = await placeOrders({ deliveryDate: this.base.deliveryDate, refs: this.base.refs });
       if (!this.stillMine()) return;
       this.takeOver(answer);
@@ -362,14 +377,25 @@ export class DraftForm {
   };
 
   // The answer of a refetch. When the form has nothing unsaved, a draft that changed somewhere else, or a
-  // day that moved on, is shown at once. With a change waiting, the save's own answer decides.
+  // day that moved on, is shown at once. With a change waiting, the save's own answer decides, and while placing
+  // the place's answer does.
   incoming(next: OpenOrder) {
     this.products = next.products;
     const base: Base = { deliveryDate: next.deliveryDate, refs: next.draft?.refs ?? {} };
-    if (sameBase(base, this.base) || this.running || this.seq !== this.savedSeq) return;
+    if (sameBase(base, this.base) || this.running || this.placing || this.seq !== this.savedSeq) return;
     if (base.deliveryDate > this.base.deliveryDate) this.tell({ closedDay: this.base.deliveryDate });
     else if (base.deliveryDate < this.base.deliveryDate) this.tell({ closedDay: null });
-    if (!sameValues(valuesOf(next), this.values)) this.tell({ changedElsewhere: true });
+    // The drafts this form shows are placed: by this form, when its place's answer was lost, so the confirmation
+    // opens as it would have; or from another screen, which the form says, ready for another order (Q-07).
+    const placed = this.placedOf(next);
+    const tried = this.tried;
+    if (placed.length && tried && placed.every((order) => order.id === tried.chilled?.id || order.id === tried.dry?.id)) {
+      this.showLatest(next);
+      this.placed(placed);
+      return;
+    }
+    if (placed.length) this.tell({ placedElsewhere: { lost: false }, changedElsewhere: false });
+    else if (!sameValues(valuesOf(next), this.values)) this.tell({ changedElsewhere: true });
     this.showLatest(next);
   }
 
@@ -398,7 +424,9 @@ export class DraftForm {
 export function useDraftForm(next: OpenOrder) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [screen, setScreen] = useState<Screen>(() => ({ values: valuesOf(next), typed: {}, saving: 'saved', placing: false, changedElsewhere: false, closedDay: null, refused: null }));
+  const [screen, setScreen] = useState<Screen>(() => ({
+    values: valuesOf(next), typed: {}, saving: 'saved', placing: false, changedElsewhere: false, placedElsewhere: null, closedDay: null, refused: null,
+  }));
   const [form] = useState(() => new DraftForm(
     next, qc, (patch) => setScreen((now) => ({ ...now, ...patch })),
     (placedOrders) => navigate('/store/orders/placed', { state: { placedOrders } satisfies PlacedNow }),

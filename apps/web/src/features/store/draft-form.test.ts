@@ -29,6 +29,7 @@ const reply = (answer: Answer) => {
   return { status: answer.status, ok: answer.status >= 200 && answer.status < 300, json: async () => answer.body };
 };
 const refusal = (status: number, code: string, message: string): Answer => ({ status, body: { error: { code, message } } });
+const answerOf = (own: Own | Promise<Own> | (() => Own) | undefined) => (typeof own === 'function' ? own() : own);
 
 // The shop's next order as the API keeps it: the draft's quantities, note and refs, and what is placed for Thursday.
 // A save or a place can be answered otherwise, or held until the test lets it go.
@@ -42,9 +43,10 @@ class Server {
   reads = 0;
   // Every request, in the order it was sent: "PUT draft", "POST place", "GET next" and "POST logout".
   log: string[] = [];
-  // The next save's or place's own answer, when it is not the server's usual one, or the usual one held back.
-  saveAnswers: (Own | Promise<Own>)[] = [];
-  placeAnswers: (Own | Promise<Own>)[] = [];
+  // The next save's or place's own answer, when it is not the server's usual one, or the usual one held back. A
+  // function runs when the request arrives, so the server can do its work and the answer still be lost.
+  saveAnswers: (Own | Promise<Own> | (() => Own))[] = [];
+  placeAnswers: (Own | Promise<Own> | (() => Own))[] = [];
 
   constructor(quantities: Record<string, number> = {}) {
     if (Object.keys(quantities).length) this.write(quantities, '');
@@ -111,7 +113,7 @@ class Server {
       this.log.push('PUT draft');
       const body = JSON.parse(String(init.body)) as SaveDraftRequest;
       this.saves.push(body);
-      const own = await this.saveAnswers.shift();
+      const own = await answerOf(this.saveAnswers.shift());
       if (own && own !== 'usual') return reply(own);
       if (!this.sameRefs(body.refs)) return reply(refusal(409, 'stale', 'This order was changed somewhere else.'));
       this.write(Object.fromEntries(body.lines.map((line) => [line.productId, line.quantity])), body.driverNote);
@@ -121,7 +123,7 @@ class Server {
       this.log.push('POST place');
       const body = JSON.parse(String(init.body)) as PlaceOrdersRequest;
       this.places.push(body);
-      const own = await this.placeAnswers.shift();
+      const own = await answerOf(this.placeAnswers.shift());
       if (own && own !== 'usual') return reply(own);
       const named = [body.refs.chilled?.id, body.refs.dry?.id].filter(Boolean);
       const already = this.placed.filter((order) => named.includes(order.id));
@@ -347,5 +349,52 @@ describe('Q-04 signing out while a change is still saving', () => {
     await form.closed();
     expect(server.quantities).toEqual({ [DRY.id]: 3 });
     expect(toast).not.toHaveBeenCalled();
+  });
+});
+
+describe('Q-07 a draft placed from another tab', () => {
+  it('says the order was placed from another screen, never that it changed somewhere else', async () => {
+    server = new Server({ [CHILLED.id]: 3, [DRY.id]: 1 });
+    const { form, screen, placed } = openForm(server);
+    // Tab A places the draft this tab shows, and the live message brings the next order here.
+    server.placeHere();
+    form.incoming(server.next());
+    expect(screen.placedElsewhere).toEqual({ lost: false });
+    expect(screen.changedElsewhere).toBeFalsy();
+    // The form is ready for another order, and nothing was placed from here.
+    expect(screen.values?.quantities).toEqual({ [CHILLED.id]: 0, [DRY.id]: 0 });
+    expect(placed).toEqual([]);
+  });
+
+  it('says so too when a change here was refused because the order was placed, and that the change is not in it', async () => {
+    server = new Server({ [CHILLED.id]: 3, [DRY.id]: 1 });
+    const { form, screen } = openForm(server);
+    form.setQuantity(CHILLED.id, 4);
+    server.placeHere();
+    await after(600);
+    expect(server.saves).toHaveLength(1);
+    expect(screen.placedElsewhere).toEqual({ lost: true });
+    expect(screen.changedElsewhere).toBeFalsy();
+    expect(screen.saving).toBe('saved');
+  });
+
+  it('takes the notice away once a new order is started', async () => {
+    server = new Server({ [CHILLED.id]: 3 });
+    const { form, screen } = openForm(server);
+    server.placeHere();
+    form.incoming(server.next());
+    form.setQuantity(DRY.id, 2);
+    expect(screen.placedElsewhere).toBeNull();
+  });
+
+  it('opens the confirmation when it was this form\'s own place whose answer was lost', async () => {
+    server = new Server({ [CHILLED.id]: 3, [DRY.id]: 1 });
+    const { form, screen, placed } = openForm(server);
+    server.placeAnswers.push(() => { server.placeHere(); return 'no signal'; });
+    await form.place();
+    expect(screen.refused).toBeTruthy();
+    form.incoming(server.next());
+    expect(placed.map((orders) => orders.map((order) => order.temp))).toEqual([['chilled', 'dry']]);
+    expect(screen.placedElsewhere).toBeFalsy();
   });
 });

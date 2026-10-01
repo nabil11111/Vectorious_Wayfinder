@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import type { StoreNextOrder, StoreProduct } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,7 +15,10 @@ import { NoOpenDay } from './parts/NextOrderCard';
 import { PageHeader } from './parts/PageHeader';
 import { Panel } from './parts/Panel';
 import { QuantityStepper, type QuantityBox } from './parts/QuantityStepper';
-import { ENTRANCE, TEMP_NAME, brandList, brandUnits, clockTime, cubic, cutoffTime, inListOrder, itemFigures, kilos, lineWords, plural, shortDay, windowWords } from './words';
+import {
+  ENTRANCE, PLACED_ELSEWHERE, PLACED_ELSEWHERE_LOST, TEMP_NAME, brandList, brandUnits, clockTime, cubic, cutoffTime, inListOrder, itemFigures, kilos, lineWords, plural,
+  shortDay, windowWords,
+} from './words';
 
 // New order (Shop · New orders, and its Style, Tech and desktop frames). The shop orders from its brand's
 // fixed list, the form saves itself as a draft, and one tap places it.
@@ -54,6 +58,17 @@ const Notice = ({ children }: { children: ReactNode }) => (
   <p role="status" className="rounded-[10px] bg-warn-tint px-3 pt-2.5 pb-2 text-xs leading-[15px] font-semibold text-warn-ink">{children}</p>
 );
 
+// The drafts on this form were placed from another screen (Q-07). The yellow line says so and opens the
+// confirmation, so nobody types the same order in again.
+export function PlacedElsewhere({ lost }: { lost: boolean }) {
+  return (
+    <p role="status" className="flex items-center justify-between gap-3 rounded-[10px] bg-warn-tint px-3 pt-2.5 pb-2 text-xs leading-[15px] font-semibold text-warn-ink">
+      {lost ? PLACED_ELSEWHERE_LOST : PLACED_ELSEWHERE}
+      <Link to="/store/orders/placed" className="-my-3.5 shrink-0 py-3.5 underline underline-offset-2">View confirmation</Link>
+    </p>
+  );
+}
+
 function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
   const form = useDraftForm(next);
   const { outlet, products, draft, deliveryDate, cutoffAt } = next;
@@ -85,6 +100,7 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
             <Notice>Orders for {shortDay(closedDay)} closed at {clockTime(cutoffAt)}. This order is now for {shortDay(deliveryDate)}.</Notice>
           )}
           {form.changedElsewhere && <Notice>This order was changed somewhere else. These are the latest numbers.</Notice>}
+          {form.placedElsewhere && <PlacedElsewhere lost={form.placedElsewhere.lost} />}
 
           {/* From the tap on Place until it settles, nothing on the form can change (see draft-form.ts). */}
           {fresh ? (
