@@ -48,7 +48,7 @@ const BOARD = PlanBoard.parse({
   drivers: [], figures: null, counts: null, suggestion: null,
 });
 const INDEX = indexOf(BOARD);
-const SCREEN: BoardScreen = { board: BOARD, draft: planOf(BOARD), saving: 'saved', refused: null, acting: false, undo: null };
+const SCREEN: BoardScreen = { board: BOARD, draft: planOf(BOARD), saving: 'saved', refused: null, acting: false, undo: null, history: { undo: null, redo: null } };
 const tripOf = (vehicleId: string) => BOARD.plan.trips.find((t) => t.vehicleId === vehicleId)!;
 
 // The text of each row a list draws: the depot's rows and each stop.
@@ -82,7 +82,7 @@ it('spec 022 "Stops in order" puts the depot before stop 1 and the return after 
   const panel = (vehicleId: string) => renderToStaticMarkup(
     <TripPanel
       screen={SCREEN} index={INDEX} trip={tripOf(vehicleId)} group={null}
-      change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+      change={() => undefined} act={async () => null} onUndo={() => undefined} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
     />,
   );
   const stops = (markup: string) => markup.slice(markup.indexOf('Stops in order'), markup.indexOf('Add a stop'));

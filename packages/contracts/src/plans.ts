@@ -285,15 +285,17 @@ export const CrewQuery = z.object({
 export type CrewQuery = z.infer<typeof CrewQuery>;
 
 // Why a truck may not take the orders, by the checker's cargo rules (spec 007): more weight or volume than it takes, a
-// chilled order and no fridge, or a shop that takes vans only. The order or shop it is about, as the checker's problem
-// names it, or null.
-export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only'] as const;
+// chilled order and no fridge, or a shop that takes vans only; or, for a truck on its first trip already, that it is
+// ready again only after every window of the orders closes (L-04). The order or shop it is about, as the checker's
+// problem names it, or null.
+export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only', 'ready_late'] as const;
 export const CrewMisfit = z.object({ code: z.enum(CREW_MISFITS), orderId: z.uuid().nullable(), outletId: z.string().nullable() });
 export type CrewMisfit = z.infer<typeof CrewMisfit>;
 
 // A truck of the depot with its driver (D-100): the one the draft gives it, or else its usual driver, who drove it on the
 // depot's latest sent plan or, with none there, the one a fixed pairing of the drivers in staff ID order with the
-// trucks in id order gives it. null when it has none.
+// trucks in id order gives it, while he drives no other truck on the draft. A driver is on one crew only, and a truck in
+// the workshop names none (L-05). null when it has none.
 export const Crew = z.object({
   vehicleId: z.string(),
   driverId: z.uuid().nullable(),
@@ -302,6 +304,9 @@ export const Crew = z.object({
   weightCapKg: z.number(),
   volumeCapM3: z.number(),
   fuelLeftPct: z.number(),
+  // When a truck on its first trip already is ready again for a second, by the checker's times; null for a truck with no
+  // trip yet, which leaves at the usual time.
+  readyAt: Minutes.nullable(),
   // The districts it ran on the depot's latest sent plan, and whether one of them is a district of the orders.
   lastDistricts: z.array(z.string()),
   ranHere: z.boolean(),

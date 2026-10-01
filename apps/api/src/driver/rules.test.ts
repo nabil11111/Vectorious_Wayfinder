@@ -4,7 +4,7 @@ import { applyDriverWrite, DriverWrite, nextStop, phoneView, tripFigures, type D
 
 const at = '2026-06-24T22:01:00.000Z';
 function day(): DriverDay {
-  const line = (quantity: number, loaded: number, temp: 'chilled' | 'dry') => ({ lineId: randomUUID(), orderId: randomUUID(), temp, productId: temp, name: temp, unit: 'carton', quantity, loaded, delivered: null });
+  const line = (quantity: number, loaded: number, temp: 'chilled' | 'dry') => ({ lineId: randomUUID(), orderId: randomUUID(), temp, productId: temp, name: temp, unit: 'carton', quantity, loaded, wontFit: 0, delivered: null });
   const stop = (seq: number, lines: ReturnType<typeof line>[]) => ({ id: randomUUID(), seq, revision: 0, retriedAt: null, outletId: `OUT00${seq}`, shopName: seq === 1 ? 'Fresh Nugegoda' : 'Fresh Wellawatte', district: 'Colombo', dockType: 'street' as const, windowOpen: '05:00', windowClose: '08:00', note: null, arrivedAt: null, doneAt: null, outcome: null, lines });
   return { depot: 'Peliyagoda', driver: 'Dilshan', driverId: randomUUID(), day: '2026-06-25', planSent: true, appliedWriteIds: [], trips: [{ tripId: randomUUID(), revision: 5, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1, brand: 'Fresh', district: 'Colombo', status: 'ready', leavesAt: at, backBy: at, readyAt: at, leftAt: null, backAt: null, stops: [stop(1, [line(12, 12, 'chilled'), line(8, 8, 'chilled'), line(4, 3, 'dry')]), stop(2, [line(48, 48, 'chilled'), line(46, 46, 'dry')])], problems: [] }] };
 }
@@ -93,8 +93,8 @@ it('AC-9 supplies per-temperature counts so screens only format chilled, dry and
   const initial = day();
   const trip = initial.trips[0]!;
   expect(tripFigures(trip).byStop[0]!.byTemp).toEqual({
-    chilled: { ordered: 20, loaded: 20, delivered: 0, refused: 0, notDelivered: 0, short: 0, onTruck: 0 },
-    dry: { ordered: 4, loaded: 3, delivered: 0, refused: 0, notDelivered: 0, short: 1, onTruck: 0 },
+    chilled: { ordered: 20, loaded: 20, delivered: 0, refused: 0, notDelivered: 0, short: 0, wontFit: 0, onTruck: 0 },
+    dry: { ordered: 4, loaded: 3, delivered: 0, refused: 0, notDelivered: 0, short: 1, wontFit: 0, onTruck: 0 },
   });
   const result = write(initial, { ...atStop(trip, 1), kind: 'refuse', reason: 'damaged', note: '', lines: [{ lineId: trip.stops[1]!.lines[0]!.lineId, refused: 2 }] });
   expect(tripFigures(result.trips[0]!).byTemp.chilled).toMatchObject({ ordered: 68, loaded: 68, delivered: 46, refused: 2, onTruck: 2 });

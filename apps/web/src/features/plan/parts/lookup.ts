@@ -72,6 +72,13 @@ export function decisionShop(index: BoardIndex, decision: BoardDecision): string
   return order ? index.shop(order.outletId)?.name ?? null : null;
 }
 
+// Orders as a history line names them (spec 027): their shop when they are one shop's, "Fresh Pannala", or "3 orders".
+export function ordersLine(index: BoardIndex, orderIds: string[]) {
+  const shops = [...new Set(orderIds.map((id) => index.order(id)?.outletId))];
+  const shop = shops.length === 1 && shops[0] ? index.shop(shops[0]) : null;
+  return shop ? shop.name : countOf(orderIds.length, 'order');
+}
+
 // The trip an early departure is about, in a sentence's words with the draft's driver (spec 026), or null for a decision
 // about an order.
 export function decisionTruck(index: BoardIndex, plan: Pick<PlanBoard['plan'], 'trips'>, decision: BoardDecision): string | null {

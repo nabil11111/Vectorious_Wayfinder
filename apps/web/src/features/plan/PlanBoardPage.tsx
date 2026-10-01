@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import type { BoardOrder, Brand } from '@wayfinder/contracts';
@@ -8,13 +8,14 @@ import { PickDepot } from '@/features/dispatcher/parts/PickDepot';
 import { useScope } from '@/features/dispatcher/scope';
 import { reasonOf } from '@/features/store/words';
 import { cn } from '@/lib/utils';
-import { joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
+import { ENDS_HISTORY, joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
 import { keyOf, placesOf, tripOf, type CrewRef, type TripKey } from './draft';
 import { BoardHeader, type Tab } from './parts/BoardHeader';
 import { BuildPanel } from './parts/BuildPanel';
 import { crewChange, type Pick } from './parts/crews';
 import { DoneList } from './parts/DoneList';
 import { FindSlot } from './parts/FindSlot';
+import { historyKey, pressOf } from './parts/history-keys';
 import { ICON } from './parts/icons';
 import { groupKey, indexOf } from './parts/lookup';
 import { OrderLists } from './parts/OrderLists';
@@ -119,6 +120,28 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
     openTrip(made.key);
   };
 
+  // The history (spec 027): Undo and Redo, from the header, a green line or the keys. A step that moved the open trip to
+  // another key, such as Swap truck, opens it again where it was, and Redo where it went (L-10).
+  const undo = () => {
+    const step = saver.undo();
+    if (step?.from !== undefined) openTrip(step.from);
+  };
+  const redo = () => {
+    const step = saver.redo();
+    if (step?.from !== undefined && step.tripKey !== null) openTrip(step.tripKey);
+  };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const which = historyKey(pressOf(event));
+      if (!which) return;
+      event.preventDefault();
+      if (which === 'undo') undo();
+      else redo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   // "+ Add a stop" points at the trip's brand and district in the list and outlines that group.
   const addStop = () => {
     const group = open ? groupOfTrip(keyOf(open)) : null;
@@ -134,7 +157,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
   const join = async (order: BoardOrder) => {
     const original = order.splitFrom;
     if (original === null) return;
-    const refused = await saver.act((day, ref) => joinOrder(day, { ...ref, orderId: original }));
+    const refused = await saver.act((day, ref) => joinOrder(day, { ...ref, orderId: original }), undefined, ENDS_HISTORY);
     if (refused) toast(refused, { id: 'plan-board' });
   };
 
@@ -163,6 +186,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         group={groupOfTrip(key)}
         change={change}
         act={saver.act}
+        onUndo={undo}
         onCrew={chooseCrew}
         onRemoved={() => openTrip(null)}
         onDone={() => openTrip(null)}
@@ -202,9 +226,11 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         onViewPlan={() => navigate(`/dispatcher/plan/${date}`)}
         stale={stale}
         onRefresh={onRefresh}
+        onUndo={undo}
+        onRedo={redo}
         refreshing={refreshing}
       />
-      <PlanDnd screen={screen} index={index} change={change} onStartTrip={setDropped}>
+      <PlanDnd screen={screen} index={index} change={change} undo={undo} onStartTrip={setDropped}>
       <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[300px_minmax(0,1fr)_270px] xl:grid-cols-[360px_minmax(0,1fr)_330px]">
         <div className={cn('min-h-0 flex-col gap-4', tab === 'unplanned' ? 'flex' : 'hidden lg:flex')}>
           <OrderLists

@@ -23,7 +23,7 @@ const stagesOf = (lines: HistoryLine[]) => ({
 });
 const line = (n: number, temp: 'chilled' | 'dry', counts: Partial<HistoryLine> & { quantity: number }): HistoryLine => ({
   lineId: id(100 + n), orderId: id(200 + n), temp, productId: `fresh-${temp}-carton`, name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton',
-  loaded: null, delivered: null, received: null, depotShort: null, refused: null, receiptShort: null, notDelivered: null, ...counts,
+  loaded: null, wontFit: 0, delivered: null, received: null, depotShort: null, refused: null, receiptShort: null, notDelivered: null, ...counts,
 });
 const issue = (n: number, kind: 'loading' | 'refused' | 'closed' | 'receipt', fields: Record<string, unknown>) => ({
   id: id(600 + n), revision: 1, kind, status: 'decided', raisedBy: 'Dilshan', note: null, hasPhoto: false, short: 0, cold: null, replacement: null,

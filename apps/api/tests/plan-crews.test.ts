@@ -84,9 +84,9 @@ it('AC-4 pairs Peliyagoda\'s drivers in staff ID order with its trucks in id ord
   const list = await crews(THU, []);
   expect(list.crews).toHaveLength(38);
   // D-001 Dilshan drives VEH001, D-003 Chaminda VEH002 and so on to D-036 Wasantha on VEH035, the fridge van. The last
-  // three trucks are past the last driver.
+  // three trucks are past the last driver. A truck in the workshop names no driver (L-05): VEH003, VEH005 and VEH036.
   expect(pairs(list)).toEqual(Object.fromEntries([
-    ['VEH001', 'D-001'], ...Array.from({ length: 34 }, (_, i) => [veh(i + 2), staffId(i + 3)]), ['VEH036', null], ['VEH037', null], ['VEH038', null],
+    ['VEH001', 'D-001'], ...Array.from({ length: 34 }, (_, i) => [veh(i + 2), [3, 5].includes(i + 2) ? null : staffId(i + 3)]), ['VEH036', null], ['VEH037', null], ['VEH038', null],
   ]));
   // The seed's sent plans hold no trips, so no truck ran a district last time, and with no orders every truck fits.
   expect(list.crews.every((crew) => crew.lastDistricts.length === 0 && !crew.ranHere && crew.fits && crew.misfits.length === 0)).toBe(true);
@@ -100,7 +100,7 @@ it('AC-1 lists the crews for Fresh Nugegoda\'s chilled order: the fridge van tha
   expect(list).toMatchObject({ orderIds: [NUGEGODA], revision: 0, load: { kg: order.load.kg, m3: order.load.m3 } });
   expect(list.crews[0]).toEqual({
     vehicleId: 'VEH035', driverId: list.crews[0]!.driverId, type: 'van', temp: 'reefer', weightCapKg: 1040, volumeCapM3: 7,
-    fuelLeftPct: board.vehicles.find((v) => v.id === 'VEH035')!.fuelLeftPct, lastDistricts: [], ranHere: false, fits: true, misfits: [], unavailable: null,
+    fuelLeftPct: board.vehicles.find((v) => v.id === 'VEH035')!.fuelLeftPct, readyAt: null, lastDistricts: [], ranHere: false, fits: true, misfits: [], unavailable: null,
   });
   expect(staffOf(list.crews[0]!)).toBe('D-036');
   // Nugegoda takes vans only, and the order needs a fridge: of the trucks that can be picked, only the fridge van fits.
@@ -118,7 +118,7 @@ it('AC-1 lists the crews for Fresh Nugegoda\'s chilled order: the fridge van tha
   expect(inPickerOrder(list)).toBe(true);
 });
 
-it('AC-1 names the draft\'s driver for a truck on the draft, keeps a usual driver the draft has elsewhere, and puts a truck on two trips last', async () => {
+it('AC-1 names the draft\'s driver for a truck on the draft, a driver once only, and puts a truck on two trips last', async () => {
   const plan: DraftPlan = { mixBrands: false, deferrals: [], trips: [
     { vehicleId: 'VEH002', tripNo: 1, leaveAt: null, driverId: dilshanId, stops: [] },
     { vehicleId: 'VEH002', tripNo: 2, leaveAt: null, driverId: dilshanId, stops: [] },
@@ -133,8 +133,9 @@ it('AC-1 names the draft\'s driver for a truck on the draft, keeps a usual drive
   expect(list.crews.slice(-4).map((crew) => crew.vehicleId)).toEqual(['VEH002', 'VEH003', 'VEH005', 'VEH036']);
   // VEH004 has a trip with no driver, and the draft's choice stands.
   expect(crewOf(list, 'VEH004')).toMatchObject({ driverId: null, unavailable: null });
-  // VEH001's usual driver drives VEH002 on the draft. The crew is still Dilshan and VEH001: picking it moves him (rule 2).
-  expect(crewOf(list, 'VEH001').driverId).toBe(dilshanId);
+  // VEH001's usual driver drives VEH002 on the draft, so he is on VEH002's row alone and VEH001 names no driver (L-05).
+  expect(crewOf(list, 'VEH001').driverId).toBeNull();
+  expect(list.crews.filter((crew) => crew.driverId === dilshanId).map((crew) => crew.vehicleId)).toEqual(['VEH002']);
   expect(inPickerOrder(list)).toBe(true);
 });
 
@@ -160,6 +161,49 @@ it('AC-4 takes the usual drivers and districts from the latest sent plan, and pu
   const fitting = list.crews.filter((crew) => crew.fits && crew.unavailable === null);
   expect(fitting[0]!.vehicleId).toBe('VEH035');
   expect(fitting.some((crew) => crew.fuelLeftPct > fitting[0]!.fuelLeftPct)).toBe(true);
+  expect(inPickerOrder(list)).toBe(true);
+});
+
+it('L-04 does not call a crew fitting whose truck is ready again only after every window of the orders closes', async () => {
+  // The suggested plan: many trucks run a first trip, and a crew for another Fresh trip's orders would start its second.
+  const built = await ruwan.post(`/api/v1/plans/${THU}/suggest`).send({ planId: null, demoDay: board.demoDay });
+  expect(built.status, JSON.stringify(built.body.error)).toBe(200);
+  const day = PlanBoard.parse(built.body);
+  const shop = (outletId: string) => day.shops.find((s) => s.id === outletId)!;
+  const fresh = day.plan.trips.find((t) => t.tripNo === 1 && t.stops.length > 1 && shop(t.stops[0]!.outletId).brand === 'Fresh')!;
+  const orderIds = fresh.stops.flatMap((s) => s.orderIds);
+  const list = await crews(THU, orderIds);
+  // The latest the orders' windows close, as the planner reads a window: its mall slot, and 07:59 for a Fresh shop.
+  const closes = Math.max(...fresh.stops.map((s) => {
+    const at = shop(s.outletId);
+    return Math.min(at.windowClose, at.mallClose ?? at.windowClose, at.brand === 'Fresh' ? 479 : Infinity);
+  }));
+  const readyOf = (vehicleId: string) => day.check!.trips.find((t) => t.vehicleId === vehicleId && t.tripNo === 1)?.times?.readyAgainAt ?? null;
+  const second = list.crews.filter((crew) => crew.unavailable === null && day.plan.trips.some((t) => t.vehicleId === crew.vehicleId));
+  expect(second.length).toBeGreaterThan(0);
+  for (const crew of second) {
+    expect(crew.readyAt).toBe(readyOf(crew.vehicleId));
+    const late = crew.readyAt !== null && crew.readyAt > closes;
+    expect(crew.misfits.some((m) => m.code === 'ready_late'), crew.vehicleId).toBe(late);
+    if (late) expect(crew.fits).toBe(false);
+  }
+  expect(second.some((crew) => crew.misfits.some((m) => m.code === 'ready_late'))).toBe(true);
+  // A truck with no trip yet is ready at the usual time, and says nothing of it.
+  expect(list.crews.filter((crew) => !day.plan.trips.some((t) => t.vehicleId === crew.vehicleId)).every((crew) => crew.readyAt === null)).toBe(true);
+  expect(inPickerOrder(list)).toBe(true);
+});
+
+it('L-04 calls no crew ready too late for an empty trip\'s swap, so its trucks with a trip go by fuel left like the rest', async () => {
+  const built = await ruwan.post(`/api/v1/plans/${THU}/suggest`).send({ planId: null, demoDay: board.demoDay });
+  expect(built.status, JSON.stringify(built.body.error)).toBe(200);
+  // Swap truck on a trip with no stops asks for no orders: no window closes, so no truck is ready after it.
+  const list = await crews(THU, []);
+  const free = list.crews.filter((crew) => crew.unavailable === null);
+  expect(free.some((crew) => crew.readyAt !== null)).toBe(true);
+  expect(list.crews.flatMap((crew) => crew.misfits)).toEqual([]);
+  expect(free.every((crew) => crew.fits)).toBe(true);
+  // So the free crews run by fuel left alone: none ran a district these orders are in.
+  expect(free.map((crew) => crew.fuelLeftPct)).toEqual(free.map((crew) => crew.fuelLeftPct).sort((a, b) => b - a));
   expect(inPickerOrder(list)).toBe(true);
 });
 

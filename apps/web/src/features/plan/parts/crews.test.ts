@@ -38,7 +38,7 @@ const INDEX = indexOf(BOARD);
 const DRAFT = planOf(BOARD);
 const crew = (vehicleId: string, driverId: string | null, change: Partial<Crew> = {}): Crew => {
   const v = BOARD.vehicles.find((x) => x.id === vehicleId)!;
-  return { vehicleId, driverId, type: v.type, temp: v.temp, weightCapKg: v.weightCapKg, volumeCapM3: v.volumeCapM3, fuelLeftPct: v.fuelLeftPct,
+  return { vehicleId, driverId, type: v.type, temp: v.temp, weightCapKg: v.weightCapKg, volumeCapM3: v.volumeCapM3, fuelLeftPct: v.fuelLeftPct, readyAt: null,
     lastDistricts: [], ranHere: false, fits: true, misfits: [], unavailable: null, ...change };
 };
 // Fresh Dehiwala's order dropped in the empty middle: a chilled order for a van-only shop.
@@ -90,16 +90,17 @@ it('rule 2 says before the press when the crew\'s driver drives another truck, w
 it('rule 1 a pick is one change of the draft with one Undo, naming the crew', () => {
   const button: Pick = { kind: 'start', group: { brand: 'Fresh', district: 'Colombo' }, orders: [BOARD.orders[2]!], startWith: [] };
   expect(crewChange(button, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toEqual({
-    ...startTrip(DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA })!, undo: { before: DRAFT, line: 'Trip started on Wasantha\'s reefer van', tripKey: 'VEH035-1' },
+    ...startTrip(DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA })!, undo: { line: 'Trip started on Wasantha\'s reefer van', tripKey: 'VEH035-1' },
   });
   expect(crewChange(DROPPED, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toMatchObject({ undo: { line: 'Fresh Dehiwala added to Wasantha\'s reefer van' } });
   // A driver who moves is said in the same line, and the one Undo puts him back.
   expect(crewChange(DROPPED, DRAFT, { vehicleId: 'VEH035', driverId: DILSHAN }, INDEX)).toMatchObject({
-    key: 'VEH035-1', undo: { before: DRAFT, line: 'Fresh Dehiwala added to Dilshan\'s reefer van. VEH001 has no driver now.' },
+    key: 'VEH035-1', undo: { line: 'Fresh Dehiwala added to Dilshan\'s reefer van. VEH001 has no driver now.' },
   });
   expect(crewChange({ kind: 'swap', key: 'VEH011-1' }, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toEqual({
     ...swapTruck(DRAFT, 'VEH011-1', { vehicleId: 'VEH035', driverId: WASANTHA })!, // Chaminda drove the trip, and Wasantha drives it now, so the line says Chaminda is off his truck.
-    undo: { before: DRAFT, line: 'Trip moved to Wasantha\'s reefer van. Chaminda is off VEH011 now.', tripKey: 'VEH035-1' },
+    // The swapped trip's old key, which Undo opens again (L-10).
+    undo: { line: 'Trip moved to Wasantha\'s reefer van. Chaminda is off VEH011 now.', tripKey: 'VEH035-1', from: 'VEH011-1' },
   });
   // A second trip says so.
   expect(crewChange(button, DRAFT, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX)).toMatchObject({ key: 'VEH011-2', undo: { line: 'Second trip started on Chaminda\'s dry truck' } });
@@ -131,4 +132,15 @@ it('offers a crews read only while it is for the saved draft on screen, and keys
   expect(crewsFor({ ...LIST, revision: 2 }, BOARD, DRAFT)).toBeNull();
   expect(crewsFor(LIST, BOARD, { ...DRAFT, trips: DRAFT.trips.slice(1) })).toBeNull();
   expect(crewsFor(undefined, BOARD, DRAFT)).toBeNull();
+});
+
+it('L-04 says when a second trip is ready, and that it is after every window closes when the read says so', () => {
+  const ready = { ...LIST, crews: [
+    crew('VEH001', DILSHAN, { readyAt: 418 }),
+    crew('VEH011', CHAMINDA, { readyAt: 498, fits: false, misfits: [{ code: 'ready_late', orderId: null, outletId: null }] }),
+  ] };
+  expect(crewRows(ready, DROPPED, DRAFT, INDEX).map((row) => row.line)).toEqual([
+    'fits · trip 2 · ready 06:58 · fuel 62% left',
+    'ready 08:18, after every window closes · trip 2 · fuel 62% left',
+  ]);
 });

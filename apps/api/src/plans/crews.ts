@@ -5,6 +5,7 @@ import { outlets, plans, stops, trips, users, vehicles } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import { snapshot } from '../orders/store-orders';
 import { checkPlan, computeLoad, type PlanInput } from '../planning';
+import { effectiveWindow } from '../planning/planner/priority';
 import type { Planner } from '../routes/plans';
 import { readBoard } from './board';
 import { usualPairing } from './suggestion';
@@ -62,7 +63,8 @@ function pickerOrder(a: Crew, b: Crew) {
 }
 
 // GET /plans/:date/crews?orders=…: every crew of the caller's depot for the orders, read from the board's own snapshot.
-// A crew's driver is the one the draft gives its truck, or its usual driver when the draft has no trip on it. Whether its
+// A crew's driver is the one the draft gives its truck, or its usual driver when the draft has no trip on it and he
+// drives no other truck there; a truck in the workshop names none (L-05). Whether its
 // truck takes the orders is the checker's cargo rules on a trip of it carrying these orders alone (rule 12).
 export function findCrews(caller: Planner, date: string, { orders: asked }: CrewQuery): Promise<CrewList> {
   return snapshot(async (tx) => {
@@ -78,13 +80,28 @@ export function findCrews(caller: Planner, date: string, { orders: asked }: Crew
     const { usual, districts } = await crewsOf(tx, caller.depotId, date);
     const here = new Set(orders.map((order) => shopOf(board, order.outletId).district));
     const misfitsOf = trialOf(input, orders);
+    // The latest any of the orders' windows closes, as the planner reads a window: within its mall slot, and before 08:00
+    // for a Fresh shop. A truck ready again only after it cannot take them on a second trip (L-04). With no orders asked,
+    // as for an empty trip's swap, no window closes and no truck is late.
+    const closes = Math.max(...orders.map((order) => effectiveWindow(input.outlets.find((o) => o.id === order.outletId)!).close));
+    const readyOf = (vehicleId: string) => board.check?.trips.find((t) => t.vehicleId === vehicleId && t.tripNo === 1)?.times?.readyAgainAt ?? null;
+    // A driver is on one row only, the truck he drives on the draft (L-05). A truck the draft has no trip on takes its
+    // usual driver while he drives none there, and a truck in the workshop names nobody.
+    const driving = new Set(board.plan.trips.flatMap((t) => (t.driverId === null ? [] : [t.driverId])));
+    const driverOf = (vehicle: PlanBoard['vehicles'][number], own: PlanBoard['plan']['trips']) => {
+      if (!vehicle.working) return null;
+      if (own[0]) return own[0].driverId;
+      const usualDriver = usual.get(vehicle.id) ?? null;
+      return usualDriver !== null && !driving.has(usualDriver) ? usualDriver : null;
+    };
     const crews = board.vehicles.filter((vehicle) => usual.has(vehicle.id)).map((vehicle): Crew => {
       const own = board.plan.trips.filter((t) => t.vehicleId === vehicle.id);
       const ran = districts.get(vehicle.id) ?? [];
-      const misfits = misfitsOf(vehicle.id);
+      const readyAt = own.length > 0 ? readyOf(vehicle.id) : null;
+      const misfits = [...misfitsOf(vehicle.id), ...(readyAt !== null && orders.length > 0 && readyAt > closes ? [{ code: 'ready_late' as const, orderId: null, outletId: null }] : [])];
       return {
-        vehicleId: vehicle.id, driverId: own[0] ? own[0].driverId : usual.get(vehicle.id) ?? null,
-        type: vehicle.type, temp: vehicle.temp, weightCapKg: vehicle.weightCapKg, volumeCapM3: vehicle.volumeCapM3, fuelLeftPct: vehicle.fuelLeftPct,
+        vehicleId: vehicle.id, driverId: driverOf(vehicle, own),
+        type: vehicle.type, temp: vehicle.temp, weightCapKg: vehicle.weightCapKg, volumeCapM3: vehicle.volumeCapM3, fuelLeftPct: vehicle.fuelLeftPct, readyAt,
         lastDistricts: ran, ranHere: ran.some((district) => here.has(district)), fits: misfits.length === 0, misfits,
         unavailable: vehicle.working ? (own.length >= 2 ? { kind: 'two_trips' } : null) : { kind: 'workshop', reason: offReasonOf(vehicle) },
       };

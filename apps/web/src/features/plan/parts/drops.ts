@@ -52,13 +52,13 @@ export function dropOf(plan: DraftPlan, dragged: Dragged, landing: Landing, call
     if (!trip) return null;
     // "Add": on the stop at the order's shop, or a new stop where it landed, at the end on a card.
     const next = addOrders(plan, landing.tripKey, dragged.orders, landing.kind === 'stops' ? landing.at : undefined);
-    return { kind: 'change', plan: next, undo: { before: plan, line: `${dragged.label} added to ${called(trip)}`, tripKey: landing.tripKey } };
+    return { kind: 'change', plan: next, undo: { line: `${dragged.label} added to ${called(trip)}`, tripKey: landing.tripKey } };
   }
 
   const trip = tripOf(plan, dragged.tripKey);
   const stop = trip?.stops[dragged.index];
   if (!trip || !stop) return null;
-  const change = (next: DraftPlan, line: string): Drop => ({ kind: 'change', plan: next, undo: { before: plan, line, tripKey: dragged.tripKey } });
+  const change = (next: DraftPlan, line: string): Drop => ({ kind: 'change', plan: next, undo: { line, tripKey: dragged.tripKey } });
   if (landing.kind === 'stops') {
     // "Move up" and "Move down", as many places as it went: the end of the list is the last place.
     const to = Math.min(landing.at, trip.stops.length - 1);

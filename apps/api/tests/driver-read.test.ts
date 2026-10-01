@@ -81,13 +81,19 @@ it('AC-2 reads VEH035 ready with the saved times, plan stop order, windows, note
   ]);
   const line = (key: string, temp: 'chilled' | 'dry', quantity: number, loaded: number) => ({
     lineId: demoId('line', `${key}:fresh-${temp}-carton`), orderId: demoId('order', key), temp, productId: `fresh-${temp}-carton`,
-    name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, loaded, delivered: null,
+    name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, loaded, wontFit: 0, delivered: null,
   });
   expect(shownStops.map(shown => shown.lines)).toEqual([
     [line(`${WED}:OUT001:chilled`, 'chilled', 12, 12), line(`${THU}:OUT001:chilled`, 'chilled', 8, 8), line(`${THU}:OUT001:dry`, 'dry', 4, 3)],
     [line(`${THU}:OUT002:chilled`, 'chilled', 48, 48), line(`${THU}:OUT002:dry`, 'dry', 46, 46)],
   ]);
   expect(await heldDriverRows()).toEqual(before);
+});
+
+it('L-09 tells the driver which cartons the loader found would not fit, apart from those short from the depot', async () => {
+  await readyWalkthrough(walk, { reason: 'wont_fit' });
+  const lines = (await driver.read()).trips[0]!.stops[0]!.lines;
+  expect(lines.map((line) => [line.temp, line.quantity, line.loaded, line.wontFit])).toEqual([['chilled', 12, 12, 0], ['chilled', 8, 8, 0], ['dry', 4, 3, 1]]);
 });
 
 it('AC-3 keeps an earlier out trip first, the current trips in leaving order including done, and hides another driver', async () => {

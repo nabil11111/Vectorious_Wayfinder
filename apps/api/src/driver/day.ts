@@ -26,7 +26,12 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[]): Promise<DriverTri
     .from(stopOrders).innerJoin(orders, eq(orders.id, stopOrders.orderId)).innerJoin(orderLines, eq(orderLines.orderId, orders.id))
     .innerJoin(products, eq(products.id, orderLines.productId)).where(inArray(stopOrders.stopId, stopRows.map(row => row.stop.id))) : [];
   // The driver's own problems only: a loader's flag stays at the dock, and a shop's report is the dispatcher's to answer.
-  const problems = await issuesOf(tx, and(inArray(trips.id, tripIds), inArray(issues.kind, ['refused', 'closed'])));
+  // Read with the loader's flags, for the lines the loader found would not fit on the truck, which the driver reads as
+  // "won't fit", not short (L-09).
+  const read = await issuesOf(tx, and(inArray(trips.id, tripIds), inArray(issues.kind, ['refused', 'closed', 'loading'])));
+  const problems = read.filter(problem => problem.kind !== 'loading');
+  const notFitting = new Set(read.filter(problem => problem.kind === 'loading' && problem.reason === 'wont_fit')
+    .flatMap(problem => problem.lines.map(line => `${problem.trip.id}:${line.lineId}`)));
   return rows.map(({ trip, plan }) => {
     const vehicle = fleet.find(vehicle => vehicle.id === trip.vehicleId);
     if (!vehicle) throw new Error(`No vehicle ${trip.vehicleId}.`);
@@ -60,7 +65,11 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[]): Promise<DriverTri
           lines: ownLines.map(({ lineId, orderId, temp, productId, name, unit, quantity, loaded, delivered }) => {
             const attempt = closed?.lines.find(line => line.lineId === lineId);
             if (closed && !attempt) throw new Error(`Closed attempt ${closed.id} has no count for ${lineId}.`);
-            return { lineId, orderId, temp, productId, name, unit, quantity, loaded: attempt ? attempt.counted : loaded, delivered: closed ? null : delivered };
+            // A closed attempt keeps its own count, which a bring-back leaves as it was while it clears the live one, so
+            // the loaded count and what would not fit both come from the attempt.
+            const counted = attempt ? attempt.counted : loaded;
+            const wontFit = notFitting.has(`${trip.id}:${lineId}`) && counted !== null ? quantity - counted : 0;
+            return { lineId, orderId, temp, productId, name, unit, quantity, loaded: counted, wontFit, delivered: closed ? null : delivered };
           }) };
       }), problems: tripProblems,
     };

@@ -43,13 +43,13 @@ const boardWith = (trips: DraftTrip[]) => PlanBoard.parse({
   figures: null, counts: null, suggestion: null,
 });
 const BOARD = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH002', null, 'OUT051', GALLE_ORDER)]);
-const screenOf = (board: PlanBoard): BoardScreen => ({ board, draft: planOf(board), saving: 'saved', refused: null, acting: false, undo: null });
+const screenOf = (board: PlanBoard): BoardScreen => ({ board, draft: planOf(board), saving: 'saved', refused: null, acting: false, undo: null, history: { undo: null, redo: null } });
 
 const doneList = (board: PlanBoard) => renderToStaticMarkup(<DoneList screen={screenOf(board)} index={indexOf(board)} openKey={null} onOpen={() => undefined} />);
 const tripPanel = (board: PlanBoard, vehicleId: string) => renderToStaticMarkup(
   <TripPanel
     screen={screenOf(board)} index={indexOf(board)} trip={board.plan.trips.find((t) => t.vehicleId === vehicleId)!} group={null}
-    change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+    change={() => undefined} act={async () => null} onUndo={() => undefined} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
   />,
 );
 
@@ -76,7 +76,7 @@ it('spec 026 AC-3 the open trip\'s header names the truck by its driver, whose n
   const markup = renderToStaticMarkup(
     <TripPanel
       screen={screenOf(second)} index={indexOf(second)} trip={second.plan.trips[1]!} group={null}
-      change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+      change={() => undefined} act={async () => null} onUndo={() => undefined} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
     />,
   );
   expect(markup).toMatch(/<h2 class="[^"]*">Planning · <button[^>]*>Chaminda<\/button> · reefer truck · trip 2<\/h2>/);
@@ -130,8 +130,24 @@ it('spec 026 rule 2 the menu lets every driver be chosen and says before the pre
 it('spec 026 rule 2 a move is one change of the draft, with Undo putting the driver back on his truck', () => {
   const move = driverChange(DAY, 'VEH035-1', 'VEH035', dilshan);
   expect(move.plan).toEqual(setDriver(DAY, 'VEH035', DILSHAN));
-  expect(move.undo).toEqual({ before: DAY, line: 'Dilshan moved from VEH001, which has no driver now', tripKey: 'VEH035-1' });
-  // Choosing a free driver, or none, touches one vehicle, so there is nothing to undo.
-  expect(driverChange({ ...DAY, trips: DAY.trips.filter((t) => t.vehicleId !== 'VEH004') }, 'VEH035-1', 'VEH035', chaminda).undo).toBeUndefined();
-  expect(driverChange(DAY, 'VEH035-1', 'VEH035', null)).toEqual({ plan: setDriver(DAY, 'VEH035', null) });
+  expect(move.undo).toEqual({ line: 'Dilshan moved from VEH001, which has no driver now', tripKey: 'VEH035-1' });
+  // Choosing a free driver, or none, touches one vehicle: a step of the history with no line on the trip (spec 027).
+  expect(driverChange({ ...DAY, trips: DAY.trips.filter((t) => t.vehicleId !== 'VEH004') }, 'VEH035-1', 'VEH035', chaminda).undo).toEqual({ line: 'Chaminda chosen as the driver', tripKey: null });
+  expect(driverChange(DAY, 'VEH035-1', 'VEH035', null)).toEqual({ plan: setDriver(DAY, 'VEH035', null), undo: { line: 'Driver taken off the truck', tripKey: null } });
+});
+
+it('L-07 says "trip 1 of 2" only when the truck has a second trip, and no count for its only trip', () => {
+  expect(tripPanel(BOARD, 'VEH004')).toMatch(/<p class="[^"]*">6\.8 t · 33\.4 m³<\/p>/);
+  expect(tripPanel(BOARD, 'VEH004')).not.toContain('of 2');
+  const both = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
+  expect(tripPanel(both, 'VEH004')).toContain('6.8 t · 33.4 m³ · trip 1 of 2');
+});
+
+it('L-03 a View plan row for a truck\'s second trip alone says "· trip 2", as its card does', () => {
+  const split = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
+  const row = (trips: DraftTrip[]) => renderToStaticMarkup(<VehicleRow vehicleId="VEH004" trips={trips} driverName="Chaminda" index={indexOf(split)} />);
+  expect(row([split.plan.trips[1]!])).toMatch(/<p class="[^"]*">Chaminda · reefer truck · trip 2<\/p>/);
+  expect(row([split.plan.trips[0]!])).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
+  // Both trips on one row are the truck's whole day.
+  expect(row(split.plan.trips)).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
 });

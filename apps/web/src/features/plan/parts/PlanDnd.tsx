@@ -5,7 +5,7 @@ import type { DraftPlan } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import type { BoardScreen, Undo } from '../board';
 import {
-  announcements, BoardChange, boardKeyboardCoordinates, draggedOf, dropLocked, keysOf, landDrop, landingCollision, landingOf, pressOf, putBack, screenReaderInstructions,
+  announcements, BoardChange, boardKeyboardCoordinates, BoardUndo, draggedOf, dropLocked, keysOf, landDrop, landingCollision, landingOf, pressOf, putBack, screenReaderInstructions,
 } from './dragging';
 import type { Dragged, DragData } from './drops';
 import type { BoardIndex } from './lookup';
@@ -15,10 +15,11 @@ import type { Pick } from './crews';
 // once it has moved a few pixels, so a click and the rows' menus work as before, and the keyboard picks it up from its
 // handle with Space or Enter. A finished drag is the change its button makes, sent through the board's own change
 // with its Undo, and an order dropped in the empty middle opens the crew picker.
-export function PlanDnd({ screen, index, change, onStartTrip, children }: {
+export function PlanDnd({ screen, index, change, undo, onStartTrip, children }: {
   screen: BoardScreen;
   index: BoardIndex;
-  change: (next: DraftPlan, undo?: Undo) => void;
+  undo: () => void;
+  change: (next: DraftPlan, said: Undo) => void;
   onStartTrip: (pick: Pick) => void;
   children: ReactNode;
 }) {
@@ -35,6 +36,7 @@ export function PlanDnd({ screen, index, change, onStartTrip, children }: {
   }, [locked, dragged]);
   return (
     <BoardChange.Provider value={change}>
+    <BoardUndo.Provider value={undo}>
       <DndContext
         sensors={sensors}
         collisionDetection={landingCollision}
@@ -51,6 +53,7 @@ export function PlanDnd({ screen, index, change, onStartTrip, children }: {
         {children}
         <DragOverlay dropAnimation={null}>{dragged && <DragCard dragged={dragged} />}</DragOverlay>
       </DndContext>
+    </BoardUndo.Provider>
     </BoardChange.Provider>
   );
 }

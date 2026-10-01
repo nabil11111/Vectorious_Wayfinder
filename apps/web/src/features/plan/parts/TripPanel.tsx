@@ -4,9 +4,10 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { BoardDriver, BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { splitOrder, type BoardScreen, type Undo } from '../board';
-import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeOff, tripOf, type CrewRef } from '../draft';
-import { countOf, cubic, figure, hhmm, litres, orderAmount, ordersAmount, tonnes, truckKind } from '../words';
+import { ENDS_HISTORY, splitOrder, type BoardScreen, type Undo } from '../board';
+import { defer, keyOf, moveStop, planOf, sameTrip, setLeaveAt, takeOff, tripOf, type CrewRef } from '../draft';
+import { capital, countOf, cubic, figure, hhmm, litres, orderAmount, ordersAmount, tonnes, truckKind } from '../words';
+import { removeTripChange, takeStopOffChange } from './changes';
 import { CrewMenu } from './CrewMenu';
 import type { Pick } from './crews';
 import { DeferForm } from './DeferForm';
@@ -16,26 +17,29 @@ import { DriverMenu } from './DriverMenu';
 import { driverChange } from './drivers';
 import { vehicleIcon } from './icons';
 import { LeaveField } from './LeaveField';
-import type { BoardIndex } from './lookup';
+import { ordersLine, type BoardIndex } from './lookup';
 import { SplitForm } from './SplitForm';
 import { StopRow } from './StopRow';
 import { Timeline } from './Timeline';
 import { fuelTone, inkButton, plainButton, toneOf } from './look';
 import { Figure, Tag } from './ui';
 
-// A split or join, which the board's queue runs once the draft is saved. It says why it was refused, or null.
-type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>) => Promise<string | null>;
+// A split or join, which the board's queue runs once the draft is saved and which ends the board's history (spec 027).
+// It says why it was refused, or null.
+type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>, done?: undefined, said?: typeof ENDS_HISTORY) => Promise<string | null>;
 
 // The open trip (Edit plan): its vehicle, driver, brand, district and leaving time, the checker's figures, the
 // timeline with the trip's problems and their fixes, the stops in order, "+ Add a stop" and "Mark trip done".
 // The numbers are the last answer's, shown only while they are for the trip on screen.
-export function TripPanel({ screen, index, trip, group, change, act, onCrew, onRemoved, onDone, onAddStop, onJoin }: {
+export function TripPanel({ screen, index, trip, group, change, act, onUndo, onCrew, onRemoved, onDone, onAddStop, onJoin }: {
   screen: BoardScreen;
   index: BoardIndex;
   trip: DraftTrip;
   group: { brand: Brand; district: string } | null;
-  change: (next: DraftPlan, undo?: Undo) => void;
+  change: (next: DraftPlan, said: Undo) => void;
   act: Act;
+  // The history's Undo, which the green line undoes too (spec 027).
+  onUndo: () => void;
   // A crew picked from "Swap truck" (spec 026).
   onCrew: (pick: Pick, crew: CrewRef) => void;
   onRemoved: () => void;
@@ -62,12 +66,12 @@ export function TripPanel({ screen, index, trip, group, change, act, onCrew, onR
   }));
 
   const split = async (order: BoardOrder, keep: { productId: string; quantity: number }[]) => {
-    const refused = await act((date, ref) => splitOrder(date, { ...ref, orderId: order.id, keep }));
+    const refused = await act((date, ref) => splitOrder(date, { ...ref, orderId: order.id, keep }), undefined, ENDS_HISTORY);
     if (refused === null) setForm(null);
     return refused;
   };
   const doDefer = (deferrals: DraftDeferral[]) => {
-    change(defer(draft, deferrals));
+    change(defer(draft, deferrals), { line: `${ordersLine(index, deferrals.map((d) => d.orderId))} deferred`, tripKey: null });
     setForm(null);
   };
   // One change of the draft, with Undo when the driver came from another vehicle, which he leaves with none (spec 026).
@@ -77,6 +81,10 @@ export function TripPanel({ screen, index, trip, group, change, act, onCrew, onR
   };
   const driver = index.driver(trip.driverId);
   const kind = vehicle ? truckKind(vehicle) : 'truck';
+  const twoTrips = draft.trips.filter((t) => t.vehicleId === trip.vehicleId).length > 1;
+  const called = index.called(trip);
+  // A leaving time set, or the usual one again, as one step of the history (spec 027).
+  const leaveAt = (minutes: number | null) => change(setLeaveAt(draft, key, minutes), { line: minutes === null ? `${capital(called)} leaves at the usual time` : `${capital(called)} leaves at ${hhmm(minutes)}`, tripKey: null });
   const menu = <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={chooseDriver} />;
   // Drag and drop (spec 023): the stops as a sortable list, outlined as one place while something that can land there is
   // dragged, and its end as a place to land.
@@ -98,12 +106,15 @@ export function TripPanel({ screen, index, trip, group, change, act, onCrew, onR
             {driver ? <>{menu} · {kind}</> : <>{kind} {trip.vehicleId} · {menu}</>}
             {trip.tripNo === 2 && ' · trip 2'}
           </h2>
-          <p className="mt-1 text-xs leading-[15px] text-muted-foreground">{vehicle ? `${tonnes(vehicle.weightCapKg)} · ${cubic(vehicle.volumeCapM3)} · ` : ''}trip {trip.tripNo} of 2</p>
+          {/* "trip 1 of 2" only while the truck runs a second trip too (L-07). */}
+          <p className="mt-1 text-xs leading-[15px] text-muted-foreground">
+            {[vehicle && `${tonnes(vehicle.weightCapKg)} · ${cubic(vehicle.volumeCapM3)}`, twoTrips && `trip ${trip.tripNo} of 2`].filter(Boolean).join(' · ')}
+          </p>
         </div>
         <div className="flex flex-wrap items-start justify-end gap-1.5">
           {group && <Tag tone={group.brand === 'Fresh' ? 'good' : 'plain'} className="h-[23px]">{group.brand}</Tag>}
           {group && <Tag className="h-[23px]">{group.district}</Tag>}
-          <LeaveField set={trip.leaveAt} usual={times?.leaveAt ?? null} onSet={(minutes) => change(setLeaveAt(draft, key, minutes))} />
+          <LeaveField set={trip.leaveAt} usual={times?.leaveAt ?? null} onSet={leaveAt} />
         </div>
       </div>
 
@@ -130,13 +141,13 @@ export function TripPanel({ screen, index, trip, group, change, act, onCrew, onR
       </div>
 
       <div className="px-3.5 pt-3">
-        <Timeline times={times} depot={board.depot} shops={stopShops} problems={problems} onLeaveAt={(minutes) => change(setLeaveAt(draft, key, minutes))} />
+        <Timeline times={times} depot={board.depot} shops={stopShops} problems={problems} onLeaveAt={leaveAt} />
       </div>
 
       {undo && (
         <div role="status" className="mx-3.5 mt-3 flex items-center gap-3 rounded-[10px] bg-good-tint px-3.5 py-2.5">
           <p className="flex-1 text-xs leading-[15px] font-semibold text-good">{undo.line}</p>
-          <Button variant="outline" className={plainButton('h-8 px-4 text-xs')} onClick={() => change(undo.before)}>Undo</Button>
+          <Button variant="outline" className={plainButton('h-8 px-4 text-xs')} onClick={onUndo}>Undo</Button>
         </div>
       )}
 
@@ -169,8 +180,9 @@ export function TripPanel({ screen, index, trip, group, change, act, onCrew, onR
                   id: stopIds[i]!, movable: canMove, name: `stop ${i + 1} of ${index.called(trip)}`,
                   dragged: { kind: 'stop', tripKey: key, index: i, label: shop.name, brand: shop.brand }, landing: { kind: 'stops', tripKey: key, at: i },
                 }}
-                onMove={(by) => change(moveStop(draft, key, i, by), { before: draft, line: `Stops ${Math.min(i, i + by) + 1} and ${Math.max(i, i + by) + 1} swapped`, tripKey: key })}
-                onTakeOff={(order) => change(takeOff(draft, [order.id]))}
+                onMove={(by) => change(moveStop(draft, key, i, by), { line: `Stops ${Math.min(i, i + by) + 1} and ${Math.max(i, i + by) + 1} swapped`, tripKey: key })}
+                onTakeStopOff={() => { const off = takeStopOffChange(draft, trip, i, index); change(off.plan, off.said); }}
+                onTakeOff={(order) => change(takeOff(draft, [order.id]), { line: `${ordersLine(index, [order.id])} taken off ${called}`, tripKey: null })}
                 onSplit={(order) => setForm({ kind: 'split', order })}
                 onDefer={(order) => setForm({ kind: 'defer', order })}
                 onJoin={onJoin}
@@ -193,7 +205,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onCrew, onR
       </div>
 
       <div className="mt-auto flex items-center justify-between gap-3 px-3.5 pt-6 pb-3.5">
-        <Button variant="outline" className={plainButton('h-9 px-4 text-[13px]')} onClick={() => { change(removeTrip(draft, key)); onRemoved(); }}>Remove trip</Button>
+        <Button variant="outline" className={plainButton('h-9 px-4 text-[13px]')} onClick={() => { const removed = removeTripChange(draft, trip, index); change(removed.plan, removed.said); onRemoved(); }}>Remove trip</Button>
         <Button variant="secondary" className={inkButton('h-9 px-6 text-[13px]')} onClick={onDone}>Mark trip done</Button>
       </div>
     </div>

@@ -7,7 +7,7 @@ import type { BoardScreen } from '../board';
 import { placesOf, planOf } from '../draft';
 import { BuildPanel } from './BuildPanel';
 import { DoneList } from './DoneList';
-import { announcements, BoardChange, boardKeyboardCoordinates, dropLocked, landDrop, landingCollision, putBack } from './dragging';
+import { announcements, BoardChange, boardKeyboardCoordinates, BoardUndo, dropLocked, landDrop, landingCollision, putBack } from './dragging';
 import type { Dragged, DropData, Landing } from './drops';
 import { indexOf } from './lookup';
 import { OrderLists } from './OrderLists';
@@ -45,7 +45,7 @@ const boardWith = (trips: DraftTrip[]) => PlanBoard.parse({
 });
 const BOARD = boardWith(TRIPS);
 const INDEX = indexOf(BOARD);
-const screenOf = (board: PlanBoard, change: Partial<BoardScreen> = {}): BoardScreen => ({ board, draft: planOf(board), saving: 'saved', refused: null, acting: false, undo: null, ...change });
+const screenOf = (board: PlanBoard, change: Partial<BoardScreen> = {}): BoardScreen => ({ board, draft: planOf(board), saving: 'saved', refused: null, acting: false, undo: null, history: { undo: null, redo: null }, ...change });
 
 const orderLists = (screen: BoardScreen, open: DraftTrip | null = null) => renderToStaticMarkup(
   <OrderLists screen={screen} index={INDEX} places={placesOf(screen.draft)} open={open} outlined={null} change={() => undefined} onCrew={() => undefined} onFindSlot={() => undefined} onJoin={() => undefined} />,
@@ -53,7 +53,7 @@ const orderLists = (screen: BoardScreen, open: DraftTrip | null = null) => rende
 const tripPanel = (screen: BoardScreen) => renderToStaticMarkup(
   <TripPanel
     screen={screen} index={INDEX} trip={screen.draft.trips[0]!} group={null}
-    change={() => undefined} act={async () => null} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+    change={() => undefined} act={async () => null} onUndo={() => undefined} onCrew={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
   />,
 );
 // Each draggable's handle by its name: "draggable" for an order, "sortable" for a stop in its list.
@@ -111,6 +111,8 @@ const over = (landing: Landing, name: string) => ({ id: name, data: { current: {
 
 it('spec 023 AC-6 says each step of a drag in words', () => {
   expect(announcements.onDragStart({ active: active(dehiwala) })).toBe('Picked up Fresh Dehiwala. Move it with the arrow keys, drop it with Space or Enter, or press Escape to put it back.');
+  // Where it sits as it is picked up is not said, so "Picked up" is heard first (L-06).
+  expect(announcements.onDragOver({ active: active(dehiwala), over: over({ kind: 'unplanned' }, 'Unplanned orders') })).toBeUndefined();
   expect(announcements.onDragOver({ active: active(dehiwala), over: over(stopTwo, 'stop 2 of VEH035') })).toBe('Fresh Dehiwala is over stop 2 of VEH035.');
   expect(announcements.onDragOver({ active: active(dehiwala), over: over({ kind: 'unplanned' }, 'Unplanned orders') })).toBe('Fresh Dehiwala cannot go on Unplanned orders.');
   expect(announcements.onDragOver({ active: active(dehiwala), over: null })).toBe('Fresh Dehiwala is over no place to drop it.');
@@ -183,9 +185,8 @@ it('spec 023 AC-6 cancels a drop that lands while the board holds still, and put
 });
 
 it('spec 023 AC-5 shows the Undo line of a drop on a trip\'s card in that card', () => {
-  const plan = planOf(BOARD);
-  const screen = screenOf(BOARD, { undo: { before: plan, line: 'Fresh Dehiwala added to VEH002', tripKey: 'VEH002-1', seq: 1, revision: 4 } });
-  const markup = renderToStaticMarkup(<BoardChange.Provider value={() => undefined}><DoneList screen={screen} index={INDEX} openKey="VEH035-1" onOpen={() => undefined} /></BoardChange.Provider>);
+  const screen = screenOf(BOARD, { undo: { line: 'Fresh Dehiwala added to VEH002', tripKey: 'VEH002-1', seq: 1, revision: 4 } });
+  const markup = renderToStaticMarkup(<BoardChange.Provider value={() => undefined}><BoardUndo.Provider value={() => undefined}><DoneList screen={screen} index={INDEX} openKey="VEH035-1" onOpen={() => undefined} /></BoardUndo.Provider></BoardChange.Provider>);
   expect(markup).toMatch(/<div role="status"[^>]*><p[^>]*>Fresh Dehiwala added to VEH002<\/p><button[^>]*>Undo<\/button><\/div>/);
 });
 
@@ -193,4 +194,12 @@ it('spec 026 AC-1 opens the crew picker as a dropdown from a group\'s "Start a t
   const menuButton = (name: string) => new RegExp(`<button[^>]*aria-haspopup="menu"[^>]*>${name}</button>`);
   expect(orderLists(screenOf(BOARD))).toMatch(menuButton('Start a trip'));
   expect(tripPanel(screenOf(BOARD))).toMatch(menuButton('Swap truck'));
+});
+
+it('spec 027 AC-3 gives each stop a × to take it off, and each card in Done a menu with Remove trip', () => {
+  const panel = tripPanel(screenOf(BOARD));
+  expect(panel).toMatch(/<button type="button" aria-label="Take Fresh Nugegoda off this trip"[^>]*>/);
+  expect(panel).toMatch(/<button type="button" aria-label="Take Fresh Wellawatte off this trip"[^>]*>/);
+  const done = renderToStaticMarkup(<BoardChange.Provider value={() => undefined}><DoneList screen={screenOf(BOARD)} index={INDEX} openKey="VEH035-1" onOpen={() => undefined} /></BoardChange.Provider>);
+  expect(done).toMatch(/<button[^>]*aria-label="More for reefer truck VEH002 · no driver · Fresh · Galle"[^>]*aria-haspopup="menu"|<button[^>]*aria-haspopup="menu"[^>]*aria-label="More for reefer truck VEH002 · no driver · Fresh · Galle"/);
 });

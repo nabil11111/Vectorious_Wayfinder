@@ -21,6 +21,9 @@ export const LoadingLine = z.object({
   quantity: z.number().int().min(1),
   going: z.number().int().min(0),
   short: z.number().int().min(0),
+  // Of short, how many stay behind because the truck cannot take them (a "won't fit" flag), not for want of stock (L-09).
+  // A read kept from before it was told has none, so it reads as 0.
+  wontFit: z.number().int().min(0).default(0),
 });
 export type LoadingLine = z.infer<typeof LoadingLine>;
 
@@ -34,6 +37,7 @@ export const LoadingStop = z.object({
   units: z.number().int().min(0),
   going: z.number().int().min(0),
   short: z.number().int().min(0),
+  wontFit: z.number().int().min(0).default(0),
   lines: z.array(LoadingLine),
 });
 export type LoadingStop = z.infer<typeof LoadingStop>;
@@ -62,6 +66,7 @@ export const LoadingTruck = z.object({
   // What is on the truck so far: the loaded stops' lines at their counts going out.
   on: z.object({ units: z.number().int().min(0), kg: z.number(), m3: z.number() }),
   short: z.number().int().min(0),
+  wontFit: z.number().int().min(0).default(0),
   // Last stop first, the order the loader loads them.
   stops: z.array(LoadingStop),
   // The open ones first, then the answered ones, latest first.

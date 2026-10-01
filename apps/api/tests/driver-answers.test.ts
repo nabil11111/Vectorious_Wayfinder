@@ -303,6 +303,20 @@ it('AC-34 brings closed goods back as placed orders, keeps the attempt in the au
   expect(board.orders.filter(order => ids.includes(order.id)).every(order => order.carriedOver)).toBe(true);
 });
 
+it('L-09 keeps the cartons the loader found would not fit as won\'t fit once a closed shop\'s goods are brought back', async () => {
+  await readyWalkthrough(walk, { reason: 'wont_fit' });
+  let trip = await write(driverTrip(await driver.read()), 'start', 3 * 60 + 31);
+  trip = await write(trip, 'arrive', 3 * 60 + 34, 1);
+  trip = await write(trip, 'closed', 3 * 60 + 38, 1);
+  const counts = (shown: DriverTrip) => driverStop(shown, 1).lines.map(line => [line.temp, line.quantity, line.loaded, line.wontFit]);
+  // Nugegoda's dry line: 4 ordered, 3 loaded, 1 would not fit.
+  const closed = counts(trip);
+  expect(closed).toEqual([['chilled', 12, 12, 0], ['chilled', 8, 8, 0], ['dry', 4, 3, 1]]);
+  await answer(1, 'bring_back', 3 * 60 + 39);
+  // The live counts are cleared for the order's next day; the closed attempt's still read the same.
+  expect(counts(driverTrip(await driver.read()))).toEqual(closed);
+});
+
 it('AC-35 replans and reloads Nugegoda on Friday with a second dry flag, while Thursday keeps its own closed counts', async () => {
   let trip = await write(await started(), 'arrive', 3 * 60 + 34, 1);
   trip = await write(trip, 'closed', 3 * 60 + 38, 1);

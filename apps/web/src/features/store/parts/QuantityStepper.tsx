@@ -61,8 +61,8 @@ export function QuantityStepper({ name, box, size, disabled = false }: { name: s
             event.preventDefault();
             if (!wrong) step(event.key === 'ArrowUp' ? 1 : -1);
           }}
-          // A longer text than three figures widens the box, so all of it shows.
-          style={shown.length > 3 ? { width: `${shown.length + 1}ch` } : undefined}
+          // The box keeps its width whatever is typed, so a long refused number scrolls inside it and never pushes the
+          // product's name aside (L-01). The line under it says what to fix.
           className={cn(
             'min-w-0 rounded-md bg-transparent p-0 text-center font-bold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-foreground',
             lg ? 'font-heading text-[28px] leading-[46px]' : 'w-[50px] font-mono text-xl leading-9',

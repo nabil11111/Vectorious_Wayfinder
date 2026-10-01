@@ -121,7 +121,7 @@ it("AC-16 flags VEH035's dry line short at 3 of 4 with a note: an open problem, 
 
   expect(flagged).toMatchObject({ revision: truck.revision + 1, units: 118, short: 1, on: { units: 0, kg: 0, m3: 0 } });
   expect(stopOf(flagged, 1)).toMatchObject({ loaded: false, units: 24, going: 23, short: 1 });
-  expect(dryLine(flagged)).toMatchObject({ quantity: 4, going: 3, short: 1 });
+  expect(dryLine(flagged)).toMatchObject({ quantity: 4, going: 3, short: 1, wontFit: 0 });
   expect(flagged.issues).toEqual([{
     id: problem!.id, revision: 0, kind: 'loading', reason: 'short', status: 'open', raisedBy: 'Kasun', raisedAt: depotInstant(THU, 2 * 60 + 33).toISOString(),
     note: 'Only 3 dry cartons in the store', hasPhoto: false, decision: null, decidedBy: null, decidedAt: null, short: 1, cold: null, replacement: null,
@@ -374,7 +374,9 @@ it('Q-20 flags a line that will not all fit on the truck as wont_fit, with the c
   freeze(THU, 2 * 60 + 33);
   const flagged = answeredTruck(await loader.flag(truck, 1, [{ lineId: line.lineId, counted: 3 }], { reason: 'wont_fit', note: 'The van is full' }), 'VEH035');
   expect((await db.select().from(issues))[0]).toMatchObject({ kind: 'loading', reason: 'wont_fit', status: 'open', note: 'The van is full' });
-  expect(dryLine(flagged)).toMatchObject({ quantity: 4, going: 3, short: 1 });
+  // The line, its stop and its truck say how many of the short ones would not fit (L-09).
+  expect(dryLine(flagged)).toMatchObject({ quantity: 4, going: 3, short: 1, wontFit: 1 });
+  expect([stopOf(flagged, 1).wontFit, flagged.wontFit]).toEqual([1, 1]);
   expect(flagged.issues.map((issue) => [issue.reason, issue.status, issue.short])).toEqual([['wont_fit', 'open', 1]]);
   const open = IssueList.parse((await ruwan.get('/api/v1/issues')).body).issues;
   expect(open.map((issue) => [issue.kind, issue.reason, issue.short, issue.lines.map((l) => [l.quantity, l.counted])])).toEqual([['loading', 'wont_fit', 1, [[4, 3]]]]);
@@ -391,11 +393,11 @@ async function answeredWontFit(decision: 'go_short' | 'load_all') {
 }
 
 it('Q-20 answers a won\'t fit flag with "Go short" as a short one: the cartons that do not fit stay behind', async () => {
-  expect(await answeredWontFit('go_short')).toMatchObject({ going: 3, short: 1 });
+  expect(await answeredWontFit('go_short')).toMatchObject({ going: 3, short: 1, wontFit: 1 });
 });
 
 it('Q-20 answers a won\'t fit flag with "Load it all" as a short one: the whole line goes on', async () => {
-  expect(await answeredWontFit('load_all')).toMatchObject({ going: 4, short: 0 });
+  expect(await answeredWontFit('load_all')).toMatchObject({ going: 4, short: 0, wontFit: 0 });
 });
 
 it('driver AC-7 allows a line flagged on an earlier trip to be flagged on this trip', async () => {

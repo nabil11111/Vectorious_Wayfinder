@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PlanBoard } from '@wayfinder/contracts';
 import { describe, expect, it } from 'vitest';
-import { REASON_FULL, REASON_REFUSED, reasonFits, reasonLine } from '../words';
+import { REASON_FULL, REASON_REFUSED, reasonFits, reasonLine, deferGroup } from '../words';
 import { DeferForm } from './DeferForm';
 import { indexOf } from './lookup';
 
@@ -63,4 +63,9 @@ describe('Q-11 the sentence the shop reads', () => {
     expect(text(short)).not.toMatch(/characters? left|full:/);
     expect(short).not.toMatch(/aria-describedby/);
   });
+});
+
+it('L-08 a group of one order offers "Defer it", and a larger one "Defer all 3"', () => {
+  expect(deferGroup(1)).toBe('Defer it');
+  expect(deferGroup(3)).toBe('Defer all 3');
 });

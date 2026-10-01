@@ -4,14 +4,14 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardScreen, Undo } from '../board';
 import { addOrders, defer, keyOf, undefer, type CrewRef, type Place } from '../draft';
-import { carriedLine, countOf, decisionTitle, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, shopLine, TO_DECIDE, whole } from '../words';
+import { carriedLine, countOf, decisionTitle, deferGroup, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, shopLine, TO_DECIDE, whole } from '../words';
 import { CrewMenu } from './CrewMenu';
 import type { Pick } from './crews';
 import { DeferForm } from './DeferForm';
 import { movable, useLanding } from './dragging';
 import type { Dragged } from './drops';
 import { BRAND_ICON, ICON } from './icons';
-import { decisionShop, decisionTruck, groupKey, listed, type BoardIndex } from './lookup';
+import { decisionShop, decisionTruck, groupKey, listed, ordersLine, type BoardIndex } from './lookup';
 import { plainButton } from './look';
 import { DragRow } from './PlanDnd';
 import { Column, ColumnHead, MenuItem, MenuPopup, MenuRoot, MenuTrigger, Pills, Tag } from './ui';
@@ -66,7 +66,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
   places: Map<string, Place>;
   open: DraftTrip | null;
   outlined: string | null;
-  change: (next: DraftPlan, undo?: Undo) => void;
+  change: (next: DraftPlan, said: Undo) => void;
   // A crew picked from a group's "Start a trip" (spec 026).
   onCrew: (pick: Pick, crew: CrewRef) => void;
   onFindSlot: (orderId: string) => void;
@@ -84,9 +84,9 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
     return order ? [{ deferral, order }] : [];
   });
 
-  const add = open ? (orders: BoardOrder[]) => change(addOrders(draft, keyOf(open), orders)) : null;
+  const add = open ? (orders: BoardOrder[]) => change(addOrders(draft, keyOf(open), orders), { line: `${ordersLine(index, orders.map((o) => o.id))} added to ${index.called(open)}`, tripKey: keyOf(open) }) : null;
   const doDefer = (deferrals: DraftDeferral[]) => {
-    change(defer(draft, deferrals));
+    change(defer(draft, deferrals), { line: `${ordersLine(index, deferrals.map((d) => d.orderId))} deferred`, tripKey: null });
     setDeferring(null);
   };
   const form = (key: string) => deferring?.key === key && (
@@ -161,7 +161,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                     <div className="flex items-center gap-2 pl-1">
                       <img src={BRAND_ICON[group.brand]} alt="" className="size-[22px] shrink-0 object-contain" />
                       <h3 className="min-w-0 flex-1 truncate text-xs leading-[15px] font-semibold">{group.brand} · {group.district} · {whole(group.count)}</h3>
-                      <RowMenu label={`${group.brand} · ${group.district}`} items={[{ label: `Defer all ${whole(group.count)}`, onClick: () => deferOrders(group.key, group.shops.flatMap((row) => row.orders)) }]} />
+                      <RowMenu label={`${group.brand} · ${group.district}`} items={[{ label: deferGroup(group.count), onClick: () => deferOrders(group.key, group.shops.flatMap((row) => row.orders)) }]} />
                       <CrewMenu
                         screen={screen}
                         index={index}
@@ -259,7 +259,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                       )}
                       actions={(
                         <>
-                          <button type="button" className="text-[11px] font-semibold underline underline-offset-2" onClick={() => change(undefer(draft, order.id))}>Undo</button>
+                          <button type="button" className="text-[11px] font-semibold underline underline-offset-2" onClick={() => change(undefer(draft, order.id), { line: `${ordersLine(index, [order.id])} back in Unplanned`, tripKey: null })}>Undo</button>
                           {order.splitFrom !== null && <RowMenu label={title} items={[{ label: 'Join back', onClick: () => onJoin(order) }]} />}
                         </>
                       )}

@@ -8,7 +8,9 @@ const Count = z.number().int().min(0);
 export const DRIVER_WRITE_KINDS = ['start', 'arrive', 'deliver', 'refuse', 'closed', 'finish'] as const;
 export const DriverWriteKind = z.enum(DRIVER_WRITE_KINDS);
 export type DriverWriteKind = z.infer<typeof DriverWriteKind>;
-export const DriverLine = z.object({ lineId: z.uuid(), orderId: z.uuid(), temp: Temp, productId: z.string(), name: z.string(), unit: z.string(), quantity: Count, loaded: Count.nullable(), delivered: Count.nullable() });
+// wontFit: of what the loader went short on, the units the truck could not take (a "won't fit" flag), not short of stock (L-09).
+// A day a phone kept from before it was told has none, so it reads as 0.
+export const DriverLine = z.object({ lineId: z.uuid(), orderId: z.uuid(), temp: Temp, productId: z.string(), name: z.string(), unit: z.string(), quantity: Count, loaded: Count.nullable(), wontFit: Count.default(0), delivered: Count.nullable() });
 export type DriverLine = z.infer<typeof DriverLine>;
 export const DriverStop = z.object({
   id: z.uuid(), seq: z.number().int().min(1), revision: Count, retriedAt: Moment.nullable(), outletId: z.string(), shopName: z.string(), district: z.string(), dockType: DockType,
@@ -95,7 +97,8 @@ export function applyDriverWrite(day: DriverDay, write: DriverWrite): DriverDay 
 
 // Counts stay with the attempt: a closed stop already has its historical loaded counts from its problem.
 export function tripFigures(trip: DriverTrip) {
-  const zero = () => ({ ordered: 0, loaded: 0, delivered: 0, refused: 0, notDelivered: 0, short: 0, onTruck: 0 });
+  // short is all the loader did not load, and wontFit the part of it the truck could not take (L-09).
+  const zero = () => ({ ordered: 0, loaded: 0, delivered: 0, refused: 0, notDelivered: 0, short: 0, wontFit: 0, onTruck: 0 });
   type Counts = ReturnType<typeof zero>;
   const add = (counts: Counts[]) => counts.reduce((total, value) => {
     for (const key of Object.keys(total) as (keyof Counts)[]) total[key] += value[key];
@@ -108,7 +111,8 @@ export function tripFigures(trip: DriverTrip) {
       const refused = stop.outcome === 'refused' ? loaded - delivered : 0;
       const notDelivered = stop.outcome === 'closed' ? loaded : 0;
       return { lineId: line.lineId, temp: line.temp, ordered: line.quantity, loaded, delivered, refused, notDelivered,
-        short: line.loaded === null ? 0 : line.quantity - line.loaded, onTruck: refused + notDelivered };
+        short: line.loaded === null ? 0 : line.quantity - line.loaded, wontFit: line.loaded === null ? 0 : Math.min(line.wontFit, line.quantity - line.loaded),
+        onTruck: refused + notDelivered };
     });
     return { stopId: stop.id, seq: stop.seq, ...add(byLine), byLine,
       byTemp: { chilled: add(byLine.filter(line => line.temp === 'chilled')), dry: add(byLine.filter(line => line.temp === 'dry')) } };
@@ -119,7 +123,7 @@ export function tripFigures(trip: DriverTrip) {
 
 // The driver's whole day, for Day done after more than one trip: each trip's figures in the day's order, and the day's
 // sums of them. Every number on a driver screen comes from these two functions.
-const DAY_SUMS = ['stops', 'stopsDone', 'ordered', 'loaded', 'delivered', 'refused', 'notDelivered', 'short', 'onTruck'] as const;
+const DAY_SUMS = ['stops', 'stopsDone', 'ordered', 'loaded', 'delivered', 'refused', 'notDelivered', 'short', 'wontFit', 'onTruck'] as const;
 export function dayFigures(trips: readonly DriverTrip[]) {
   const byTrip = trips.map(trip => ({ tripId: trip.tripId, tripNo: trip.tripNo, figures: tripFigures(trip) }));
   const sums = Object.fromEntries(DAY_SUMS.map(key => [key, byTrip.reduce((total, each) => total + each.figures[key], 0)])) as Record<(typeof DAY_SUMS)[number], number>;

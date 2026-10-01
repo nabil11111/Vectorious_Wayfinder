@@ -12,7 +12,7 @@ import { lastLoaded } from './stops';
 import { TruckPage } from './TruckPage';
 import { TrucksPage } from './TrucksPage';
 import { asksBeforeLeaving } from './unsent';
-import { answerSentence, countHint, countLine, countWhere, leftLine, loadFigure, outOnLine, outOnWords, undoFirstWords, undoStopWords } from './words';
+import { allOnLine, answerSentence, countHint, countLine, countWhere, leftLine, loadFigure, outOnLine, outOnWords, readyLine, readyNote, stopOnShort, undoFirstWords, undoStopWords } from './words';
 
 // The loader's screens as the live QA run found them (phase 3, Q-16 to Q-23). The pages are drawn as the server would
 // draw them, from a loading day in the query and the app clock at Thu 25 Jun 02:35. These fixtures live in the test only.
@@ -24,32 +24,35 @@ vi.mock('react', async (original) => {
 });
 
 type Line = [lineId: string, quantity: number, temp?: 'chilled' | 'dry'];
-interface StopSpec { seq: number; shop: string; lines: Line[]; loaded?: boolean; short?: Record<string, number> }
+// short: how many of a line stay behind, and wontFit the lines among them that would not fit on the truck (L-09).
+interface StopSpec { seq: number; shop: string; lines: Line[]; loaded?: boolean; short?: Record<string, number>; wontFit?: string[] }
 
 const TRIP = '0b000000-0000-4000-8000-000000000038';
 
-function stopOf({ seq, shop, lines, loaded = false, short = {} }: StopSpec): LoadingStop {
+function stopOf({ seq, shop, lines, loaded = false, short = {}, wontFit = [] }: StopSpec): LoadingStop {
   const out = lines.map(([lineId, quantity, temp = 'dry']) => {
     const going = quantity - (short[lineId] ?? 0);
-    return { lineId, orderId: `order-${lineId}`, temp, productId: `fresh-${temp}-carton`, name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, going, short: quantity - going };
+    return { lineId, orderId: `order-${lineId}`, temp, productId: `fresh-${temp}-carton`, name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, going, short: quantity - going,
+      wontFit: wontFit.includes(lineId) ? quantity - going : 0 };
   });
-  const sum = (key: 'quantity' | 'going' | 'short') => out.reduce((total, line) => total + line[key], 0);
-  return { id: `stop-${seq}`, seq, outletId: `OUT00${seq}`, shopName: shop, loaded, units: sum('quantity'), going: sum('going'), short: sum('short'), lines: out };
+  const sum = (key: 'quantity' | 'going' | 'short' | 'wontFit') => out.reduce((total, line) => total + line[key], 0);
+  return { id: `stop-${seq}`, seq, outletId: `OUT00${seq}`, shopName: shop, loaded, units: sum('quantity'), going: sum('going'), short: sum('short'), wontFit: sum('wontFit'), lines: out };
 }
 
 // VEH038, the dry van of Q-16: Fresh Wellawatte's 46 and 2 dry cartons on stop 3, Fresh Kotahena's 57 on stop 2 and
 // Fresh Nugegoda's 3 on stop 1, 108 in all, listed last stop first. `loaded` names the stops on the truck.
-function veh038(loaded: number[], changes: Partial<LoadingTruck> = {}, short: Record<string, number> = {}): LoadingTruck {
+function veh038(loaded: number[], changes: Partial<LoadingTruck> = {}, short: Record<string, number> = {}, wontFit: string[] = []): LoadingTruck {
   const stops = [
-    stopOf({ seq: 3, shop: 'Fresh Wellawatte', lines: [['w-46', 46], ['w-2', 2]], loaded: loaded.includes(3), short }),
-    stopOf({ seq: 2, shop: 'Fresh Kotahena', lines: [['k-57', 57]], loaded: loaded.includes(2), short }),
-    stopOf({ seq: 1, shop: 'Fresh Nugegoda', lines: [['n-3', 3]], loaded: loaded.includes(1), short }),
+    stopOf({ seq: 3, shop: 'Fresh Wellawatte', lines: [['w-46', 46], ['w-2', 2]], loaded: loaded.includes(3), short, wontFit }),
+    stopOf({ seq: 2, shop: 'Fresh Kotahena', lines: [['k-57', 57]], loaded: loaded.includes(2), short, wontFit }),
+    stopOf({ seq: 1, shop: 'Fresh Nugegoda', lines: [['n-3', 3]], loaded: loaded.includes(1), short, wontFit }),
   ];
   const on = stops.filter((stop) => stop.loaded).reduce((total, stop) => total + stop.going, 0);
   return {
     tripId: TRIP, revision: 4, vehicleId: 'VEH038', vehicleType: 'van', vehicleTemp: 'ambient', tripNo: 1, brand: 'Fresh', district: 'Colombo',
     status: 'loading', leavesAt: '2026-06-24T23:06:00.000Z', readyAt: null, driver: 'Dilshan', weightCapKg: 1200, volumeCapM3: 9,
-    units: 108, on: { units: on, kg: on * 7, m3: on * 0.04 }, short: stops.reduce((total, stop) => total + stop.short, 0), stops, issues: [], outOn: null, ...changes,
+    units: 108, on: { units: on, kg: on * 7, m3: on * 0.04 }, short: stops.reduce((total, stop) => total + stop.short, 0),
+    wontFit: stops.reduce((total, stop) => total + stop.wontFit, 0), stops, issues: [], outOn: null, ...changes,
   };
 }
 
@@ -396,5 +399,29 @@ describe('Q-34 a truck that has left the dock', () => {
     expect(leftLine({ ...LEFT, tripNo: 2 })).toBe('VEH011 trip 2 left with Asanka at 04:11.');
     expect(leftLine({ ...LEFT, driver: null })).toBe('VEH011 left at 04:11.');
     expect(leftLine({ ...LEFT, leftAt: null })).toBe('VEH011 left with Asanka.');
+  });
+});
+
+describe('L-09 a line flagged won\'t fit', () => {
+  // Fresh Nugegoda's 3 dry cartons with 1 that would not fit, and Kotahena's 57 with 2 short of stock.
+  const truck = veh038([3, 2, 1], { status: 'ready' }, { 'n-3': 1, 'k-57': 2 }, ['n-3']);
+  const nugegoda = truck.stops.find((stop) => stop.seq === 1)!;
+  const kotahena = truck.stops.find((stop) => stop.seq === 2)!;
+
+  it('reads "won\'t fit", not short, on the stop, the truck and the ready screen', () => {
+    expect(stopOnShort(nugegoda)).toBe('2 on · 1 won\'t fit');
+    expect(stopOnShort(kotahena)).toBe('55 on · 2 short');
+    expect(allOnLine(truck)).toBe('105 of 108 on, 2 short, 1 won\'t fit');
+    expect(readyLine(truck)).toMatch(/^105 of 108 on · 2 short · 1 won't fit · leaves /);
+    expect(readyNote(truck)).toBe('Dilshan sees the short cartons and those that won\'t fit on stops 1 and 2 before driving.');
+    const onlyWontFit = veh038([3, 2, 1], { status: 'ready' }, { 'n-3': 1 }, ['n-3']);
+    expect(readyNote(onlyWontFit)).toBe('Dilshan sees the carton that won\'t fit on stop 1 before driving.');
+  });
+
+  it('tags the flagged line "3 won\'t fit" on the truck\'s page', () => {
+    const flagged = veh038([3], {}, { 'k-57': 3 }, ['k-57']);
+    const html = truckPage({ ...flagged, issues: [flagOn(flagged, 'wont_fit', 'go_short')] });
+    expect(html).toContain('3 won&#x27;t fit');
+    expect(html).not.toContain('3 short');
   });
 });

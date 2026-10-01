@@ -168,7 +168,7 @@ function tripOf(status: 'ready' | 'out', delivered = false): DriverTrip {
       windowOpen: '05:00', windowClose: '07:30', note: null, arrivedAt: delivered ? '2026-06-24T22:04:00.000Z' : null,
       doneAt: delivered ? '2026-06-24T22:08:00.000Z' : null, outcome: delivered ? 'delivered' : null,
       lines: [{ lineId: '7c000000-0000-4000-8000-000000000001', orderId: '7d000000-0000-4000-8000-000000000001', temp: 'chilled', productId: 'P001',
-        name: 'Chilled', unit: 'carton', quantity: 12, loaded: 12, delivered: delivered ? 12 : null }],
+        name: 'Chilled', unit: 'carton', quantity: 12, loaded: 12, wontFit: 0, delivered: delivered ? 12 : null }],
     }],
   };
 }

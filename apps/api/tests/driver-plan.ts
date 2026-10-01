@@ -11,7 +11,8 @@ import {
 
 // The three walkthroughs through the APIs: Nadeesha places, Ruwan sends, Kasun loads with one dry carton short,
 // Ruwan accepts the shortage, and Kasun marks VEH035 ready at 02:36. The driver's clock starts at 03:30.
-export async function readyWalkthrough(walk: Walkthrough & { kasun: Agent }, options: { withVeh004?: boolean } = {}): Promise<LoadingTruck> {
+// The flag is "short" unless asked, or "won't fit" for the truck that cannot take the fourth carton (L-09).
+export async function readyWalkthrough(walk: Walkthrough & { kasun: Agent }, options: { withVeh004?: boolean; reason?: 'short' | 'wont_fit' } = {}): Promise<LoadingTruck> {
   await sendWalkthroughPlan(walk, options);
   const loader = loaderScreen(walk.kasun);
   const day = await loader.read();
@@ -19,7 +20,7 @@ export async function readyWalkthrough(walk: Walkthrough & { kasun: Agent }, opt
   walk.freeze(THU, 2 * 60 + 31);
   truck = answeredTruck(await loader.stopLoaded(truck, 2), 'VEH035');
   walk.freeze(THU, 2 * 60 + 33);
-  truck = answeredTruck(await loader.flag(truck, 1, [{ lineId: dryLine(truck).lineId, counted: 3 }], { note: 'Only 3 dry cartons in the store' }), 'VEH035');
+  truck = answeredTruck(await loader.flag(truck, 1, [{ lineId: dryLine(truck).lineId, counted: 3 }], { note: 'Only 3 dry cartons in the store', reason: options.reason ?? 'short' }), 'VEH035');
   walk.freeze(THU, 2 * 60 + 34);
   truck = answeredTruck(await loader.stopLoaded(truck, 1), 'VEH035');
   walk.freeze(THU, 2 * 60 + 35);

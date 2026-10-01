@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
+import { X } from 'lucide-react';
 import { CSS } from '@dnd-kit/utilities';
 import type { BoardOrder, BoardShop, StopTime } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
@@ -15,10 +16,10 @@ export interface StopDrag { id: string; dragged: Dragged; landing: Landing; name
 
 // One stop of the open trip (Edit plan, "Stops in order"): its number, when the checker says it arrives, the
 // shop, its entrance and window, the wait, the unloading and when it leaves, "why?" with the planner's reason for
-// its orders (spec 014), and "⋮" with what can be done: move it, and for each of its orders take it off, split it,
+// its orders (spec 014), × to take it off the trip (spec 027), and "⋮" with what can be done: move it, and for each of its orders take it off, split it,
 // defer it or join a split order back. It can be dragged up and down, off its trip or onto another trip's card, by
 // the pointer from anywhere on it and by the keyboard from its number. An order dropped on it lands before it.
-export function StopRow({ seq, shop, orders, time, longWait, why, first, last, drag, onMove, onTakeOff, onSplit, onDefer, onJoin, children }: {
+export function StopRow({ seq, shop, orders, time, longWait, why, first, last, drag, onMove, onTakeStopOff, onTakeOff, onSplit, onDefer, onJoin, children }: {
   seq: number;
   shop: BoardShop;
   orders: BoardOrder[];
@@ -31,6 +32,8 @@ export function StopRow({ seq, shop, orders, time, longWait, why, first, last, d
   last: boolean;
   drag: StopDrag;
   onMove: (by: -1 | 1) => void;
+  // The ×: every order of the stop off the trip, as one step (spec 027).
+  onTakeStopOff: () => void;
   onTakeOff: (order: BoardOrder) => void;
   onSplit: (order: BoardOrder) => void;
   onDefer: (order: BoardOrder) => void;
@@ -69,6 +72,9 @@ export function StopRow({ seq, shop, orders, time, longWait, why, first, last, d
         </div>
         {late && <Tag tone="bad" className="text-[10px]">late</Tag>}
         {why.length > 0 && <Why title={shop.name} reasons={why} />}
+        <button type="button" aria-label={`Take ${shop.name} off this trip`} onClick={onTakeStopOff} className="flex size-[22px] shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
+          <X aria-hidden="true" className="size-3.5" />
+        </button>
         <MenuRoot>
           <MenuTrigger aria-label={`More for stop ${seq}, ${shop.name}`} className="flex h-[22px] w-6 shrink-0 items-center justify-center rounded-md text-sm font-bold text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 data-popup-open:bg-muted">⋮</MenuTrigger>
           <MenuPopup>

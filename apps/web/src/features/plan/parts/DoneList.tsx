@@ -2,14 +2,16 @@ import { useContext, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { Brand, DraftTrip, TripTimes } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
-import type { BoardScreen } from '../board';
+import { editable, type BoardScreen } from '../board';
 import { keyOf, planOf, sameTrip, tripOf, type TripKey } from '../draft';
 import { countOf, figure, hhmm, whole } from '../words';
+import { removeTripChange } from './changes';
 import { DepotRow } from './DepotRow';
-import { BoardChange, useLanding } from './dragging';
+import { BoardChange, BoardUndo, useLanding } from './dragging';
 import { ICON } from './icons';
 import type { BoardIndex } from './lookup';
 import { toneOf } from './look';
+import { RowMenu } from './OrderLists';
 import { ColumnHead, Figure } from './ui';
 
 const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
@@ -55,6 +57,7 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
   // An order or a stop dropped on the card joins this trip at the end, and the drop's Undo line shows here (spec 023).
   const { setNodeRef: landingRef, look: landingLook } = useLanding(`card:${key}`, { kind: 'card', tripKey: key }, `the card of ${index.called(trip)}`);
   const change = useContext(BoardChange);
+  const undoStep = useContext(BoardUndo);
   const undo = screen.undo?.tripKey === key ? screen.undo : null;
 
   return (
@@ -64,6 +67,10 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
           <span className="block">{name}{!driver && <> · <span className="text-warn-ink">no driver</span></>}{where && ' ·'}</span>
           {where && <span className="block">{where}</span>}
         </button>
+        {/* "Remove trip" off the card, as one step (spec 027). */}
+        {change && editable(screen.board) && (
+          <RowMenu label={title} items={[{ label: 'Remove trip', onClick: () => { const removed = removeTripChange(screen.draft, trip, index); change(removed.plan, removed.said); } }]} />
+        )}
         {/* One chevron for both states, turned while the card is open. */}
         <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${title}` : `Show the stops of ${title}`} onClick={() => setOpen(!open)} className="group -mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
           <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-aria-expanded:rotate-180" />
@@ -79,10 +86,10 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
           <Figure small label="m³" value={`${figure(figures.m3Pct)}%`} tone={toneOf(figures.m3Pct, has('over_volume'))} />
         </div>
       )}
-      {undo && change && (
+      {undo && undoStep && (
         <div role="status" className="mt-2 flex items-center gap-2 rounded-[10px] bg-good-tint px-2.5 py-1.5">
           <p className="flex-1 text-[11px] leading-[14px] font-semibold text-good">{undo.line}</p>
-          <button type="button" className="text-[11px] leading-[14px] font-semibold underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50" onClick={() => change(undo.before)}>Undo</button>
+          <button type="button" className="text-[11px] leading-[14px] font-semibold underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50" onClick={undoStep}>Undo</button>
         </div>
       )}
       {open && <CardStops trip={trip} times={times} depot={screen.board.depot} index={index} />}

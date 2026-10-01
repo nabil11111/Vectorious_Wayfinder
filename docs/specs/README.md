@@ -79,3 +79,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [023](023-plan-drag/spec.md) | Planning by drag and drop | Done |
 | [024](024-checker-words/spec.md) | The plan checker in plain words | Done |
 | [026](026-crews/spec.md) | Crews: a truck and its driver picked as one | In progress |
+| [027](027-plan-history/spec.md) | Undo, redo and starting over on the plan board | In progress |

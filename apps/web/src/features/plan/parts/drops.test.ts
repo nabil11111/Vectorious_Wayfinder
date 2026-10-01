@@ -32,7 +32,7 @@ const CARD: Landing = { kind: 'card', tripKey: 'VEH002-1' };
 
 it('spec 023 AC-1 an order dropped among the open trip\'s stops goes where it lands, at the end as "Add" puts it', () => {
   expect(dropOf(PLAN, dehiwala, stops(1), called)).toEqual({
-    kind: 'change', plan: addOrders(PLAN, 'VEH035-1', dehiwala.orders, 1), undo: { before: PLAN, line: 'Fresh Dehiwala added to Wasantha\'s reefer van', tripKey: 'VEH035-1' },
+    kind: 'change', plan: addOrders(PLAN, 'VEH035-1', dehiwala.orders, 1), undo: { line: 'Fresh Dehiwala added to Wasantha\'s reefer van', tripKey: 'VEH035-1' },
   });
   expect(dropOf(PLAN, dehiwala, stops(3), called)).toMatchObject({ plan: addOrders(PLAN, 'VEH035-1', dehiwala.orders) });
   // A whole group is its orders, as the group's shop rows add them.
@@ -41,7 +41,7 @@ it('spec 023 AC-1 an order dropped among the open trip\'s stops goes where it la
 
 it('spec 023 AC-1 an order dropped on a trip\'s card in Done joins that trip at the end, with the line on that card', () => {
   expect(dropOf(PLAN, dehiwala, CARD, called)).toEqual({
-    kind: 'change', plan: addOrders(PLAN, 'VEH002-1', dehiwala.orders), undo: { before: PLAN, line: 'Fresh Dehiwala added to Chaminda\'s dry truck', tripKey: 'VEH002-1' },
+    kind: 'change', plan: addOrders(PLAN, 'VEH002-1', dehiwala.orders), undo: { line: 'Fresh Dehiwala added to Chaminda\'s dry truck', tripKey: 'VEH002-1' },
   });
   // A second trip is named as its card names it.
   const second: DraftPlan = { ...PLAN, trips: [...PLAN.trips, { ...PLAN.trips[1]!, tripNo: 2, stops: [] }] };
@@ -54,7 +54,7 @@ it('spec 023 AC-4 an order dropped in the empty middle opens the crew picker for
 
 it('spec 023 AC-3 a stop dragged up or down is the menu\'s move, by as many places as it went', () => {
   expect(dropOf(PLAN, nugegoda, stops(2), called)).toEqual({
-    kind: 'change', plan: moveStop(PLAN, 'VEH035-1', 0, 2), undo: { before: PLAN, line: 'Stops 1 and 3 moved', tripKey: 'VEH035-1' },
+    kind: 'change', plan: moveStop(PLAN, 'VEH035-1', 0, 2), undo: { line: 'Stops 1 and 3 moved', tripKey: 'VEH035-1' },
   });
   // One place is the menu's swap, said as the menu says it.
   expect(dropOf(PLAN, { ...nugegoda, index: 2, label: 'Fresh Wellawatte' }, stops(1), called)).toMatchObject({ plan: moveStop(PLAN, 'VEH035-1', 2, -1), undo: { line: 'Stops 2 and 3 swapped' } });
@@ -65,10 +65,10 @@ it('spec 023 AC-3 a stop dragged up or down is the menu\'s move, by as many plac
 
 it('spec 023 AC-3 a stop dropped on Unplanned orders comes off its trip, and on another trip\'s card moves there', () => {
   expect(dropOf(PLAN, nugegoda, { kind: 'unplanned' }, called)).toEqual({
-    kind: 'change', plan: takeOff(PLAN, [uuid(1), uuid(11)]), undo: { before: PLAN, line: 'Fresh Nugegoda taken off Wasantha\'s reefer van', tripKey: 'VEH035-1' },
+    kind: 'change', plan: takeOff(PLAN, [uuid(1), uuid(11)]), undo: { line: 'Fresh Nugegoda taken off Wasantha\'s reefer van', tripKey: 'VEH035-1' },
   });
   const moved = addOrders(PLAN, 'VEH002-1', [{ id: uuid(1), outletId: 'OUT001' }, { id: uuid(11), outletId: 'OUT001' }]);
-  expect(dropOf(PLAN, nugegoda, CARD, called)).toEqual({ kind: 'change', plan: moved, undo: { before: PLAN, line: 'Fresh Nugegoda moved to Chaminda\'s dry truck', tripKey: 'VEH035-1' } });
+  expect(dropOf(PLAN, nugegoda, CARD, called)).toEqual({ kind: 'change', plan: moved, undo: { line: 'Fresh Nugegoda moved to Chaminda\'s dry truck', tripKey: 'VEH035-1' } });
   expect(moved.trips.map((t) => t.stops.map((s) => s.outletId))).toEqual([['OUT003', 'OUT002'], ['OUT051', 'OUT001']]);
 });
 

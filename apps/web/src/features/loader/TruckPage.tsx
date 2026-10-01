@@ -17,7 +17,7 @@ import { NextList } from './parts/TruckRow';
 import { ActionBar, Card, Label, NotSaved, Tag, TickBox } from './parts/ui';
 import { KeptRefusal } from './TrucksPage';
 import { useTicks } from './ticks';
-import { allOnLine, answeredBy, answerSentence, brandOfStop, countOf, lineWords, outOnLine, readyLine, readyNote, truckName, waitingLine, whole } from './words';
+import { allOnLine, answeredBy, answerSentence, brandOfStop, countOf, lineWords, notGoing, outOnLine, readyLine, readyNote, truckName, waitingLine } from './words';
 
 // Load a truck at /loader/trucks/:tripId (spec 012, Loader · Load a truck, · phone and · all on, and Loader · Truck
 // ready). The truck is found in the loading day by its id. It is loaded last stop first, a whole stop at a time, and
@@ -142,7 +142,7 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
 }
 
 // "Now loading · stop 2", the shop, and a tick box per line: the loader's own checklist, which is never saved. A
-// flagged line says how many are short.
+// flagged line says how many are short, or won't fit (L-09).
 function NowLoading({ truck, stop, started, ticks, flagged }: {
   truck: LoadingTruck; stop: LoadingStop; started: boolean; ticks: ReturnType<typeof useTicks>; flagged: Set<string>;
 }) {
@@ -166,7 +166,7 @@ function LineRow({ line, words, ticked, flagged, onToggle }: { line: LoadingLine
       <button type="button" role="checkbox" aria-checked={ticked} onClick={onToggle} className="flex w-full items-center gap-3.5 rounded-lg py-4 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         <TickBox ticked={ticked} />
         <span className={cn('min-w-0 flex-1 text-lg leading-6', ticked ? 'text-muted-foreground' : 'font-semibold')}>{words}</span>
-        {flagged && line.short > 0 && <Tag tone="bad" className="h-[26px] text-[13px]">{whole(line.short)} short</Tag>}
+        {flagged && line.short > 0 && <Tag tone="bad" className="h-[26px] text-[13px]">{notGoing(line)}</Tag>}
       </button>
     </li>
   );

@@ -12,15 +12,15 @@ interface TripSpec { vehicleId: string; tripNo?: number; leavesAt: string; drive
 function truck(spec: TripSpec): LoadingTruck {
   const stops = spec.stops.map(([outletId, shopName, lines], i) => {
     const out = lines.map(([orderId, lineId, quantity, temp = 'chilled']) => ({
-      lineId, orderId, temp, productId: `fresh-${temp}-carton`, name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, going: quantity, short: 0,
+      lineId, orderId, temp, productId: `fresh-${temp}-carton`, name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, going: quantity, short: 0, wontFit: 0,
     }));
     const units = out.reduce((sum, line) => sum + line.quantity, 0);
-    return { id: crypto.randomUUID(), seq: i + 1, outletId, shopName, loaded: false, units, going: units, short: 0, lines: out };
+    return { id: crypto.randomUUID(), seq: i + 1, outletId, shopName, loaded: false, units, going: units, short: 0, wontFit: 0, lines: out };
   });
   const units = stops.reduce((sum, stop) => sum + stop.units, 0);
   return {
     tripId: crypto.randomUUID(), revision: 0, vehicleId: spec.vehicleId, vehicleType: 'truck', vehicleTemp: 'reefer', tripNo: spec.tripNo ?? 1, brand: 'Fresh', district: spec.district,
-    status: 'planned', leavesAt: spec.leavesAt, readyAt: null, driver: spec.driver, weightCapKg: 3990, volumeCapM3: 21.1, units, on: { units: 0, kg: 0, m3: 0 }, short: 0,
+    status: 'planned', leavesAt: spec.leavesAt, readyAt: null, driver: spec.driver, weightCapKg: 3990, volumeCapM3: 21.1, units, on: { units: 0, kg: 0, m3: 0 }, short: 0, wontFit: 0,
     // The loader's list carries its stops last stop first.
     stops: [...stops].reverse(), issues: [], outOn: null,
   };

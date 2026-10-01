@@ -12,7 +12,7 @@ import { NextStopPage } from './NextStopPage';
 import { TodaysTrip } from './TripPage';
 import { UnloadPage } from './UnloadPage';
 import { tripsOf, type DriverView } from './view';
-import { backOnlineLines, handBack, lineName, overLoadedLine, wholeCountsLine } from './words';
+import { backOnlineLines, handBack, lineName, loadedLine, loaderShortLine, overLoadedLine, refusedLine, tripRows, wholeCountsLine } from './words';
 
 // The driver's screens as the live QA run found them (phase 4, Q-25 to Q-32). The pages are drawn as the phone would
 // draw them, from a day as the server sends it and the app clock on Thu 25 Jun. These fixtures live in the test only.
@@ -35,9 +35,10 @@ vi.mock('./queue', async (original) => {
 
 const id = (kind: number, n: number) => `0${kind}000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-interface LineSpec { n: number; quantity: number; loaded?: number | null; delivered?: number | null; temp?: 'chilled' | 'dry'; name?: string; unit?: string }
-function lineOf({ n, quantity, loaded = quantity, delivered = null, temp = 'chilled', name, unit = 'carton' }: LineSpec): DriverLine {
-  return { lineId: id(3, n), orderId: id(4, n), temp, productId: `p-${n}`, name: name ?? (temp === 'chilled' ? 'Chilled carton' : 'Dry carton'), unit, quantity, loaded, delivered };
+// wontFit: of what the loader went short on, the units the truck could not take (L-09).
+interface LineSpec { n: number; quantity: number; loaded?: number | null; wontFit?: number; delivered?: number | null; temp?: 'chilled' | 'dry'; name?: string; unit?: string }
+function lineOf({ n, quantity, loaded = quantity, wontFit = 0, delivered = null, temp = 'chilled', name, unit = 'carton' }: LineSpec): DriverLine {
+  return { lineId: id(3, n), orderId: id(4, n), temp, productId: `p-${n}`, name: name ?? (temp === 'chilled' ? 'Chilled carton' : 'Dry carton'), unit, quantity, loaded, wontFit, delivered };
 }
 
 function stopOf(n: number, seq: number, shopName: string, lines: LineSpec[], more: Partial<DriverStop> = {}): DriverStop {
@@ -469,5 +470,25 @@ describe('the hand-back card says it for one carton and them for more', () => {
     expect(card(2)).toBe('2 chilled cartons refused at Kotahena. Hand them to the depot check. '
       + '2 cartons for Wellawatte, nobody at the shop. Hand them in; they go on the next run. '
       + '2 cartons for Dehiwala, nobody at the shop. The depot decides what happens to them.');
+  });
+});
+
+describe('L-09 a line the loader found would not fit', () => {
+  // Fresh Nugegoda: 12 chilled cartons with 8 loaded and 4 that would not fit, and 4 dry with 3 loaded, 1 short of stock.
+  const trip = tripOf(900, { stops: [stopOf(901, 1, 'Fresh Nugegoda', [{ n: 902, quantity: 12, loaded: 8, wontFit: 4 }, { n: 903, quantity: 4, loaded: 3, temp: 'dry' }])] });
+  const figures = tripFigures(trip);
+  const [chilled, dry] = trip.stops[0]!.lines as [DriverLine, DriverLine];
+
+  it('reads "won\'t fit" on the loaded line, the count and Trip done, and "short" only for the short ones', () => {
+    expect(loadedLine(trip, figures)).toBe('Loaded · 11 of 16 · 4 chilled won\'t fit for Nugegoda · 1 dry short for Nugegoda');
+    expect(loaderShortLine(chilled, figures.byStop[0]!.byLine[0]!)).toBe('Loader flagged 4 cartons that won\'t fit on the truck');
+    expect(loaderShortLine(dry, figures.byStop[0]!.byLine[1]!)).toBe('Loader flagged 1 carton short at the depot');
+    expect(tripRows(trip, figures)).toEqual(expect.arrayContaining([
+      { label: 'Short from the depot', value: '1 dry · Nugegoda' },
+      { label: 'Won\'t fit on the truck', value: '4 chilled · Nugegoda' },
+    ]));
+    expect(handBack(trip, figures).text).toBe('The 4 chilled cartons for Nugegoda did not fit on the truck. The dry carton for Nugegoda never left the depot.');
+    const refused = { ...trip.stops[0]!, outcome: 'refused' as const };
+    expect(refusedLine(refused, tripFigures({ ...trip, stops: [refused] }).byStop[0]!)).toBe('Stop 1 · 0 delivered · 11 refused · 1 short · 4 won\'t fit');
   });
 });
