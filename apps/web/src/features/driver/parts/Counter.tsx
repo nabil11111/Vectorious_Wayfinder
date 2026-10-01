@@ -2,7 +2,7 @@ import { NumberField } from '@base-ui/react/number-field';
 import { cn } from '@/lib/utils';
 import { whole } from '../words';
 
-const STEP = 'flex size-11 shrink-0 items-center justify-center rounded-[11px] border bg-card text-xl leading-none font-semibold outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:text-muted-foreground/40';
+const STEP = 'flex size-[46px] shrink-0 items-center justify-center rounded-[12px] border bg-card text-xl leading-none font-semibold outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:text-muted-foreground/40';
 
 // The frames' counter: − the count /of +. It runs from 0 to max, and the number can be typed as well. The count is
 // the screen's own (the driver's tally, or a refusal's pair), never a figure the phone keeps.

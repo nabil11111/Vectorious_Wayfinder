@@ -79,7 +79,7 @@ export function DayDone({ view, day, trip, figures }: { view: DriverView; day: D
   return (
     <div>
       <TopArea waitingRecords={waiting}>
-        <Band tone={waiting > 0 ? 'warn' : 'good'} className="flex items-center gap-2 py-[11px]">
+        <Band tone={waiting > 0 ? 'warn' : 'good'} className="flex min-h-[33px] items-center gap-2 py-2">
           {waiting === 0 && <Check className="size-3.5 shrink-0 stroke-[2.5] text-good" aria-hidden="true" />}
           <p role="status" className={cn('text-xs leading-4 font-semibold', waiting > 0 && 'text-warn-ink')}>{tripClosedLine(figures, waiting)}</p>
         </Band>

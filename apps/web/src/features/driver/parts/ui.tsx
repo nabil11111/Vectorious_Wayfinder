@@ -43,7 +43,7 @@ export function StopHead({ stopLine, stop, brand, sub }: { stopLine: string; sto
   return (
     <header>
       <p className="text-xs leading-4 font-semibold text-muted-foreground">{stopLine}</p>
-      <h1 className="mt-3.5 flex items-center gap-3 text-xl leading-7 font-bold">
+      <h1 className="mt-2.5 flex items-center gap-3 text-xl leading-7 font-bold">
         <img src={shopIcon(brand)} alt="" className="size-7 shrink-0 object-contain" />
         {stop.shopName}
       </h1>

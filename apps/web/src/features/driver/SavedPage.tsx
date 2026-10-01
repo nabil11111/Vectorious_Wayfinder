@@ -21,8 +21,9 @@ export function SavedPage({ me }: { me: Me }) {
     <div className="flex min-h-[calc(100dvh-93px)] flex-col">
       <TopArea waitingRecords={view.waitingRecords} />
       <div role="status" className="flex flex-1 flex-col items-center justify-center px-4 pb-10 text-center">
-        <img src={ICON.tray} alt="" className="h-[60px] w-[78px] object-contain" />
-        <h1 className="mt-6 text-[26px] leading-8 font-bold">Saved on this phone</h1>
+        {/* The picture has room around the tray, so it is drawn larger than the tray's 78 px. */}
+        <img src={ICON.tray} alt="" className="-my-2.5 size-[92px] object-contain" />
+        <h1 className="mt-[19px] text-[26px] leading-8 font-bold">Saved on this phone</h1>
         <p className="mt-3 text-sm leading-5 text-muted-foreground">{savedLine(stop, view.figures)}</p>
         <p className="mt-2.5 text-sm leading-5">Sends by itself when the signal is back</p>
       </div>

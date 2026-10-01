@@ -49,15 +49,15 @@ function TopLine({ day, trip, figures, waiting }: { day: DriverDay; trip: Driver
       ? answerLine(problem, stop, brand, counts, day.depot)
       : problem.kind === 'refused' ? keepLine(brand, counts) : DEPOT_DECIDES;
     return (
-      <Band tone="warn" className="flex items-start gap-3 py-[13px]">
-        <div className="min-w-0 flex-1">
-          <p className="flex gap-2 text-xs leading-4 font-semibold">
+      <Band tone="warn" className="pt-2 pb-[7px]">
+        <div className="flex min-h-[22px] items-center gap-3">
+          <p className="flex min-w-0 flex-1 gap-2 text-xs leading-4 font-semibold">
             <span aria-hidden="true" className="font-bold text-warn-ink">!</span>
             <span>{problem.kind === 'refused' ? refusedLine(stop, counts) : closedLine(stop)}</span>
           </p>
-          <p className="mt-[7px] text-[11px] leading-[14px] text-muted-foreground">{detail}</p>
+          <SentChip onPhone={onPhone} word="sent" />
         </div>
-        <SentChip onPhone={onPhone} word="sent" />
+        <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">{detail}</p>
       </Band>
     );
   }
@@ -65,7 +65,7 @@ function TopLine({ day, trip, figures, waiting }: { day: DriverDay; trip: Driver
   if (!done) return null;
   const onPhone = waiting.some((entry) => 'stopId' in entry.write && entry.write.stopId === done.id && entry.write.kind !== 'arrive');
   return (
-    <Band tone="good" className="flex items-center gap-3 py-[11px]">
+    <Band tone="good" className="flex min-h-[38px] items-center gap-3 py-2">
       <p className="flex min-w-0 flex-1 items-center gap-2 text-xs leading-4 font-semibold">
         {/* The design draws a plain tick here, so it is the outline set's. */}
         <Check className="size-3.5 shrink-0 stroke-[2.5] text-good" aria-hidden="true" />
