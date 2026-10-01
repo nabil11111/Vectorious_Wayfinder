@@ -494,7 +494,7 @@ Friday's plan while Thursday's stop 2 stays closed.
 7. A closed shop is answered with "Try again on this trip" or "Bring them back"; no frame draws them.
 8. "Nothing to hand back" says the short carton never left the depot, without "It goes on Monday's run": nothing here
    makes a new order for it, as in spec 012's departure 8.
-9. The driver's bell has no count (A7).
+9. The driver's bell has no count. Spec 016 (A7) leaves it out too.
 10. The top bar also carries the demo chip, as "Demo" alone next to the status chip on a phone (spec 008).
 11. States the design lacks: not loaded yet, no trip, could not load, the waiting sheet, not accepted, sign in again, could
     not save on this phone, the unusable photo, the answer on the phone, a stop to try again, and Day done with records
