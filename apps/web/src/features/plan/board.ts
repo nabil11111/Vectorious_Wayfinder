@@ -1,7 +1,9 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { DraftPlan, JoinOrderRequest, Me, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest } from '@wayfinder/contracts';
+import type {
+  AcceptDecisionsRequest, DraftPlan, JoinOrderRequest, Me, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
+} from '@wayfinder/contracts';
 import { meKey } from '@/features/auth/api';
 import { reasonOf } from '@/features/store/words';
 import { api, ApiRequestError } from '@/lib/api';
@@ -45,6 +47,9 @@ export const splitOrder = (date: string, body: SplitOrderRequest) => write(() =>
 export const joinOrder = (date: string, body: JoinOrderRequest) => write(() => api<PlanBoard>(`/plans/${date}/join`, { method: 'POST', json: body }));
 export const sendPlan = (date: string, body: PlanRef) => write(() => api<PlanBoard>(`/plans/${date}/send`, { method: 'POST', json: body }));
 export const unsendPlan = (date: string, body: PlanRef) => write(() => api<PlanBoard>(`/plans/${date}/unsend`, { method: 'POST', json: body }));
+// The suggested plan (spec 014): building it, which replaces the whole draft, and accepting the planner's decisions.
+export const suggestPlan = (date: string, body: SuggestPlanRequest) => write(() => api<PlanBoard>(`/plans/${date}/suggest`, { method: 'POST', json: body }));
+export const acceptDecisions = (date: string, body: AcceptDecisionsRequest) => write(() => api<PlanBoard>(`/plans/${date}/decisions`, { method: 'POST', json: body }));
 
 // A write names the plan by its id and revision, or before the first save by the demo day the board was read
 // under, so a request from before a reset never lands on the new day (rule 3).
@@ -103,7 +108,7 @@ export interface BoardScreen {
   saving: Saving;
   // Why the server refused, in its own words.
   refused: string | null;
-  // A split, join, send or back to edit is on its way, and the board holds still until it answers.
+  // A split, join, send, back to edit, build or accept is on its way, and the board holds still until it answers.
   acting: boolean;
   undo: (Undo & { seq: number; revision: number | null }) | null;
 }
@@ -404,8 +409,9 @@ class PlanSaver {
     return new Promise((resolve) => this.waiters.push(resolve));
   };
 
-  // A split, join, send or back to edit (rule 8, rule 11). Each waits until the draft is saved and any other of
-  // them has answered, and the board holds still until this one answers. It says why when it was refused, or null.
+  // A split, join, send or back to edit (rule 8, rule 11), and spec 014's build and accept. Each waits until the draft
+  // is saved and any other of them has answered, and the board holds still until this one answers. It says why when
+  // it was refused, or null.
   act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>): Promise<string | null> => {
     do {
       if (!(await this.idle())) return 'The plan has changes that are not saved yet. Save them first.';

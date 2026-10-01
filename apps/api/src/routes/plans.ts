@@ -1,16 +1,17 @@
 import { Router, type Request } from 'express';
 import { depotCallerOf, requireDepot, requireRole, type DepotCaller } from '../middleware/auth';
-import { JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, UnsendPlanRequest } from '@wayfinder/contracts';
+import { AcceptDecisionsRequest, JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, SuggestPlanRequest, UnsendPlanRequest } from '@wayfinder/contracts';
 import { getBoard } from '../plans/board';
 import { saveDraft } from '../plans/draft';
 import { joinOrder, splitOrder } from '../plans/split';
 import { sendPlan, unsendPlan } from '../plans/send';
 import { findSlots } from '../plans/slots';
+import { acceptDecisions, suggestPlan } from '../plans/suggest';
 
 // The dispatcher's plan board (spec 010): the board of a day, saving its draft, splitting and joining an order,
-// sending the plan and taking it back to edit, and finding a slot. Every route works on the caller's own depot.
-// Nothing in a request names a depot, so there is no way to plan another depot's day. The router is mounted here
-// and tasks T1 to T4 of spec 010 add the eight routes.
+// sending the plan and taking it back to edit, and finding a slot. Spec 014 adds building the suggested plan and
+// accepting the planner's decisions. Every route works on the caller's own depot. Nothing in a request names a depot,
+// so there is no way to plan another depot's day.
 export const plansRouter = Router();
 
 plansRouter.use(requireRole('dispatcher'), requireDepot);
@@ -28,3 +29,5 @@ plansRouter.post('/:date/join', async (req, res) => { res.json(await joinOrder(p
 plansRouter.post('/:date/send', async (req, res) => { res.json(await sendPlan(plannerOf(req), dateOf(req), SendPlanRequest.parse(req.body))); });
 plansRouter.post('/:date/unsend', async (req, res) => { res.json(await unsendPlan(plannerOf(req), dateOf(req), UnsendPlanRequest.parse(req.body))); });
 plansRouter.get('/:date/slots', async (req, res) => { res.json(await findSlots(plannerOf(req), dateOf(req), SlotQuery.parse(req.query))); });
+plansRouter.post('/:date/suggest', async (req, res) => { res.json(await suggestPlan(plannerOf(req), dateOf(req), SuggestPlanRequest.parse(req.body))); });
+plansRouter.post('/:date/decisions', async (req, res) => { res.json(await acceptDecisions(plannerOf(req), dateOf(req), AcceptDecisionsRequest.parse(req.body))); });

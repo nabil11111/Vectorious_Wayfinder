@@ -43,6 +43,13 @@
       "when": 1790803899371,
       "tag": "0005_loading",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790812818036,
+      "tag": "0006_suggested-plan",
+      "breakpoints": true
     }
   ]
 }

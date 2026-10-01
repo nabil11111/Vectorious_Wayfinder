@@ -1,4 +1,4 @@
-import { DeferralCode, PlanCheck, type DraftPlan, type PlanBoard, type TripFigures } from '@wayfinder/contracts';
+import { DeferralCode, PlanCheck, Suggestion, type DraftPlan, type PlanBoard, type TripFigures } from '@wayfinder/contracts';
 import { and, desc, eq, inArray, lt, lte } from 'drizzle-orm';
 import type { Tx } from '../db/client';
 import { calendarDays, deferrals, demoDay, districtTravel, fuelLog, orderLines, orders, outlets, plans, products, serviceAllowance, stopOrders, stops, trips, users, vehicleDaysOff, vehicles } from '../db/schema';
@@ -10,6 +10,7 @@ import { snapshot } from '../orders/store-orders';
 import { checkPlan, computeLoad, DEFAULT_SETTINGS, toMinutes, type PlanInput } from '../planning';
 import type { Planner } from '../routes/plans';
 import { boardDay, percent } from './board-day';
+import { boardSuggestion } from './suggestion';
 
 export interface BoardMoment { at: Date; demoDay: number }
 export const emptyDraft = (): DraftPlan => ({ mixBrands: false, trips: [], deferrals: [] });
@@ -44,7 +45,7 @@ export async function readBoard(tx: Tx, depotId: string, date: string | null, mo
   const blank: PlanBoard = {
     depot: depotId, demoDay: clock.demoDay, day: null,
     plan: { ...emptyDraft(), id: null, revision: 0, status: 'draft', savedAt: null, sentAt: null, canUnsend: false },
-    dropped: [], check: null, orders: [], shops: [], vehicles: [], drivers: [], figures: null, counts: null,
+    dropped: [], check: null, orders: [], shops: [], vehicles: [], drivers: [], figures: null, counts: null, suggestion: null,
   };
   if (!date) return { board: blank, input: null };
   const cutoffDate = days.filter((day) => day < date).at(-1);
@@ -148,6 +149,8 @@ export async function readBoard(tx: Tx, depotId: string, date: string | null, mo
       if (!allowance) throw new Error(`No unloading allowance for ${s.brand} at ${s.dockType}.`);
       return { ...s, mallOpen: s.mallOpen ?? null, mallClose: s.mallClose ?? null, unloadMin: allowance.minutes };
     }),
+    // The plan's suggestion as built, each of its decisions judged on the cleaned draft (spec 014).
+    suggestion: saved?.suggestion ? boardSuggestion(Suggestion.parse(saved.suggestion), draft) : null,
     counts: check && { vehiclesUsed: new Set(draft.trips.map((t) => t.vehicleId)).size, vehiclesWorking: boardVehicles.filter((v) => v.working).length,
       trips: draft.trips.length, ordersDue: boardOrders.length, ordersOnTrips: assigned.size, ordersDeferred: draft.deferrals.length,
       ordersUnplanned: boardOrders.length - assigned.size - draft.deferrals.length,

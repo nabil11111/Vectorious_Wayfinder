@@ -120,6 +120,32 @@ are what the demo clock shows.
 
 Driving and the shop's receipt come with the next pieces.
 
+### The suggested plan
+
+The planner builds the same day in one press. It has its own short walkthrough, because the one above plans by hand.
+Press **Reset the demo day** first if you walked the one above.
+
+1. **Orders close.** Move the demo clock to "Orders closed, 16:00". Nadeesha's draft stays a draft, so 102 orders are
+   due.
+2. **The empty board.** As `ruwan`, the Plan board shows "Unplanned · 102" with "Carried over · 4" (Fresh Dickwella,
+   deferred twice, first), "0 / 35 trucks", "0 / 102 orders", "37% fuel this week" and "0 / 140.7 m³ fridge space".
+   In the middle, "Build the suggested plan" in orange.
+3. **Build it.** Press it: "Building the plan · 102 orders · 35 trucks", then "Unplanned · 0", "Done · 27 trips",
+   "26 / 35 trucks", "96 / 102 orders", "41% fuel this week" and "57.02 / 140.7 m³ fridge space". "Deferred · 6" holds
+   the chilled orders of four Kurunegala shops (Pannala, Polgahawela, Wariyapola, Mawathagama) and two Puttalam shops
+   (Wennappuwa, Puttalam), each with the sentence the shop will read, such as "No fridge truck could reach Fresh
+   Pannala before its window closed at 07:45 on Thursday." The middle says "Suggested plan · 16:00 · 6 decisions to
+   make".
+4. **Ask why.** Under Done, open VEH004's Fresh · Matara trip and press **why?** on Fresh Dickwella: "Rank 1: waited
+   since Tuesday; chilled; …". Press **why?** on a deferred order: its rank, why no truck could take it, and "to
+   decide".
+5. **An ordinary edit.** Open VEH035's trip, the fridge van with Fresh Nugegoda's carried-over cartons, and choose
+   Dilshan as its driver. It is saved and checked like any other change.
+6. **Decide and send.** Open **View plan**: "Suggested plan · 16:00", "Decisions · 6" and a greyed "Send plan · 6
+   decisions open". Press **Accept all 6**: "Decisions · all made", and "Checks · 3" keeps the two long waits and the
+   Fresh workload listed with "Ready, with warnings". Press **Send plan to loaders and drivers**: "✓ Sent 16:06 ·
+   loaders and 1 driver".
+
 ## Departures from the design
 
 Anything we built differently from our Designathon submission, and why.
@@ -147,8 +173,14 @@ Anything we built differently from our Designathon submission, and why.
   the dispatcher's six tabs fit the top bar.
 
 **The plan board and View plan**
-- **The suggested plan is not built yet.** "Build the suggested plan", "Changes", the "suggested" hints and the
-  why chips come with the planner (spec 011).
+- **"why?" gives the planner's reason for an order.** The design's why chips, which ask why the dispatcher changed
+  the suggestion, are not built (D-55).
+- **Building shows a moving bar,** since one request has no progress to report, and its line has no "16 windows to
+  check".
+- **The planner's decisions are a card on View plan** in the Suggestions card's place, with Accept, "Accept all" and
+  "Open in edit" (D-54). The design draws none.
+- **No "Changes · N" and no "Back to the suggestion"** in the board's header. View plan says when the plan was
+  suggested, with no switch between the suggested and the edited plan.
 - **Orders are named by shop, amount and wanted day.** The design's order numbers (WF-2402) do not exist here.
 - **The depot switch** shows the dispatcher's own depot and greys the others (D-32), from 1280 wide.
 - **Drivers** are picked from the depot's driver accounts, and a vehicle may have none (D-31).
@@ -162,7 +194,9 @@ Anything we built differently from our Designathon submission, and why.
   narrower and View plan's rows stack.
 - **Problems** show as lines under the trip's timeline, and failures as short notices.
 - **View plan** says "h on the road" where the design says "h driving", because the figure includes unloading.
-- **States the design lacks:** orders still open, no day left, deferring, splitting, saving, not saved and refused.
+- **States the design lacks:** orders still open, no day left, deferring, splitting, saving, not saved and refused,
+  and for the suggested plan: replacing a draft, the line after a build, a refused build, and a plan ready with
+  warnings.
 
 **Loading and Live day**
 - **One list of trucks in leaving order,** with no "Wave 1 · 03:30" and "Wave 2 · 08:30" tabs, no dock numbers and no

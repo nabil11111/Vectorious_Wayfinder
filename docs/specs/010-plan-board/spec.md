@@ -314,7 +314,10 @@ reset; *unit* ones use made-up data. Screens get a click-through at 1440 × 900 
   percentage or header count of rule 12 worked out there.
 
 ## Left for the planner (B4)
-The screen leaves these out, and the README lists them as coming with B4: "Build the suggested plan" and Edit plan ·
+Spec 014 has since built "Build the suggested plan" and Edit plan · building, a "why?" that gives the planner's reason
+(D-55), and on View plan "Suggested plan · 16:05" with the planner's decisions in the Suggestions card's place (D-54).
+The rest of this list stays out, AC-42 covers only that rest, and the README lists it under the departures. The list as
+this spec left it: "Build the suggested plan" and Edit plan ·
 building; the "suggested …" lines, "came in after the suggestion" and "cannot be met from wave 1"; the "Planner: …
 Add it · Skip" row; "Back to the suggestion", "Changes · 2" and the "why?" chips; "on would save 2 trips, 140 km"; "2
 fit Fresh · Kalutara" and "fits all 12 · back 08:10"; the "Swap stops 5 and 6" advice; Find a slot's day tabs, "Try Tue

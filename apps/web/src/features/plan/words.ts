@@ -1,4 +1,4 @@
-import type { BoardOrder, BoardShop, BoardVehicle, Brand, DeferralCode, DockType, Problem, Temp } from '@wayfinder/contracts';
+import type { BoardOrder, BoardShop, BoardVehicle, Brand, DeferralCode, DockType, Problem, SuggestionDecision, Temp } from '@wayfinder/contracts';
 import { clockTime, cubic, kilos, shortDay } from '@/features/store/words';
 
 // The words and formats of the plan board (spec 010, plan.md "Words"). Nothing here works a figure out: every
@@ -111,3 +111,42 @@ export const countOf = (n: number, one: string, many = `${one}s`) => `${WHOLE.fo
 // The line when the board took orders out of a draft because they are no longer the day's (rule 2).
 export const droppedLine = (n: number, date: string) =>
   `${countOf(n, 'order was', 'orders were')} taken off the plan: ${n === 1 ? 'it is' : 'they are'} no longer for ${shortDay(date)}.`;
+
+// ── The suggested plan (spec 014, plan.md "Words") ─────────────────────────────────────────────────────────────
+
+export const BUILD = 'Build the suggested plan';
+export const BUILDING = 'Building the plan';
+// Under Building, the board's counts: "102 orders · 35 trucks".
+export const buildingLine = (orders: number, trucks: number) => `${countOf(orders, 'order')} · ${countOf(trucks, 'truck')}`;
+// "Suggested plan · 16:00"
+export const suggestedAt = (builtAt: string) => `Suggested plan · ${clockTime(builtAt)}`;
+// "6 decisions to make", "1 decision to make" and "no decisions to make".
+export const toMake = (n: number) => (n === 0 ? 'no decisions to make' : `${countOf(n, 'decision')} to make`);
+
+// Replacing a draft (D-52), with the draft's counts: "Your 1 trip and 99 deferred orders are replaced".
+export const REPLACE_TITLE = 'Replace the draft with a suggested plan?';
+export function replaceLine(orders: number, trips: number, deferred: number) {
+  const yours = [trips > 0 && countOf(trips, 'trip'), deferred > 0 && countOf(deferred, 'deferred order')].filter(Boolean).join(' and ');
+  // "is" for one trip or one deferred order alone, "are" for anything more.
+  const one = (trips === 1 && deferred === 0) || (trips === 0 && deferred === 1);
+  return `The planner plans all ${countOf(orders, 'order')} again. Your ${yours} ${one ? 'is' : 'are'} replaced, and orders split on this draft are joined back first. Vehicles keep their drivers.`;
+}
+export const KEEP_DRAFT = 'Keep the draft';
+
+// A decision's title by its kind: "VEH002 trip 1 leaves early, at 03:07", "Fresh Dickwella waits again" and "Fresh
+// Pannala would be late, so it waits". shop is the shop of the order the decision is about.
+// An order the board no longer has is called "This order".
+export function decisionTitle(decision: Pick<SuggestionDecision, 'kind' | 'vehicleId' | 'tripNo' | 'leaveAt'>, shop: string | null) {
+  if (decision.kind === 'early_leave') return `${decision.vehicleId} trip ${decision.tripNo} leaves early${decision.leaveAt === null ? '' : `, at ${hhmm(decision.leaveAt)}`}`;
+  const who = shop ?? 'This order';
+  return decision.kind === 'waited_again' ? `${who} waits again` : `${who} would be late, so it waits`;
+}
+export const TO_DECIDE = 'to decide';
+// After an accept: "✓ accepted 16:08" in why?, and "✓ Accepted 16:08" on View plan.
+export const acceptedNote = (at: string) => `✓ accepted ${clockTime(at)}`;
+export const acceptedLine = (at: string) => `✓ Accepted ${clockTime(at)}`;
+export const acceptAll = (n: number) => `Accept all ${whole(n)}`;
+export const decisionsTitle = (listed: number, open: number) => (open > 0 ? `Decisions · ${whole(listed)}` : 'Decisions · all made');
+export const openCount = (n: number) => `${whole(n)} open`;
+export const sendDecisionsOpen = (n: number) => `Send plan · ${countOf(n, 'decision')} open`;
+export const READY_WITH_WARNINGS = 'Ready, with warnings';
