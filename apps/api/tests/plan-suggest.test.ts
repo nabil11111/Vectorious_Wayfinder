@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { clearDemoDay, demoId, seedDemoDay } from '../src/db/demo-day';
-import { auditLog, deferrals, demoDay, orderLines, orders, outlets, plans, stopOrders, stops, trips, users, vehicleDaysOff } from '../src/db/schema';
+import { auditLog, deferrals, demoDay, orderLines, orders, outlets, plans, stopOrders, stops, trips, users, vehicleDaysOff, vehicles } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { buildSuggestedPlan, type PlannerResult } from '../src/planning';
@@ -87,8 +87,31 @@ const audits = async (entityId: string, action: string) => (await db.select().fr
 // OUT001's carried-over order raised from 12 to 180 chilled cartons, which only the fridge van can take (rule 4).
 const raiseNugegoda = () => db.update(orderLines).set({ quantity: 180 }).where(eq(orderLines.orderId, CARRIED.OUT001));
 // Peliyagoda's drivers in staff ID order, D-001 Dilshan first (spec 022, D-97).
-const staffOrder = async () => (await db.select({ id: users.id }).from(users)
-  .where(and(eq(users.depotId, 'Peliyagoda'), eq(users.role, 'driver'), eq(users.active, true))).orderBy(users.staffId)).map((row) => row.id);
+const staffOrder = () => db.select({ id: users.id, staffId: users.staffId, name: users.displayName }).from(users)
+  .where(and(eq(users.depotId, 'Peliyagoda'), eq(users.role, 'driver'), eq(users.active, true))).orderBy(users.staffId);
+// Each truck of a draft with its driver's staff ID, or null.
+const staffIdsOf = async (b = board) => {
+  const staff = await staffOrder();
+  return Object.fromEntries([...driversOf(b)].map(([vehicleId, list]) => [vehicleId, staff.find((d) => d.id === list[0])?.staffId ?? null]));
+};
+// A truck's usual driver on the seeded day, whose sent plans hold no trips: the fixed pairing of the drivers in staff
+// ID order (D-001, then D-003 to D-036) with the trucks in id order (spec 026).
+const pairedWith = (vehicleId: string) => {
+  const n = Number(vehicleId.slice(3));
+  return n === 1 ? 'D-001' : n <= 35 ? `D-${String(n + 1).padStart(3, '0')}` : null;
+};
+// The name each truck goes by in the planner's sentences after a build on the seeded day (spec 026): a truck of the plan
+// by its driver, and any other by its usual driver, unless the plan gave him to another truck.
+const plannerNames = async (b = board) => {
+  const staff = await staffOrder();
+  const fleet = await db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.depotId, 'Peliyagoda')).orderBy(vehicles.id);
+  const onPlan = new Map(b.plan.trips.map((t) => [t.vehicleId, staff.find((d) => d.id === t.driverId)?.name]));
+  const taken = new Set(onPlan.values());
+  return new Map(fleet.map(({ id }) => {
+    const usual = staff.find((d) => d.staffId === pairedWith(id))?.name;
+    return [id, onPlan.has(id) ? onPlan.get(id) : usual !== undefined && !taken.has(usual) ? usual : undefined];
+  }));
+};
 // Each vehicle of a draft, in id order, with its trips' drivers.
 const driversOf = (b = board) => {
   const drivers = new Map<string, (string | null)[]>();
@@ -96,11 +119,9 @@ const driversOf = (b = board) => {
   return drivers;
 };
 // Dilshan put on VEH035 as the board's driver menu puts him there once the suggestion gave every truck a driver: the
-// vehicle he drove takes VEH035's driver (spec 022, AC-5).
-const dilshanOnVeh035 = (b = board): DraftPlan => {
-  const was = b.plan.trips.find((t) => t.vehicleId === 'VEH035')?.driverId ?? null;
-  return { ...planOf(b), trips: b.plan.trips.map((t) => (t.vehicleId === 'VEH035' ? { ...t, driverId: dilshanId } : t.driverId === dilshanId ? { ...t, driverId: was } : t)) };
-};
+// truck he drove is left with no driver (spec 026, rule 2).
+const dilshanOnVeh035 = (b = board): DraftPlan =>
+  ({ ...planOf(b), trips: b.plan.trips.map((t) => (t.vehicleId === 'VEH035' ? { ...t, driverId: dilshanId } : t.driverId === dilshanId ? { ...t, driverId: null } : t)) });
 // Everything a build or an accept may write, so a refusal can be shown to change nothing.
 const held = async () => ({
   orders: await db.select().from(orders).orderBy(orders.id), lines: await db.select().from(orderLines).orderBy(orderLines.id),
@@ -176,10 +197,14 @@ it('AC-2 saves exactly what the planner gives for spec 011\'s seeded-day fixture
   expect(fixture.input.plan.trips).toHaveLength(27);
   expect(fixture.splits).toEqual([]);
   expect(fixture.decisions.map((d) => d.kind)).toEqual(Array(6).fill('late_order'));
-  // The fixture calls a shop by its id, so its sentences name the district. Given the shops' names, the planner writes
-  // the board's sentences word for word.
+  // The fixture calls a shop by its id, so its sentences name the district, and a truck by its kind and id. Given the
+  // shops' names and the trucks' drivers (spec 026), the planner writes the board's sentences word for word.
   const names = new Map((await db.select({ id: outlets.id, name: outlets.name }).from(outlets)).map((o) => [o.id, o.name]));
-  const named = buildSuggestedPlan({ ...input, outlets: input.outlets.map((o) => ({ ...o, name: names.get(o.id)! })) });
+  const drivers = await plannerNames();
+  const named = buildSuggestedPlan({
+    ...input, outlets: input.outlets.map((o) => ({ ...o, name: names.get(o.id)! })),
+    vehicles: input.vehicles.map((v) => (drivers.get(v.id) === undefined ? v : { ...v, driverName: drivers.get(v.id) })),
+  });
   if (named.status === 'unavailable') throw new Error('Expected the seeded suggestion');
   expect(board.suggestion!.choices.map((c) => c.reason)).toEqual(named.choices.map((c) => c.reason));
   expect(board.suggestion!.decisions.map((d) => d.reason)).toEqual(named.decisions.map((d) => d.reason));
@@ -280,20 +305,22 @@ it('AC-6 replaces every trip and deferral of a hand-made draft, and a vehicle th
   answered(await build());
   expect(board.plan.revision).toBe(2);
   expect(board.plan.trips.filter((t) => t.vehicleId === 'VEH035').map((t) => t.driverId)).toEqual([dilshanId]);
-  // VEH004 had no driver, so it takes a free one (spec 022, AC-3), and the planner's own leaving time.
-  expect(board.plan.trips.filter((t) => t.vehicleId === 'VEH004').map((t) => [t.driverId !== null, t.leaveAt])).toEqual([[true, null]]);
-  // VEH008 is not in the suggestion, so its driver is free again: every truck but VEH035 takes the depot's next free
-  // driver in staff ID order, and he is one of them.
+  // VEH004 had no driver, so it takes its usual one, and the planner's own leaving time.
+  expect(board.plan.trips.filter((t) => t.vehicleId === 'VEH004').map((t) => t.leaveAt)).toEqual([null]);
+  // VEH008 is not in the suggestion, so its driver is free again. VEH001's usual driver, Dilshan, stays on VEH035, so
+  // VEH001 takes the first driver free by staff ID, Lasantha (D-004), whose truck is in the workshop, and VEH038, past
+  // the last driver, the next one, Sanjeewa (D-006). Every other truck has its usual driver (spec 026).
   expect(board.plan.trips.some((t) => t.vehicleId === 'VEH008')).toBe(false);
-  const others = [...driversOf()].filter(([vehicleId]) => vehicleId !== 'VEH035').map(([, drivers]) => drivers[0]);
-  expect(others).toEqual((await staffOrder()).filter((id) => id !== dilshanId).slice(0, others.length));
-  expect(others).toContain(other);
+  const staffIds = await staffIdsOf();
+  expect(staffIds).toEqual(Object.fromEntries(Object.keys(staffIds).map((vehicleId) => [vehicleId,
+    vehicleId === 'VEH035' ? 'D-001' : vehicleId === 'VEH001' ? 'D-004' : vehicleId === 'VEH038' ? 'D-006' : pairedWith(vehicleId)])));
+  expect(staffIds.VEH004).toBe('D-005');
   expect(board.plan.deferrals.some((d) => d.code === 'dispatcher_choice')).toBe(false);
   expect(board.counts).toMatchObject({ trips: 27, ordersOnTrips: 96, ordersDeferred: 6, ordersUnplanned: 0, drivers: 26 });
   expect(tripOf(CARRIED.OUT060)).toEqual(['VEH004', 1]);
 });
 
-it('spec 022 AC-3 gives every truck of the built plan its own driver of the depot, the same on both its trips', async () => {
+it('spec 026 AC-4 gives every truck of the built plan its usual driver on the seeded day, the same on both its trips', async () => {
   answered(await build());
   const drivers = driversOf();
   expect(drivers.size).toBe(26);
@@ -303,29 +330,41 @@ it('spec 022 AC-3 gives every truck of the built plan its own driver of the depo
   // Each a driver of Peliyagoda, and none on two trucks.
   expect(chosen.filter((driverId) => !board.drivers.some((d) => d.id === driverId))).toEqual([]);
   expect(new Set(chosen).size).toBe(26);
-  // With no driver in the draft before, the trucks in id order take the depot's drivers in staff ID order.
-  expect(chosen).toEqual((await staffOrder()).slice(0, 26));
-  expect(chosen[0]).toBe(dilshanId);
+  // With no driver in the draft before and no trips on the seed's sent plans, each truck takes its usual driver from the
+  // fixed pairing: VEH001 Dilshan (D-001), VEH004 Priyantha (D-005), VEH035 Wasantha (D-036). VEH038 is past the last
+  // driver, so it takes the first one free by staff ID, Lasantha (D-004), whose truck VEH003 is in the workshop.
+  const staffIds = await staffIdsOf();
+  expect(staffIds).toEqual(Object.fromEntries(Object.keys(staffIds).map((vehicleId) => [vehicleId, vehicleId === 'VEH038' ? 'D-004' : pairedWith(vehicleId)])));
+  expect([staffIds.VEH001, staffIds.VEH004, staffIds.VEH035, staffIds.VEH038]).toEqual(['D-001', 'D-005', 'D-036', 'D-004']);
   expect(board.counts).toMatchObject({ vehiclesUsed: 26, drivers: 26 });
   // A build again keeps each truck's driver.
   answered(await build());
   expect(driversOf()).toEqual(drivers);
 });
 
-it('spec 022 AC-5 saves the driver menu\'s swap as one change: Dilshan on VEH035, and his truck takes VEH035\'s driver', async () => {
+it('spec 026 rule 2 saves the driver menu\'s move as one change: Dilshan on VEH035, and the truck he drove with no driver', async () => {
   answered(await build());
   const before = driversOf();
-  const vehicleId = [...before].find(([, list]) => list[0] === dilshanId)![0];
-  const was = before.get('VEH035')![0]!;
-  expect(vehicleId).not.toBe('VEH035');
+  expect(before.get('VEH001')).toEqual([dilshanId]);
   answered(await save(dilshanOnVeh035()));
   expect(board.plan.revision).toBe(2);
   const after = driversOf();
   expect(after.get('VEH035')!.every((id) => id === dilshanId)).toBe(true);
-  expect(after.get(vehicleId)!.every((id) => id === was)).toBe(true);
+  expect(after.get('VEH001')).toEqual([null]);
   // Every other truck keeps its driver, and nobody drives two.
-  expect([...after].filter(([id]) => id !== 'VEH035' && id !== vehicleId)).toEqual([...before].filter(([id]) => id !== 'VEH035' && id !== vehicleId));
-  expect(board.counts!.drivers).toBe(26);
+  expect([...after].filter(([id]) => id !== 'VEH035' && id !== 'VEH001')).toEqual([...before].filter(([id]) => id !== 'VEH035' && id !== 'VEH001'));
+  expect(board.counts!.drivers).toBe(25);
+});
+
+it('spec 026 names each truck in the planner\'s reasons by its driver, a truck given a free driver too', async () => {
+  answered(await build());
+  const reasons = [...board.suggestion!.choices.map((c) => c.reason), ...board.suggestion!.decisions.map((d) => d.reason)];
+  // VEH035, the fridge van, is Wasantha's, and VEH038, the van past the last driver, Lasantha's once the plan gave him to it.
+  expect(reasons.some((reason) => reason.includes('Wasantha\'s reefer van'))).toBe(true);
+  expect(reasons.some((reason) => reason.includes('Lasantha\'s van'))).toBe(true);
+  // No truck of the plan is called by its kind and id, which is for a truck with no driver.
+  const used = [...new Set(board.plan.trips.map((t) => t.vehicleId))];
+  expect(reasons.filter((reason) => used.some((vehicleId) => reason.includes(vehicleId)))).toEqual([]);
 });
 
 // ── Refusals and what a build tells ──────────────────────────────────────────────────────────────────────────────

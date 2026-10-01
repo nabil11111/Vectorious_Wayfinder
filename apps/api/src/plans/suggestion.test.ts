@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { buildSuggestedPlan, type PlannerResult } from '../planning';
 import { plannerInput, plannerOrder } from '../planning/planner/testing/input';
 import { vehicle } from '../planning/testing/shared';
-import { boardSuggestion, decisionOpen, driversFor, suggestionOf } from './suggestion';
+import { boardSuggestion, decisionOpen, driversFor, namedDrivers, suggestionOf, usualPairing } from './suggestion';
 
 // Spec 014's plain functions on made-up days: when a decision is open (AC-11), and how the planner's result becomes
-// the draft to save and the suggestion to keep. Spec 022's drivers for the vehicles a suggestion uses (AC-3).
+// the draft to save and the suggestion to keep. Spec 022's drivers for the vehicles a suggestion uses (AC-3), which spec
+// 026 takes from each vehicle's usual driver, and the names the planner's sentences call the vehicles by.
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const [A, B, C, FIRST, SECOND, DILSHAN] = [1, 2, 3, 4, 5, 6].map(id) as [string, string, string, string, string, string];
@@ -131,7 +132,7 @@ describe('the planner\'s result as a draft and a suggestion', () => {
       plannerOrder(C, 'OUT006'),
       plannerOrder(A, 'OUT001', 'fresh-chilled-carton', 180, { deliveryDate: '2026-06-24', timesDeferred: 1 }),
     ], { vehicles: [vehicle('VEH035'), vehicle('VEH012')] })));
-    const drivers = driversFor(result.input.plan.trips.map((trip) => trip.vehicleId), new Map(), [D001, D003, D004]);
+    const drivers = driversFor(result.input.plan.trips.map((trip) => trip.vehicleId), new Map(), new Map(), [D001, D003, D004]);
     const { draft } = suggestionOf(result, new Map([[`split:${A}:keep`, FIRST], [`split:${A}:rest`, SECOND]]), drivers, BUILT);
     expect(draft.trips.map((trip) => [trip.vehicleId, trip.tripNo, trip.driverId])).toEqual([['VEH012', 1, D001], ['VEH035', 1, D003], ['VEH035', 2, D003]]);
   });
@@ -146,22 +147,56 @@ describe('the planner\'s result as a draft and a suggestion', () => {
   });
 });
 
-describe('the drivers of the vehicles a suggestion uses (spec 022, D-97)', () => {
-  it('AC-3 keeps a vehicle\'s earlier driver and gives each other vehicle, in id order, the first free driver by staff ID', () => {
-    // VEH035 had D-004 in the draft before. A vehicle named on two trips is one vehicle.
-    expect(driversFor(['VEH035', 'VEH004', 'VEH001', 'VEH035'], new Map([['VEH035', D004]]), [D001, D003, D004, D005]))
-      .toEqual(new Map([['VEH001', D001], ['VEH004', D003], ['VEH035', D004]]));
+describe('the drivers of the vehicles a suggestion uses (spec 022, D-97, spec 026)', () => {
+  // Each vehicle's usual driver here, as usualPairing gives them: VEH001 D-001, VEH002 D-003, VEH004 D-004, VEH035 D-005.
+  const USUAL = new Map<string, string | null>([['VEH001', D001], ['VEH002', D003], ['VEH004', D004], ['VEH035', D005]]);
+
+  it('spec 026 gives each vehicle the driver the draft already had, else its usual driver, else the first free one', () => {
+    // VEH035 had D-001 in the draft: the dispatcher's choice wins, so VEH001 cannot have its usual D-001.
+    expect(driversFor(['VEH035', 'VEH004', 'VEH001', 'VEH035'], new Map([['VEH035', D001]]), USUAL, [D001, D003, D004, D005]))
+      .toEqual(new Map([['VEH001', D003], ['VEH004', D004], ['VEH035', D001]]));
+    // With no draft before, each takes its usual driver.
+    expect(driversFor(['VEH002', 'VEH001', 'VEH004'], new Map(), USUAL, [D001, D003, D004, D005]))
+      .toEqual(new Map([['VEH001', D001], ['VEH002', D003], ['VEH004', D004]]));
   });
 
-  it('AC-3 gives no driver to two vehicles, and frees the driver of a vehicle the suggestion leaves out', () => {
-    // VEH008 had D-001 and is not in the suggestion, so D-001 is free again. VEH010 keeps D-003, which nobody else gets.
-    expect(driversFor(['VEH010', 'VEH002', 'VEH003'], new Map([['VEH008', D001], ['VEH010', D003]]), [D001, D003, D004, D005]))
-      .toEqual(new Map([['VEH002', D001], ['VEH003', D004], ['VEH010', D003]]));
+  it('spec 026 lets no vehicle take another\'s usual driver ahead of it, and a vehicle with none takes the first free', () => {
+    // VEH002's usual D-003 drives VEH004 in the draft, so VEH002 takes the first driver free by staff ID once VEH001
+    // and VEH035 have their own: D-004, VEH004's usual driver, whom VEH004 no longer needs.
+    expect(driversFor(['VEH001', 'VEH002', 'VEH004', 'VEH035'], new Map([['VEH004', D003]]), USUAL, [D001, D003, D004, D005]))
+      .toEqual(new Map([['VEH001', D001], ['VEH002', D004], ['VEH004', D003], ['VEH035', D005]]));
+    // VEH036 has no usual driver.
+    expect(driversFor(['VEH036', 'VEH001'], new Map(), USUAL, [D001, D003])).toEqual(new Map([['VEH001', D001], ['VEH036', D003]]));
   });
 
-  it('AC-3 leaves a vehicle without a driver only once every driver of the depot is taken', () => {
-    expect(driversFor(['VEH001', 'VEH002', 'VEH003'], new Map([['VEH003', D001]]), [D001, D003]))
-      .toEqual(new Map([['VEH001', D003], ['VEH002', null], ['VEH003', D001]]));
-    expect(driversFor([], new Map([['VEH003', D001]]), [D001])).toEqual(new Map());
+  it('spec 022 AC-3 gives no driver to two vehicles, frees a left-out vehicle\'s driver, and runs out only with every driver taken', () => {
+    // VEH008 had D-001 and is not in the suggestion, so D-001 is free again for VEH001, whose usual driver it is.
+    expect(driversFor(['VEH001', 'VEH010'], new Map([['VEH008', D001], ['VEH010', D003]]), USUAL, [D001, D003, D004]))
+      .toEqual(new Map([['VEH001', D001], ['VEH010', D003]]));
+    expect(driversFor(['VEH003', 'VEH006', 'VEH007'], new Map(), new Map(), [D001, D003]))
+      .toEqual(new Map([['VEH003', D001], ['VEH006', D003], ['VEH007', null]]));
+    expect(driversFor([], new Map([['VEH003', D001]]), USUAL, [D001])).toEqual(new Map());
+  });
+});
+
+describe('the driver each vehicle is named by in the planner\'s sentences (spec 026)', () => {
+  it('names a vehicle of the plan by its driver, and any other by its first driver unless the plan gave him to another', () => {
+    // Before the build: the draft's or usual driver of every vehicle, VEH038 with none.
+    const first = new Map<string, string | null>([['VEH001', D001], ['VEH003', D003], ['VEH008', D004], ['VEH038', null]]);
+    // The plan uses VEH001 and VEH038, which takes D-003, the driver of VEH003, which stays in the workshop.
+    expect(namedDrivers(first, new Map([['VEH001', D001], ['VEH038', D003]])))
+      .toEqual(new Map([['VEH001', D001], ['VEH003', null], ['VEH008', D004], ['VEH038', D003]]));
+    // Nothing moved: the names are the first ones.
+    expect(namedDrivers(first, new Map([['VEH001', D001], ['VEH008', D004]]))).toEqual(first);
+  });
+});
+
+describe('each vehicle\'s usual driver (spec 026)', () => {
+  it('AC-4 is the driver who drove it on the latest sent plan, else the next driver by staff ID, vehicles in id order', () => {
+    // No history: the depot's drivers pair with its vehicles in order, and a vehicle past the last driver has none.
+    expect(usualPairing(['VEH001', 'VEH002', 'VEH003'], new Map(), [D001, D003])).toEqual(new Map([['VEH001', D001], ['VEH002', D003], ['VEH003', null]]));
+    // VEH002 drove with D-001 last time: it keeps him, and the others pair with the drivers history left.
+    expect(usualPairing(['VEH001', 'VEH002', 'VEH003'], new Map([['VEH002', D001]]), [D001, D003, D004]))
+      .toEqual(new Map([['VEH001', D003], ['VEH002', D001], ['VEH003', D004]]));
   });
 });
