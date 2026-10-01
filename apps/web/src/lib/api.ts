@@ -15,14 +15,19 @@ export class ApiRequestError extends Error {
 
 // D-95: a dispatcher's tab names the depot it shows on every request, so the server refuses one whose depot the session
 // has left (409 depot_changed) instead of acting on the other depot. The dispatcher's pages say which depot that is: the
-// one the tab last took, never one a later read found. The tab hears of such a refusal through DEPOT_CHANGED. Any
-// other account names none.
+// one the tab last took, never one a later read found, and 'Both' for a tab on both depots together (spec 021), which
+// the server takes as a scope like a depot. The tab hears of such a refusal through DEPOT_CHANGED. Any other account
+// names none.
 export const DEPOT_HEADER = 'x-wayfinder-depot';
 export const DEPOT_CHANGED = 'wayfinder-depot-changed';
 let namedDepot: string | null = null;
 export function nameDepot(depotId: string | null) {
   namedDepot = depotId;
 }
+
+// Spec 021: every dispatcher read names the one depot it reads, ?depot=, which a session on both depots needs to tell
+// its reads apart, and which a session on one depot may only name as its own.
+export const forDepot = (path: string, depot: string) => `${path}${path.includes('?') ? '&' : '?'}depot=${encodeURIComponent(depot)}`;
 
 // depot names the depot a request was made for, such as a plan write that waited its turn, in place of the one the tab
 // names when it goes; null names none.
