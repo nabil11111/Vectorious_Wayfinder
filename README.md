@@ -386,6 +386,9 @@ Anything we built differently from our Designathon submission, and why.
 - **Between trips,** the second trip's Today's trip opens with "✓ Trip 1 closed · 4 of 4 stops · all records sent ·
   checked in 03:56" and trip 1's hand-back card until it starts. The frames draw no state between two trips, and the
   driver must know trip 1 went and what to hand in before the truck is loaded again.
+- **Day done after two trips** shows a line per trip, "Trip 1 · 4 of 4 stops · 105 of 144 cartons delivered · 39 handed
+  back", and the day's totals, then "Trip 3 · none today". The frame draws a one-trip day, and the driver's last screen
+  should show the whole day rather than only the last trip.
 - **States the design lacks:** not loaded yet, no trip, could not load, the waiting sheet, not accepted, sign in again,
   could not save on this phone, the unusable photo, the answer on the phone, a stop to try again, and Day done with
   records waiting.

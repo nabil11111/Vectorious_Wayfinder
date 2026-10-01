@@ -117,6 +117,15 @@ export function tripFigures(trip: DriverTrip) {
     byTemp: { chilled: add(byStop.map(stop => stop.byTemp.chilled)), dry: add(byStop.map(stop => stop.byTemp.dry)) }, next: nextStop(trip) };
 }
 
+// The driver's whole day, for Day done after more than one trip: each trip's figures in the day's order, and the day's
+// sums of them. Every number on a driver screen comes from these two functions.
+const DAY_SUMS = ['stops', 'stopsDone', 'ordered', 'loaded', 'delivered', 'refused', 'notDelivered', 'short', 'onTruck'] as const;
+export function dayFigures(trips: readonly DriverTrip[]) {
+  const byTrip = trips.map(trip => ({ tripId: trip.tripId, tripNo: trip.tripNo, figures: tripFigures(trip) }));
+  const sums = Object.fromEntries(DAY_SUMS.map(key => [key, byTrip.reduce((total, each) => total + each.figures[key], 0)])) as Record<(typeof DAY_SUMS)[number], number>;
+  return { trips: trips.length, ...sums, byTrip };
+}
+
 // Only still-waiting writes enter this function; refused ones are kept separately by the phone.
 export function phoneView(day: DriverDay, writes: readonly DriverWrite[]): { day: DriverDay; writes: DriverWrite[] } {
   const waiting = writes.filter(write => !day.appliedWriteIds.includes(write.writeId));

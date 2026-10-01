@@ -290,6 +290,24 @@ export function tripClosedLine(figures: Figures, waiting: number, tripNo?: numbe
 export const betweenTripsLine = (trip: DriverTrip, figures: Figures, waiting: number) =>
   [tripClosedLine(figures, waiting, trip.tripNo), trip.backAt && `checked in ${clockTime(trip.backAt)}`].filter(Boolean).join(' · ');
 export const backAtLine = (day: DriverDay) => `Back at ${day.depot}`;
+
+// A line of Day done after more than one trip, for a trip or for the whole day (Q-31), with what was delivered counted
+// against what was loaded: "4 of 4 stops · 105 of 144 cartons delivered · 39 handed back".
+export function dayDoneLine(counts: Pick<Figures, 'stops' | 'stopsDone' | 'loaded' | 'delivered' | 'onTruck'>, brand: Brand | null) {
+  return [
+    `${whole(counts.stopsDone)} of ${countOf(counts.stops, 'stop')}`,
+    `${whole(counts.delivered)} of ${unitsWords(brand, counts.loaded)} delivered`,
+    counts.onTruck > 0 ? `${whole(counts.onTruck)} handed back` : 'nothing handed back',
+  ].join(' · ');
+}
+
+// The brand a day's totals are counted in: its trips' one brand, or none, in units, when they carried more than one.
+export const dayBrand = (trips: DriverTrip[]): Brand | null => {
+  const [first] = trips;
+  return first && trips.every((trip) => trip.brand === first.brand) ? first.brand : null;
+};
+export const DAY_TOTAL = 'Total';
+export const tripLabel = (tripNo: number) => `Trip ${tripNo}`;
 export const checkedInLine = (trip: DriverTrip) => (trip.backAt ? `Checked in at the depot ${clockTime(trip.backAt)}` : 'Checked in at the depot');
 export const SIGN_OUT_WAITS = 'Sign out once everything is sent.';
 

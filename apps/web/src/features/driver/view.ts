@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { phoneView, tripFigures, type DriverDay, type DriverTrip } from '@wayfinder/contracts';
+import { dayFigures, phoneView, tripFigures, type DriverDay, type DriverTrip } from '@wayfinder/contracts';
 import { recordOf, useKept, type Queued } from './queue';
 import type { Figures } from './words';
 
@@ -30,6 +30,8 @@ export interface DayTrips {
   // The trip checked in just before the open one, while the open one has not started: trip 2's Today's trip opens
   // with trip 1's close and its hand-back card (Q-29).
   closed: TripWithFigures | null;
+  // Once every trip is done, the whole day: each trip's figures and the day's sums, for Day done (Q-31).
+  wholeDay: ReturnType<typeof dayFigures> | null;
 }
 
 export function tripsOf(day: DriverDay): DayTrips {
@@ -37,7 +39,8 @@ export function tripsOf(day: DriverDay): DayTrips {
   const trip = open ?? day.trips.at(-1) ?? null;
   const before = open ? day.trips[day.trips.indexOf(open) - 1] : undefined;
   const closed = open && open.status !== 'out' && before?.status === 'done' ? { trip: before, figures: tripFigures(before) } : null;
-  return { trip, figures: trip ? tripFigures(trip) : null, allDone: open === null && trip !== null, closed };
+  const allDone = open === null && trip !== null;
+  return { trip, figures: trip ? tripFigures(trip) : null, allDone, closed, wholeDay: allDone ? dayFigures(day.trips) : null };
 }
 
 const records = (entries: Queued[]) => new Set(entries.map((entry) => recordOf(entry.write))).size;
@@ -52,7 +55,7 @@ export function useDriverView(userId: string): DriverView {
     if (!ready || !kept.day) {
       return {
         ready, day: null, waiting: held, refused, waitingRecords: records(held), refusedRecords: records(refused),
-        trip: null, figures: null, allDone: false, closed: null,
+        trip: null, figures: null, allDone: false, closed: null, wholeDay: null,
       };
     }
     const view = phoneView(kept.day, held.map((entry) => entry.write));

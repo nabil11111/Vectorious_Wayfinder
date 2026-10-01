@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { tripFigures, type ClockState, type DriverDay, type DriverLine, type DriverStop, type DriverTrip } from '@wayfinder/contracts';
+import { dayFigures, tripFigures, type ClockState, type DriverDay, type DriverLine, type DriverStop, type DriverTrip } from '@wayfinder/contracts';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { clockKey } from '@/lib/clock';
 import { Counter } from './parts/Counter';
 import { NO_PAIR, readBox, refusalPair, tallyFor } from './tally';
-import { TripDone } from './DonePage';
+import { DayDone, TripDone } from './DonePage';
 import { NextStopPage } from './NextStopPage';
 import { TodaysTrip } from './TripPage';
 import { UnloadPage } from './UnloadPage';
@@ -335,5 +335,56 @@ describe('Q-29 checking in trip 1 when trip 2 is to come', () => {
     expect(tripsOf(dayOf(veh057trip1('out'), veh057trip2())).closed).toBeNull();
     const first = viewOf(dayOf(veh057trip2('planned', { tripNo: 1 })));
     expect(textOf(draw(<TodaysTrip view={first} trip={first.trip!} figures={first.figures!} />))).not.toMatch(/closed|Still on the truck|Nothing to hand back/);
+  });
+});
+
+// ── Q-31 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// Day done, every trip of the day checked in.
+const dayDone = (...trips: DriverTrip[]) => {
+  const view = viewOf(dayOf(...trips));
+  return textOf(draw(<DayDone view={view} day={view.day!} trip={view.trip!} figures={view.figures!} />));
+};
+
+// VEH011 at Peliyagoda, Asanka's: trip 1 Fresh Colombo, 433 cartons, then trip 2 Style Colombo, 155 boxes.
+const veh011 = () => [
+  tripOf(11, { vehicleId: 'VEH011', status: 'done', backAt: at('04:15'), stops: [stopOf(11, 1, 'Fresh Borella', [{ n: 11, quantity: 433, temp: 'dry', delivered: 433 }], { doneAt: at('04:14'), outcome: 'delivered' })] }),
+  tripOf(12, { vehicleId: 'VEH011', tripNo: 2, brand: 'Style', status: 'done', backAt: at('04:19'), stops: [
+    stopOf(12, 1, 'Style Liberty Plaza', [{ n: 12, quantity: 155, temp: 'dry', name: 'Folded clothing', unit: 'box', delivered: 155 }], { doneAt: at('04:18'), outcome: 'delivered' }),
+  ] }),
+];
+
+describe('Q-31 Day done after two trips', () => {
+  it('adds the day up in the contracts, each trip once, beside each trip\'s own figures', () => {
+    const day = dayFigures([veh057trip1(), veh057trip2('done')]);
+    expect(day).toMatchObject({ trips: 2, stops: 5, stopsDone: 5, ordered: 270, loaded: 266, delivered: 227, refused: 0, notDelivered: 39, short: 4, onTruck: 39 });
+    expect(day.byTrip.map(({ tripNo, figures }) => [tripNo, figures.stopsDone, figures.delivered, figures.loaded, figures.onTruck])).toEqual([[1, 4, 105, 144, 39], [2, 1, 122, 122, 0]]);
+  });
+
+  it('shows the whole day: a line per trip, the day\'s totals, then "Trip 3 · none today" and Sign out', () => {
+    const text = dayDone(veh057trip1(), veh057trip2('done'));
+    expect(text).toContain('Trip 2 closed · 1 of 1 stop · all records sent');
+    expect(text).toContain('Back at Kandy Checked in at the depot 04:01');
+    expect(text).toContain('Trip 1 4 of 4 stops · 105 of 144 cartons delivered · 39 handed back');
+    expect(text).toContain('Trip 2 1 of 1 stop · 122 of 122 cartons delivered · nothing handed back');
+    expect(text).toContain('Total 5 of 5 stops · 227 of 266 cartons delivered · 39 handed back');
+    expect(text).toMatch(/Trip 1 [\s\S]*Trip 2 [\s\S]*Total [\s\S]*Trip 3 none today[\s\S]*Sign out/);
+  });
+
+  it('counts a day of two brands in units, each trip in its own', () => {
+    const text = dayDone(...veh011());
+    expect(text).toContain('Trip 1 1 of 1 stop · 433 of 433 cartons delivered · nothing handed back');
+    expect(text).toContain('Trip 2 1 of 1 stop · 155 of 155 boxes delivered · nothing handed back');
+    expect(text).toContain('Total 2 of 2 stops · 588 of 588 units delivered · nothing handed back');
+    expect(text).toContain('Trip 3 none today');
+  });
+
+  it('keeps a one-trip Day done as the design draws it', () => {
+    const text = dayDone(veh057trip1());
+    expect(text).toContain('Trip closed · 4 of 4 stops · all records sent');
+    expect(text).toContain('Stops 4 of 4 Cartons delivered 105 of 148');
+    expect(text).toContain('Still on the truck');
+    expect(text).toContain('Trip 2 none today');
+    expect(text).not.toContain('Total');
   });
 });

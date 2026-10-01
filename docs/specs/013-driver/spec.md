@@ -92,6 +92,7 @@ alone below 640 wide beside a status chip), the avatar and the plain bell. Words
 |  | A refusal | Driver · Trip done · refused | "Cartons delivered 115 of 118", "Refused 2 · Wellawatte", "Short from the depot 1 dry · Nugegoda". "Still on the truck": "2 chilled cartons refused at Wellawatte. Hand them to the depot check with the refusal photo. The dry carton for Nugegoda never left the depot." |
 |  | A closed shop | Driver · Trip done · shop closed | "Cartons delivered 23 of 118", "Not delivered 94 · Wellawatte", "Short from the depot 1 dry · Nugegoda". "Still on the truck": "94 cartons for Wellawatte, nobody at the shop. The depot decides what happens to them.", and after "Bring them back": "… Hand them in; they go on the next run." |
 | Day done `/driver` | The day's trips done | Driver · Day done | Green "✓ Trip closed · 2 of 2 stops · all records sent", or yellow "Trip closed · 1 waiting to send". "Back at Peliyagoda", "Checked in at the depot 03:55", the trip's card and hand-back card, "Trip 2 · none today", and the orange "Sign out", greyed with "Sign out once everything is sent." while records wait. |
+|  | After two trips | No frame | The last trip's close by its number, "✓ Trip 2 closed · 1 of 1 stop · all records sent", "Back at Kandy" and "Checked in at the depot 04:01". Then the whole day in one card, a line per trip with its stops done, what it delivered of what was loaded and what was handed back, "Trip 1 · 4 of 4 stops · 105 of 144 cartons delivered · 39 handed back" and "Trip 2 · 1 of 1 stop · 122 of 122 cartons delivered · nothing handed back", and the day's totals under them, "Total · 5 of 5 stops · 227 of 266 cartons delivered · 39 handed back", in units when the trips carried more than one brand. Then "Trip 3 · none today" and "Sign out" as above. |
 | Live day `/dispatcher/live` | A refusal open | Dispatcher · Live day · issue open, its right column | Spec 012's card: "03:48", "2 chilled cartons refused", "Fresh Wellawatte · stop 2 · VEH035 · Dilshan · damaged, the shop took 46 of 48 chilled", the rows "Driver · Dilshan · 03:48", "Note · 2 crushed at the bottom", "Photo" when there is one, which opens it, "At the dock · loaded 02:31, nothing flagged" and "Still on VEH035 · 2 chilled cartons · no stops left". "What should the driver do with them?", the one option card "Bring them back to Peliyagoda" ("The driver hands them in at the depot."), chosen, and the orange "Send to driver". |
 |  | A closed shop open | No frame, the same card | "Nobody at Fresh Wellawatte", "stop 2 · VEH035 · Dilshan · arrived 03:45, saved 03:48", the note and photo rows, "Still on VEH035 · 94 cartons · no stops left". "What should the driver do?", "Try again on this trip" ("The driver goes back after the other stops.", not offered once the trip is back) and "Bring them back" ("The orders wait for the next plan."), and "Send to driver". |
 |  | Answer sent | Dispatcher · Live day · issue open · decision sent, its green card | "✓ Sent 03:52" and "VEH035 · 2 cartons back to Peliyagoda, Dilshan told", "VEH035 · tries Fresh Wellawatte again, Dilshan told" or "VEH035 · 94 cartons back to Peliyagoda, Dilshan told". |
@@ -109,9 +110,11 @@ cartons and 3 of 4 dry, window 05:00 to 07:30, street) and stop 2 Fresh Wellawat
    earlier day first. A trip's stops come in plan order and their lines in spec 012's order. The phone opens on the first
    trip that is not done: its Today's trip until it is out, then its stops, then Trip done. A trip that follows one
    checked in opens with that trip's close and its hand-back card on its Today's trip, until it starts. With every trip
-   done it shows Day done. *Dilshan has one trip, VEH035 trip 1. At Kandy, Asitha's VEH057 has two: checking in trip 1
-   at 03:56 opens trip 2's Today's trip under "✓ Trip 1 closed · 4 of 4 stops · all records sent · checked in 03:56",
-   with the 39 cartons for Mulgampola still to hand in.*
+   done it shows Day done, which after more than one trip shows each trip and the day's totals. *Dilshan has one trip,
+   VEH035 trip 1. At Kandy, Asitha's VEH057 has two: checking in trip 1 at 03:56 opens trip 2's Today's trip under "✓
+   Trip 1 closed · 4 of 4 stops · all records sent · checked in 03:56", with the 39 cartons for Mulgampola still to hand
+   in, and checking in trip 2 at 04:01 opens Day done with both trips and "Total · 5 of 5 stops · 227 of 266 cartons
+   delivered · 39 handed back".*
 3. **Starting.** "Start trip" makes a `ready` trip `out` at the time kept. It is offered only on a ready trip, and a
    vehicle's two trips are never out at once: a start takes the depot's lock, so two starts of one vehicle's trips go one
    after the other and the second finds the first out. The leaving time is the plan's, not a gate (open question 1).
@@ -190,7 +193,8 @@ cartons and 3 of 4 dry, window 05:00 to 07:30, street) and stop 2 Fresh Wellawat
     everything waiting has gone, one green line names the stops that reached the depot. The waiting count counts stops
     with something waiting, and the trip's start and end, as the design's bar counts deliveries. *After the refusal with
     no signal: "Offline │ 1", then "Back online · 1 stop sent · Wellawatte reached the depot".*
-13. **The numbers (D-50).** Every count on the driver's screens comes from `tripFigures` in the contracts, over the day the
+13. **The numbers (D-50).** Every count on the driver's screens comes from `tripFigures` in the contracts, and the whole
+    day's on Day done after more than one trip from `dayFigures`, which adds up each trip's, over the day the
     server last sent with the still-waiting writes applied by `phoneView`. The screen formats them, counts the minutes to
     leaving and waited from the app clock, and keeps the tally and the accepted and refused pair of its own forms. Live
     day's numbers come from the API, as in spec 012.
@@ -418,7 +422,7 @@ reset. A helper runs the walkthroughs of specs 009, 010 and 012 to VEH035 ready 
   API stopped and nothing kept, no trip before the send, not loaded yet, sign in again, the photo that cannot be used, and
   Day done with records waiting.
 - [ ] **AC-50** When a reviewer reads `features/driver`, they shall find no count worked out there but through
-  `tripFigures`, only formats, the minutes to leaving and waited, and the forms' own tally and counters; the whole sync
+  `tripFigures` and `dayFigures`, only formats, the minutes to leaving and waited, and the forms' own tally and counters; the whole sync
   loop, fetching the day, keeping it and sending, inside `navigator.locks.request('wayfinder-driver', …)` held for the
   tab's life; a 15 second limit on each send and each fetch; the health probe independent of `navigator.onLine`; and, as
   spec 012's AC-33 asks, no write's answer put in the view, only the day fetched again after each write.
@@ -507,6 +511,8 @@ Friday's plan while Thursday's stop 2 stays closed.
     waiting.
 12. Between trips, the next trip's Today's trip opens with the closed trip's line and hand-back card. The frames draw one
     trip only, and the driver must know trip 1 went and what to hand in before the truck is loaded again.
+13. Day done after two trips shows a line per trip and the day's totals in place of one trip's card. The frame draws a
+    one-trip day, and the driver's last screen should show the whole day, not only the last trip.
 
 ## Known limits
 1. **The server checks a photo's structure and never decodes the picture.** It takes a file that starts `FF D8`, ends `FF
