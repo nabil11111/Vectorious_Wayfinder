@@ -30,8 +30,9 @@ const total = (values: number[]) => values.reduce((sum, value) => sum + value, 0
 const openThenLatest = (a: Issue, b: Issue) => (a.status === b.status ? 0 : a.status === 'open' ? -1 : 1)
   || (b.decidedAt ?? b.raisedAt).localeCompare(a.decidedAt ?? a.raisedAt) || a.id.localeCompare(b.id);
 
-// The trucks of these trips of one sent plan, in leaving order, then by vehicle and trip number.
-export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[]): Promise<LoadingTruck[]> {
+// The trucks of these trips of one sent plan, in leaving order, then by vehicle and trip number. out holds the plan's
+// trips on the road, so a trip whose vehicle is still out on an earlier one says so, with when it is due back (Q-26).
+export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: TripRow[] = []): Promise<LoadingTruck[]> {
   if (!tripRows.length) return [];
   const check = plan.sentCheck === null ? null : PlanCheck.parse(plan.sentCheck);
   const tripIds = tripRows.map((trip) => trip.id);
@@ -70,22 +71,29 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[]): Prom
     // What is on so far: the loaded stops' lines at their counts, from the one load calculator. A line at 0 adds nothing.
     const on = computeLoad(truckStops.filter((s) => s.loaded).flatMap((s) => s.lines).filter((l) => l.going > 0).map((l) => ({ productId: l.productId, quantity: l.going })), items);
     const brands = [...new Set(own.map((row) => row.brand))];
+    const away = out.filter((t) => t.vehicleId === trip.vehicleId && t.tripNo < trip.tripNo && t.status === 'out').sort((a, b) => b.tripNo - a.tripNo)[0];
     return {
       tripId: trip.id, revision: trip.revision, vehicleId: trip.vehicleId, vehicleType: vehicle.type, vehicleTemp: vehicle.temp, tripNo: trip.tripNo,
       brand: brands.length === 1 ? brands[0]! : null, district, status: listed(trip), leavesAt: leavesAt.toISOString(), readyAt: trip.readyAt?.toISOString() ?? null,
       driver: drivers.find((d) => d.id === trip.driverId)?.name ?? null, weightCapKg: vehicle.weightCapKg, volumeCapM3: Number(vehicle.volumeCapM3),
       units: total(truckStops.map((s) => s.units)), on: { units: on.units, kg: on.kg, m3: on.m3 }, short: total(truckStops.map((s) => s.short)),
       stops: truckStops, issues: problems.filter((problem) => problem.trip.id === trip.id).sort(openThenLatest),
+      outOn: away ? { tripNo: away.tripNo, backBy: sentTrip(plan.date, check, away.vehicleId, away.tripNo).backBy.toISOString() } : null,
     };
   });
   return trucks.sort((a, b) => a.leavesAt.localeCompare(b.leavesAt) || a.vehicleId.localeCompare(b.vehicleId) || a.tripNo - b.tripNo);
 }
 
-// The loading day of a depot at an instant: the loader's day, its plan while it is sent, and its trucks.
+// The trips that left: out on the road or back. A trip that left before the app kept its time comes after the others.
+const leftFirst = (a: TripRow, b: TripRow) => (a.leftAt?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.leftAt?.getTime() ?? Number.MAX_SAFE_INTEGER)
+  || a.vehicleId.localeCompare(b.vehicleId) || a.tripNo - b.tripNo;
+
+// The loading day of a depot at an instant: the loader's day, its plan while it is sent, its trucks, and the trucks
+// that have left the dock (Q-34), so a page open on one tells it apart from a truck the plan took away.
 export async function loadingDayOf(tx: Tx, depotId: string, moment: BoardMoment): Promise<LoadingDay> {
   const day = loaderDay(depotDate(moment.at), depotMinutes(moment.at), await operatingDays(tx));
   const [plan] = day ? await tx.select().from(plans).where(and(eq(plans.depotId, depotId), eq(plans.date, day), eq(plans.status, 'published'))) : [];
-  if (!plan) return { depot: depotId, demoDay: moment.demoDay, day, plan: null, trucks: [] };
+  if (!plan) return { depot: depotId, demoDay: moment.demoDay, day, plan: null, trucks: [], left: [] };
   if (!plan.publishedAt) throw new Error(`Sent plan ${plan.id} has no publication time.`);
   // The exact publication's sender, not its creator or a later audit's wall time. The older seed has no send audit.
   const [sent] = await tx.select({ name: users.displayName }).from(auditLog).leftJoin(users, eq(users.id, auditLog.actorId))
@@ -93,9 +101,12 @@ export async function loadingDayOf(tx: Tx, depotId: string, moment: BoardMoment)
       sql`${auditLog.after}->>'revision' = ${String(plan.revision)}`));
   if (plan.sentCheck !== null && !sent?.name) throw new Error(`Sent plan ${plan.id} has no sender for revision ${plan.revision}.`);
   const onTheList = await tx.select().from(trips).where(and(eq(trips.planId, plan.id), inArray(trips.status, [...ON_THE_LIST])));
+  const gone = (await tx.select({ trip: trips, driver: users.displayName }).from(trips).leftJoin(users, eq(users.id, trips.driverId))
+    .where(and(eq(trips.planId, plan.id), inArray(trips.status, ['out', 'done'])))).sort((a, b) => leftFirst(a.trip, b.trip));
   return { depot: depotId, demoDay: moment.demoDay, day,
     plan: { id: plan.id, revision: plan.revision, publishedAt: plan.publishedAt.toISOString(), publishedBy: sent?.name ?? null },
-    trucks: await trucksOf(tx, plan, onTheList) };
+    trucks: await trucksOf(tx, plan, onTheList, gone.map(({ trip }) => trip)),
+    left: gone.map(({ trip, driver }) => ({ tripId: trip.id, vehicleId: trip.vehicleId, tripNo: trip.tripNo, driver, leftAt: trip.leftAt?.toISOString() ?? null })) };
 }
 
 // GET /loading, in one read-only snapshot that a reset waits behind.

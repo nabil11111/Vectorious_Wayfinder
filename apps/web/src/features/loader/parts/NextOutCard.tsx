@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { orangeButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
 import { CHANGED } from '../changes';
-import { leaves, onOfUnits, stopGoingOf, stopUnits, truckName, tripLine, untilLeaving, vehicleWords } from '../words';
+import { leaves, onOfUnits, outOnWords, stopGoingOf, stopUnits, truckName, tripLine, untilLeaving, vehicleWords } from '../words';
 import { truckIcon } from './icons';
 import { Card, Label, LoadBar, StopChip, Tag } from './ui';
 
@@ -41,6 +41,8 @@ export function NextOutCard({ truck, at, busy, starting, onStart, changed = fals
           <div className="flex items-center gap-2"><Label>Next out</Label>{changed && <Tag tone="warn">{CHANGED}</Tag>}</div>
           <h2 className="mt-[7px] text-[22px] leading-7 font-bold lg:mt-[9px] lg:text-[30px] lg:leading-9">{truckName(truck)} · {leaves(truck)}</h2>
           <p className="mt-[5px] text-[15px] leading-5 text-muted-foreground lg:mt-[7px]">{sub}</p>
+          {/* A trip whose vehicle is still out on an earlier one says so, as its row would (Q-26). */}
+          {truck.outOn && <p className="mt-1.5 text-[13px] leading-4 font-semibold text-warn-ink">{outOnWords(truck.outOn)}</p>}
         </div>
         <img src={truckIcon(truck)} alt="" className="-mt-1 size-14 shrink-0 object-contain lg:mt-1 lg:size-20" />
       </div>

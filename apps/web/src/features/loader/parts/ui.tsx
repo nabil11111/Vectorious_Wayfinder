@@ -87,16 +87,17 @@ export function NotSaved({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-// The loader tried to leave the flag form while its flag is not sent (Q-22). It stays in view under the top bar, as
-// "Not saved" does, until they choose: Try again sends the same flag, and Leave without sending goes where they meant to.
-export function LeaveUnsent({ onRetry, onLeave }: { onRetry: () => void; onLeave: () => void }) {
+// The loader tried to leave the flag form, or to sign out, while its flag is not sent (Q-22). It stays in view under the
+// top bar, as "Not saved" does, until they choose: Try again sends the same flag, and Leave without sending or Sign out
+// anyway does what they meant to.
+export function LeaveUnsent({ signingOut = false, onRetry, onLeave }: { signingOut?: boolean; onRetry: () => void; onLeave: () => void }) {
   const line = useId();
   return (
     <div role="alertdialog" aria-labelledby={line} className="sticky top-[61px] z-[5] mb-3 rounded-[10px] bg-warn-tint px-3 pt-2.5 pb-3 text-warn-ink">
-      <p id={line} className="text-[13px] leading-4 font-semibold">This flag is not sent. If you leave now, the dispatcher may never see it.</p>
+      <p id={line} className="text-[13px] leading-4 font-semibold">This flag is not sent. If you {signingOut ? 'sign out' : 'leave'} now, the dispatcher may never see it.</p>
       <div className="mt-2.5 grid grid-cols-2 gap-2">
         <Button className={orangeButton('h-11 rounded-[10px] text-[13px]')} onClick={onRetry}>Try again</Button>
-        <Button variant="outline" className={plainButton('h-11 rounded-[10px] text-[13px]')} onClick={onLeave}>Leave without sending</Button>
+        <Button variant="outline" className={plainButton('h-11 rounded-[10px] text-[13px]')} onClick={onLeave}>{signingOut ? 'Sign out anyway' : 'Leave without sending'}</Button>
       </div>
     </div>
   );

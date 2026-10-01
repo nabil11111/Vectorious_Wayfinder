@@ -22,14 +22,14 @@ function truck(spec: TripSpec): LoadingTruck {
     tripId: crypto.randomUUID(), revision: 0, vehicleId: spec.vehicleId, vehicleType: 'truck', vehicleTemp: 'reefer', tripNo: spec.tripNo ?? 1, brand: 'Fresh', district: spec.district,
     status: 'planned', leavesAt: spec.leavesAt, readyAt: null, driver: spec.driver, weightCapKg: 3990, volumeCapM3: 21.1, units, on: { units: 0, kg: 0, m3: 0 }, short: 0,
     // The loader's list carries its stops last stop first.
-    stops: [...stops].reverse(), issues: [],
+    stops: [...stops].reverse(), issues: [], outOn: null,
   };
 }
 const PLAN = crypto.randomUUID();
 function published(revision: number, trips: TripSpec[], at = '2026-06-24T21:01:00.000Z'): LoadingDay {
-  return { depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: { id: PLAN, revision, publishedAt: at, publishedBy: 'Ruwan' }, trucks: trips.map(truck) };
+  return { depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: { id: PLAN, revision, publishedAt: at, publishedBy: 'Ruwan' }, trucks: trips.map(truck), left: [] };
 }
-const withdrawn = (): LoadingDay => ({ depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: null, trucks: [] });
+const withdrawn = (): LoadingDay => ({ depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: null, trucks: [], left: [] });
 
 // The README's trip, VEH035 with Nugegoda's three orders and Wellawatte's two: 118 cartons.
 const NUGEGODA: Stop = ['OUT001', 'Fresh Nugegoda', [['o1', 'l1', 12], ['o2', 'l2', 8], ['o3', 'l3', 4, 'dry']]];
