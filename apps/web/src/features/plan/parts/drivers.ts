@@ -21,10 +21,12 @@ export function driverRows(plan: DraftPlan, vehicleId: string, drivers: BoardDri
   });
 }
 
-// Choosing the open trip's driver as one change of the draft (rule 2). A driver from another vehicle leaves it with
-// no driver, so the trip shows the line with Undo, which puts him back there.
-export function driverChange(plan: DraftPlan, tripKey: TripKey, vehicleId: string, driver: BoardDriver | null): { plan: DraftPlan; undo?: Undo } {
+// Choosing the open trip's driver as one change of the draft (rule 2), named for the history (spec 027). A driver from
+// another vehicle leaves it with no driver, so the trip shows the line with Undo, which puts him back there.
+export function driverChange(plan: DraftPlan, tripKey: TripKey, vehicleId: string, driver: BoardDriver | null): { plan: DraftPlan; undo: Undo } {
   const other = driver === null ? null : vehicleOfDriver(plan, driver.id, vehicleId);
   const next = setDriver(plan, vehicleId, driver?.id ?? null);
-  return other === null || driver === null ? { plan: next } : { plan: next, undo: { before: plan, line: `${driver.name} moved from ${other}, which has no driver now`, tripKey } };
+  if (driver === null) return { plan: next, undo: { line: 'Driver taken off the truck', tripKey: null } };
+  return other === null ? { plan: next, undo: { line: `${driver.name} chosen as the driver`, tripKey: null } }
+    : { plan: next, undo: { line: `${driver.name} moved from ${other}, which has no driver now`, tripKey } };
 }

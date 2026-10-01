@@ -90,16 +90,17 @@ it('rule 2 says before the press when the crew\'s driver drives another truck, w
 it('rule 1 a pick is one change of the draft with one Undo, naming the crew', () => {
   const button: Pick = { kind: 'start', group: { brand: 'Fresh', district: 'Colombo' }, orders: [BOARD.orders[2]!], startWith: [] };
   expect(crewChange(button, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toEqual({
-    ...startTrip(DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA })!, undo: { before: DRAFT, line: 'Trip started on Wasantha\'s reefer van', tripKey: 'VEH035-1' },
+    ...startTrip(DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA })!, undo: { line: 'Trip started on Wasantha\'s reefer van', tripKey: 'VEH035-1' },
   });
   expect(crewChange(DROPPED, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toMatchObject({ undo: { line: 'Fresh Dehiwala added to Wasantha\'s reefer van' } });
   // A driver who moves is said in the same line, and the one Undo puts him back.
   expect(crewChange(DROPPED, DRAFT, { vehicleId: 'VEH035', driverId: DILSHAN }, INDEX)).toMatchObject({
-    key: 'VEH035-1', undo: { before: DRAFT, line: 'Fresh Dehiwala added to Dilshan\'s reefer van. VEH001 has no driver now.' },
+    key: 'VEH035-1', undo: { line: 'Fresh Dehiwala added to Dilshan\'s reefer van. VEH001 has no driver now.' },
   });
   expect(crewChange({ kind: 'swap', key: 'VEH011-1' }, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toEqual({
     ...swapTruck(DRAFT, 'VEH011-1', { vehicleId: 'VEH035', driverId: WASANTHA })!, // Chaminda drove the trip, and Wasantha drives it now, so the line says Chaminda is off his truck.
-    undo: { before: DRAFT, line: 'Trip moved to Wasantha\'s reefer van. Chaminda is off VEH011 now.', tripKey: 'VEH035-1' },
+    // The swapped trip's old key, which Undo opens again (L-10).
+    undo: { line: 'Trip moved to Wasantha\'s reefer van. Chaminda is off VEH011 now.', tripKey: 'VEH035-1', from: 'VEH011-1' },
   });
   // A second trip says so.
   expect(crewChange(button, DRAFT, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX)).toMatchObject({ key: 'VEH011-2', undo: { line: 'Second trip started on Chaminda\'s dry truck' } });

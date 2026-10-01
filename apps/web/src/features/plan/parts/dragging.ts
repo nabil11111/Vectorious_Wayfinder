@@ -27,7 +27,9 @@ export function putBack(page: EventTarget) {
 }
 
 // The board's change, for a part that shows a drop's Undo line without a change of its own to call: a card in Done.
-export const BoardChange = createContext<((next: DraftPlan, undo?: Undo) => void) | null>(null);
+export const BoardChange = createContext<((next: DraftPlan, said: Undo) => void) | null>(null);
+// The history's Undo, for a card's green line, which undoes the same step as the header's Undo (spec 027).
+export const BoardUndo = createContext<(() => void) | null>(null);
 
 export const draggedOf = (active: Active | null) => (active?.data.current as DragData | undefined)?.dragged;
 

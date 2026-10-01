@@ -110,5 +110,6 @@ export function crewChange(pick: Pick, plan: DraftPlan, crew: CrewRef, index: Bo
   const moved = displaced(plan, made.plan, crew);
   for (const vehicleId of moved.left) line += `. ${vehicleId} has no driver now.`;
   for (const { driverId, vehicleId } of moved.off) line += `${line.endsWith('.') ? '' : '.'} ${index.driver(driverId)?.name ?? 'A driver'} is off ${vehicleId} now.`;
-  return { ...made, undo: { before: plan, line, tripKey: made.key } };
+  // A swapped trip has a new key: Undo opens it again at the one it had (L-10).
+  return { ...made, undo: { line, tripKey: made.key, ...(pick.kind === 'swap' ? { from: pick.key } : {}) } };
 }

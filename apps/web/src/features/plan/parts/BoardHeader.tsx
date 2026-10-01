@@ -1,11 +1,19 @@
+import { useState } from 'react';
 import { Switch } from '@base-ui/react/switch';
+import { Tooltip } from '@base-ui/react/tooltip';
+import { Redo2, RotateCcw, Undo2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { BoardCounts, DraftPlan } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { BoardScreen, Undo } from '../board';
+import { editable, type BoardScreen, type Undo } from '../board';
 import { setMixBrands } from '../draft';
 import { clockTime, figure, planFor, space, whole } from '../words';
-import { inkButton } from './look';
+import { startOverChange } from './changes';
+import { START_OVER_LINE } from './history-keys';
+import { inkButton, plainButton } from './look';
 import { Tag } from './ui';
 
 export type Tab = 'unplanned' | 'planning' | 'done';
@@ -13,7 +21,7 @@ export type Tab = 'unplanned' | 'planning' | 'done';
 // The top of the board (Edit plan's header): the day, the three columns as tabs, whether the draft is saved,
 // the counts of rule 12, "Mix brands" and "View plan". Below 1024 px the tabs choose the column on screen; on a
 // desktop they only mark the column being worked in.
-export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedCount, doneCount, change, retry, onViewPlan, stale, onRefresh, refreshing }: {
+export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedCount, doneCount, change, retry, onViewPlan, stale, onRefresh, refreshing, onUndo, onRedo }: {
   screen: BoardScreen;
   tab: Tab;
   working: Tab;
@@ -21,13 +29,17 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
   openCount: number;
   unplannedCount: number;
   doneCount: number;
-  change: (next: DraftPlan, undo?: Undo) => void;
+  change: (next: DraftPlan, said: Undo) => void;
   retry: () => void;
   onViewPlan: () => void;
   stale: boolean;
   onRefresh: () => void;
   refreshing: boolean;
+  // The history's Undo and Redo (spec 027).
+  onUndo: () => void;
+  onRedo: () => void;
 }) {
+  const [asking, setAsking] = useState(false);
   const { board, draft } = screen;
   // View plan is greyed until the first change has made a plan.
   const hasPlan = board.plan.id !== null || screen.saving !== 'saved';
@@ -71,10 +83,17 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
             <button type="button" className="underline underline-offset-2 disabled:opacity-50" disabled={refreshing} onClick={onRefresh}>Try again</button>
           </p>
         )}
+        <HistoryButton icon={Undo2} verb="Undo" line={screen.history.undo} onPress={onUndo} />
+        <HistoryButton icon={Redo2} verb="Redo" line={screen.history.redo} onPress={onRedo} />
+        {editable(board) && (
+          <Button variant="outline" className={plainButton('h-8 px-3.5 text-[13px]')} onClick={() => setAsking(true)}>
+            <RotateCcw aria-hidden="true" className="size-3.5" /> Start over
+          </Button>
+        )}
         <label className="flex h-8 cursor-pointer items-center gap-2.5 rounded-[10px] bg-card pr-3 pl-3 shadow-[0_2px_6px_color-mix(in_srgb,var(--foreground)_8%,transparent)]">
           <Switch.Root
             checked={draft.mixBrands}
-            onCheckedChange={(on) => change(setMixBrands(draft, on))}
+            onCheckedChange={(on) => change(setMixBrands(draft, on), { line: `Mix brands turned ${on ? 'on' : 'off'}`, tripKey: null })}
             className="relative flex h-5 w-9 shrink-0 items-center rounded-full bg-border p-0.5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 data-checked:bg-secondary"
           >
             <Switch.Thumb className="size-4 rounded-full bg-card shadow-sm ring-1 ring-foreground/5 transition-transform data-checked:translate-x-4" />
@@ -83,7 +102,44 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
         </label>
         <Button variant="secondary" className={inkButton('h-8 w-[120px] text-[13px]')} disabled={!hasPlan} focusableWhenDisabled onClick={onViewPlan}>View plan</Button>
       </div>
+      {/* Start over asks in the app first, never with the browser's box (spec 027). */}
+      <AlertDialog open={asking} onOpenChange={setAsking}>
+        <AlertDialogContent className="gap-3.5 rounded-lg p-5 sm:max-w-sm">
+          <AlertDialogHeader className="gap-2">
+            <AlertDialogTitle className="text-base leading-5 font-bold">Start over?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[13px] leading-[18px] text-muted-foreground">{START_OVER_LINE(board.day!.date)}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="-mx-5 -mb-5 rounded-b-lg px-5 py-3.5">
+            <AlertDialogCancel className={plainButton('h-10 px-5 text-[13px]')}>Keep the plan</AlertDialogCancel>
+            <Button className={inkButton('h-10 px-5 text-[13px]')} onClick={() => { const over = startOverChange(draft); change(over.plan, over.said); setAsking(false); }}>Start over</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
+  );
+}
+
+// Undo or Redo (spec 027): an icon button named by the change it would undo or redo, also in its tooltip, and off with
+// nothing to do.
+function HistoryButton({ icon: Icon, verb, line, onPress }: { icon: typeof Undo2; verb: 'Undo' | 'Redo'; line: string | null; onPress: () => void }) {
+  const label = line ? `${verb}: ${line}` : verb;
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger
+        render={<button type="button" />}
+        aria-label={label}
+        disabled={line === null}
+        onClick={onPress}
+        className="flex size-8 items-center justify-center rounded-[10px] border bg-card text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:text-muted-foreground/50"
+      >
+        <Icon aria-hidden="true" className="size-4" />
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Positioner sideOffset={6} className="z-50">
+          <Tooltip.Popup className="max-w-72 rounded-md bg-secondary px-2.5 py-1.5 text-xs leading-[15px] text-secondary-foreground shadow-md">{label}</Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 

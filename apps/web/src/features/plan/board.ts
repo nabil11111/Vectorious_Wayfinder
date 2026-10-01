@@ -134,9 +134,15 @@ export function useOrdersFollow() {
 // not reach the server and another follows. 'refused': the server said no, and the changes wait for Try again.
 export type Saving = 'saved' | 'saving' | 'retrying' | 'refused';
 
-// The draft from before the last stop move, which "Undo" puts back while nothing else has changed, with the line
-// the moved trip shows.
-export interface Undo { before: DraftPlan; line: string; tripKey: string }
+// What a change of the draft is called (spec 027): the line that names it, in the header's Undo and Redo and, when it
+// is about a trip, in the green line that trip shows with Undo. from is the trip that was open before a change that
+// moved it to another key, such as Swap truck, which Undo opens again (L-10), and Redo opens tripKey once more.
+export interface Undo { line: string; tripKey: string | null; from?: string }
+
+// One step of the board's history: the draft before and after a change, and what the change is called.
+interface Step extends Undo { before: DraftPlan; after: DraftPlan }
+// The most steps the history keeps (spec 027).
+const HISTORY = 50;
 
 export interface BoardScreen {
   // The board as the server last answered: its check, figures and counts belong to it.
@@ -149,6 +155,8 @@ export interface BoardScreen {
   // A split, join, send, back to edit, build or accept is on its way, and the board holds still until it answers.
   acting: boolean;
   undo: (Undo & { seq: number; revision: number | null }) | null;
+  // What the header's Undo and Redo would undo and redo, or null when there is nothing (spec 027).
+  history: { undo: string | null; redo: string | null };
 }
 
 // Refusals that say the plan moved on without this screen. The screen loads the board again and says why.
@@ -203,6 +211,9 @@ class PlanSaver {
   private unanswered: DraftPlan[] = [];
   private waiters: ((saved: boolean) => void)[] = [];
   private droppedShown = '';
+  // This tab's changes of the draft, the latest last, and the ones undone, the latest undone last (spec 027).
+  private past: Step[] = [];
+  private future: Step[] = [];
 
   // The depot the queue's board is for, which every write it makes names.
   readonly depot: string | null;
@@ -263,9 +274,13 @@ class PlanSaver {
 
   // Shows a board: its numbers always, and its draft too when nothing on screen is waiting to be saved. An
   // "Undo" lasts only while the plan's revision is the one its move's save made.
-  private take(board: PlanBoard, withDraft: boolean) {
+  private take(board: PlanBoard, withDraft: boolean, keepHistory = false) {
     const held = this.screen;
     const undo = held?.undo && held.undo.revision !== null && held.undo.revision !== board.plan.revision ? null : held?.undo ?? null;
+    // A draft from elsewhere (another tab, a refetch that differs, a split or a join) or a sent plan ends the history,
+    // so Undo never puts back a plan someone else changed (spec 027).
+    const replaced = withDraft && held !== null && !sameDraft(planOf(board), held.draft);
+    if (!keepHistory && (replaced || board.plan.status === 'published')) this.past = this.future = [];
     this.screen = {
       board,
       draft: withDraft || !held ? planOf(board) : held.draft,
@@ -273,6 +288,7 @@ class PlanSaver {
       refused: held?.refused ?? null,
       acting: this.acting,
       undo,
+      history: this.historyLines(),
     };
     for (const listener of this.listeners) listener();
     const dropped = board.dropped.join(',');
@@ -280,9 +296,13 @@ class PlanSaver {
     this.droppedShown = dropped;
   }
 
+  private historyLines() {
+    return { undo: this.past.at(-1)?.line ?? null, redo: this.future.at(-1)?.line ?? null };
+  }
+
   // A write's answer goes on screen and into the cache, where the board and View plan read it.
-  private answered(board: PlanBoard, withDraft: boolean) {
-    this.take(board, withDraft);
+  private answered(board: PlanBoard, withDraft: boolean, keepHistory = false) {
+    this.take(board, withDraft, keepHistory);
     if (!board.day) return;
     this.qc.setQueryData(dayKey(board.day.date), board);
     const held = this.qc.getQueryData<PlanBoard>(boardKey);
@@ -301,7 +321,8 @@ class PlanSaver {
     window.clearTimeout(this.retryTimer);
     this.unanswered = [];
     this.savedSeq = this.sentSeq = this.seq;
-    this.show({ undo: null });
+    this.past = this.future = [];
+    this.show({ undo: null, history: this.historyLines() });
     this.settle(false);
   }
 
@@ -322,20 +343,52 @@ class PlanSaver {
     this.show({ saving: 'saved', refused: null });
   };
 
-  // A change on the board. It shows at once and is saved behind any save on its way. While a split, join or send
-  // is out the board holds still, and says so.
-  change = (next: DraftPlan, undo?: Undo) => {
+  // A change on the board, named by what it is called. It shows at once and is saved behind any save on its way, and
+  // it is one step of the history, which ends anything undone (spec 027). While a split, join or send is out the board
+  // holds still, and says so.
+  change = (next: DraftPlan, said: Undo) => {
     const held = this.screen;
-    if (!held || !editable(held.board)) return;
+    if (!this.canChange(held)) return;
+    this.past = [...this.past, { ...said, before: held.draft, after: next }].slice(-HISTORY);
+    this.future = [];
+    this.put(next, said.tripKey === null ? null : said);
+  };
+
+  // Undo: the draft before the latest step, saved as any change is. Redo: the step undone last, again (spec 027).
+  // Each answers the step it undid or made again, so the board can open the trip it is about, or null.
+  undo = (): Undo | null => {
+    const step = this.past.at(-1);
+    if (!step || !this.canChange(this.screen)) return null;
+    this.past = this.past.slice(0, -1);
+    this.future = [...this.future, step];
+    this.put(step.before, null);
+    return { line: step.line, tripKey: step.tripKey, ...(step.from === undefined ? {} : { from: step.from }) };
+  };
+  redo = (): Undo | null => {
+    const step = this.future.at(-1);
+    if (!step || !this.canChange(this.screen)) return null;
+    this.future = this.future.slice(0, -1);
+    this.past = [...this.past, step];
+    this.put(step.after, step.tripKey === null ? null : step);
+    return { line: step.line, tripKey: step.tripKey, ...(step.from === undefined ? {} : { from: step.from }) };
+  };
+
+  private canChange(held: BoardScreen | null): held is BoardScreen {
+    if (!held || !editable(held.board)) return false;
     if (this.acting) {
       tell('One moment: the board is still saving.');
-      return;
+      return false;
     }
+    return true;
+  }
+
+  // The draft on screen, saved behind any save on its way, with the line its trip shows, if any.
+  private put(next: DraftPlan, line: Undo | null) {
     this.seq += 1;
     window.clearTimeout(this.retryTimer);
-    this.show({ draft: next, saving: 'saving', refused: null, undo: undo ? { ...undo, seq: this.seq, revision: null } : null });
+    this.show({ draft: next, saving: 'saving', refused: null, undo: line ? { line: line.line, tripKey: line.tripKey, seq: this.seq, revision: null } : null, history: this.historyLines() });
     void this.flush();
-  };
+  }
 
   // Try again after a refusal: the same changes, sent again.
   retry = () => {
@@ -486,7 +539,8 @@ class PlanSaver {
   // is saved and any other of them has answered, and the board holds still until this one answers. It says why when
   // it was refused, or null. done gets the board it answered once the board has taken it, and only then: a build that
   // went through opens View plan from there (spec 023).
-  act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>, done?: (board: PlanBoard) => void): Promise<string | null> => {
+  // said names a write that is a step of the history, as a build is (spec 027): Undo then puts back the draft before it.
+  act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>, done?: (board: PlanBoard) => void, said?: Undo): Promise<string | null> => {
     // A queue for an account or depot no longer on show sends nothing (spec 020), here and below before the send.
     if (!this.stillMine()) {
       this.dropAll();
@@ -509,8 +563,12 @@ class PlanSaver {
       }
       const answer = await madeBy(this, () => run(date, refOf(before)));
       if (!this.stillMine()) return null;
-      this.answered(answer, true);
-      this.show({ saving: 'saved', refused: null, undo: null });
+      if (said) {
+        this.past = [...this.past, { ...said, before: held.draft, after: planOf(answer) }].slice(-HISTORY);
+        this.future = [];
+      }
+      this.answered(answer, true, said !== undefined);
+      this.show({ saving: 'saved', refused: null, undo: null, history: this.historyLines() });
       done?.(answer);
       return null;
     } catch (error) {
@@ -618,6 +676,6 @@ export function useBoardScreen(board: PlanBoard | undefined) {
   }, [saver, board]);
   const screen = useSyncExternalStore(saver.subscribe, saver.snapshot);
   // The first drawing with a board comes before the effect above has handed it over.
-  const shown: BoardScreen | null = screen ?? (board ? { board, draft: planOf(board), saving: 'saved', refused: null, acting: false, undo: null } : null);
+  const shown: BoardScreen | null = screen ?? (board ? { board, draft: planOf(board), saving: 'saved', refused: null, acting: false, undo: null, history: { undo: null, redo: null } } : null);
   return { saver, screen: shown };
 }

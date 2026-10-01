@@ -112,7 +112,9 @@ are what the demo clock shows.
    new orders, and "Fresh Nugegoda added to Wasantha's reefer van" with **Undo**. (The group's **Start a trip** opens
    the same picker for all of Colombo's orders.) Add Nugegoda's 12 carried-over chilled cartons from Carried over,
    and Wellawatte. The trip leaves 04:36, reaches Fresh Nugegoda at 05:00 and Fresh Wellawatte at 05:24, and is back
-   at 06:10. Every change is saved and checked at once.
+   at 06:10. Every change is saved and checked at once. Undo in the header (or Ctrl+Z) takes the last change back, its
+   tooltip naming it, such as "Undo: Fresh Wellawatte added to Wasantha's reefer van", and Redo (Ctrl+Shift+Z) makes it
+   again.
 5. **Everything else waits, with a reason.** Defer each other group from its ⋮ menu with a reason the shop will
    read, such as "No fridge truck was left for Colombo.", until nothing is unplanned.
 6. **Send.** Mark the trip done and open **View plan**: 5 of 104 orders on 1 trip, 99 deferred, checks all
@@ -301,6 +303,10 @@ Anything we built differently from our Designathon submission, and why.
 - **Drivers** are picked from the depot's driver accounts, and a vehicle may have none (D-31). Each truck has a usual
   driver, from the latest sent plan, and the suggested plan gives it them. The driver menu in a trip's header changes
   the driver alone, and a driver taken from another truck leaves it with none.
+- **Undo, Redo and Start over** sit in the board's header, where the design draws none: every change of the draft is a
+  step this tab can undo and redo (Ctrl+Z, Ctrl+Shift+Z), and Start over takes every trip and deferral off after asking,
+  as one step Undo brings back (D-101). A stop has a × that takes it off its trip, and a card in Done a ⋮ with Remove
+  trip.
 - **Moving stops** shows no "12 km shorter" or "35 min earlier", and a late stop says "late": the checker's
   kilometres depend only on the number of stops, and its sentence under the timeline gives the minutes.
 - **More actions than the frames draw:** a stop's ⋮ menu has Take off, Split and Defer for each order, group and

@@ -20,7 +20,7 @@ export function FindSlot({ screen, index, orderId, change, onPut, onCrew, onClos
   screen: BoardScreen;
   index: BoardIndex;
   orderId: string;
-  change: (next: DraftPlan, undo?: Undo) => void;
+  change: (next: DraftPlan, said: Undo) => void;
   onPut: (key: TripKey) => void;
   // A crew picked for a new trip with this order (spec 026).
   onCrew: (pick: Pick, crew: CrewRef) => void;
@@ -57,11 +57,12 @@ export function FindSlot({ screen, index, orderId, change, onPut, onCrew, onClos
   // Offers stand only for the saved draft they were worked out on: a change on its way hides them until it is saved.
   const current = saved && slots.data && slots.data.revision === board.plan.revision ? slots.data : null;
   const put = (key: TripKey) => {
-    change(addOrders(draft, key, [order]));
+    const trip = draft.trips.find((t) => keyOf(t) === key);
+    change(addOrders(draft, key, [order]), { line: `${shop.name} added to ${trip ? index.called(trip) : 'the trip'}`, tripKey: key });
     onPut(key);
   };
   const keepDeferred = (deferrals: DraftDeferral[]) => {
-    change(defer(draft, deferrals));
+    change(defer(draft, deferrals), { line: `${shop.name} kept deferred`, tripKey: null });
     onClose();
   };
   const facts = [

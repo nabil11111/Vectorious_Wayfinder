@@ -66,7 +66,7 @@ it('AC-6 a depot switch starts the board afresh, so the board held for the depot
 it('AC-6 a save for the depot before that answers after the switch is dropped, and lands on no board', async () => {
   const qc = signedIn(RUWAN);
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await settled();
   expect(fetch).toHaveBeenCalledTimes(1);
 
@@ -84,7 +84,7 @@ it('AC-6 a change on its way holds a depot switch until it lands, and one the se
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
   expect(planWriteOnItsWay(qc)).toBe(false);
 
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   expect(planWriteOnItsWay(qc)).toBe(true);
   await settled();
   answer(Response.json(boardOf('Peliyagoda', PLAN, 1)));
@@ -93,7 +93,7 @@ it('AC-6 a change on its way holds a depot switch until it lands, and one the se
   expect(planWriteOnItsWay(qc)).toBe(false);
 
   // A save that got no answer is tried again later, so it is still on its way.
-  saver.change({ ...MIXED, mixBrands: false });
+  saver.change({ ...MIXED, mixBrands: false }, { line: 'A change', tripKey: null });
   await settled();
   answer(new TypeError('Failed to fetch'));
   await settled();
@@ -113,7 +113,7 @@ it('AC-6 a change on its way holds a depot switch until it lands, and one the se
 it('AC-6 only the board of the account and depot on show can hold a switch', async () => {
   const qc = signedIn(RUWAN);
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   expect(planWriteOnItsWay(qc)).toBe(true);
   // Once the session is on Kandy, Peliyagoda's board is not the one on show, and Kandy's has nothing on its way.
   qc.setQueryData(meKey, IN_KANDY);
@@ -165,7 +165,7 @@ async function withRetries(test: () => Promise<void>) {
 it('AC-6 a switch retires the board\'s queue whatever page is on show, so a save waiting to try again is never sent', () => withRetries(async () => {
   const qc = signedIn(RUWAN);
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await vi.advanceTimersByTimeAsync(0);
   answer(new TypeError('Failed to fetch'));
   await vi.advanceTimersByTimeAsync(0);
@@ -182,7 +182,7 @@ it('AC-6 a switch retires the board\'s queue whatever page is on show, so a save
 it('AC-6 the board\'s queue checks the account and depot before every save, split, join, send or build', () => withRetries(async () => {
   const qc = signedIn(RUWAN);
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await vi.advanceTimersByTimeAsync(0);
   answer(new TypeError('Failed to fetch'));
   await vi.advanceTimersByTimeAsync(0);
@@ -210,7 +210,7 @@ it('D-95 retiring the board\'s queue says whether it held plan changes not yet s
   expect(retireBoard(qc)).toBeNull();
 
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await settled();
   expect(retireBoard(qc)).toBe('unsure');
   answer(Response.json(boardOf('Peliyagoda', PLAN, 1)));
@@ -220,7 +220,7 @@ it('D-95 retiring the board\'s queue says whether it held plan changes not yet s
 it('D-95 a change the server turned down was not kept: retiring the queue says it is dropped', async () => {
   const qc = signedIn(RUWAN);
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await settled();
   answer(Response.json({ error: { code: 'depot_changed', message: 'The depot was switched in another tab.' } }, { status: 409 }));
   await settled();
@@ -231,7 +231,7 @@ it('D-95 a change the server turned down was not kept: retiring the queue says i
 it('D-95 a save that got no answer may have been kept, even once its retry is turned down: retiring the queue says it is unsure', async () => {
   const qc = signedIn(RUWAN);
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await settled();
   // The server saved it, but its answer was lost on the way back.
   answer(new TypeError('Failed to fetch'));
@@ -249,7 +249,7 @@ it('D-95 a save that got no answer may have been kept, even once its retry is tu
 it('D-95 a retired queue stays retired: switching back to the same account and depot neither revives it nor lets its late answers land, and it sends nothing more', async () => {
   const qc = signedIn(RUWAN);
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await settled();
   expect(fetch).toHaveBeenCalledTimes(1);
 
@@ -264,7 +264,7 @@ it('D-95 a retired queue stays retired: switching back to the same account and d
 
   // The board drawn now has a queue of its own, and the old one sends nothing more.
   expect(useBoardScreen(undefined).saver).not.toBe(saver);
-  saver.change({ ...MIXED, mixBrands: false });
+  saver.change({ ...MIXED, mixBrands: false }, { line: 'A change', tripKey: null });
   await settled();
   expect(await saver.act(sendPlan)).toBeNull();
   expect(fetch).toHaveBeenCalledTimes(1);
@@ -273,7 +273,7 @@ it('D-95 a retired queue stays retired: switching back to the same account and d
 it('D-95 a queue that finds itself no longer the screen\'s drops its waiting changes, so it holds no switch after the same dispatcher signs in again', () => withRetries(async () => {
   const qc = signedIn(RUWAN);
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await vi.advanceTimersByTimeAsync(0);
   answer(new TypeError('Failed to fetch'));
   await vi.advanceTimersByTimeAsync(0);
@@ -300,7 +300,7 @@ it('D-95 a save waiting its turn behind another write does not go once a switch 
   const sending = writeOutsideBoard(qc, '2026-06-25', board, sendPlan);
   await settled();
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-  saver.change(MIXED);
+  saver.change(MIXED, { line: 'A change', tripKey: null });
   await settled();
   expect(fetch).toHaveBeenCalledTimes(1);
 
@@ -321,7 +321,7 @@ it('D-95 a write waiting its turn names the depot it was made for, not the one t
     const sending = writeOutsideBoard(qc, '2026-06-25', boardOf('Peliyagoda', PLAN, 1), sendPlan);
     await settled();
     const { saver } = useBoardScreen(boardOf('Peliyagoda'));
-    saver.change(MIXED);
+    saver.change(MIXED, { line: 'A change', tripKey: null });
     await settled();
     // The tab names Kandy by the time the save's turn comes, as it does the moment it takes a switch.
     nameDepot('Kandy');
@@ -359,7 +359,7 @@ it('spec 026 rule 2 a driver moved in the menu goes out as one save of the draft
   expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: { line: 'Dilshan moved from VEH001, which has no driver now', tripKey: 'VEH035-1', revision: 2 } });
 
   // Undo, as the trip's green line does it: the draft before, Dilshan back on VEH001, in one more save.
-  saver.change(saver.snapshot()!.undo!.before);
+  saver.undo();
   await settled();
   expect(sent()).toEqual([[['VEH001', null], ['VEH035', dilshan]], [['VEH001', dilshan], ['VEH035', sanjeewa]]]);
   answer(Response.json({ ...board, plan: { ...board.plan, revision: 3 } }));
@@ -388,7 +388,7 @@ it('spec 023 AC-5 a drop goes out as one save of the draft, checked as a button\
   await settled();
   expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: { line: 'Stops 1 and 3 moved', tripKey: 'VEH035-1', revision: 2 } });
 
-  saver.change(saver.snapshot()!.undo!.before);
+  saver.undo();
   await settled();
   expect(sent()).toEqual([['OUT003', 'OUT002', 'OUT001'], ['OUT001', 'OUT003', 'OUT002']]);
   answer(Response.json({ ...board, plan: { ...board.plan, revision: 3 } }));
