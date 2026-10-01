@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { BRANDS, type LoadingDay } from '@wayfinder/contracts';
 import { z } from 'zod';
 import { meKey, useMe } from '@/features/auth/api';
-import { useLoadingDay } from './loading';
+import { dismissRefusal, useLoadingDay } from './loading';
 import { brandOfShop, clockTime, lineWords, unitsWords } from './words';
 
 // The loader's Plan changed notice (spec 016 rule 9, D-70, D-71). The tablet keeps the last two publications it read,
@@ -273,6 +273,6 @@ export function usePlanWatch() {
     store.observe(account && day.day ? { account, depot: day.depot, demoDay: day.demoDay, day: day.day } : null, day);
   }, [day, account]);
   useEffect(() => qc.getQueryCache().subscribe((event) => {
-    if (event.type === 'updated' && event.query.queryKey[0] === meKey[0] && event.query.state.data === null) store.forget();
+    if (event.type === 'updated' && event.query.queryKey[0] === meKey[0] && event.query.state.data === null) { store.forget(); dismissRefusal(); }
   }), [qc]);
 }

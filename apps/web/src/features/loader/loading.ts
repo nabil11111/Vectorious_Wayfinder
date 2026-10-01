@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { LoadingDay, MarkReadyRequest, RaiseFlagRequest, StartLoadingRequest, StopLoadedRequest } from '@wayfinder/contracts';
 import { reasonOf } from '@/features/store/words';
@@ -61,6 +61,20 @@ export interface LoaderWrites {
   retry: () => void;
 }
 
+// A refused write's sentence stays on this tab until the loader dismisses it (spec 016, AC-31): a stale Start opens
+// what changed, and the page that sent it, with its own copy of the sentence, goes. A new write replaces it.
+let refusal: string | null = null;
+const refusalListeners = new Set<() => void>();
+function keepRefusal(text: string | null) {
+  refusal = text;
+  for (const listener of refusalListeners) listener();
+}
+export const useKeptRefusal = () => useSyncExternalStore((change) => {
+  refusalListeners.add(change);
+  return () => { refusalListeners.delete(change); };
+}, () => refusal);
+export const dismissRefusal = () => keepRefusal(null);
+
 // A screen's writes, one at a time (plan.md "The screen"). The write's id is made when the button is pressed and
 // kept until an answer comes, so Try again sends the same body and a write that had landed is answered as done.
 // Only a write with no answer, a 5xx or a 429 is sent again, and only when the loader taps Try again. A refusal says
@@ -81,6 +95,7 @@ export function useLoaderWrites(): LoaderWrites {
     const write = pending.current;
     if (!write || running.current) return;
     running.current = true;
+    keepRefusal(null);
     setState({ out: write.kind, phase: 'saving', refused: null });
     try {
       await api<LoadingDay>(`/loading/trips/${encodeURIComponent(write.tripId)}/${PATH[write.kind]}`, {
@@ -93,6 +108,7 @@ export function useLoaderWrites(): LoaderWrites {
         return;
       }
       pending.current = null;
+      keepRefusal(reasonOf(error));
       await fetchAgain(qc, loadingKey);
       running.current = false;
       setState({ out: null, phase: 'idle', refused: reasonOf(error) });

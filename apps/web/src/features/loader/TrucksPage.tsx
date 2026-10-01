@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { useAppClock } from '@/lib/clock';
 import { NOT_KEPT, SEE_CHANGES, WITHDRAWN, chipsOf, markChangesOpened, noticeOf, planChangedLine, truckKey, usePlanChanges } from './changes';
-import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
+import { dismissRefusal, useKeptRefusal, useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { LoadFailed } from './parts/LoadFailed';
 import { DayNote, NextOutCard } from './parts/NextOutCard';
 import { NextList } from './parts/TruckRow';
@@ -65,7 +65,7 @@ function Trucks({ day, writes, stale }: { day: LoadingDay; writes: LoaderWrites;
   return (
     <div>
       {stale && <div className="mb-3">{stale}</div>}
-      {writes.refused && <Refused>{writes.refused}</Refused>}
+      <KeptRefusal />
       {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
       {changes.failed && <p role="status" className="mb-3 rounded-[10px] bg-warn-tint px-3 py-2.5 text-[13px] leading-4 font-semibold text-warn-ink">{NOT_KEPT}</p>}
       {/* A notice seen but not closed with Got it stays on top of the list, and opens again from here or the bell. */}
@@ -136,5 +136,20 @@ function TrucksSkeleton() {
         </div>
       </div>
     </div>
+  );
+}
+
+// A refused write's sentence, kept until the loader dismisses it: it stays through the change page a stale Start
+// opens, and on the truck page when the truck it named is gone (spec 016, AC-31).
+export function KeptRefusal() {
+  const text = useKeptRefusal();
+  if (!text) return null;
+  return (
+    <Refused>
+      <span className="flex items-start justify-between gap-3">
+        <span>{text}</span>
+        <button type="button" className="-my-3 shrink-0 py-3 underline underline-offset-2" onClick={dismissRefusal}>Dismiss</button>
+      </span>
+    </Refused>
   );
 }
