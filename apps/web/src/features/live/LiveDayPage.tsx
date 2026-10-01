@@ -15,7 +15,7 @@ import { useOperations } from './operations';
 import { Events } from './parts/Events';
 import { focusIssue, focusOpener, showTrip } from './parts/focus';
 import { CountsSkeleton, TripsSkeleton } from './parts/LiveSkeleton';
-import { allTrips, needsAttention, type Filter } from './parts/rows';
+import { allTrips, needsAttention, shownGroups, type Filter } from './parts/rows';
 import { Section } from './parts/Section';
 import type { RowActions } from './parts/TripRow';
 import { CARD, LiveLine, StaleLine, Switch } from './parts/ui';
@@ -186,10 +186,11 @@ function Trips({ query, filter, issues, actions, at }: { query: UseQueryResult<O
       {day.plan && !day.plan.detailRecorded && <Note>{NOT_RECORDED_PLAN}</Note>}
       {day.plan && day.groups.length === 0 && <Note>{NO_TRIPS}</Note>}
       {filter === 'problems' && !matching && <Note>{NO_MATCH}</Note>}
-      {day.day !== null && day.groups.length > 0 && (
+      {/* A section the filter leaves empty goes, heading and axis too; its totals were never filtered. */}
+      {day.day !== null && shownGroups(day.groups, filter).length > 0 && (
         <Section date={day.day} totals={day.brandTotals} groups={day.groups} timeline={day.timeline} filter={filter} issues={list} actions={actions} at={at} />
       )}
-      {day.earlierOut.map((section) => (
+      {day.earlierOut.filter((section) => shownGroups(section.groups, filter).length > 0).map((section) => (
         <div key={section.date} className="pt-1">
           <h2 className="px-1 text-sm leading-5 font-bold">{stillOutFrom(section.date)}</h2>
           <Section date={section.date} totals={section.brandTotals} groups={section.groups} timeline={section.timeline} filter={filter} issues={list} actions={actions} at={at} />

@@ -14,7 +14,7 @@ import { isRecorded } from './rows';
 // The axis above a section's trips: the hours every two hours, "now" in bold, and the legend's three marks.
 export function Axis({ timeline, date, now }: { timeline: OperationsTimeline; date: string; now: number | null }) {
   // A tick label that would sit under "now" gives it the room, as the frame does.
-  const clear = (tick: string) => now === null || Math.abs(Date.parse(tick) - now) > 50 * 60_000;
+  const clear = (tick: string) => now === null || Math.abs(Date.parse(tick) - now) > 75 * 60_000;
   return (
     <div className={cn(ROW, 'h-[22px] px-6')}>
       <div className="col-span-2 flex items-center gap-3 text-[10px] leading-3 text-muted-foreground xl:col-span-3">
