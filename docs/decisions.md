@@ -168,3 +168,53 @@ consent (spec 011). An edit that changes the planner's choice ends its decision.
 **D-55 · 1 Oct · "why?" shows the planner's reason for an order** (our pick, until Nabil answers). A judge and a
 dispatcher must be able to ask why an order went where it did. The design's chips that ask why the dispatcher changed
 the suggestion are not built, because a deferral already carries its reason (spec 010, rule 7).
+
+## Spec 017 picks
+D-43–79 belong to specs 013–016 and their reviews, including the entries already joined above. The entries below are picks for
+[017](specs/017-look-up-pages/spec.md), pending Nabil's answers to its open questions; they do not fill those gaps.
+
+**D-80 · 1 Oct · The dispatcher's look-up pages only read what the earlier pieces record.** A8 remains the first
+piece cut if time runs short. Orders, History and Fleet add no business write or new kind of record. The exported
+six-week Book action hires reefers; neither that hire nor booking a vehicle off is included. The plan board,
+Live day, shop and admin retain their existing commands.
+
+**D-81 · 1 Oct · Orders is a wanted-date lookup with current status.** Day means the shop's wanted date; Last
+4 weeks means the 28 calendar dates ending on it. Count submitted leaf orders, not drafts or split parents.
+Show published deferrals and the latest sent-plan record separately, so returned goods do not acquire a promised
+new date. Real outlet/order identities replace the frame's example order numbers.
+
+**D-82 · 1 Oct · History shows retained sent-plan detail and recorded attempts without replay.** Open a published
+plan's date, use its kept schedule and read loading, driver outcomes, problems and shop confirmations. Each closed
+issue keeps its own counts, times and photo; its old arrival can come only from the audit matched to that existing
+stop, trip and issue/write id. Missing evidence is labelled. Deleted publication revisions, a full audit explorer
+and animated replay stay out, narrowing the earlier A8 promise explicitly.
+
+**D-83 · 1 Oct · History keeps orders, stops, attempts and shop confirmations separate.** Quantities say ordered,
+loaded, handed over or received, with null for missing evidence. Three orders confirmed at one stop are one shop
+confirmation, not three deliveries. Closed attempts never inherit later receipts. Returned means Return
+instructed, including refused goods answered Send replacements; it does not claim a depot return scan exists.
+
+**D-84 · 1 Oct · History reuses the scoped proof and problem-photo reads.** Share 016's stop-proof GET and 013's
+issue-photo GET, with depot authorization and JPEG private/no-store, no-sniff and same-origin headers. Lists carry
+metadata only. Open photos on demand and release them on close, reset or sign-out; no gallery table, public link,
+receipt signature or persistent browser photo cache.
+
+**D-85 · 1 Oct · Fleet Today means the app's calendar date and reported trip state.** Out now includes any
+published out trip, even from an earlier date. Its driver/status takes precedence, then today's first unfinished
+trip, then its last returned trip. Not recorded out replaces the frame's physical At the depot claim. Workshop
+and archive are independent facts; archives remove active capacity but never erase historical trips.
+
+**D-86 · 1 Oct · Fleet fuel is recorded and committed litres.** Use that calendar date's ISO-week ledger once,
+including estimates already committed when plans were sent. Show quota minus that sum, with honest negative or
+unknown values and distinct recorded/remaining percentages. Count trips and planned km only from sent plans,
+not from legacy fuel rows. This is neither measured consumption nor a future fuel forecast.
+
+**D-87 · 1 Oct · Fleet next 6 weeks is 42 dates of recorded availability.** Today through today + 41 lists the
+current active inventory and recorded days off, in separate reefer, dry-truck and dry-van categories. Calendar
+operating/closed status is independent; missing dates stay unknown. No recorded day off does not promise an
+available trip or enough route capacity. No demand model, seasonal uplift, calendar extension or booking success.
+
+**D-88 · 1 Oct · Lookups keep full read access below 1024 wide.** Desktop tables/timeline and detail rail follow
+the frames; narrower screens use cards, labelled times and inline detail. Keep filters, photos and all 42 dates
+accessible without page-wide overflow. Reads use the existing live stream and refresh fallback; a failed refresh
+shows labelled last-loaded records, with no persistent offline lookup store or second phone queue.
