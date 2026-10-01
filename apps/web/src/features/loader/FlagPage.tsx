@@ -10,7 +10,7 @@ import { flagCounts, wholeCount } from './count';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { GOODS_ICON } from './parts/icons';
 import { BackLink } from './parts/LoadCard';
-import { LoadFailed, NotOnList } from './parts/LoadFailed';
+import { LoadFailed, TruckGone } from './parts/LoadFailed';
 import { ActionBar, Card, LeaveUnsent, NotSaved, Refused, SendingFirst, TickBox } from './parts/ui';
 import { useTicks } from './ticks';
 import { asksBeforeLeaving } from './unsent';
@@ -39,7 +39,8 @@ function FlagScreen({ tripId, stopId }: { tripId: string; stopId: string }) {
       : <FlagSkeleton />;
   }
   const truck = query.data.trucks.find((t) => t.tripId === tripId);
-  if (!truck) return <NotOnList />;
+  // A truck its driver drove away says who and when (Q-34); any other left the plan.
+  if (!truck) return <TruckGone day={query.data} tripId={tripId} />;
   const stop = truck.stops.find((s) => s.id === stopId);
   // A flag is raised while the truck loads, on one of its stops. Anything else goes back to the truck.
   if (!stop || truck.status !== 'loading') return <Navigate to={`/loader/trucks/${truck.tripId}`} replace />;

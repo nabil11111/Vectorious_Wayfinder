@@ -12,7 +12,7 @@ import { SEE_CHANGES, usePlanChanges } from './changes';
 import { useKeptRefusal, useLoadingDay, useLoaderWrites, type LoaderWrites, type WriteKind } from './loading';
 import { DISPATCHER_ICON } from './parts/icons';
 import { BackLink, LoadCard, StopList } from './parts/LoadCard';
-import { LoadFailed, NotOnList } from './parts/LoadFailed';
+import { LoadFailed, TruckGone } from './parts/LoadFailed';
 import { NextList } from './parts/TruckRow';
 import { ActionBar, Card, Label, NotSaved, Tag, TickBox } from './parts/ui';
 import { KeptRefusal } from './TrucksPage';
@@ -40,15 +40,17 @@ function TruckScreen({ tripId }: { tripId: string }) {
   }
   const stale = query.isError ? <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : null;
   const truck = query.data.trucks.find((t) => t.tripId === tripId);
-  // A truck gone because the plan was sent again (spec 016): the list's sentence, and the way to what changed.
-  // The refusal and the write waiting for Try again stay on screen with it (AC-31).
+  // A truck its driver drove away says who and when (Q-34). A truck gone because the plan was sent again (spec 016)
+  // has the list's sentence, and the way to what changed. The refusal and the write waiting for Try again stay on
+  // screen with either (AC-31).
   if (!truck) {
+    const left = query.data.left.some((t) => t.tripId === tripId);
     return (
       <>
         <KeptRefusal />
         {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
-        <ChangesLink className="mb-3" />
-        <NotOnList />
+        {!left && <ChangesLink className="mb-3" />}
+        <TruckGone day={query.data} tripId={tripId} />
       </>
     );
   }

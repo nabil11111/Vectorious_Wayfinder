@@ -1,4 +1,4 @@
-import { BRANDS, type Brand, type FlagReason, type Issue, type IssueLine, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
+import { BRANDS, type Brand, type FlagReason, type Issue, type IssueLine, type LeftTruck, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
 import { clockTime, countOf, shortDay, unitsOf, vehicleKind } from '@/features/plan/words';
 import { countOf as amountOf, plural, TEMP_NAME } from '@/features/store/words';
 
@@ -28,6 +28,11 @@ export const unitsWords = (brand: Brand | null, units: number) => (brand ? units
 
 // "VEH035", and "VEH035 trip 2" for a truck's second trip of the day.
 export const truckName = (truck: { vehicleId: string; tripNo: number }) => (truck.tripNo > 1 ? `${truck.vehicleId} trip ${truck.tripNo}` : truck.vehicleId);
+
+// A truck its driver has driven away, as the API lists it (Q-34): "VEH011 left with Asanka at 04:11.", leaving out a
+// driver or a time the day does not have.
+export const leftLine = (left: Pick<LeftTruck, 'vehicleId' | 'tripNo' | 'driver' | 'leftAt'>) =>
+  `${truckName(left)} left${left.driver ? ` with ${left.driver}` : ''}${left.leftAt ? ` at ${clockTime(left.leftAt)}` : ''}.`;
 
 // "Fresh · Colombo", or the district alone when the trip mixes brands.
 export const tripPlace = (truck: Pick<LoadingTruck, 'brand' | 'district'>) => [truck.brand, truck.district].filter(Boolean).join(' · ');

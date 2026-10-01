@@ -299,8 +299,9 @@ Anything we built differently from our Designathon submission, and why.
 - **Small differences:** the flag form asks to tap the line first, the "loading" chip is yellow, and an answer also
   shows under its stop's lines while that stop is still loading.
 - **States the design lacks:** no plan out, nothing to load, every truck loaded, no day left, a truck no longer on the
-  list, waiting for the answer, saving, not saved, refused, nothing needs you, and a second trip whose truck is still
-  out on its first ("out on trip 1 · back by 06:38").
+  list, waiting for the answer, saving, not saved, refused, nothing needs you, a second trip whose truck is still out
+  on its first ("out on trip 1 · back by 06:38"), and a truck its driver has driven away ("VEH011 left with Asanka at
+  04:11.").
 
 **The shop's receipt**
 - **Confirm delivery lists every line of the drop,** so Nugegoda's three orders are three cards, as the driver's Unload

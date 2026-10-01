@@ -1,5 +1,5 @@
 // VEH004 runs two trips on Thursday, Gampaha first and Colombo after, with Anura driving. The loader's day while the
-// truck is out on trip 1 and trip 2 waits at the dock (Q-26).
+// truck is out on trip 1 and trip 2 waits at the dock (Q-26), and the trucks that have left it (Q-34).
 import { LoadingDay, PlanBoard, PlanCheck, type DraftPlan, type DraftTrip, type LoadingTruck } from '@wayfinder/contracts';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
@@ -109,4 +109,25 @@ it('Q-26 drops it once trip 1 is checked in at the depot', async () => {
   const first = await tripOneOut();
   await db.update(trips).set({ status: 'done', backAt: depotInstant(THU, 6 * 60) }).where(eq(trips.id, first));
   expect(tripOf(await loader.read(), 2).outOn).toBeNull();
+});
+
+// Q-34: a truck the driver has driven away leaves the list of trucks to load, and the loading day says it left, with
+// whom and when, so the loader's page can tell it apart from a truck the plan took away.
+it('Q-34 lists a truck that has left, with its driver and when it left, apart from the trucks to load', async () => {
+  await twoTrips();
+  expect((await loader.read()).left).toEqual([]);
+  const first = await tripOneOut();
+  const day = await loader.read();
+  expect(day.trucks.map((t) => t.tripId)).not.toContain(first);
+  expect(day.left).toEqual([{ tripId: first, vehicleId: 'VEH004', tripNo: 1, driver: 'Anura', leftAt: depotInstant(THU, 3 * 60 + 30).toISOString() }]);
+  // Back at the depot, it has still left the dock.
+  await db.update(trips).set({ status: 'done', backAt: depotInstant(THU, 6 * 60) }).where(eq(trips.id, first));
+  expect((await loader.read()).left.map((t) => t.tripId)).toEqual([first]);
+});
+
+it('Q-34 lists nothing as left once the plan goes back to edit, as its trucks left the plan and not the dock', async () => {
+  await twoTrips();
+  const board = PlanBoard.parse((await ruwan.get(`/api/v1/plans/${THU}`)).body);
+  expect((await ruwan.post(`/api/v1/plans/${THU}/unsend`).send({ planId: board.plan.id, revision: board.plan.revision })).status).toBe(200);
+  expect(await loader.read()).toMatchObject({ plan: null, trucks: [], left: [] });
 });

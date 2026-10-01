@@ -12,7 +12,7 @@ import { lastLoaded } from './stops';
 import { TruckPage } from './TruckPage';
 import { TrucksPage } from './TrucksPage';
 import { asksBeforeLeaving } from './unsent';
-import { answerSentence, countHint, countLine, countWhere, loadFigure, outOnLine, outOnWords, undoFirstWords, undoStopWords } from './words';
+import { answerSentence, countHint, countLine, countWhere, leftLine, loadFigure, outOnLine, outOnWords, undoFirstWords, undoStopWords } from './words';
 
 // The loader's screens as the live QA run found them (phase 3, Q-16 to Q-23). The pages are drawn as the server would
 // draw them, from a loading day in the query and the app clock at Thu 25 Jun 02:35. These fixtures live in the test only.
@@ -54,7 +54,7 @@ function veh038(loaded: number[], changes: Partial<LoadingTruck> = {}, short: Re
 }
 
 const dayOf = (...trucks: LoadingTruck[]): LoadingDay => ({
-  depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: { id: '0c000000-0000-4000-8000-000000000001', revision: 3, publishedAt: '2026-06-24T10:36:00.000Z', publishedBy: 'Ruwan' }, trucks,
+  depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: { id: '0c000000-0000-4000-8000-000000000001', revision: 3, publishedAt: '2026-06-24T10:36:00.000Z', publishedBy: 'Ruwan' }, trucks, left: [],
 });
 
 // Thu 25 Jun 02:35 at the depot.
@@ -359,5 +359,35 @@ describe('Q-26 a second trip whose vehicle is still out on its first', () => {
   it('says nothing of it once the vehicle is back', () => {
     expect(truckPage(secondTrip({ outOn: null }))).not.toContain('is out on trip');
     expect(page('/loader', dayOf(veh035(), secondTrip({ outOn: null })))).not.toContain('out on trip');
+  });
+});
+
+// VEH011 trip 1, which Asanka drove away at 04:11 while its ready screen was open.
+const LEFT = { tripId: TRIP, vehicleId: 'VEH011', tripNo: 1, driver: 'Asanka', leftAt: '2026-06-24T22:41:00.000Z' };
+const PLAN_CHANGED = 'This truck is not on the list any more. The plan may have changed.';
+
+describe('Q-34 a truck that has left the dock', () => {
+  it('says who drove it away and when, with Back to trucks, in place of "The plan may have changed"', () => {
+    const html = page(`/loader/trucks/${TRIP}`, { ...dayOf(), left: [LEFT] });
+    expect(html).toContain('VEH011 left with Asanka at 04:11.');
+    expect(html).toMatch(/<button[^>]*>Back to trucks<\/button>/);
+    expect(html).not.toContain('The plan may have changed');
+  });
+
+  it('says the same on the flag form of a truck that has left', () => {
+    const html = page(`/loader/trucks/${TRIP}/flag?stop=stop-2`, { ...dayOf(), left: [LEFT] });
+    expect(html).toContain('VEH011 left with Asanka at 04:11.');
+    expect(html).not.toContain('The plan may have changed');
+  });
+
+  it('keeps "The plan may have changed" for a truck the plan took away', () => {
+    expect(page(`/loader/trucks/${TRIP}`, dayOf())).toContain(PLAN_CHANGED);
+    expect(page(`/loader/trucks/${TRIP}`, { ...dayOf(), left: [{ ...LEFT, tripId: '0b000000-0000-4000-8000-000000000999' }] })).toContain(PLAN_CHANGED);
+  });
+
+  it('names a second trip, and leaves out a driver or a time the day does not have', () => {
+    expect(leftLine({ ...LEFT, tripNo: 2 })).toBe('VEH011 trip 2 left with Asanka at 04:11.');
+    expect(leftLine({ ...LEFT, driver: null })).toBe('VEH011 left at 04:11.');
+    expect(leftLine({ ...LEFT, leftAt: null })).toBe('VEH011 left with Asanka.');
   });
 });
