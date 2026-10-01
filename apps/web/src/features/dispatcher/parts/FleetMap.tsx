@@ -1,4 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { BOTH_DEPOTS } from '@wayfinder/contracts';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ICON } from '@/features/live/parts/icons';
 import { CARD } from '@/features/live/parts/ui';
 import { truckName } from '@/features/loader/words';
@@ -36,8 +38,11 @@ const shapesOf = (view: string): MapShapes | null => (view === 'Peliyagoda' || v
 
 // The dashboard's district map (spec 019), the card right of Needs you on Dispatcher · Dashboard (53:11540), as the
 // design's map-fleet-overview.js draws it, with the live day's numbers (D-92). From 640 wide it is the frame's card
-// scaled to its column; below that its parts stack, the list under the map. Hover details are not built.
-export function FleetMap({ read }: { read: MapRead }) {
+// scaled to its column; below that its parts stack, the list under the map. Hover details are not built. view is the
+// depot on show, or Both; read is what the card draws, null until every depot's day is read, and failed says one could
+// not be.
+export function FleetMap({ view, read, failed = false }: { view: string; read: MapRead | null; failed?: boolean }) {
+  if (!read) return <WaitingMap view={view} failed={failed} />;
   const shapes = shapesOf(read.view);
   const drawing = shapes && drawingOf(read, shapes);
   const list = deliveredList(read.map);
@@ -90,6 +95,29 @@ export function FleetMap({ read }: { read: MapRead }) {
         </ul>
         <Source className="mt-2.5 px-4" wrap />
       </div>
+    </section>
+  );
+}
+
+// The card before its map can be drawn: a day still on its way, or one that could not be read. The drawing and its
+// figures need every depot's day, but the Map view switch stays, as it is the only depot switch below 1280 wide.
+function WaitingMap({ view, failed }: { view: string; failed: boolean }) {
+  return (
+    <section aria-label="District map" className={cn(CARD, 'px-4 pt-[15px] pb-4')} style={{ '--u': '1px' } as CSSProperties}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
+        {failed ? <h2 className="font-sans text-map-title" style={type(14, 600)}>District map</h2> : <Skeleton className="h-3.5 w-24 rounded-full" />}
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          <span className="text-map-muted" style={type(9)}>Map view</span>
+          <ViewSwitch depot={view} />
+        </div>
+      </div>
+      {failed ? (
+        <p className="mt-3 text-xs leading-4 text-muted-foreground">{view === BOTH_DEPOTS ? 'The map shows once both depots\' days are read.' : 'The map shows once the day is read.'}</p>
+      ) : (
+        <div role="status" aria-label="Loading the district map" className="mt-3">
+          <Skeleton className="aspect-[340/280] w-full rounded-[10px]" />
+        </div>
+      )}
     </section>
   );
 }

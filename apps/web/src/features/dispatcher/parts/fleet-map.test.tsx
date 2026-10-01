@@ -77,7 +77,7 @@ const SHAPES: MapShapes = {
 const shareAlong = (points: readonly Point[], at: readonly [number, number]) =>
   Math.hypot(at[0] - points[0][0], at[1] - points[0][1]) / Math.hypot(points[40][0] - points[0][0], points[40][1] - points[0][1]);
 // The card as the dashboard draws it, inside the app's query client, which its view switch uses.
-const card = (day: OperationsDay, qc = new QueryClient()) => renderToStaticMarkup(<QueryClientProvider client={qc}><FleetMap read={mapReadOf(day)} /></QueryClientProvider>);
+const card = (day: OperationsDay, qc = new QueryClient()) => renderToStaticMarkup(<QueryClientProvider client={qc}><FleetMap view={day.depot.id} read={mapReadOf(day)} /></QueryClientProvider>);
 // The wide card, as from 640 wide; the narrow one draws the same map again below it.
 const wide = (markup: string) => markup.slice(0, markup.indexOf('data-layout="narrow"'));
 const narrow = (markup: string) => markup.slice(markup.indexOf('data-layout="narrow"'));
@@ -237,7 +237,7 @@ describe('the view switch and the chosen depot (spec 020)', () => {
   });
 
   it('AC-7 the card on both depots\' read draws the Both view with Both chosen, at every width', () => {
-    const markup = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><FleetMap read={bothMapRead([dayWith([]), dayWith([], {}, 'Kandy')])} /></QueryClientProvider>);
+    const markup = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><FleetMap view="Both" read={bothMapRead([dayWith([]), dayWith([], {}, 'Kandy')])} /></QueryClientProvider>);
     for (const layout of [wide(markup), narrow(markup)]) {
       expect(views(layout)).toEqual([['Peliyagoda', 'button'], ['Kandy', 'button'], ['Both', 'chosen']]);
       expect(layout).toMatch(/<button[^>]*aria-pressed="true"[^>]*class="[^"]*bg-map-chosen[^"]*"[^>]*>Both<\/button>/);

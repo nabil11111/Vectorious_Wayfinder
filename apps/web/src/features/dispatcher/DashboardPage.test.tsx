@@ -133,13 +133,46 @@ it('AC-7 one depot\'s failed read shows that depot failed with Try again, keeps 
   // Kandy's day and its problems say they failed, each with Try again.
   expect(text).toContain('Could not load Kandy\'s day. Something went wrong on our side. Try again');
   expect(text).toContain('Could not load what needs you at Kandy. Something went wrong on our side. Try again');
-  // No tile, no map and no count stands for both depots.
+  // No tile, no map drawing and no count stands for both depots.
   expect(tiles(html)).toEqual([]);
-  expect(html).not.toContain('aria-label="District map"');
   expect(text).not.toMatch(/Needs you · \d/);
   expect(text).not.toMatch(/Trucks out now · \d/);
   // Peliyagoda's rows stay, with its chip.
   expect(rowsOf(html, 'aria-labelledby="needs-you"', 'aria-label="Next runs"').map((row) => [row.chip, row.text.split(' · ')[0]])).toEqual([['Peliyagoda', 'Fresh Nugegoda']]);
   expect(rowsOf(html, '<tbody>', '</tbody>', '<tr').map((row) => [row.chip, row.text.split(' ')[0]])).toEqual([['Peliyagoda', 'VEH035']]);
   expect(rowsOf(html, 'aria-label="Next runs"', 'aria-labelledby="trucks-out"').map((row) => row.chip)).toEqual(['Peliyagoda']);
+});
+
+// The map card's own part: its Map view switch, and whether it draws the map.
+const mapCard = (html: string) => {
+  const card = html.slice(html.indexOf('aria-label="District map"'), html.indexOf('aria-labelledby="trucks-out"') > 0 ? html.indexOf('aria-labelledby="trucks-out"') : undefined);
+  return {
+    card,
+    views: [...card.matchAll(/<button[^>]*aria-pressed="(true|false)"[^>]*>(Peliyagoda|Kandy|Both)<\/button>/g)].map(([, pressed, name]) => [name, pressed === 'true']),
+    drawn: card.includes('role="img"') || /\d+ stores/.test(card),
+  };
+};
+
+it('AC-7 the map card keeps its depot switch, the only one below 1280, when a depot\'s read failed, and draws nothing', async () => {
+  const peliyagoda = dayOf({ depot: 'Peliyagoda', orders: 102, fuel: null, deferred: 0, plan: true });
+  const { html } = await dashboard(ON_BOTH, [{ depot: 'Peliyagoda', day: peliyagoda, issues: listOf([]) }, { depot: 'Kandy', day: 'failed', issues: listOf([]) }]);
+  const map = mapCard(html);
+  expect(html).toContain('aria-label="District map"');
+  expect(map.views).toEqual([['Peliyagoda', false], ['Kandy', false], ['Both', true]]);
+  expect(map.drawn).toBe(false);
+  // One depot whose read failed keeps the switch too.
+  const alone = mapCard((await dashboard(RUWAN, [{ depot: 'Peliyagoda', day: 'failed', issues: listOf([]) }])).html);
+  expect(alone.views).toEqual([['Peliyagoda', true], ['Kandy', false], ['Both', false]]);
+  expect(alone.drawn).toBe(false);
+});
+
+it('AC-7 while the days load the map card shows its switch and a grey block in the map\'s place', async () => {
+  const { html } = await dashboard(ON_BOTH, [{ depot: 'Peliyagoda', day: PELIYAGODA_DAY(), issues: listOf([]) }, { depot: 'Kandy' }]);
+  const map = mapCard(html);
+  expect(map.views).toEqual([['Peliyagoda', false], ['Kandy', false], ['Both', true]]);
+  expect(map.drawn).toBe(false);
+  expect(map.card).toContain('aria-label="Loading the district map"');
+  const first = mapCard((await dashboard(RUWAN, [{ depot: 'Peliyagoda' }])).html);
+  expect(first.views).toEqual([['Peliyagoda', true], ['Kandy', false], ['Both', false]]);
+  expect(first.card).toContain('aria-label="Loading the district map"');
 });
