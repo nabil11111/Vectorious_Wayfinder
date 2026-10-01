@@ -10,6 +10,9 @@ export const SWITCH_CHOICES = [...DEPOTS, BOTH_DEPOTS] as const;
 // apart, Peliyagoda then Kandy. A read always names one depot; Both is never one.
 export const depotsOf = (scope: string | null | undefined): string[] => (!scope ? [] : scope === BOTH_DEPOTS ? [...DEPOTS] : [scope]);
 
+// The id of the heading that names one depot's part of a page on both depots together, which labels the part.
+export const partId = (depot: string) => `part-${depot}`;
+
 // What the line under the dispatcher's name says of the session's depot: the depot, or "Both depots".
 export const scopeName = (scope: string) => (scope === BOTH_DEPOTS ? 'Both depots' : scope);
 

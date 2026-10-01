@@ -78,15 +78,19 @@ export function dayOf(spec: DaySpec): OperationsDay {
 export const PELIYAGODA_DAY = () => dayOf({ depot: 'Peliyagoda', orders: 102, fuel: { litres: 6945, quota: 18600 }, deferred: 4, plan: true });
 export const KANDY_DAY = () => dayOf({ depot: 'Kandy', orders: 64, fuel: { litres: 0, quota: 10660 }, deferred: 0, plan: false });
 
-export interface IssueSpec { n: number; shop: string; vehicleId: string; raisedBy: string; raisedAt: string; hasPhoto?: boolean }
-// A loader's open flag: 2 of 8 chilled cartons short at the dock.
+export interface IssueSpec { n: number; shop: string; vehicleId: string; raisedBy: string; raisedAt: string; hasPhoto?: boolean; refused?: boolean }
+// A loader's open flag: 2 of 8 chilled cartons short at the dock; or with refused, a driver's: the shop took 6 of 8
+// chilled cartons and refused 2 as damaged.
 export function issueOf(spec: IssueSpec): Issue {
+  const refused = spec.refused ?? false;
   return Issue.parse({
-    id: uuid(spec.n), revision: 0, kind: 'loading', reason: 'short', status: 'open', raisedBy: spec.raisedBy, raisedAt: spec.raisedAt, note: null,
-    decision: null, decidedBy: null, decidedAt: null, hasPhoto: spec.hasPhoto ?? false, short: 2, cold: null, replacement: null,
-    trip: { id: uuid(spec.n + 100), vehicleId: spec.vehicleId, tripNo: 1, leavesAt: '2026-06-23T23:06:00.000Z', status: 'loading', driver: null, stopsLeft: 1 },
-    stop: { id: uuid(spec.n + 200), seq: 1, outletId: 'OUT001', shopName: spec.shop, arrivedAt: null, doneAt: null, loadedAt: null, flaggedAtDock: true },
-    lines: [{ lineId: uuid(spec.n + 300), orderId: uuid(spec.n + 400), temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 8, counted: 6, loaded: null, delivered: null, received: null }],
+    id: uuid(spec.n), revision: 0, kind: refused ? 'refused' : 'loading', reason: refused ? 'damaged' : 'short', status: 'open', raisedBy: spec.raisedBy,
+    raisedAt: spec.raisedAt, note: null, decision: null, decidedBy: null, decidedAt: null, hasPhoto: spec.hasPhoto ?? false, short: 2, cold: null, replacement: null,
+    trip: { id: uuid(spec.n + 100), vehicleId: spec.vehicleId, tripNo: 1, leavesAt: '2026-06-23T23:06:00.000Z', status: refused ? 'out' : 'loading', driver: refused ? spec.raisedBy : null, stopsLeft: 1 },
+    stop: { id: uuid(spec.n + 200), seq: 1, outletId: 'OUT001', shopName: spec.shop, arrivedAt: refused ? '2026-06-23T23:40:00.000Z' : null, doneAt: refused ? '2026-06-23T23:48:00.000Z' : null,
+      loadedAt: refused ? '2026-06-23T21:01:00.000Z' : null, flaggedAtDock: !refused },
+    lines: [{ lineId: uuid(spec.n + 300), orderId: uuid(spec.n + 400), temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 8,
+      counted: 6, loaded: refused ? 8 : null, delivered: refused ? 6 : null, received: null }],
   });
 }
 export const listOf = (issues: Issue[]): IssueList => IssueList.parse({ day: WED, replaceOn: THU, issues });
