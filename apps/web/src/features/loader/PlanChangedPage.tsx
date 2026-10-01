@@ -11,6 +11,7 @@ import { useLoadingDay } from './loading';
 import { BackLink } from './parts/LoadCard';
 import { NextList } from './parts/TruckRow';
 import { Card } from './parts/ui';
+import { KeptRefusal } from './TrucksPage';
 import { unitsWords } from './words';
 
 // Plan changed at /loader/changes (spec 016, Loader · Plan changed 85:71921): who sent the plan again and when, one
@@ -33,6 +34,7 @@ export function PlanChangedPage() {
     return (
       <div className="space-y-3">
         <BackLink to="/loader">Trucks</BackLink>
+        <KeptRefusal />
         {failed && <Line tone="warn">{NOT_KEPT}</Line>}
         <Card className="px-5 py-5 lg:max-w-[680px] lg:px-6 lg:py-6">
           <p className="text-[15px] leading-5 font-semibold">{page === 'withdrawn' ? WITHDRAWN : NONE_KEPT}</p>
@@ -46,6 +48,8 @@ export function PlanChangedPage() {
   const trucks = query.data?.trucks ?? [];
   return (
     <div className="lg:pt-1">
+      {/* A stale Start's refusal comes along to this page and stays until dismissed (AC-31). */}
+      <KeptRefusal />
       {failed && <div className="mb-3"><Line tone="warn">{NOT_KEPT}</Line></div>}
       <p role="status" className="flex items-center gap-3 rounded-[12px] bg-warn-tint px-4 py-3 text-[15px] leading-5 font-semibold text-warn-ink lg:px-6 lg:py-[13px]">
         <span aria-hidden="true" className="font-bold">!</span>
@@ -76,13 +80,15 @@ function ChangeCard({ row }: { row: ChangeRow }) {
   const trip = row.after ?? row.before!;
   const changed = new Set<ChangeDetail>(row.details);
   const goods = goodsChange(row);
+  // A trip's units are struck only when the total changed, not when orders of the same size changed places.
+  const units = row.before !== null && row.after !== null && row.before.units !== row.after.units;
   return (
     <Card ink className="px-5 pt-5 pb-5 lg:px-[26px] lg:pt-[29px] lg:pb-[26px]">
       <h2 className="text-[22px] leading-7 font-bold lg:text-2xl lg:leading-8">{changeTitle(trip)}</h2>
       <div className="mt-4 flex flex-col gap-3 lg:mt-[22px] lg:flex-row lg:items-start lg:gap-[22px]">
-        <Side label="Before" trip={row.before} changed={changed} lines={goods.left} old empty="Not on the plan before" />
+        <Side label="Before" trip={row.before} changed={changed} lines={goods.left} units={units} old empty="Not on the plan before" />
         <span aria-hidden="true" className="hidden pt-1 text-[26px] leading-8 font-semibold lg:block">→</span>
-        <Side label="Now" trip={row.after} changed={changed} lines={goods.joined} empty="Taken off this plan" />
+        <Side label="Now" trip={row.after} changed={changed} lines={goods.joined} units={units} empty="Taken off this plan" />
       </div>
     </Card>
   );
@@ -91,8 +97,8 @@ function ChangeCard({ row }: { row: ChangeRow }) {
 // One side of a change: the vehicle, when it leaves, the driver, and the stops or the goods when those changed, with
 // the order lines that left or joined the trip at their counts. The old side strikes what changed; the new side writes
 // it in full.
-function Side({ label, trip, changed, lines, old = false, empty }: {
-  label: string; trip: KeptTrip | null; changed: Set<ChangeDetail>; lines: LineAt[]; old?: boolean; empty: string;
+function Side({ label, trip, changed, lines, units, old = false, empty }: {
+  label: string; trip: KeptTrip | null; changed: Set<ChangeDetail>; lines: LineAt[]; units: boolean; old?: boolean; empty: string;
 }) {
   const struck = (detail: ChangeDetail) => old && changed.has(detail);
   return (
@@ -109,7 +115,7 @@ function Side({ label, trip, changed, lines, old = false, empty }: {
             <p className={cn('mt-1 text-[13px] leading-[18px]', old ? 'text-muted-foreground' : 'font-semibold')}>
               <span className={cn(struck('stops') && 'line-through')}>{stopsLine(trip)}</span>
               {' · '}
-              <span className={cn(struck('goods') && 'line-through')}>{unitsWords(trip.brand, trip.units)}</span>
+              <span className={cn(old && units && 'line-through')}>{unitsWords(trip.brand, trip.units)}</span>
             </p>
           )}
           {changed.has('goods') && lines.length > 0 && (
