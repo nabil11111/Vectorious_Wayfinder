@@ -255,6 +255,8 @@ Anything we built differently from our Designathon submission, and why.
   replacements" (D-48) and no "shop credited, claim opened": a write-off or a replacement is a record the depot adds later.
 - **A closed shop is answered with "Try again on this trip" or "Bring them back";** no frame draws them.
 - **"Nothing to hand back"** says the short carton never left the depot, without "It goes on Monday's run".
+- **"Done unloading" stays grey until every line is counted,** where the frame draws it orange at 2 of 6: a stop that
+  cannot be counted in full goes through "Something's wrong".
 - **The driver's bell has no count.**
 - **The top bar carries the demo chip,** as "Demo" alone beside the status chip on a phone, and the status chip hides its
   words below 380 px wide so both fit.
