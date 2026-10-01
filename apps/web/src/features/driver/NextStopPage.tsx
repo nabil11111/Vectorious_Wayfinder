@@ -32,7 +32,7 @@ export function NextStopPage({ view, day, trip, figures, stop }: { view: DriverV
   return (
     <div className="flex min-h-[calc(100dvh-61px-102px)] flex-col">
       <TopArea waitingRecords={view.waitingRecords}>
-        <TopLines day={day} trip={trip} figures={figures} waiting={view.waiting} waitingRecords={view.waitingRecords} noSignalBar />
+        <TopLines trip={trip} figures={figures} waiting={view.waiting} waitingRecords={view.waitingRecords} noSignalBar />
       </TopArea>
       {failed && <Problem>{NOT_SAVED}</Problem>}
       <p className="text-center text-xs leading-4 font-semibold text-muted-foreground">{stopOfLine(stop, figures)}</p>

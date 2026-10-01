@@ -112,7 +112,7 @@ export function TripDone({ view, day, trip, figures }: { view: DriverView; day: 
   return (
     <div>
       <TopArea waitingRecords={view.waitingRecords}>
-        <TopLines day={day} trip={trip} figures={figures} waiting={view.waiting} waitingRecords={view.waitingRecords} noSignalBar={false} />
+        <TopLines trip={trip} figures={figures} waiting={view.waiting} waitingRecords={view.waitingRecords} noSignalBar={false} />
       </TopArea>
       {failed && <Problem>{NOT_SAVED}</Problem>}
       <h1 className="text-[26px] leading-8 font-bold">Trip done</h1>

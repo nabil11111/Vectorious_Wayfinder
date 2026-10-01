@@ -502,3 +502,17 @@ describe('L-09 a line the loader found would not fit', () => {
     expect(refusedLine(refused, tripFigures({ ...trip, stops: [refused] }).byStop[0]!)).toBe('Stop 1 · 0 delivered · 11 refused · 1 short · 4 won\'t fit');
   });
 });
+
+// ── Spec 025 ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+describe('spec 025 AC-3b the trip\'s top line after the dispatcher answers', () => {
+  it('keeps only the answer\'s picture and short form, never the full sentence', async () => {
+    const { ANSWER_ICON } = await import('@/features/notifications/icons');
+    const html = tripDone({});
+    // Mulgampola was closed and Ruwan answered Bring them back: 39 chilled cartons.
+    expect(textOf(html)).toContain('Stop 3 · not delivered · nobody there');
+    expect(textOf(html)).toContain('Bring back · 39 chilled');
+    expect(html).toContain(`src="${ANSWER_ICON.bring_back}"`);
+    expect(textOf(html)).not.toContain('Bring the 39 cartons back');
+  });
+});
