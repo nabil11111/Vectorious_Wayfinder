@@ -4,7 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { BoardDriver, BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { splitOrder, type BoardScreen, type Undo } from '../board';
+import { ENDS_HISTORY, splitOrder, type BoardScreen, type Undo } from '../board';
 import { defer, keyOf, moveStop, planOf, sameTrip, setLeaveAt, takeOff, tripOf, type CrewRef } from '../draft';
 import { capital, countOf, cubic, figure, hhmm, litres, orderAmount, ordersAmount, tonnes, truckKind } from '../words';
 import { removeTripChange, takeStopOffChange } from './changes';
@@ -24,8 +24,9 @@ import { Timeline } from './Timeline';
 import { fuelTone, inkButton, plainButton, toneOf } from './look';
 import { Figure, Tag } from './ui';
 
-// A split or join, which the board's queue runs once the draft is saved. It says why it was refused, or null.
-type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>) => Promise<string | null>;
+// A split or join, which the board's queue runs once the draft is saved and which ends the board's history (spec 027).
+// It says why it was refused, or null.
+type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>, done?: undefined, said?: typeof ENDS_HISTORY) => Promise<string | null>;
 
 // The open trip (Edit plan): its vehicle, driver, brand, district and leaving time, the checker's figures, the
 // timeline with the trip's problems and their fixes, the stops in order, "+ Add a stop" and "Mark trip done".
@@ -65,7 +66,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
   }));
 
   const split = async (order: BoardOrder, keep: { productId: string; quantity: number }[]) => {
-    const refused = await act((date, ref) => splitOrder(date, { ...ref, orderId: order.id, keep }));
+    const refused = await act((date, ref) => splitOrder(date, { ...ref, orderId: order.id, keep }), undefined, ENDS_HISTORY);
     if (refused === null) setForm(null);
     return refused;
   };

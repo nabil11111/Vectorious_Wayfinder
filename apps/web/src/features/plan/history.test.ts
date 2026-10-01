@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { PlanBoard, type DraftPlan, type Me } from '@wayfinder/contracts';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { meKey } from '@/features/auth/api';
-import { sendPlan, useBoardScreen } from './board';
+import { ENDS_HISTORY, joinOrder, sendPlan, splitOrder, useBoardScreen } from './board';
 
 // Spec 027: the board's history of draft changes, kept in its save queue. Every change is one step Undo puts back and
 // Redo makes again, each saved as any change is, and the history is this tab's own: it clears when the draft is
@@ -57,7 +57,9 @@ const deferred = (plan: DraftPlan, orderId: string): DraftPlan => ({ ...plan, de
 
 async function saved(saver: ReturnType<typeof useBoardScreen>['saver'], revision: number) {
   await settled();
-  answer(Response.json(answered(saver.snapshot()!.draft, revision)));
+  // The save leaves the day's orders as they were.
+  const held = saver.snapshot()!;
+  answer(Response.json({ ...answered(held.draft, revision), orders: held.board.orders }));
   await settled();
 }
 
@@ -218,6 +220,53 @@ it('AC-1 keeps a build that split or joined nothing as one step', async () => {
   expect(saver.snapshot()!.history).toEqual({ undo: 'Suggested plan built', redo: null });
   saver.undo();
   expect(saver.snapshot()!.draft).toEqual(split);
+  saver.stop();
+});
+
+it('AC-2 clears the history after a join that left the draft as it was, so Undo never brings back a part since deleted', async () => {
+  signedIn(RUWAN);
+  // Order 1 is in two parts, each on a trip.
+  const split = withTrip(withTrip({ ...START, trips: [] }, 'VEH011', uuid(21)), 'VEH001', uuid(22));
+  const { saver } = useBoardScreen(withOrders(split, 1, [part(21), part(22), order(3)]));
+  saver.change({ ...split, trips: [] }, { line: 'Plan started over', tripKey: null });
+  await saved(saver, 2);
+  expect(saver.snapshot()!.history.undo).toBe('Plan started over');
+  // The parts, unplanned now, joined back: the empty draft is the same, but the orders are not.
+  const joining = saver.act((date, ref) => joinOrder(date, { ...ref, orderId: uuid(1) }), undefined, ENDS_HISTORY);
+  await settled();
+  answer(Response.json(withOrders({ ...split, trips: [] }, 3, [order(1), order(3)])));
+  expect(await joining).toBeNull();
+  expect(saver.snapshot()!.history).toEqual({ undo: null, redo: null });
+  expect(saver.undo()).toBeNull();
+  saver.stop();
+});
+
+it('AC-2 clears the history after a split, even of an order no step named', async () => {
+  signedIn(RUWAN);
+  const { saver } = useBoardScreen(withOrders(START, 1, [order(1), order(3), order(4)]));
+  saver.change(deferred(START, uuid(3)), { line: 'Fresh Pannala deferred', tripKey: null });
+  await saved(saver, 2);
+  const splitting = saver.act((date, ref) => splitOrder(date, { ...ref, orderId: uuid(4), keep: [{ productId: 'fresh-chilled-carton', quantity: 6 }] }), undefined, ENDS_HISTORY);
+  await settled();
+  answer(Response.json(withOrders(deferred(START, uuid(3)), 3, [order(1), order(3), order(41, uuid(4)), order(42, uuid(4))])));
+  expect(await splitting).toBeNull();
+  expect(saver.snapshot()!.history).toEqual({ undo: null, redo: null });
+  saver.stop();
+});
+
+it('AC-2 clears the history when a refetch no longer has an order a step names, and keeps it for one no step names', async () => {
+  signedIn(RUWAN);
+  const split = withTrip({ ...START, trips: [] }, 'VEH011', uuid(21));
+  const { saver } = useBoardScreen(withOrders(split, 1, [part(21), part(22), order(3), order(5)]));
+  saver.change({ ...split, trips: [] }, { line: 'Plan started over', tripKey: null });
+  await saved(saver, 2);
+  // Order 5 went from the day; no step names it.
+  saver.incoming(withOrders({ ...split, trips: [] }, 3, [part(21), part(22), order(3)]));
+  expect(saver.snapshot()!.history.undo).toBe('Plan started over');
+  // Another tab joined order 1's parts back: the draft is the same, but the step before it names part 21.
+  saver.incoming(withOrders({ ...split, trips: [] }, 4, [order(1), order(3)]));
+  expect(saver.snapshot()!.history).toEqual({ undo: null, redo: null });
+  expect(saver.undo()).toBeNull();
   saver.stop();
 });
 

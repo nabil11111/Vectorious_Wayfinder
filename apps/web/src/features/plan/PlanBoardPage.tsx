@@ -8,7 +8,7 @@ import { PickDepot } from '@/features/dispatcher/parts/PickDepot';
 import { useScope } from '@/features/dispatcher/scope';
 import { reasonOf } from '@/features/store/words';
 import { cn } from '@/lib/utils';
-import { joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
+import { ENDS_HISTORY, joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
 import { keyOf, placesOf, tripOf, type CrewRef, type TripKey } from './draft';
 import { BoardHeader, type Tab } from './parts/BoardHeader';
 import { BuildPanel } from './parts/BuildPanel';
@@ -157,7 +157,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
   const join = async (order: BoardOrder) => {
     const original = order.splitFrom;
     if (original === null) return;
-    const refused = await saver.act((day, ref) => joinOrder(day, { ...ref, orderId: original }));
+    const refused = await saver.act((day, ref) => joinOrder(day, { ...ref, orderId: original }), undefined, ENDS_HISTORY);
     if (refused) toast(refused, { id: 'plan-board' });
   };
 

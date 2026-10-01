@@ -151,6 +151,13 @@ function sameOrders(one: PlanBoard, other: PlanBoard) {
   return other.orders.length === ids.size && other.orders.every((order) => ids.has(order.id));
 }
 
+// The orders a draft names, on its stops and in its deferrals.
+const namedIn = (plan: DraftPlan) => [...plan.trips.flatMap((trip) => trip.stops.flatMap((stop) => stop.orderIds)), ...plan.deferrals.map((d) => d.orderId)];
+
+// A write that ends the history whatever it answers: a split or a join, which remake the orders the history's drafts
+// name (spec 027 rule 5).
+export const ENDS_HISTORY = 'ends history';
+
 export interface BoardScreen {
   // The board as the server last answered: its check, figures and counts belong to it.
   board: PlanBoard;
@@ -288,6 +295,9 @@ class PlanSaver {
     // so Undo never puts back a plan someone else changed (spec 027).
     const replaced = withDraft && held !== null && !sameDraft(planOf(board), held.draft);
     if (!keepHistory && (replaced || board.plan.status === 'published')) this.past = this.future = [];
+    // So does a board that no longer has an order a step names, split or joined elsewhere: the server would refuse
+    // the draft Undo or Redo put back.
+    if (held !== null && this.namesGone(held.board, board)) this.past = this.future = [];
     this.screen = {
       board,
       draft: withDraft || !held ? planOf(board) : held.draft,
@@ -301,6 +311,14 @@ class PlanSaver {
     const dropped = board.dropped.join(',');
     if (board.day && board.dropped.length > 0 && dropped !== this.droppedShown) tell(droppedLine(board.dropped.length, board.day.date));
     this.droppedShown = dropped;
+  }
+
+  // An order the board before had, the board now has not, and a step of the history names.
+  private namesGone(before: PlanBoard, now: PlanBoard) {
+    const kept = new Set(now.orders.map((order) => order.id));
+    const gone = new Set(before.orders.map((order) => order.id).filter((id) => !kept.has(id)));
+    if (gone.size === 0) return false;
+    return [...this.past, ...this.future].some((step) => [...namedIn(step.before), ...namedIn(step.after)].some((id) => gone.has(id)));
   }
 
   private historyLines() {
@@ -547,7 +565,8 @@ class PlanSaver {
   // it was refused, or null. done gets the board it answered once the board has taken it, and only then: a build that
   // went through opens View plan from there (spec 023).
   // said names a write that is a step of the history, as a build is (spec 027): Undo then puts back the draft before it.
-  act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>, done?: (board: PlanBoard) => void, said?: Undo): Promise<string | null> => {
+  // ENDS_HISTORY marks a split or a join, after which there is nothing to undo or redo.
+  act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>, done?: (board: PlanBoard) => void, said?: Undo | typeof ENDS_HISTORY): Promise<string | null> => {
     // A queue for an account or depot no longer on show sends nothing (spec 020), here and below before the send.
     if (!this.stillMine()) {
       this.dropAll();
@@ -570,11 +589,13 @@ class PlanSaver {
       }
       const answer = await madeBy(this, () => run(date, refOf(before)));
       if (!this.stillMine()) return null;
-      // A build is one step, unless it split an order or joined one's parts back: the drafts before it name orders the
-      // server has since replaced, which it would refuse, so the history ends there as for a change from elsewhere.
-      const step = said !== undefined && sameOrders(before, answer);
-      if (said) {
-        this.past = step ? [...this.past, { ...said, before: held.draft, after: planOf(answer) }].slice(-HISTORY) : [];
+      // A split or a join ends the history. A build is one step, unless it split an order or joined one's parts back:
+      // the drafts before it name orders the server has since replaced, which it would refuse, so the history ends there
+      // as for a change from elsewhere.
+      if (said === ENDS_HISTORY || (said !== undefined && !sameOrders(before, answer))) {
+        this.past = this.future = [];
+      } else if (said !== undefined) {
+        this.past = [...this.past, { ...said, before: held.draft, after: planOf(answer) }].slice(-HISTORY);
         this.future = [];
       }
       this.answered(answer, true, said !== undefined);
