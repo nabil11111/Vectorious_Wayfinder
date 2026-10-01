@@ -40,3 +40,4 @@ export * from './loading';
 export * from './driver';
 export * from './operations';
 export * from './receipt';
+export * from './lookup';

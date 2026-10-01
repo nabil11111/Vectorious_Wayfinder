@@ -52,6 +52,9 @@ export function useLive() {
         if (topic === 'clock' || topic === 'demo') void followClock(qc, topic);
         else {
           void qc.invalidateQueries({ queryKey: [topic] });
+          if (['plans', 'loading', 'driver', 'orders', 'issues', 'admin'].includes(topic)) {
+            void qc.invalidateQueries({ queryKey: ['lookup'] });
+          }
           if (['plans', 'loading', 'driver', 'orders', 'issues'].includes(topic)) {
             void qc.invalidateQueries({ queryKey: ['operations'] });
           }
