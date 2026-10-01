@@ -118,7 +118,34 @@ are what the demo clock shows.
     **Mark ready**: "VEH035 is ready · 117 of 118 on · 1 short". Nadeesha's three orders now read "Loaded", and View plan
     no longer offers Back to edit.
 
-Driving and the shop's receipt come with the next pieces.
+12. **The driver's trip.** Move the demo clock on to "Trucks leave, Thu 03:30". On a phone, or Chrome at 390 wide,
+    sign in as `dilshan`. Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda",
+    then "1 · Fresh Nugegoda · 23 of 24 cartons" and "2 · Fresh Wellawatte · 94 cartons". Press **Start trip**.
+13. **A delivery.** Next stop: "Stop 1 of 2 · Fresh Nugegoda", "Unload 23 cartons · 20 chilled · 3 dry" and the shop's
+    note. Press **I've arrived**, count 12 and 8 chilled and 3 dry ("Loader flagged 1 carton short at the depot" sits
+    under the dry line), press **Done unloading**, then **Take photo** (on a laptop, pick any picture) and **Save
+    delivery**: "✓ Stop 1 Fresh Nugegoda delivered · synced" and "Stop 2 of 2 · Fresh Wellawatte".
+14. **No signal.** Turn the network off: DevTools, Network, "Offline". Press **I've arrived**: the chip turns "Offline"
+    with 1 waiting. Press **Something's wrong**, keep "Shop refused some", pick "48 cartons chilled", press + on Refused
+    twice ("Accepted 46/48", "Refused 2/48"), choose **Damaged**, write a note and press **Save partial delivery**:
+    "Saved on this phone". Press **Continue route**: Trip done, worked out on the phone, with "Cartons delivered 115 of
+    118", "Refused 2 · Wellawatte" and "Short from the depot 1 dry · Nugegoda". Reload the page with the network still
+    off: it opens on the same screen.
+15. **Back online.** Turn the network back on: within seconds "Back online · 1 stop sent · Wellawatte reached the depot",
+    and the chip turns "Online".
+16. **The dispatcher answers.** As `ruwan`, the bell shows 1. Live day's card: "2 chilled cartons refused", "Fresh
+    Wellawatte · stop 2 · VEH035 · Dilshan · damaged, the shop took 46 of 48 chilled", with **Bring them back to
+    Peliyagoda** chosen. Press **Send to driver**: "✓ Sent · VEH035 · 2 cartons back to Peliyagoda, Dilshan told".
+17. **Back at the depot.** On Dilshan's phone, without a reload: "Ruwan, dispatcher · Bring the 2 chilled cartons back to
+    Peliyagoda." Press **I'm back at the depot**: "✓ Trip closed · 2 of 2 stops · all records sent". Nadeesha's three
+    Thursday orders now read "Delivered".
+
+The shop's receipt comes with the next piece.
+
+**A closed shop.** At step 14 choose "Shop closed" instead and press **Save attempt and move on**: Ruwan's card reads
+"Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Dilshan's next stop again, and delivering it ends
+at 117 of 118. **Bring them back** ends with "Hand them in; they go on the next run.", and Wellawatte's two orders are
+placed again for Friday's plan.
 
 ### The suggested plan
 
@@ -214,6 +241,30 @@ Anything we built differently from our Designathon submission, and why.
   shows under its stop's lines while that stop is still loading.
 - **States the design lacks:** no plan out, nothing to load, every truck loaded, no day left, a truck no longer on the
   list, waiting for the answer, saving, not saved, refused, and nothing needs you.
+
+**The driver**
+- **No calls and no signature.** No "Call the shop", "Called the shop" or "Call Prasanna": the data has no phone numbers
+  (D-40). No "Get a signature instead": the photo is the proof (D-47).
+- **"What's wrong?" has "Shop refused some" and "Shop closed".** A damaged or wrong carton is one the shop refuses, with
+  "Damaged" or "Not ordered" as its reason, and "Cannot reach" has no frame.
+- **No dock and no address.** Today's trip names no dock (D-40), and a stop's line under its name is the district and
+  entrance, "Colombo · street".
+- **A stop lists its lines,** so Nugegoda's two chilled orders are two counters, as the loader's screens do. Style and Tech
+  lines name the item.
+- **A refusal has one answer, "Bring them back",** with "Send to driver". No "Write off on the road", no "Send 2
+  replacements" (D-48) and no "shop credited, claim opened": a write-off or a replacement is a record the depot adds later.
+- **A closed shop is answered with "Try again on this trip" or "Bring them back";** no frame draws them.
+- **"Nothing to hand back"** says the short carton never left the depot, without "It goes on Monday's run".
+- **"Done unloading" stays grey until every line is counted,** where the frame draws it orange at 2 of 6: a stop that
+  cannot be counted in full goes through "Something's wrong".
+- **The driver's bell has no count.**
+- **The top bar carries the demo chip,** as "Demo" alone beside the status chip on a phone, and the status chip hides its
+  words below 380 px wide so both fit.
+- **"Back online" takes the top line's place,** with the dispatcher's answer under it, so the driver never closes the bar
+  to read it, and it shows on Trip done when the stop that waited was the last one.
+- **States the design lacks:** not loaded yet, no trip, could not load, the waiting sheet, not accepted, sign in again,
+  could not save on this phone, the unusable photo, the answer on the phone, a stop to try again, and Day done with
+  records waiting.
 
 ## Docs
 

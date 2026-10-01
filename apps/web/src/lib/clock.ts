@@ -14,7 +14,31 @@ export const demoKey = ['demo'] as const;
 // The clock as the server sent it, with the steady timer's reading when it arrived.
 export type HeldClock = ClockState & { heldAt: number };
 
-const hold = (clock: ClockState): HeldClock => ({ ...clock, heldAt: performance.now() });
+const CLOCK_KEY = 'wayfinder-clock';
+const hold = (clock: ClockState): HeldClock => {
+  try { localStorage.setItem(CLOCK_KEY, JSON.stringify({ clock, deviceAt: Date.now() })); }
+  catch (error) { console.warn('Could not keep the clock on this phone.', error); }
+  return { ...clock, heldAt: performance.now() };
+};
+
+// Across reloads the steady timer starts over. Count the saved clock on by the device's elapsed time once,
+// then use the steady timer again. The server bounds times submitted after a device clock move (D-46).
+function keptClock(): HeldClock | undefined {
+  try {
+    const text = localStorage.getItem(CLOCK_KEY);
+    if (text === null) return undefined;
+    const saved = JSON.parse(text) as { clock: unknown; deviceAt: unknown };
+    const parsed = ClockState.safeParse(saved.clock);
+    if (!parsed.success || typeof saved.deviceAt !== 'number' || !Number.isFinite(saved.deviceAt)) {
+      localStorage.removeItem(CLOCK_KEY); return undefined;
+    }
+    const clock = parsed.data;
+    const ran = Date.parse(clock.now) + Math.max(0, Date.now() - saved.deviceAt);
+    const at = clock.holdsAt === null ? ran : Math.min(ran, Date.parse(clock.holdsAt));
+    return { ...clock, now: new Date(at).toISOString(), heldAt: performance.now() };
+  } catch (error) { console.warn('Could not read the kept clock on this phone.', error); return undefined; }
+}
+
 
 // The instant a held clock shows at a reading of the steady timer: the time it arrived with plus the time
 // passed since, never past the point where the clock waits.
@@ -64,7 +88,11 @@ export interface AppClock {
 
 // The time on screen. It comes from GET /clock, runs on by itself and is drawn again every 15 seconds.
 export function useAppClock(): AppClock {
-  const query = useQuery({ queryKey: clockKey, queryFn: async () => hold(await api<ClockState>('/clock')) });
+  const query = useQuery({ queryKey: clockKey, initialData: keptClock, initialDataUpdatedAt: 0, networkMode: 'always', queryFn: async ({ signal }) => {
+    const clock = await api<ClockState>('/clock', { signal });
+    signal.throwIfAborted();
+    return hold(clock);
+  } });
   const state = query.data;
   const retry = () => void query.refetch();
   const [reading, setReading] = useState(() => performance.now());

@@ -194,7 +194,7 @@ gets `available` from `vehicle_days_off` and `litresUsedThisWeek` from `fuel_log
   same endpoint if a screen needs it to show a late truck.
 - A second seeded day, one for Kandy, and trips, loading, deliveries and receipts in the seed (later specs add
   their own, and a reset brings them back). The 16:00 cut-off (spec 009). A sign that the stream is down and the
-  time on a phone with no signal (A6). Push notifications, sounds, sockets and a second server process (D-01).
+  time on a phone with no signal (the driver's came with A4, spec 013; the shop's comes with A5). Push notifications, sounds, sockets and a second server process (D-01).
 
 ## Departures from the design
 1. A demo chip beside the time in every top bar, with a control that moves the clock to the next part of the day

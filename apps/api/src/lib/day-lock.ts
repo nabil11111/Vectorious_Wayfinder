@@ -8,7 +8,7 @@ import { config } from './config';
 // order. In demo mode the demo_day row is taken for share: a reset takes it for update first, so a reset and these
 // writes take turns and never deadlock. The clock is read from that locked row only once every lock is held, so a
 // write is judged at the moment it got its turn, not the moment it was sent.
-export interface DayMoment { at: Date; demoDay: number }
+export interface DayMoment { at: Date; demoDay: number; read: () => DayMoment }
 
 async function lockClockRow(tx: Tx) {
   if (!config.DEMO_MODE) return null;
@@ -17,8 +17,11 @@ async function lockClockRow(tx: Tx) {
   return row;
 }
 
-const momentOf = (row: Awaited<ReturnType<typeof lockClockRow>>): DayMoment =>
-  row ? { at: new Date(demoClockAt(row, realNow()).now), demoDay: row.day } : { at: now(), demoDay: 1 };
+const momentOf = (row: Awaited<ReturnType<typeof lockClockRow>>): DayMoment => ({
+  ...(row ? { at: new Date(demoClockAt(row, realNow()).now), demoDay: row.day } : { at: now(), demoDay: 1 }),
+  // Driver writes call this only after the trip lock is held, counting on from the locked clock row then.
+  read: () => momentOf(row),
+});
 
 // The day's lock alone, for a write that works on one truck or one problem (spec 012's loader writes and answers).
 export async function lockDay(tx: Tx): Promise<DayMoment> {

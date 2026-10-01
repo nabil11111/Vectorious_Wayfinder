@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { boolean, check, date, integer, jsonb, pgTable, primaryKey, smallint, text, time, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
-import { planStatusEnum, tripStatusEnum } from './enums';
+import { planStatusEnum, tripStatusEnum, stopOutcomeEnum } from './enums';
 import { users } from './identity';
 import { orders } from './orders';
 import { depots, outlets, vehicles } from './reference';
@@ -51,6 +51,9 @@ export const trips = pgTable('trips', {
   lastWriteId: uuid('last_write_id'),
   // "ready 02:36" is a time people see, so it comes from the app clock (D-18).
   readyAt: timestamp('ready_at', { withTimezone: true }),
+  leftAt: timestamp('left_at', { withTimezone: true }),
+  backAt: timestamp('back_at', { withTimezone: true }),
+  lastEventAt: timestamp('last_event_at', { withTimezone: true }),
 }, (t) => [unique('trips_vehicle_trip').on(t.planId, t.vehicleId, t.tripNo), check('trips_trip_no', sql`${t.tripNo} in (1, 2)`)]);
 
 export const stops = pgTable('stops', {
@@ -62,7 +65,13 @@ export const stops = pgTable('stops', {
   plannedDepart: time('planned_depart'),
   // When the loader marked the stop loaded, from the app clock. A stop is loaded whole, last stop first (D-35).
   loadedAt: timestamp('loaded_at', { withTimezone: true }),
-}, (t) => [unique('stops_trip_seq').on(t.tripId, t.seq)]);
+  revision: integer('revision').notNull().default(0),
+  retriedAt: timestamp('retried_at', { withTimezone: true }),
+  arrivedAt: timestamp('arrived_at', { withTimezone: true }),
+  doneAt: timestamp('done_at', { withTimezone: true }),
+  outcome: stopOutcomeEnum('outcome'),
+}, (t) => [unique('stops_trip_seq').on(t.tripId, t.seq),
+  check('stops_done', sql`(${t.outcome} is null and ${t.doneAt} is null) or (${t.outcome} is not null and ${t.doneAt} is not null and ${t.arrivedAt} is not null)`)]);
 
 export const stopOrders = pgTable('stop_orders', {
   stopId: uuid('stop_id').notNull().references(() => stops.id, { onDelete: 'cascade' }),

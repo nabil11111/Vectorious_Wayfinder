@@ -131,8 +131,8 @@ export function raiseFlag(caller: DepotCaller, tripId: string, body: RaiseFlagRe
       if (!line) throw unknownRecord(lineId, 'That line is not on this stop.');
       return { ...line, counted };
     });
-    const taken = new Set((await tx.select({ lineId: issueLines.orderLineId }).from(issueLines).innerJoin(issues, eq(issues.id, issueLines.issueId))
-      .where(and(eq(issues.kind, 'loading'), inArray(issueLines.orderLineId, named.map((l) => l.id))))).map((row) => row.lineId));
+    const taken = new Set((await tx.select({ lineId: issueLines.orderLineId }).from(issueLines).innerJoin(issues, eq(issues.id, issueLines.issueId)).innerJoin(stops, eq(stops.id, issues.stopId))
+      .where(and(eq(stops.tripId, trip.id), eq(issues.kind, 'loading'), inArray(issueLines.orderLineId, named.map((l) => l.id))))).map((row) => row.lineId));
     const flagged = named.find((l) => taken.has(l.id));
     if (flagged) {
       throw new HttpError(409, 'already_flagged', `The ${unitsOf(flagged)} for ${stop.shopName} ${flagged.quantity === 1 ? 'is' : 'are'} already flagged.`, { lineId: flagged.id });
@@ -174,6 +174,6 @@ export function markReady(caller: DepotCaller, tripId: string, body: MarkReadyRe
       after: { status: 'ready', revision: trip.revision + 1, readyAt: moment.at.toISOString(), lines: lines.map((l) => ({ lineId: l.lineId, loadedQty: l.going })) } });
     // Each shop on the truck hears of its orders with its depot, as a shop's place does.
     const shops = [...new Set(truck.stops.map((s) => s.outletId))];
-    return [{ topic: 'loading', depotId: caller.depotId }, ...shops.map((outletId) => ({ topic: 'orders', outletId, depotId: caller.depotId }))];
+    return [{ topic: 'loading', depotId: caller.depotId }, { topic: 'driver', depotId: caller.depotId }, ...shops.map((outletId) => ({ topic: 'orders', outletId, depotId: caller.depotId }))];
   });
 }

@@ -15,6 +15,7 @@ const tellPlanAndShops = (board: PlanBoard) => {
   announce({ topic: 'plans', depotId: board.depot });
   // The loader's list follows the plan as it is sent and taken back to edit (spec 012).
   announce({ topic: 'loading', depotId: board.depot });
+  announce({ topic: 'driver', depotId: board.depot });
   announce({ topic: 'orders', depotId: board.depot });
   for (const outletId of new Set(board.orders.map((o) => o.outletId))) announce({ topic: 'orders', outletId });
 };

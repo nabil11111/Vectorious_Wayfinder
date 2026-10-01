@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { demoId } from '../src/db/demo-day';
-import { demoDay, orderLines, plans, trips } from '../src/db/schema';
+import { demoDay, issueLines, issues, orderLines, plans, trips, users } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { code, heldRows, resetDay, sendWalkthroughPlan, signIn, THU, WED, type Walkthrough } from './loading-plan';
@@ -141,4 +141,16 @@ it('AC-6 turns away no session, the other roles and an admin on all seven endpoi
   }
   for (const path of loaders) expect(code(await call(ruwan, path))).toEqual([403, 'forbidden']);
   for (const path of dispatchers) expect(code(await call(kasun, path))).toEqual([403, 'forbidden']);
+});
+
+// Spec 013 AC-7: a driver's problem never changes the loader's going counts or flags.
+it('driver AC-7 keeps a refused problem out of loading flags', async () => {
+  await sendWalkthroughPlan(walk);
+  const initial = await loadingDay();
+  const truck = initial.trucks[0]!;
+  const stop = truck.stops[0]!;
+  const [driver] = await db.select().from(users).where(eq(users.username, 'dilshan'));
+  const [problem] = await db.insert(issues).values({ kind: 'refused', reason: 'damaged', stopId: stop.id, raisedBy: driver!.id, raisedAt: depotInstant(THU, 3 * 60) }).returning();
+  await db.insert(issueLines).values({ issueId: problem!.id, orderLineId: stop.lines[0]!.lineId, counted: 2 });
+  expect(await loadingDay()).toEqual(initial);
 });

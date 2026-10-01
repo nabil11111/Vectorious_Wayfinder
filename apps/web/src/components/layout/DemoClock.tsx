@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 // The demo chip beside the time and the control it opens (spec 008). It is the judges' tool for walking a whole
 // delivery day in a few minutes, so it has no frame of its own and is built from the style guide: the chip, a
 // sheet from the bottom on a phone, a small panel under the chip on a desktop, one orange button.
-export function DemoClock({ clock, as, className }: { clock: AppClock; as: 'sheet' | 'panel'; className?: string }) {
+export function DemoClock({ clock, as, className, compact = false }: { clock: AppClock; as: 'sheet' | 'panel'; className?: string; compact?: boolean }) {
   const { state, at, waiting } = clock;
   const chip = cn(
     'relative inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 text-xs font-semibold whitespace-nowrap text-foreground outline-none select-none',
@@ -33,7 +33,7 @@ export function DemoClock({ clock, as, className }: { clock: AppClock; as: 'shee
   const label = (
     <>
       {waiting && <span className="size-2 rounded-full bg-warn" aria-hidden="true" />}
-      Demo · {inDepot(at).day}
+      Demo<span className={compact ? 'hidden sm:inline' : undefined}> · {inDepot(at).day}</span>
       {waiting && <span className="sr-only">, the clock waits</span>}
       <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden="true" />
     </>

@@ -30,7 +30,7 @@ const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatch
 // bar is a page's own control in the top bar, such as the dispatcher's depot switch (spec 010). wide lets a page use
 // the full width of a large screen, such as the plan board's three columns. bell replaces the plain bell with one that
 // counts, such as the dispatcher's open problems (spec 012).
-export function AppShell({ nav = [], place, bar, bell, wide = false, children }: { nav?: NavItem[]; place?: string; bar?: ReactNode; bell?: ReactNode; wide?: boolean; children: ReactNode }) {
+export function AppShell({ nav = [], place, bar, bell, status, wide = false, children }: { nav?: NavItem[]; place?: string; bar?: ReactNode; bell?: ReactNode; status?: ReactNode; wide?: boolean; children: ReactNode }) {
   const { data: me } = useMe();
   const logout = useLogout();
   // The app's own time, never the device's, and the stream that keeps every open screen current (spec 008).
@@ -43,7 +43,8 @@ export function AppShell({ nav = [], place, bar, bell, wide = false, children }:
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-card px-4 py-3 md:px-6">
         <span className="font-mono text-2xl font-bold tabular-nums lg:hidden">{clock.time}</span>
-        <DemoClock clock={clock} as="sheet" className="lg:hidden" />
+        {status && <span className="lg:hidden">{status}</span>}
+        <DemoClock clock={clock} as="sheet" compact={Boolean(status)} className="lg:hidden" />
         <Wordmark className="hidden lg:inline-flex" />
         {nav.length > 0 && (
           <nav className="ml-4 hidden gap-1 lg:flex">
@@ -57,6 +58,7 @@ export function AppShell({ nav = [], place, bar, bell, wide = false, children }:
         <div className="flex-1" />
         {bar && <div className="hidden shrink-0 lg:block">{bar}</div>}
         <span className="hidden font-mono text-lg font-bold tabular-nums lg:inline">{clock.time}</span>
+        {status && <span className="hidden lg:inline-flex">{status}</span>}
         <DemoClock clock={clock} as="panel" className="hidden lg:inline-flex" />
         {/* The design's bell, last on a phone. A count never goes into the picture: it will sit over the corner as a
             small badge. */}
