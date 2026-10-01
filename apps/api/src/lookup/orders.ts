@@ -24,11 +24,13 @@ export function getLookupOrders(caller: DepotCaller, query: LookupOrdersQuery): 
     const candidates = await tx.select({ order: orders, shop: outlets }).from(orders).innerJoin(outlets, eq(outlets.id, orders.outletId)).where(and(
       eq(outlets.depotId, caller.depotId), notInArray(orders.status, ['draft', 'split', 'cancelled']),
       or(between(orders.deliveryDate, from, date), named.length ? inArray(orders.id, named) : undefined,
+        named.length ? inArray(orders.splitFrom, named) : undefined,
         and(inArray(orders.status, ['placed', 'deferred']), lte(orders.deliveryDate, date)))));
     const admitted = candidates.map(row => ({ ...row, days: days.filter(day => {
       const plan = publications.find(plan => plan.date === day);
       return row.order.deliveryDate === day || (plan
-        ? assigned.some(member => member.trip.planId === plan.id && member.orderId === row.order.id) || deferred.some(member => member.planId === plan.id && member.orderId === row.order.id)
+        ? assigned.some(member => member.trip.planId === plan.id && [row.order.id, row.order.splitFrom].includes(member.orderId))
+          || deferred.some(member => member.planId === plan.id && [row.order.id, row.order.splitFrom].includes(member.orderId))
         : ['placed', 'deferred'].includes(row.order.status) && row.order.deliveryDate < day);
     }) })).filter(row => row.days.length);
     const parentIds = [...new Set(admitted.flatMap(row => row.order.splitFrom ? [row.order.splitFrom] : []))];
@@ -57,7 +59,9 @@ export function getLookupOrders(caller: DepotCaller, query: LookupOrdersQuery): 
         days: days.map(day => {
           const plan = publications.find(row => row.date === day);
           const member = assigned.find(row => row.orderId === order.id && row.trip.planId === plan?.id);
-          const skipped = deferred.find(row => row.orderId === order.id && row.planId === plan?.id);
+          // A leaf inherits its original's deferral for this day, never its old truck assignment.
+          const skipped = deferred.find(row => row.orderId === order.id && row.planId === plan?.id)
+            ?? deferred.find(row => row.orderId === order.splitFrom && row.planId === plan?.id);
           const time = member && plan ? keptTrip(plan, member.trip).times.stops.find(row => row.seq === member.stop.seq && row.outletId === member.stop.outletId) : null;
           if (member && !time) throw new Error(`No kept arrival for ${member.stop.id}.`);
           return { date: day, carriedOver: order.deliveryDate < day, publication: plan ? publicationOf(plan) : null,
