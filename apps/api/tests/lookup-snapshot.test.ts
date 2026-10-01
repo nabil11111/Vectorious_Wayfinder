@@ -25,7 +25,7 @@ async function acrossWrite<T>(read: () => Promise<T>, write: () => Promise<unkno
 }
 for (const kind of ['orders', 'fleet'] as const) {
   it(`AC-27 ${kind} keeps one snapshot while a write commits`, async () => {
-    const read = () => h[kind]();
+    const read = async () => await h[kind]();
     const before = await read();
     const during = await acrossWrite(read, async () => {
       if (kind === 'orders') await db.update(orders).set({ status: 'placed' }).where(eq(orders.status, 'draft'));
@@ -36,7 +36,7 @@ for (const kind of ['orders', 'fleet'] as const) {
   });
   it(`AC-27 ${kind} holds reset outside its snapshot without deadlock`, async () => {
     await sendWalkthroughPlan(h);
-    const read = () => h[kind](), before = await read();
+    const read = async () => await h[kind](), before = await read();
     let entered!: () => void, release!: () => void;
     const atRead = new Promise<void>(resolve => { entered = resolve; }), resume = new Promise<void>(resolve => { release = resolve; });
     const original = board.readMoment;

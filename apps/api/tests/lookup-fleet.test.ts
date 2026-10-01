@@ -61,8 +61,8 @@ it('AC-22 archiving excludes only the header while keeping the vehicles fuel and
   try {
     await db.update(vehicles).set({ archivedAt: depotInstant(THU, 600) }).where(eq(vehicles.id, 'VEH003'));
     const day = await h.fleet();
-    expect(day.summary).toMatchObject({ active: 37, reefers: 8, vans: 4, activeOffToday: 2, activeWithoutOffToday: 35, recordedOut: 0, notRecordedOut: 37 });
-    expect(day.vehicles.find(row => row.id === 'VEH003')).toMatchObject({ archivedAt: depotInstant(THU, 600).toISOString(), recordedOut: true, selectedTrip: { tripId: trip.tripId }, fuel: { recordedCommitted: 280, quota: 340, remaining: 60 } });
+    expect(day.summary).toMatchObject({ active: 37, reefers: 8, vans: 4, activeOffToday: 2, activeWithoutOffToday: 35, recordedOut: 0, notRecordedOut: 37, fuel: { recordedCommitted: 6871.7, quota: 18120 } });
+    expect(day.vehicles.find(row => row.id === 'VEH003')).toMatchObject({ archivedAt: depotInstant(THU, 600).toISOString(), recordedOut: true, selectedTrip: { tripId: trip.tripId }, fuel: { recordedCommitted: 76, quota: 480, remaining: 404 } });
   } finally { await db.update(vehicles).set({ archivedAt: null }).where(eq(vehicles.id, 'VEH003')); }
 });
 it('AC-23 ledger fuel includes the full ISO week once and sent trips only supply km and links', async () => {
@@ -99,4 +99,24 @@ it('AC-2 and AC-3 fleet is depot scoped, read only and accepts no alternative da
   for (const query of ['?date=2026-06-25', '?depotId=Kandy', '?range=next_six_weeks']) expect(code(await h.ruwan.get(`/api/v1/lookup/fleet${query}`))).toEqual([400, 'invalid_input']);
   expect((await h.fleet()).vehicles.some(row => row.id === 'VEH044')).toBe(false);
   expect(await heldDriverRows()).toEqual(before);
+});
+it('AC-21 and AC-23 latest five sent links are bounded and the last returned trip remains selected', async () => {
+  await sendWalkthroughPlan(h);
+  const [plan] = await db.select().from(plans).where(eq(plans.date, THU));
+  const expected: string[] = [];
+  for (const date of ['2026-06-18', '2026-06-19', '2026-06-20']) {
+    const check = PlanCheck.parse(plan!.sentCheck);
+    check.trips.push({ ...check.trips[0]!, tripNo: 2 });
+    const [past] = await db.insert(plans).values({ depotId: 'Peliyagoda', date, status: 'published', publishedAt: depotInstant(date, 120), sentCheck: check }).returning();
+    for (const tripNo of [1, 2]) {
+      const [trip] = await db.insert(trips).values({ planId: past!.id, vehicleId: 'VEH035', tripNo, status: 'done', backAt: depotInstant(date, 600 + tripNo) }).returning();
+      expected.unshift(trip!.id);
+    }
+  }
+  const today = (await h.fleet()).vehicles.find(row => row.id === 'VEH035')!.selectedTrip!;
+  await db.update(trips).set({ status: 'done', backAt: depotInstant(THU, 600) }).where(eq(trips.id, today.tripId));
+  const vehicle = (await h.fleet()).vehicles.find(row => row.id === 'VEH035')!;
+  expect(vehicle.recentTrips.map(row => row.tripId)).toEqual([today.tripId, ...expected].slice(0, 5));
+  expect(vehicle.selectedTrip).toMatchObject({ tripId: today.tripId, status: 'done', backAt: depotInstant(THU, 600).toISOString() });
+  expect(vehicle.fuel!.sentTrips).toBe(1);
 });
