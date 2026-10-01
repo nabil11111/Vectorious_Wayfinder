@@ -181,6 +181,10 @@ export function problemWord(kind: IssueKind, issue: Issue | undefined) {
   if (issue?.kind === 'loading') return issue.reason === 'wont_fit' ? `${whole(issue.short)} won't fit` : `${whole(issue.short)} short`;
   return PROBLEM_WORD[kind];
 }
+// A problem's row in the Dashboard's Needs you: "Fresh Wellawatte · 2 chilled cartons refused", "Tech Kandy City Centre ·
+// 1 crate of 2 damaged, 1 pallet missing" (Q-40), and "Nobody at Fresh Wellawatte", which names the shop already.
+export const needsYouTitle = (issue: Issue) => (issue.kind === 'closed' ? driverIssueTitle(issue) : problemLine(issue));
+
 export function problemLine(issue: Issue) {
   if (issue.kind === 'loading') return `${issue.stop.shopName} · ${issueTitle(issue)}`;
   if (issue.kind === 'receipt') return `${issue.stop.shopName} · ${reportTitle(issue)}`;

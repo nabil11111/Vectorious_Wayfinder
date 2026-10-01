@@ -1,5 +1,5 @@
 import {
-  DEPOT_TIME_ZONE, type Brand, type DeliveryFigures, type DockType, type OrderDelivery, type OrderLine, type OrderProblem, type OrderReceipt,
+  DEPOT_TIME_ZONE, reportReasons, type Brand, type DeliveryFigures, type DockType, type OrderDelivery, type OrderLine, type OrderProblem, type OrderReceipt,
   type RefusalReason, type ShortReason, type StoreDelivery, type StoreDeliveryLine, type StoreOrder, type StoreOutlet, type StoreProduct,
   type StoreReceipt, type Temp,
 } from '@wayfinder/contracts';
@@ -208,6 +208,8 @@ export const refusedAtDoorLine = (units: number) => `${WHOLE.format(units)} refu
 export const overLine = (handedOver: number) => `More than the ${WHOLE.format(handedOver)} handed over.`;
 
 export const SHORT_REASON_WORDS: Record<ShortReason, string> = { missing: 'Missing', damaged: 'Damaged' };
+// The note that goes with a report (Q-40), for the depot to read with it.
+export const RECEIPT_NOTE_LABEL = 'Note for the depot (optional)';
 
 export const RECEIPT_TITLE = 'Confirm delivery';
 export const NOT_SAVED_ON_PHONE = 'Could not save on this phone. Try again.';
@@ -257,7 +259,9 @@ export function sentStatus(receipt: StoreReceipt, brand: Brand, short: number, t
   const { report } = receipt;
   if (!report) return { chip: { label: 'All received', tone: 'good' }, sentences: ['The depot has your receipt.'], foot: foot() };
   const one = short === 1;
-  const goods = report.reason === 'not_cold' ? 'the chilled goods' : `the ${one ? '' : `${WHOLE.format(short)} `}${report.reason} ${unitOf(brand, short)}`;
+  // The report's reasons, each once (Q-40): "the 2 damaged and missing items" when its lines differ.
+  const reasons = reportReasons(report);
+  const goods = report.reason === 'not_cold' ? 'the chilled goods' : `the ${one ? '' : `${WHOLE.format(short)} `}${reasons.join(' and ')} ${unitOf(brand, short)}`;
   if (report.decision === 'send_replacements' && report.replacement) {
     const day = shortDay(report.replacement.day);
     return {
@@ -280,16 +284,16 @@ export function sentStatus(receipt: StoreReceipt, brand: Brand, short: number, t
       foot: foot('report unresolved'),
     };
   }
-  const which = report.reason === 'missing' ? 'shortage' : 'damage';
+  const which = reasons.length > 1 ? null : report.reason === 'missing' ? 'shortage' : 'damage';
   const Goods = goods.charAt(0).toUpperCase() + goods.slice(1);
   return {
     chip: { label: 'Awaiting depot review', tone: 'good' },
     sentences: [
-      `The depot has your receipt and ${which} report.`,
+      `The depot has your receipt and ${which ? `${which} ` : ''}report.`,
       `${Goods} still ${one ? 'needs' : 'need'} a resolution.`,
       `Reporting ${one ? 'it does not mark it' : 'them does not mark them'} as replaced.`,
     ],
-    foot: foot(`${which} unresolved`),
+    foot: foot(`${which ?? 'report'} unresolved`),
   };
 }
 

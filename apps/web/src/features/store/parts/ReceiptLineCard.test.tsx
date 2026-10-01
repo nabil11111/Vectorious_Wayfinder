@@ -16,7 +16,7 @@ const kotahena: StoreDeliveryLine = {
 const figures = { lineId: kotahena.lineId, orderId: kotahena.orderId, temp: 'chilled' as const, expected: 50, received: null, short: 0, shortFromDepot: 0, refused: 3 };
 const card = (text?: string, count = 50) => renderToStaticMarkup(
   <CountCard brand="Fresh" line={kotahena} figures={figures} count={count} text={text} reason="missing" disabled={false}
-    onStep={() => {}} onType={() => {}} onLeave={() => {}} />,
+    onStep={() => {}} onType={() => {}} onLeave={() => {}} onReason={() => {}} />,
 );
 const stepButtons = (html: string) => [...html.matchAll(/<button[^>]*aria-label="One (?:less|more)[^>]*>/g)].map(([tag]) => tag);
 const lineUnder = (html: string) => html.match(/<p[^>]*id="([^"]+)"[^>]*role="alert"[^>]*>([^<]*)<\/p>/);

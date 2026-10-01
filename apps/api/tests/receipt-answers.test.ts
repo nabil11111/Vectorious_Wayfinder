@@ -129,7 +129,7 @@ it('AC-21 lists Nadeesha\'s report for Ruwan with its people, time, photo and co
     stop: { id: delivery.stopId, seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda', arrivedAt: at(3 * 60 + 34).toISOString(), doneAt: at(3 * 60 + 38).toISOString(),
       loadedAt: at(2 * 60 + 34).toISOString(), flaggedAtDock: true },
     lines: [{ lineId: twelve.lineId, orderId: twelve.orderId, temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton',
-      quantity: 12, counted: 1, loaded: 12, delivered: 12, received: 11 }],
+      quantity: 12, counted: 1, loaded: 12, delivered: 12, received: 11, reason: 'missing' }],
   }] });
   expect(await heldDriverRows()).toEqual(before);
 });

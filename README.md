@@ -160,13 +160,13 @@ are what the demo clock shows.
 19. **The shop confirms.** Move the demo clock on to "Delivered by 08:30". As Nadeesha (`S-001`) on a phone, Today shows her three
     Thursday orders "Delivered", the dry one "3 of 4 delivered · 1 short from the depot". Open **Deliveries**: "Confirm
     delivery", each line against what the driver handed over (12 and 8 chilled, 3 dry with "1 short from the depot"), and
-    "Still cold on arrival?" with Yes. On the first card press − once: "1 carton missing", and "What's wrong?" with
-    Missing.
+    "Still cold on arrival?" with Yes. On the first card press − once: "1 carton missing", and beside it "What's wrong?"
+    with Missing; each short line has its own. "Note for the depot (optional)" takes a note of up to 200 characters.
 20. **A receipt with no signal.** Turn the network off and press **Confirm delivery**: "Receipt saved on this phone",
     "Received 11 cartons · Missing 1 carton", "Saved at 08:30 · waiting to sync". Reload with the network still off: the
     same screen opens. Turn it back on: "Receipt sent to the depot" and "Sent at 08:31 · shortage unresolved".
 21. **The depot replaces it.** As Ruwan (`P-001`), the bell shows 1. Live day: "1 chilled carton missing", "Shop · Nadeesha",
-    "Received · 11 of 12 chilled cartons", "Cold on arrival · yes", with **Send 1 replacement on Fri 26 Jun** chosen.
+    "Received · 11 of 12 chilled cartons, 1 missing", "Cold on arrival · yes", with **Send 1 replacement on Fri 26 Jun** chosen.
     Press **Send to shop**: "✓ Sent · Fresh Nugegoda · 1 replacement on Fri 26 Jun, Nadeesha told".
 22. **The shop sees it.** On Nadeesha's phone, without a reload, the receipt says "replacement on Fri 26 Jun". Orders,
     Past: "12 chilled cartons · 11 received · 1 short" with "1 replacement comes on Fri 26 Jun.", "8 chilled cartons ·
@@ -329,8 +329,9 @@ Anything we built differently from our Designathon submission, and why.
 - **A typed count stays as typed.** A minus or a fraction says "Whole numbers from 0 to 50." and a count above what was
   handed over "More than the 50 handed over.", in red, and Confirm waits; the frame draws no wrong count, and changing
   what was typed sent a report the shop never meant.
-- **"What's wrong?" shows once a count is lower,** with "Missing" and "Damaged", and "Add a photo (optional)" only on a
-  receipt that reports something.
+- **"What's wrong?" shows on each line once its count is lower,** with "Missing" and "Damaged", and "Add a photo
+  (optional)" and "Note for the depot (optional)" only on a receipt that reports something. One answer for the whole
+  receipt could not say a crate came damaged while a pallet never came, and the frame draws no note.
 - **The saved screen** says "There is no signal right now." when the phone knew it had none, and "The connection dropped
   while sending." after a send that got no answer.
 - **No "and signed":** there is no signature; the shop's receipt is the confirmation.

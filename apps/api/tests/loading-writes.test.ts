@@ -114,7 +114,7 @@ it("AC-16 flags VEH035's dry line short at 3 of 4 with a note: an open problem, 
   expect(others).toEqual([]);
   expect(problem).toMatchObject({ kind: 'loading', reason: 'short', status: 'open', revision: 0, stopId: stopOf(truck, 1).id, raisedBy: kasunId,
     raisedAt: depotInstant(THU, 2 * 60 + 33), note: 'Only 3 dry cartons in the store', decision: null, decidedBy: null, decidedAt: null });
-  expect(await db.select().from(issueLines)).toEqual([{ issueId: problem!.id, orderLineId: line.lineId, counted: 3 }]);
+  expect(await db.select().from(issueLines)).toEqual([{ issueId: problem!.id, orderLineId: line.lineId, counted: 3, reason: null }]);
   expect((await db.select().from(trips).where(eq(trips.id, truck.tripId)))[0]!.revision).toBe(truck.revision + 1);
   expect(await auditsOf(problem!.id, 'issue.raised')).toHaveLength(1);
   expect(told()).toEqual([{ topic: 'loading', depotId: 'Peliyagoda' }, { topic: 'issues', depotId: 'Peliyagoda' }]);

@@ -32,13 +32,20 @@ export const StoreDeliveryLine = z.object({
 });
 export type StoreDeliveryLine = z.infer<typeof StoreDeliveryLine>;
 
+// The most a receipt's note holds, as the shop's note for the driver (Q-40).
+export const RECEIPT_NOTE_MOST = 200;
+
 // The shop's report (rule 5): a problem of kind receipt whose id is the receipt's. It counts each short line at the
-// units short, and when the chilled goods were not cold each chilled line that came too, at 0 when nothing is short on
-// it. decision and decidedAt are null while it is open; replacement is what an answer of "Send N replacements" placed.
+// units short, with the shop's own reason for it, and when the chilled goods were not cold each chilled line that came
+// too, at 0 and with no reason when nothing is short on it (Q-40). Its reason is its first short line's, or not_cold.
+// A report kept before lines had reasons has none on them, and lineReason reads each short one as the report's. note is
+// what the shop wrote, null when it wrote nothing. decision and decidedAt are null while it is open; replacement is what
+// an answer of "Send N replacements" placed.
 export const ReceiptReport = z.object({
   id: z.uuid(),
   reason: ReceiptReason,
-  lines: z.array(z.object({ lineId: z.uuid(), counted: Count })),
+  lines: z.array(z.object({ lineId: z.uuid(), counted: Count, reason: ShortReason.nullable().optional() })),
+  note: z.string().nullable().optional(),
   decision: ReceiptDecision.nullable(),
   decidedAt: Moment.nullable(),
   replacement: z.object({ day: Day, units: z.number().int().min(1) }).nullable(),
@@ -90,7 +97,9 @@ export type StoreDeliveries = z.infer<typeof StoreDeliveries>;
 
 // POST /store/receipts: one receipt, saved on the phone first as this exact request (D-57). It names the stop's
 // revision and counts every line of the delivery once. cold is set exactly when a chilled line came with something on
-// it, and reason exactly when a line is short. A photo may go with a report.
+// it. Each short line says what is wrong with it, and only a short line does (Q-40). A receipt saved before lines had
+// reasons says it once in reason instead, which stands for every short line that names none. A photo and a note of up
+// to 200 characters may go with a report.
 export const ReceiptWrite = z.object({
   kind: z.literal('receipt'),
   writeId: Id,
@@ -98,11 +107,12 @@ export const ReceiptWrite = z.object({
   // The app clock on the phone.
   at: Moment,
   revision: Count,
-  lines: z.array(z.object({ lineId: Id, received: z.number().int().min(0).max(MAX_LINE_UNITS) })).min(1).max(MAX_STOP_LINES)
+  lines: z.array(z.object({ lineId: Id, received: z.number().int().min(0).max(MAX_LINE_UNITS), reason: ShortReason.nullable().optional() })).min(1).max(MAX_STOP_LINES)
     .refine((lines) => new Set(lines.map((line) => line.lineId)).size === lines.length, 'Name each line once.'),
   cold: z.boolean().nullable(),
   reason: ShortReason.nullable(),
   photo: PhotoDataUrl.optional(),
+  note: z.string().trim().max(RECEIPT_NOTE_MOST).optional(),
 });
 export type ReceiptWrite = z.infer<typeof ReceiptWrite>;
 
@@ -132,6 +142,21 @@ export function deliveryFigures(delivery: StoreDelivery) {
 }
 export type DeliveryFigures = ReturnType<typeof deliveryFigures>;
 
+// What a receipt says is wrong with one of its lines (Q-40): the line's own reason, else the one reason a receipt saved
+// before lines had reasons gave for all of them.
+export const writtenReason = (write: Pick<ReceiptWrite, 'reason'>, line: { reason?: ShortReason | null }): ShortReason | null => line.reason ?? write.reason;
+
+// What a report says is wrong with a line it counts (Q-40): the line's own reason, else, for a report kept before lines
+// had reasons, the report's when the line is short. A chilled line counted only because the goods came warm has none.
+export function lineReason(report: Pick<ReceiptReport, 'reason'>, line: { counted: number; reason?: ShortReason | null }): ShortReason | null {
+  if (line.reason) return line.reason;
+  return line.counted > 0 && report.reason !== 'not_cold' ? report.reason : null;
+}
+
+// The reasons of a report's short lines, each once, in the order of its lines: ['damaged', 'missing'].
+export const reportReasons = (report: Pick<ReceiptReport, 'reason' | 'lines'>): ShortReason[] =>
+  [...new Set(report.lines.flatMap((line) => lineReason(report, line) ?? []))];
+
 // The server's order of deliveries (rule 1): those to confirm, oldest handover first, then those confirmed, latest
 // first. Moments are compared as the ISO strings the server writes, to the millisecond.
 export function byDeliveryOrder(a: StoreDelivery, b: StoreDelivery): number {
@@ -152,7 +177,8 @@ export function applyReceipt(deliveries: StoreDeliveries, write: ReceiptWrite): 
   const counted = own.lines.map((line) => ({ line, received: write.lines.find((named) => named.lineId === line.lineId)?.received ?? null }));
   const shortOf = ({ line, received }: (typeof counted)[number]) => (received === null ? 0 : line.delivered - received);
   const short = counted.some((entry) => shortOf(entry) > 0);
-  if (short && write.reason === null) return deliveries;
+  const reasonOf = (lineId: string) => writtenReason(write, write.lines.find((named) => named.lineId === lineId) ?? {});
+  if (counted.some((entry) => shortOf(entry) > 0 && reasonOf(entry.line.lineId) === null)) return deliveries;
   const notCold = write.cold === false;
   const result = structuredClone(deliveries);
   const delivery = result.deliveries.find((each) => each.stopId === write.stopId)!;
@@ -167,11 +193,13 @@ export function applyReceipt(deliveries: StoreDeliveries, write: ReceiptWrite): 
     cold: write.cold,
     report: short || notCold ? {
       id: write.writeId,
-      reason: short ? write.reason! : 'not_cold',
+      reason: short ? reasonOf(counted.find((entry) => shortOf(entry) > 0)!.line.lineId)! : 'not_cold',
       lines: counted.flatMap((entry) => {
         const units = shortOf(entry);
-        return units > 0 || (notCold && entry.line.temp === 'chilled' && entry.line.delivered > 0) ? [{ lineId: entry.line.lineId, counted: units }] : [];
+        return units > 0 || (notCold && entry.line.temp === 'chilled' && entry.line.delivered > 0)
+          ? [{ lineId: entry.line.lineId, counted: units, reason: units > 0 ? reasonOf(entry.line.lineId) : null }] : [];
       }),
+      note: write.note ? write.note : null,
       decision: null, decidedAt: null, replacement: null,
     } : null,
   };

@@ -1,4 +1,4 @@
-import { IssueReason, IssueDecision, PlanCheck, type Issue, type IssueList } from '@wayfinder/contracts';
+import { IssueReason, IssueDecision, lineReason, PlanCheck, ReceiptReason, ShortReason, type Issue, type IssueList } from '@wayfinder/contracts';
 import { and, eq, inArray, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db, type Tx } from '../db/client';
@@ -38,7 +38,7 @@ export async function issuesOf(tx: Tx, where: SQL | undefined): Promise<Issue[]>
   const sent = await tx.select({ id: plans.id, date: plans.date, check: plans.sentCheck }).from(plans).where(inArray(plans.id, [...new Set(rows.map((r) => r.planId))]));
   const checks = new Map(sent.map((plan) => [plan.id, { date: plan.date, check: plan.check === null ? null : PlanCheck.parse(plan.check) }]));
   const counted = await tx.select({
-    issueId: issueLines.issueId, counted: issueLines.counted, lineId: orderLines.id, quantity: orderLines.quantity, orderId: orders.id, temp: orders.temp,
+    issueId: issueLines.issueId, counted: issueLines.counted, said: issueLines.reason, lineId: orderLines.id, quantity: orderLines.quantity, orderId: orders.id, temp: orders.temp,
     loaded: orderLines.loadedQty, delivered: orderLines.deliveredQty, received: orderLines.receivedQty, placedAt: orders.placedAt, productId: products.id, name: products.name, unit: products.unit,
   }).from(issueLines)
     .innerJoin(orderLines, eq(orderLines.id, issueLines.orderLineId))
@@ -59,8 +59,11 @@ export async function issuesOf(tx: Tx, where: SQL | undefined): Promise<Issue[]>
   return rows.map(({ issue, stop, shopName, trip, planId, raisedBy, decidedBy }) => {
     const plan = checks.get(planId)!;
     const lines = counted.filter((line) => line.issueId === issue.id).sort(byLoadOrder)
-      .map(({ lineId, orderId, temp, productId, name, unit, quantity, counted: good, loaded, delivered, received }) => ({ lineId, orderId, temp, productId, name, unit, quantity, counted: good,
-        loaded: issue.kind === 'closed' ? good : loaded, delivered: issue.kind === 'closed' ? null : delivered, received: issue.kind === 'closed' ? null : received }));
+      .map(({ lineId, orderId, temp, productId, name, unit, quantity, counted: good, said, loaded, delivered, received }) => ({ lineId, orderId, temp, productId, name, unit, quantity, counted: good,
+        loaded: issue.kind === 'closed' ? good : loaded, delivered: issue.kind === 'closed' ? null : delivered, received: issue.kind === 'closed' ? null : received,
+        // A shop's report gives each line its own reason, and one kept before lines had reasons its own (Q-40). No other
+        // kind has a reason per line.
+        ...(issue.kind === 'receipt' ? { reason: lineReason({ reason: ReceiptReason.parse(issue.reason) }, { counted: good, reason: said === null ? null : ShortReason.parse(said) }) } : {}) }));
     return {
       id: issue.id, revision: issue.revision, kind: issue.kind, reason: IssueReason.parse(issue.reason), status: issue.status,
       raisedBy, raisedAt: issue.raisedAt.toISOString(), note: issue.note,

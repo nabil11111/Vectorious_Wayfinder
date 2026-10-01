@@ -137,7 +137,8 @@ function DriverCard({ issue, depot, answering, time, className }: CardProps) {
 }
 
 // A shop's report on its receipt (spec 015, rule 12, D-58): what is missing, damaged or not cold, the delivery it is
-// on, who confirmed it and when, each counted line as received of handed over, the cold check, the photo, then "Send N
+// on, who confirmed it and when, each counted line as received of handed over with its own reason (Q-40), the cold
+// check, the shop's note, the photo, then "Send N
 // replacements" for the day an order placed now is for, or "No replacement", and "Send to shop". A report of the cold
 // alone counts nothing short, so it only takes "No replacement", as does any report while no day is open.
 function ReportCard({ issue, depot, answering, time, className }: CardProps) {
@@ -157,6 +158,8 @@ function ReportCard({ issue, depot, answering, time, className }: CardProps) {
     },
     { key: 'received', label: 'Received', value: receivedOf(issue) },
     ...(issue.cold !== null ? [{ key: 'cold', label: 'Cold on arrival', value: coldWords(issue.cold) }] : []),
+    // The shop's own words with its report (Q-40).
+    ...(issue.note ? [{ key: 'note', label: 'Note', value: issue.note }] : []),
     ...(issue.hasPhoto ? [{ key: 'photo', label: 'Photo', value: <PhotoLink issue={issue} depot={depot} /> }] : []),
   ];
   return (

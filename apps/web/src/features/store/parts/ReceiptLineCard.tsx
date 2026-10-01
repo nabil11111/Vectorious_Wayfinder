@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from 'react';
-import type { Brand, DeliveryFigures, ShortReason, StoreDeliveryLine } from '@wayfinder/contracts';
+import { SHORT_REASONS, type Brand, type DeliveryFigures, type ShortReason, type StoreDeliveryLine } from '@wayfinder/contracts';
 import damaged from '@/assets/icons/icon-damaged.png';
 import shortfall from '@/assets/icons/icon-shortfall.png';
 import { Chip } from '@/components/ui/chip';
@@ -7,6 +7,7 @@ import { countLine } from '@/features/loader/words';
 import { cn } from '@/lib/utils';
 import { receiptBox } from '../receipt-counts';
 import { countOf, expectedWords, lineGoods, overLine, receiptLineName, refusedAtDoorLine, SHORT_REASON_WORDS, shortChip, shortFromDepotLine } from '../words';
+import { Choice } from './Choice';
 import { goodsIcon } from './icons';
 import { Panel } from './Panel';
 
@@ -73,9 +74,9 @@ function Note({ icon, children }: { icon: string; children: ReactNode }) {
 // Confirm delivery's card for one line (Shop · Confirm delivery): the goods' picture and name, what the driver handed
 // over, the shop's own count, the units missing or damaged once the count is lower, and what the depot sent short or
 // the shop refused at the door, reported where it was found (D-56).
-export function CountCard({ brand, line, figures, count, text, reason, disabled, onStep, onType, onLeave }: {
+export function CountCard({ brand, line, figures, count, text, reason, disabled, onStep, onType, onLeave, onReason }: {
   brand: Brand; line: StoreDeliveryLine; figures: LineFigures; count: number; text: string | undefined; reason: ShortReason; disabled: boolean;
-  onStep: (count: number) => void; onType: (text: string) => void; onLeave: () => void;
+  onStep: (count: number) => void; onType: (text: string) => void; onLeave: () => void; onReason: (reason: ShortReason) => void;
 }) {
   const name = receiptLineName(brand, line);
   const short = figures.expected - count;
@@ -98,7 +99,21 @@ export function CountCard({ brand, line, figures, count, text, reason, disabled,
           {wrong === 'over' ? overLine(figures.expected) : countLine(figures.expected)}
         </p>
       )}
-      {short > 0 && <Chip tone="warn" size="sm" className="mt-[21px] px-[9px] py-1.5">{shortChip(short, line.unit, reason)}</Chip>}
+      {short > 0 && (
+        // What is wrong with this line's short units, its own answer (Q-40): a crate can come damaged while a pallet
+        // never came.
+        <div className="mt-[21px] flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
+          <Chip tone="warn" size="sm" className="px-[9px] py-1.5">{shortChip(short, line.unit, reason)}</Chip>
+          <div className="flex items-center gap-2.5">
+            <p id={`${lineId}-why`} className="text-xs leading-4 font-semibold">What’s wrong?</p>
+            <div role="radiogroup" aria-labelledby={`${lineId}-why`} className="flex h-10 overflow-hidden rounded-[10px] border bg-card">
+              {SHORT_REASONS.map((why) => (
+                <Choice key={why} on={reason === why} disabled={disabled} joined onClick={() => onReason(why)}>{SHORT_REASON_WORDS[why]}</Choice>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {figures.shortFromDepot > 0 && <Note icon={shortfall}>{shortFromDepotLine(figures.shortFromDepot)}</Note>}
       {figures.refused > 0 && <Note icon={damaged}>{refusedAtDoorLine(figures.refused)}</Note>}
     </Panel>

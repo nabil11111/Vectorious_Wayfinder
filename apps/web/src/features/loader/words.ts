@@ -1,4 +1,4 @@
-import { BRANDS, type Brand, type FlagReason, type Issue, type IssueLine, type LeftTruck, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
+import { BRANDS, lineReason as reasonOfLine, type Brand, type FlagReason, type Issue, type IssueLine, type LeftTruck, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
 import { clockTime, countOf, shortDay, unitsOf, vehicleKind } from '@/features/plan/words';
 import { countOf as amountOf, plural, TEMP_NAME } from '@/features/store/words';
 
@@ -202,27 +202,40 @@ export const waitingLine = (issue: Pick<Issue, 'raisedAt'>) => `Waiting for the 
 // "1 replacement", "2 replacements"
 const replacementsWords = (units: number) => `${whole(units)} ${units === 1 ? 'replacement' : 'replacements'}`;
 
-// A report's title by its reason: "1 chilled carton missing", "1 chilled carton damaged", "Chilled goods not cold". The
-// goods are those of the lines it counts a unit on, as the API counted them.
+// A report's title by its lines' reasons: "1 chilled carton missing", "1 chilled carton damaged", "1 crate of 2 damaged,
+// 1 pallet missing" when its lines differ (Q-40), and "Chilled goods not cold". The goods of each reason are those of the
+// lines it counts a unit on, as the API counted them; a report kept before lines had reasons reads its one reason.
 export function reportTitle(issue: IssueWords & Pick<Issue, 'reason'>) {
   if (issue.reason === 'not_cold') return 'Chilled goods not cold';
-  return `${shortGoods({ ...issue, lines: issue.lines.filter((line) => line.counted > 0) })} ${issue.reason}`;
+  const counted = issue.lines.filter((line) => line.counted > 0);
+  const reasons = [...new Set(counted.map((line) => lineReason(issue, line) ?? issue.reason))];
+  return reasons.map((reason) => {
+    const lines = counted.filter((line) => (lineReason(issue, line) ?? issue.reason) === reason);
+    return `${shortGoods({ ...issue, lines, short: lines.reduce((units, line) => units + line.counted, 0) })} ${reason}`;
+  }).join(', ');
 }
 
 // "Fresh Nugegoda · stop 1 · VEH035 · Dilshan · delivered 03:38"
 export const reportPlace = (issue: Pick<Issue, 'stop' | 'trip'>) =>
   [issue.stop.shopName, `stop ${issue.stop.seq}`, truckName(issue.trip), issue.trip.driver, issue.stop.doneAt && `delivered ${clockTime(issue.stop.doneAt)}`].filter(Boolean).join(' · ');
 
-// Each line the report counts, as the shop received it of what was handed over: "11 of 12 chilled cartons", and "8 of
-// 10 boxes · Folded clothing" for Style and Tech.
-export function receivedOf(issue: Pick<Issue, 'lines' | 'stop'>) {
+// Each line the report counts, as the shop received it of what was handed over, with what the shop said of the units
+// short (Q-40): "11 of 12 chilled cartons, 1 missing", and "1 of 2 crates of 2 · Refrigerators, 1 damaged" for Style and
+// Tech. A chilled line counted only because the goods came warm has nothing short to say.
+export function receivedOf(issue: Pick<Issue, 'lines' | 'stop' | 'reason'>) {
   const brand = brandOfShop(issue.stop.shopName);
   return issue.lines.map((line) => {
     const handed = line.delivered ?? 0;
     const of = `${whole(line.received ?? 0)} of`;
-    return brand === 'Fresh' ? `${of} ${whole(handed)} ${line.temp} ${handed === 1 ? line.unit : plural(line.unit)}` : `${of} ${amountOf(handed, line.unit)} · ${line.name}`;
-  }).join(', ');
+    const said = lineReason(issue, line);
+    const goods = brand === 'Fresh' ? `${of} ${whole(handed)} ${line.temp} ${handed === 1 ? line.unit : plural(line.unit)}` : `${of} ${amountOf(handed, line.unit)} · ${line.name}`;
+    return said ? `${goods}, ${whole(line.counted)} ${said}` : goods;
+  }).join('; ');
 }
+
+// What a report says of one of its lines (Q-40): its own reason, or a report kept before lines had reasons its one.
+const lineReason = (issue: Pick<Issue, 'reason'>, line: IssueLine) =>
+  (issue.reason === 'missing' || issue.reason === 'damaged' || issue.reason === 'not_cold' ? reasonOfLine({ reason: issue.reason }, line) : null);
 
 // "yes", "no"
 export const coldWords = (cold: boolean) => (cold ? 'yes' : 'no');

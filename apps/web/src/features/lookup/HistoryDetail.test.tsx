@@ -85,7 +85,7 @@ it('History shows each stop\'s own shop confirmation and says one that is not th
   expect(text).toContain('confirmed 08:31 · reached the depot 08:33');
   expect(text).toContain('3 orders · 22 cartons received · 1 short on the receipt');
   expect(text).toContain('chilled goods arrived cold');
-  expect(text).toContain('Report · missing');
+  expect(text).toContain('Report · 1 chilled carton missing');
   expect(text).toContain('answered Send replacements · Ruwan 08:40 · 1 carton on Fri 26 Jun');
   // The report is listed once, inside the confirmation, not again as a separate problem.
   expect(text).not.toContain('Shop report');
@@ -137,4 +137,20 @@ it('History keeps a closed visit as its own attempt, listed once, with its own t
   // A closed stop handed nothing over, so it has no proof or receipt line to miss.
   expect(text).not.toContain('Not confirmed by the shop yet');
   expect(text).not.toContain('No photo recorded');
+});
+
+it('Q-40 History gives each line of the shop\'s report its own reason, and the report\'s note', () => {
+  const [nugegoda, wellawatte] = trip.stops;
+  const report = { ...nugegoda!.receipt!.report!, reason: 'damaged' as const, note: 'One crushed, the dry carton never came',
+    lines: [{ lineId: id(101), counted: 1, reason: 'damaged' as const }, { lineId: id(103), counted: 1, reason: 'missing' as const }] };
+  const reported = HistoryTrip.parse({ ...trip, stops: [{ ...nugegoda!, receipt: { ...nugegoda!.receipt!, report } }, wellawatte] });
+  const text = textOf(<HistoryDetail trip={reported} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />);
+  expect(text).toContain('Report · 1 chilled carton damaged, 1 dry carton missing');
+  expect(text).toContain('Note · One crushed, the dry carton never came');
+  // A report kept before lines had reasons reads its one reason on its short line.
+  const kept = { ...report, reason: 'missing' as const, note: null, lines: [{ lineId: id(101), counted: 1 }] };
+  const before = HistoryTrip.parse({ ...trip, stops: [{ ...nugegoda!, receipt: { ...nugegoda!.receipt!, report: kept } }, wellawatte] });
+  const old = textOf(<HistoryDetail trip={before} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />);
+  expect(old).toContain('Report · 1 chilled carton missing');
+  expect(old).not.toContain('Note ·');
 });

@@ -269,7 +269,7 @@ it('AC-18 records Wellawatte’s two refused chilled cartons with the optional p
   }
   expect((await db.select().from(issues).where(eq(issues.id, body.writeId)))[0]).toMatchObject({ id: body.writeId, kind: 'refused', reason: 'damaged', status: 'open', revision: 0,
     stopId: previous.id, raisedBy: dilshanId, raisedAt: at(3 * 60 + 48), note: '2 crushed at the bottom', decision: null, decidedBy: null, decidedAt: null });
-  expect(await db.select().from(issueLines).where(eq(issueLines.issueId, body.writeId))).toEqual([{ issueId: body.writeId, orderLineId: chilled.lineId, counted: 2 }]);
+  expect(await db.select().from(issueLines).where(eq(issueLines.issueId, body.writeId))).toEqual([{ issueId: body.writeId, orderLineId: chilled.lineId, counted: 2, reason: null }]);
   expect((await db.select().from(photos).where(eq(photos.id, body.writeId)))[0]).toEqual({ id: body.writeId, stopId: previous.id, issueId: body.writeId, jpeg, takenBy: dilshanId, takenAt: at(3 * 60 + 48) });
   expect(result.problems).toEqual([{ id: body.writeId, kind: 'refused', stopId: previous.id, reason: 'damaged', note: '2 crushed at the bottom', raisedAt: body.at, hasPhoto: true,
     lines: [{ lineId: chilled.lineId, counted: 2 }], decision: null, decidedBy: null, decidedAt: null }]);
@@ -307,7 +307,7 @@ it('AC-20 records a closed Wellawatte at 48 and 46 still on the truck with its o
   expect((await db.select().from(issues).where(eq(issues.id, body.writeId)))[0]).toMatchObject({ kind: 'closed', reason: 'nobody_there', status: 'open', raisedBy: dilshanId,
     raisedAt: at(3 * 60 + 48), stopId: previous.id, note: 'Lights off, gate locked' });
   expect((await db.select().from(issueLines).where(eq(issueLines.issueId, body.writeId))).sort((a, b) => a.counted - b.counted)).toEqual(
-    previous.lines.map(line => ({ issueId: body.writeId, orderLineId: line.lineId, counted: line.loaded })).sort((a, b) => a.counted! - b.counted!));
+    previous.lines.map(line => ({ issueId: body.writeId, orderLineId: line.lineId, counted: line.loaded, reason: null })).sort((a, b) => a.counted! - b.counted!));
   expect(await db.select().from(photos).where(eq(photos.id, body.writeId))).toEqual([]);
   await expectAudit(previous.id, 'stop.closed');
   expect(told()).toEqual([{ topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'issues', depotId: 'Peliyagoda' }]);

@@ -1,11 +1,12 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue } from '@wayfinder/contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { issueTitle, sentLine } from '@/features/loader/words';
+import { issueTitle, reportTitle, sentLine } from '@/features/loader/words';
 import { reasonWords } from '@/features/lookup/words';
 import { IssueCard } from './IssueCard';
 import type { Answering } from './issues';
-import { problemLine, problemWord } from './words';
+import { needsYouTitle, problemLine, problemWord } from './words';
 
 // Q-20: a truck that cannot take it all is flagged "won't fit", and the dispatcher reads it as no room on the truck,
 // not as missing stock. These fixtures live in the test only.
@@ -63,5 +64,36 @@ describe('Q-20 the dispatcher reads a won\'t fit flag as no room on the truck', 
     expect(sentLine({ ...WONT_FIT, status: 'decided', decision: 'go_short' })).toBe('VEH057 goes without the 4 chilled cartons that won\'t fit, Sarath told');
     expect(sentLine({ ...WONT_FIT, status: 'decided', decision: 'load_all' })).toBe('VEH057 loads it all, Sarath told');
     expect(sentLine({ ...SHORT, status: 'decided', decision: 'go_short' })).toBe('VEH035 goes 1 dry carton short, Kasun told');
+  });
+});
+
+// Q-40: Malinda's report at Tech Kandy City Centre, 08:56: one refrigerator crate came damaged and one pallet of small
+// appliances never came, with a note. Each line keeps its own reason, and the note goes with the report.
+const TECH_REPORT: Issue = {
+  ...WONT_FIT, id: '7c000000-0000-4000-8000-000000000040', kind: 'receipt', reason: 'damaged', raisedBy: 'Malinda', raisedAt: '2026-06-25T03:26:00.000Z',
+  note: 'The crate door is dented', short: 2, cold: null,
+  trip: { ...WONT_FIT.trip, vehicleId: 'VEH045', status: 'out', driver: 'Saman' },
+  stop: { ...WONT_FIT.stop, outletId: 'OUT094', shopName: 'Tech Kandy City Centre', arrivedAt: '2026-06-24T23:10:00.000Z', doneAt: '2026-06-24T23:20:00.000Z', flaggedAtDock: false },
+  lines: [
+    { lineId: 'l-1', orderId: 'o-1', temp: 'dry', productId: 'tech-fridge', name: 'Refrigerators', unit: 'crate of 2', quantity: 2, counted: 1, loaded: 2, delivered: 2, received: 1, reason: 'damaged' },
+    { lineId: 'l-2', orderId: 'o-1', temp: 'dry', productId: 'tech-small', name: 'Small appliances', unit: 'pallet', quantity: 2, counted: 1, loaded: 2, delivered: 2, received: 1, reason: 'missing' },
+  ],
+};
+
+describe('Q-40 a shop\'s report gives each line its own reason, and its note', () => {
+  it('titles the report by each line\'s reason on Live day, the Dashboard and a truck\'s row', () => {
+    expect(reportTitle(TECH_REPORT)).toBe('1 crate of 2 damaged, 1 pallet missing');
+    expect(problemLine(TECH_REPORT)).toBe('Tech Kandy City Centre · 1 crate of 2 damaged, 1 pallet missing');
+    expect(needsYouTitle(TECH_REPORT)).toBe('Tech Kandy City Centre · 1 crate of 2 damaged, 1 pallet missing');
+    // A report kept before lines had reasons reads as it did.
+    const kept = { ...TECH_REPORT, reason: 'missing' as const, lines: TECH_REPORT.lines.map(({ reason: _gone, ...line }) => line) };
+    expect(reportTitle(kept)).toBe('2 items missing');
+  });
+
+  it('shows each line received with its reason, and the note, on Live day\'s card', () => {
+    const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><IssueCard issue={TECH_REPORT} depot="Kandy" answering={ANSWERING} time /></QueryClientProvider>);
+    expect(html).toContain('<h3 class="text-[15px] leading-5 font-bold">1 crate of 2 damaged, 1 pallet missing</h3>');
+    expect(html).toMatch(/Received<\/dt><dd[^>]*>1 of 2 crates of 2 · Refrigerators, 1 damaged; 1 of 2 pallets · Small appliances, 1 missing</);
+    expect(html).toMatch(/Note<\/dt><dd[^>]*>The crate door is dented</);
   });
 });

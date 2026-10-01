@@ -1,3 +1,4 @@
+import { deliveryFigures, type ReceiptWrite, type ShortReason, type StoreDelivery } from '@wayfinder/contracts';
 import { wholeCount } from '@/features/loader/count';
 
 // What a receipt's count box stands for (Q-38), with the loader's flag box's helper (Q-17): a whole number from 0 to
@@ -27,5 +28,33 @@ export function receiptCounts(lines: { lineId: string; expected: number }[], cou
     wrongOf,
     short: lines.some((line, i) => countAt(i) < line.expected),
     canConfirm: !anyWrong,
+  };
+}
+
+// The receipt as it is sent (spec 015, rule 3, Q-40): every line once at its count, a line handed over at 0 at 0, each
+// short line with its own reason (Missing until the shop picks another) and a full one with none, the cold answer only
+// when chilled goods came, and the photo and the note only with a report. The receipt's one reason is for phones that
+// saved receipts before lines had their own, so a new receipt leaves it empty. A note of only spaces is no note.
+export function receiptRequest(delivery: StoreDelivery, input: {
+  writeId: string; at: string; counts: number[]; reasons: Record<string, ShortReason>; cold: boolean; note: string; photo: string | null;
+}): ReceiptWrite {
+  const figures = deliveryFigures(delivery);
+  const lines = delivery.lines.map((line, i) => {
+    const short = input.counts[i]! < figures.byLine[i]!.expected;
+    return { lineId: line.lineId, received: input.counts[i]!, reason: short ? input.reasons[line.lineId] ?? 'missing' : null };
+  });
+  const reports = lines.some((line) => line.reason !== null) || (figures.chilled && !input.cold);
+  const note = input.note.trim();
+  return {
+    kind: 'receipt',
+    writeId: input.writeId,
+    stopId: delivery.stopId,
+    at: input.at,
+    revision: delivery.revision,
+    lines,
+    cold: figures.chilled ? input.cold : null,
+    reason: null,
+    ...(reports && input.photo ? { photo: input.photo } : {}),
+    ...(reports && note ? { note } : {}),
   };
 }

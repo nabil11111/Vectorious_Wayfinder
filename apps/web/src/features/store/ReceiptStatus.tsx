@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { deliveryFigures, type Brand, type StoreDelivery, type StoreOutlet } from '@wayfinder/contracts';
+import { deliveryFigures, lineReason, writtenReason, type Brand, type StoreDelivery, type StoreOutlet } from '@wayfinder/contracts';
 import receiptIcon from '@/assets/icons/icon-order-delivered.png';
 import trayIcon from '@/assets/icons/icon-offline-queue.png';
 import { Button } from '@/components/ui/button';
@@ -10,23 +10,30 @@ import { cn } from '@/lib/utils';
 import { markShownSaved, PAST_ORDERS, type ReceiptRecord } from './deliveries';
 import { ORANGE, orangeLink } from './parts/actions';
 import { ReceivedCard } from './parts/ReceiptLineCard';
+import { ReceiptNote } from './parts/ReceiptNote';
 import { ReceiptFoot, StatusCard, StatusHead } from './parts/ReceiptStatusCard';
 import {
   confirmedLine, COULD_NOT_CLEAR, DROPPED, keptSentences, NO_SIGNAL, NOT_ACCEPTED, NOT_SENT_YET, notAcceptedFoot, reportFacts, SAVED_TITLE, savedFoot,
   SENT_TITLE, sentStatus,
 } from './words';
 
-// The lines of a receipt, each as received, with what the shop said about the ones that are short. Every count is
-// deliveryFigures' over the delivery.
+// The lines of a receipt, each as received, with what the shop said about each one that is short (Q-40), and the note
+// that went with its report. Every count is deliveryFigures' over the delivery.
 function Lines({ delivery, brand }: { delivery: StoreDelivery | null; brand: Brand }) {
   if (!delivery) return null;
   const figures = deliveryFigures(delivery);
-  const reason = delivery.receipt?.report?.reason;
-  const said = reason === 'missing' || reason === 'damaged' ? reason : null;
+  const report = delivery.receipt?.report ?? null;
+  const said = (lineId: string) => {
+    const counted = report?.lines.find((line) => line.lineId === lineId);
+    return report && counted ? lineReason(report, counted) : null;
+  };
   return (
-    <div className="mt-6 space-y-3">
-      {delivery.lines.map((line, i) => <ReceivedCard key={line.lineId} brand={brand} line={line} figures={figures.byLine[i]!} reason={said} />)}
-    </div>
+    <>
+      <div className="mt-6 space-y-3">
+        {delivery.lines.map((line, i) => <ReceivedCard key={line.lineId} brand={brand} line={line} figures={figures.byLine[i]!} reason={said(line.lineId)} />)}
+      </div>
+      <ReceiptNote note={report?.note} />
+    </>
   );
 }
 
@@ -40,7 +47,8 @@ export function SavedReceipt({ record, drawn, brand, today }: { record: ReceiptR
   useEffect(() => { markShownSaved(writeId); }, [writeId]);
   const dropped = unanswered.includes(writeId);
   const sending = signal && !dropped && !signedOut;
-  const reports = record.write.reason !== null || record.write.cold === false;
+  // A line with a reason, or the one reason of a receipt saved before lines had their own (Q-40), or warm goods.
+  const reports = record.write.lines.some((line) => writtenReason(record.write, line) !== null) || record.write.cold === false;
   return (
     <div className="max-w-xl lg:pt-2.5">
       <StatusHead icon={trayIcon} title={SAVED_TITLE} sub={dropped ? DROPPED : signal ? null : NO_SIGNAL} />

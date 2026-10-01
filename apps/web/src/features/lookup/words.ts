@@ -1,8 +1,9 @@
 import { ZodError } from 'zod';
-import type {
-  Brand, DeferralCode, HistoryMeasure, HistoryTrip, IssueDecision, IssueKind, IssueReason, Load, LookupFuel, LookupOrderRow, LookupOrders, LookupTripRef,
-  LookupVehicle, OrderStatus,
+import {
+  lineReason, type Brand, type DeferralCode, type HistoryLine, type HistoryMeasure, type HistoryTrip, type IssueDecision, type IssueKind, type IssueReason, type Load,
+  type LookupFuel, type LookupOrderRow, type LookupOrders, type LookupTripRef, type LookupVehicle, type OrderStatus, type ReceiptReport,
 } from '@wayfinder/contracts';
+type HistoryReport = Pick<ReceiptReport, 'reason' | 'lines'>;
 import { DECISION_WORDS, depotDay } from '@/features/live/words';
 import { clockTime, shortDay, unitsWords, whole } from '@/features/loader/words';
 import { DEFERRAL, litres, tonnes } from '@/features/plan/words';
@@ -160,6 +161,19 @@ const REASON_WORDS: Record<IssueReason, string> = {
   missing: 'missing', not_cold: 'not cold',
 };
 export const reasonWords = (reason: IssueReason) => REASON_WORDS[reason];
+// A shop's report by its lines, each with its own reason (Q-40): "1 chilled carton damaged, 1 dry carton missing", and
+// "1 crate of 2 · Refrigerators damaged" for Style and Tech. A report kept before lines had reasons reads its one reason
+// on each short line, and one of warm goods only says "not cold".
+export function reportWords(report: HistoryReport, lines: HistoryLine[], brand: Brand) {
+  const said = report.lines.flatMap((counted) => {
+    const reason = lineReason(report, counted);
+    const line = lines.find((each) => each.lineId === counted.lineId);
+    if (!reason || !line) return [];
+    const goods = brand === 'Fresh' ? `${whole(counted.counted)} ${line.temp} ${counted.counted === 1 ? line.unit : plural(line.unit)}` : `${whole(counted.counted)} ${counted.counted === 1 ? line.unit : plural(line.unit)} · ${line.name}`;
+    return [`${goods} ${REASON_WORDS[reason]}`];
+  });
+  return said.length ? said.join(', ') : REASON_WORDS[report.reason];
+}
 // "answered Go short · Ruwan 02:35", or that it waits for an answer in Live day.
 export const answerWords = (decision: IssueDecision | null, decidedBy: string | null, decidedAt: string | null) =>
   (decision ? [`answered ${DECISION_WORDS[decision]}`, [decidedBy, decidedAt && clockTime(decidedAt)].filter(Boolean).join(' ')].filter(Boolean).join(' · ') : 'not answered yet');

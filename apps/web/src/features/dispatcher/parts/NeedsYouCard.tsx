@@ -7,8 +7,8 @@ import { ICON, problemIcon } from '@/features/live/parts/icons';
 import { allTrips, isRecorded, type RecordedTrip } from '@/features/live/parts/rows';
 import { CARD } from '@/features/live/parts/ui';
 import { openOf } from '@/features/live/sums';
-import { NOTHING_NEEDS_YOU, NO_NEXT_DAY, driverIssueTitle, nextRunTitle, ordersClose } from '@/features/live/words';
-import { clockTime, countOf, issueTitle, truckName, whole } from '@/features/loader/words';
+import { NOTHING_NEEDS_YOU, NO_NEXT_DAY, needsYouTitle, nextRunTitle, ordersClose } from '@/features/live/words';
+import { clockTime, countOf, truckName, whole } from '@/features/loader/words';
 import { inkButton, orangeButton, plainButton } from '@/features/plan/parts/look';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { reasonOf } from '@/features/store/words';
@@ -77,7 +77,7 @@ const Depot = ({ depot }: { depot: string | null }) => (depot ? <DepotTag depot=
 
 // "Fresh Wellawatte · 2 chilled cartons refused", "Dilshan · 03:48 · stop 2 · VEH035", and Decide.
 function ProblemRow({ issue, depot, first }: { issue: Issue; depot: string | null; first: boolean }) {
-  const title = issue.kind === 'loading' ? `${issue.stop.shopName} · ${issueTitle(issue)}` : issue.kind === 'refused' ? `${issue.stop.shopName} · ${driverIssueTitle(issue)}` : driverIssueTitle(issue);
+  const title = needsYouTitle(issue);
   return (
     <li className={ROW}>
       <div className="flex min-w-0 flex-1 items-center gap-3.5">
@@ -85,6 +85,8 @@ function ProblemRow({ issue, depot, first }: { issue: Issue; depot: string | nul
         <div className="min-w-0">
           <p className="text-[15px] leading-5 font-semibold">{title}</p>
           <p className="mt-1 text-xs leading-4 text-muted-foreground"><Depot depot={depot} />{issue.raisedBy} · {clockTime(issue.raisedAt)} · stop {issue.stop.seq} · {truckName(issue.trip)}</p>
+          {/* A shop's report carries its note (Q-40). */}
+          {issue.kind === 'receipt' && issue.note && <p className="mt-1 text-xs leading-4 text-muted-foreground">Note · {issue.note}</p>}
         </div>
       </div>
       <Link to={`/dispatcher/live?issue=${encodeURIComponent(issue.id)}`} className={first ? orangeButton(BUTTON) : inkButton(BUTTON)}>Decide</Link>
