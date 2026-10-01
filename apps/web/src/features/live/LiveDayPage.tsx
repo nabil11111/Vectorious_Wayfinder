@@ -106,6 +106,7 @@ export function LiveDayPage() {
             : <LiveLine updated={clockTime(day.readAt)} />
         ) : ops.isPending && <Skeleton aria-hidden="true" className="h-2.5 w-28 rounded-full" />}
         {trips.length > 0 && <Switch label="Trucks shown" value={filter} options={FILTERS} onChange={setFilter} className="lg:ml-auto" />}
+        {!day && ops.isPending && <Skeleton soft aria-hidden="true" className="h-[27px] w-[212px] rounded-full lg:ml-auto" />}
       </header>
       <div className="mt-2.5">{day ? <Counts day={day} issues={issues.data} /> : ops.isPending && <CountsSkeleton />}</div>
 

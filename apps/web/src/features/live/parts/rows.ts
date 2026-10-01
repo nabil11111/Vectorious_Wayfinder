@@ -1,6 +1,6 @@
 import type { Issue, OperationsDay, OperationsGroup, OperationsStatus, OperationsTrip } from '@wayfinder/contracts';
 import { clockTime, whole } from '@/features/loader/words';
-import { NOT_RECORDED, backAtDepot, problemLine, problemWord, statusSentence } from '../words';
+import { ARRIVED_AFTER_WINDOW, NOT_RECORDED, backAtDepot, problemLine, problemWord, statusSentence } from '../words';
 import type { Tone } from './ui';
 
 // A trip row's facts on the dashboard and Live day (spec 016, rule 4 and rule 5). The status comes from the read: an
@@ -50,7 +50,7 @@ function factsOf(trip: RecordedTrip) {
   if (trip.status === 'loading') return trip.onSoFar ? `Loading · ${whole(trip.onSoFar.units)} on so far · ${leaves}` : `Loading · ${leaves}`;
   if (trip.status === 'ready') {
     const on = trip.figures.loaded === null ? null : `${whole(trip.figures.loaded)} of ${whole(trip.figures.ordered)} on`;
-    return [t.readyAt ? `Ready ${clockTime(t.readyAt)}` : 'Ready', on, leaves].filter(Boolean).join(' · ');
+    return [t.readyAt ? `Ready ${clockTime(t.readyAt)}` : 'Ready', on].filter(Boolean).join(' · ');
   }
   if (trip.status === 'done') return t.backAt ? backAtDepot(t.backAt) : 'Done';
   const next = trip.outRow?.nextStop ?? trip.figures.next;
@@ -71,7 +71,9 @@ export function rowFacts(trip: OperationsTrip, issues: Issue[] | undefined): Row
   const tint = trip.openIssueIds.length > 0 ? 'bad' : null;
   if (!isRecorded(trip)) return { status, sentence: NOT_RECORDED, word: WORD.unrecorded!, tone: 'plain', tint };
   const said = statusSentence(status, null);
-  const sentence = status.kind === 'returning' && trip.outRow?.plannedReturn ? `Returning · planned back ${clockTime(trip.outRow.plannedReturn)}` : said ?? factsOf(trip);
+  // An arrival recorded after the shop's window closed says so beside it (rule 4).
+  const late = status.kind === 'at_stop' && trip.stopDetails.find((stop) => stop.id === status.stopId)?.arrivedAfterWindow ? ` · ${ARRIVED_AFTER_WINDOW}` : '';
+  const sentence = status.kind === 'returning' && trip.outRow?.plannedReturn ? `Returning · planned back ${clockTime(trip.outRow.plannedReturn)}` : said ? `${said}${late}` : factsOf(trip);
   return { status, sentence, word: WORD[status.kind] ?? trip.status, tone: 'plain', tint };
 }
 

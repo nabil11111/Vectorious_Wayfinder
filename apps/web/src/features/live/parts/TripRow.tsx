@@ -58,7 +58,7 @@ export function TripRow({ trip, facts, timeline, issues, actions }: { trip: Oper
   return (
     <li id={tripAnchor(trip.tripId)} className="scroll-mt-28">
       <div className={cn(ROW, 'hidden min-h-[30px] rounded-[10px] px-2 py-1 lg:grid xl:py-0.5', tint)}>
-        <img src={truckIcon(trip)} alt="" className="size-6 object-contain" />
+        <img src={truckIcon(trip)} alt="" className="size-5 object-contain" />
         <div className="min-w-0">
           {nameButton}
           <p className={cn('mt-0.5 text-[10px] leading-3 xl:hidden', SENTENCE[facts.tone])}>{sentence}</p>
