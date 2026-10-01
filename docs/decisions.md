@@ -403,3 +403,8 @@ another tab or through an answer that never arrived, then never shows or changes
 the session and takes the depot the session is on. Requests without the header pass, so scripts and the other roles
 work as before. The account, sign-in and sign-out routes, the switch itself, the demo clock and its reset, health
 and the live stream ignore it, and photos go through the same check as every other read (spec 020's follow-up).
+
+**D-96 · 1 Oct · Both shows the two depots together; planning picks one.** The switch's Both works: the dashboard adds
+the two depots up, and Live day, Orders, History and Fleet show Peliyagoda's part and then Kandy's. Problems from
+either depot are answered from it, each going to its own depot. A plan and its send belong to one depot, so the plan
+board and View plan ask which depot to plan, and a plan write on Both is refused (Nabil, 1 Oct, spec 021).
