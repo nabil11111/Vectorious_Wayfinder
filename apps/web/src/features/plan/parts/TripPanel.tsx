@@ -77,6 +77,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onCrew, onR
   };
   const driver = index.driver(trip.driverId);
   const kind = vehicle ? truckKind(vehicle) : 'truck';
+  const twoTrips = draft.trips.filter((t) => t.vehicleId === trip.vehicleId).length > 1;
   const menu = <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={chooseDriver} />;
   // Drag and drop (spec 023): the stops as a sortable list, outlined as one place while something that can land there is
   // dragged, and its end as a place to land.
@@ -98,7 +99,10 @@ export function TripPanel({ screen, index, trip, group, change, act, onCrew, onR
             {driver ? <>{menu} · {kind}</> : <>{kind} {trip.vehicleId} · {menu}</>}
             {trip.tripNo === 2 && ' · trip 2'}
           </h2>
-          <p className="mt-1 text-xs leading-[15px] text-muted-foreground">{vehicle ? `${tonnes(vehicle.weightCapKg)} · ${cubic(vehicle.volumeCapM3)} · ` : ''}trip {trip.tripNo} of 2</p>
+          {/* "trip 1 of 2" only while the truck runs a second trip too (L-07). */}
+          <p className="mt-1 text-xs leading-[15px] text-muted-foreground">
+            {[vehicle && `${tonnes(vehicle.weightCapKg)} · ${cubic(vehicle.volumeCapM3)}`, twoTrips && `trip ${trip.tripNo} of 2`].filter(Boolean).join(' · ')}
+          </p>
         </div>
         <div className="flex flex-wrap items-start justify-end gap-1.5">
           {group && <Tag tone={group.brand === 'Fresh' ? 'good' : 'plain'} className="h-[23px]">{group.brand}</Tag>}

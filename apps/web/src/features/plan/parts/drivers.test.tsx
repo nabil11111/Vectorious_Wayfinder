@@ -135,3 +135,10 @@ it('spec 026 rule 2 a move is one change of the draft, with Undo putting the dri
   expect(driverChange({ ...DAY, trips: DAY.trips.filter((t) => t.vehicleId !== 'VEH004') }, 'VEH035-1', 'VEH035', chaminda).undo).toBeUndefined();
   expect(driverChange(DAY, 'VEH035-1', 'VEH035', null)).toEqual({ plan: setDriver(DAY, 'VEH035', null) });
 });
+
+it('L-07 says "trip 1 of 2" only when the truck has a second trip, and no count for its only trip', () => {
+  expect(tripPanel(BOARD, 'VEH004')).toMatch(/<p class="[^"]*">6\.8 t · 33\.4 m³<\/p>/);
+  expect(tripPanel(BOARD, 'VEH004')).not.toContain('of 2');
+  const both = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
+  expect(tripPanel(both, 'VEH004')).toContain('6.8 t · 33.4 m³ · trip 1 of 2');
+});
