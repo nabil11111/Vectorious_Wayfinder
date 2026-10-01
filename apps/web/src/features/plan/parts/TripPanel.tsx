@@ -6,6 +6,7 @@ import { splitOrder, type BoardScreen, type Undo } from '../board';
 import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeOff, tripOf } from '../draft';
 import { countOf, figure, hhmm, litres, orderAmount, ordersAmount, vehicleSize } from '../words';
 import { DeferForm } from './DeferForm';
+import { DepotRow } from './DepotRow';
 import { DriverMenu } from './DriverMenu';
 import { driverChange } from './drivers';
 import { vehicleIcon } from './icons';
@@ -116,6 +117,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
       )}
 
       <h3 className="px-3.5 pt-3 pb-2 text-xs leading-[15px] font-semibold text-muted-foreground">Stops in order</h3>
+      {times && <DepotRow end="start" depot={board.depot} at={times.leaveAt} className="mx-3.5" />}
       <ol className="mx-3.5">
         {trip.stops.map((stop, i) => {
           const shop = index.shop(stop.outletId);
@@ -151,6 +153,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
           );
         })}
       </ol>
+      {times && <DepotRow end="end" depot={board.depot} at={times.backAt} className="mx-3.5" />}
 
       <div className="px-3.5 pt-1">
         <button type="button" onClick={onAddStop} className="flex h-9 items-center gap-2 rounded-md px-1.5 text-xs font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">

@@ -3,12 +3,14 @@ import { PlanBoard, type DraftTrip } from '@wayfinder/contracts';
 import { expect, it, vi } from 'vitest';
 import type { BoardScreen } from '../board';
 import { planOf } from '../draft';
-import { DoneList } from './DoneList';
+import { CardStops, DoneList } from './DoneList';
 import { indexOf } from './lookup';
+import { TripPanel } from './TripPanel';
 
 // Spec 022's stop lists, drawn as the page draws them: Done's card opening to its stops with one chevron for both
-// states. The board is made up: VEH004 leaves Peliyagoda at 03:30 for two Colombo shops and is back at 05:24, and
-// VEH002's trip has no times from the checker.
+// states, and the depot at both ends of a trip's stops, in the card and in the middle's "Stops in order", from the
+// checker's leaving and return times. The board is made up: VEH004 leaves Peliyagoda at 03:30 for two Colombo shops
+// and is back at 05:24, and VEH002's trip has no times from the checker.
 
 vi.mock('sonner', () => ({ toast: vi.fn() }));
 
@@ -46,6 +48,11 @@ const BOARD = PlanBoard.parse({
 });
 const INDEX = indexOf(BOARD);
 const SCREEN: BoardScreen = { board: BOARD, draft: planOf(BOARD), saving: 'saved', refused: null, acting: false, undo: null };
+const tripOf = (vehicleId: string) => BOARD.plan.trips.find((t) => t.vehicleId === vehicleId)!;
+
+// The text of each row a list draws: the depot's rows and each stop.
+const textOf = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const rowsOf = (html: string) => [...html.matchAll(/<(?:div data-depot="(?:start|end)"|li\b)[^>]*>(.*?)<\/(?:div|li)>/g)].map(([, inside]) => textOf(inside!));
 
 it('spec 022 Done\'s card draws one chevron for both states, at one size, turned while the card is open', () => {
   const markup = renderToStaticMarkup(<DoneList screen={SCREEN} index={INDEX} openKey={null} onOpen={() => undefined} />);
@@ -56,4 +63,37 @@ it('spec 022 Done\'s card draws one chevron for both states, at one size, turned
     expect(inside).toMatch(/^<svg [^>]*class="lucide lucide-chevron-down size-3\.5 transition-transform group-aria-expanded:rotate-180"[^>]*>/);
   }
   expect(markup).not.toMatch(/[⌄⌃]/);
+});
+
+it('spec 022 Done\'s opened card puts the depot before stop 1 and the return after the last stop', () => {
+  const times = INDEX.trip('VEH004', 1)!.times;
+  expect(rowsOf(renderToStaticMarkup(<CardStops trip={tripOf('VEH004')} times={times} depot="Peliyagoda" index={INDEX} />))).toEqual([
+    '0 Peliyagoda · leaves 03:30',
+    '1 04:07 Fresh Colombo Fort 03:00 to 08:00',
+    '2 04:31 Fresh Wellawatte 03:00 to 08:00',
+    'Peliyagoda · back 05:24',
+  ]);
+  // A trip with no times from the checker shows neither.
+  expect(rowsOf(renderToStaticMarkup(<CardStops trip={tripOf('VEH002')} times={null} depot="Peliyagoda" index={INDEX} />))).toEqual(['1 --:-- Fresh Galle Fort 03:00 to 08:00']);
+});
+
+it('spec 022 "Stops in order" puts the depot before stop 1 and the return after the last stop, as quiet rows', () => {
+  const panel = (vehicleId: string) => renderToStaticMarkup(
+    <TripPanel
+      screen={SCREEN} index={INDEX} trip={tripOf(vehicleId)} group={null}
+      change={() => undefined} act={async () => null} onSwap={() => undefined} onRemoved={() => undefined} onDone={() => undefined} onAddStop={() => undefined} onJoin={() => undefined}
+    />,
+  );
+  const stops = (markup: string) => markup.slice(markup.indexOf('Stops in order'), markup.indexOf('Add a stop'));
+  const veh004 = stops(panel('VEH004'));
+  const rows = rowsOf(veh004);
+  expect(rows[0]).toBe('0 Peliyagoda · leaves 03:30');
+  expect(rows.slice(1, 3).map((row) => row.split(' ').slice(0, 2).join(' '))).toEqual(['1 04:07', '2 04:31']);
+  expect(rows.at(-1)).toBe('Peliyagoda · back 05:24');
+  expect(rows).toHaveLength(4);
+  // Quiet rows, not stops: the list of stops holds only the stops.
+  expect(veh004).toMatch(/<div data-depot="start" class="[^"]*text-muted-foreground[^"]*">/);
+  expect(veh004.match(/<ol\b[^>]*>(.*)<\/ol>/)![1]).not.toContain('data-depot');
+  // VEH002's trip has no times yet, so neither row.
+  expect(rowsOf(stops(panel('VEH002'))).filter((row) => row.includes('Peliyagoda'))).toEqual([]);
 });

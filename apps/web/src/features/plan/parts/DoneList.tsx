@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { Brand, DraftTrip } from '@wayfinder/contracts';
+import type { Brand, DraftTrip, TripTimes } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import type { BoardScreen } from '../board';
 import { keyOf, planOf, sameTrip, tripOf, type TripKey } from '../draft';
 import { countOf, figure, hhmm, whole } from '../words';
+import { DepotRow } from './DepotRow';
 import { ICON } from './icons';
 import type { BoardIndex } from './lookup';
 import { toneOf } from './look';
@@ -74,22 +75,32 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
           <Figure small label="m³" value={`${figure(figures.m3Pct)}%`} tone={toneOf(figures.m3Pct, has('over_volume'))} />
         </div>
       )}
-      {open && (
-        <ol className="mt-2 space-y-1.5">
-          {trip.stops.map((stop, i) => {
-            const at = index.shop(stop.outletId);
-            const time = times?.stops[i];
-            return (
-              <li key={stop.outletId} className="flex items-center gap-2 text-[11px] leading-[14px]">
-                <span className={cn('flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold', time?.late ? 'bg-bad text-white' : 'bg-muted')}>{whole(i + 1)}</span>
-                <span className={cn('w-9 shrink-0 font-mono', time?.late && 'text-bad')}>{time ? hhmm(time.arriveAt) : '--:--'}</span>
-                <span className="min-w-0 flex-1 truncate font-semibold">{at?.name ?? stop.outletId}</span>
-                {at && <span className="shrink-0 text-[10px] text-muted-foreground">{hhmm(time?.windowOpen ?? at.windowOpen)} to {hhmm(time?.windowClose ?? at.windowClose)}</span>}
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      {open && <CardStops trip={trip} times={times} depot={screen.board.depot} index={index} />}
     </li>
+  );
+}
+
+// An opened card's stops, between the depot the trip leaves and the depot it comes back to (spec 022). The depot's
+// rows need the checker's times, so a trip with none shows its stops alone.
+export function CardStops({ trip, times, depot, index }: { trip: DraftTrip; times: TripTimes | null; depot: string; index: BoardIndex }) {
+  return (
+    <div className="mt-2 space-y-1.5">
+      {times && <DepotRow small end="start" depot={depot} at={times.leaveAt} />}
+      <ol className="space-y-1.5">
+        {trip.stops.map((stop, i) => {
+          const at = index.shop(stop.outletId);
+          const time = times?.stops[i];
+          return (
+            <li key={stop.outletId} className="flex items-center gap-2 text-[11px] leading-[14px]">
+              <span className={cn('flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold', time?.late ? 'bg-bad text-white' : 'bg-muted')}>{whole(i + 1)}</span>
+              <span className={cn('w-9 shrink-0 font-mono', time?.late && 'text-bad')}>{time ? hhmm(time.arriveAt) : '--:--'}</span>
+              <span className="min-w-0 flex-1 truncate font-semibold">{at?.name ?? stop.outletId}</span>
+              {at && <span className="shrink-0 text-[10px] text-muted-foreground">{hhmm(time?.windowOpen ?? at.windowOpen)} to {hhmm(time?.windowClose ?? at.windowClose)}</span>}
+            </li>
+          );
+        })}
+      </ol>
+      {times && <DepotRow small end="end" depot={depot} at={times.backAt} />}
+    </div>
   );
 }
