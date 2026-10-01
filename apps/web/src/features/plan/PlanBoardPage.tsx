@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import type { BoardOrder, Brand } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PickDepot } from '@/features/dispatcher/parts/PickDepot';
+import { useScope } from '@/features/dispatcher/scope';
 import { reasonOf } from '@/features/store/words';
 import { cn } from '@/lib/utils';
 import { joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
@@ -11,6 +13,7 @@ import { keyOf, placesOf, startTrip, swapTruck, tripOf, type TripKey } from './d
 import { BoardHeader, type Tab } from './parts/BoardHeader';
 import { BuildPanel } from './parts/BuildPanel';
 import { DoneList } from './parts/DoneList';
+import { startUndo } from './parts/drops';
 import { FindSlot } from './parts/FindSlot';
 import { ICON } from './parts/icons';
 import { groupKey, indexOf } from './parts/lookup';
@@ -26,8 +29,13 @@ import { clockTime, planFor, shortDay } from './words';
 // The plan board (spec 010, Dispatcher · Edit plan and its states). The dispatcher builds the board's day by
 // hand: trips from the orders and trucks on the left, the open trip in the middle, the other trips on the right.
 // With no trip open, the middle builds the suggested plan instead (spec 014). Every number on it comes from the
-// board the API sent.
+// board the API sent. On both depots together a plan belongs to one depot (spec 021, D-96): the page reads no board and
+// asks which depot to plan.
 export function PlanBoardPage() {
+  return useScope().both ? <PickDepot title="Plan board" /> : <OneDepotBoard />;
+}
+
+function OneDepotBoard() {
   const query = useBoard();
   useOrdersFollow();
   const { saver, screen } = useBoardScreen(query.data);
@@ -110,7 +118,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
     }
     const started = startTrip(draft, vehicleId, pick.startWith);
     if (!started) return;
-    change(started.plan);
+    change(started.plan, startUndo(pick, draft, started));
     const group = pick.group;
     if (group) setStartedFrom({ ...startedFrom, [started.key]: group });
     openTrip(started.key);

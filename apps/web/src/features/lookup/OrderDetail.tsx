@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Link } from 'react-router';
 import type { LookupOrderRow, OrderStatus } from '@wayfinder/contracts';
 import { CARD, Chip, type Tone } from '@/features/live/parts/ui';
@@ -43,7 +44,9 @@ function entriesOf(row: LookupOrderRow): Entry[] {
   return [...placed, ...earlier, ...days].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export function OrderDetail({ row, onClose }: { row: LookupOrderRow; onClose: () => void }) {
+// anchor is the id the page scrolls to, one per depot's part on both depots together (spec 021).
+export function OrderDetail({ row, anchor, onClose }: { row: LookupOrderRow; anchor: string; onClose: () => void }) {
+  const title = useId();
   const part = partOf(row);
   const facts: [string, string][] = [
     ['Load', loadWords(row.outlet.brand, row.load)],
@@ -53,10 +56,10 @@ export function OrderDetail({ row, onClose }: { row: LookupOrderRow; onClose: ()
     ...(row.note ? [['Note', row.note] as [string, string]] : []),
   ];
   return (
-    <section id="order-detail" aria-labelledby="order-detail-title" className={cn(CARD, 'scroll-mt-24 px-5 pt-[18px] pb-5')}>
+    <section id={anchor} aria-labelledby={title} className={cn(CARD, 'scroll-mt-24 px-5 pt-[18px] pb-5')}>
       <div className="flex items-start gap-2.5">
         <img src={shopIcon(row.outlet.brand)} alt="" className="mt-[-3px] size-[26px] shrink-0 object-contain" />
-        <h2 id="order-detail-title" className="min-w-0 flex-1 text-[15px] leading-5 font-bold">{row.outlet.name}</h2>
+        <h2 id={title} className="min-w-0 flex-1 text-[15px] leading-5 font-bold">{row.outlet.name}</h2>
         <CloseButton label={`Close ${row.outlet.name}`} onClick={onClose} />
       </div>
       <p className="mt-2 font-mono text-[11px] leading-4 break-all text-muted-foreground">{row.id}</p>

@@ -38,12 +38,22 @@ export function canLand(dragged: Dragged, landing: Landing): boolean {
 // A trip as its card names it: "VEH035", or "VEH011 trip 2".
 export const tripLabel = (trip: { vehicleId: string; tripNo: number }) => (trip.tripNo === 2 ? `${trip.vehicleId} trip 2` : trip.vehicleId);
 
+// The Undo of a trip an order dropped in the empty middle started, once the picker has given it a truck: the drop is
+// one change of the draft, undone in one (rule 1). A trip started from a button has none, as before.
+export function startUndo(pick: Pick, before: DraftPlan, started: { plan: DraftPlan; key: TripKey }): Undo | undefined {
+  if (pick.kind !== 'start' || pick.dropped === undefined) return undefined;
+  const trip = tripOf(started.plan, started.key);
+  return trip ? { before, line: `${pick.dropped} added to ${tripLabel(trip)}`, tripKey: started.key } : undefined;
+}
+
 // The drop as a change of the draft, or null when it lands where it cannot or changes nothing.
 export function dropOf(plan: DraftPlan, dragged: Dragged, landing: Landing): Drop | null {
   if (!canLand(dragged, landing)) return null;
   if (dragged.kind === 'orders') {
     // In the empty middle, its group's "Start a trip": pick a truck, and the trip starts with these orders.
-    if (landing.kind === 'middle') return { kind: 'start', pick: { kind: 'start', group: dragged.group, orders: dragged.orders, startWith: dragged.orders } };
+    if (landing.kind === 'middle') {
+      return { kind: 'start', pick: { kind: 'start', group: dragged.group, orders: dragged.orders, startWith: dragged.orders, dropped: dragged.label } };
+    }
     if (landing.kind === 'unplanned') return null;
     const trip = tripOf(plan, landing.tripKey);
     if (!trip) return null;

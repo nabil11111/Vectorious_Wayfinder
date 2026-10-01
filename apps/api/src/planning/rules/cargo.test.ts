@@ -31,14 +31,14 @@ describe('rules for what a vehicle carries', () => {
     const three = [chilled('a', 'OUT004'), chilled('b', 'OUT006'), chilled('c', 'OUT007')];
     expect(carried('Peliyagoda', 'VEH035', three)).toEqual([{
       code: 'over_weight', level: 'block', vehicleId: 'VEH035', tripNo: 1,
-      message: 'VEH035 trip 1 carries 1,242 kg and its limit is 1,040 kg.', fix: 'Take 202 kg off this trip.',
+      message: 'The reefer van VEH035 carries 1,242 kg, 202 kg over its 1,040 kg limit.', fix: 'Take 202 kg off this trip.',
     }]);
 
     // Each trip is weighed by itself. A fourth order alone on trip 1 is 414 kg and fits, so only trip 2 is over.
     const fourth = chilled('d', 'OUT005');
     expect(check('Peliyagoda', [fourth, ...three], [tripOf('VEH035', [fourth], 1), tripOf('VEH035', three, 2)])).toEqual([{
       code: 'over_weight', level: 'block', vehicleId: 'VEH035', tripNo: 2,
-      message: 'VEH035 trip 2 carries 1,242 kg and its limit is 1,040 kg.', fix: 'Take 202 kg off this trip.',
+      message: 'The reefer van VEH035 carries 1,242 kg on its second trip, 202 kg over its 1,040 kg limit.', fix: 'Take 202 kg off this trip.',
     }]);
 
     // A load exactly at the limit is allowed: 20 pallets of small appliances are 3,800 kg, the limit of VEH008.
@@ -50,7 +50,7 @@ describe('rules for what a vehicle carries', () => {
     const rails = [order('rails', 'OUT019', 'style-hanging', 80)];
     expect(carried('Peliyagoda', 'VEH008', rails)).toEqual([{
       code: 'over_volume', level: 'block', vehicleId: 'VEH008', tripNo: 1,
-      message: 'VEH008 trip 1 carries 24 m³ and its limit is 22 m³.', fix: 'Take 2 m³ off this trip.',
+      message: 'The dry truck VEH008 carries 24 m³, 2 m³ over its 22 m³ limit.', fix: 'Take 2 m³ off this trip.',
     }]);
 
     // A load exactly at the limit is allowed: the same 24.0 m³ is the limit of VEH012.
@@ -70,7 +70,7 @@ describe('rules for what a vehicle carries', () => {
     const orders = [order('dry', 'OUT006', 'fresh-dry-carton', 48), order('chilled', 'OUT005', 'fresh-chilled-carton', 40)];
     expect(carried('Peliyagoda', 'VEH012', orders)).toEqual([{
       code: 'needs_reefer', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 2, outletId: 'OUT005', orderId: 'chilled',
-      message: 'VEH012 trip 1 carries the 276 kg chilled order for OUT005, and VEH012 is not a fridge vehicle.',
+      message: 'The 276 kg chilled order for OUT005 needs a fridge, and it is on the dry truck VEH012.', fix: 'Move it to a reefer truck or van.',
     }]);
 
     // A fridge vehicle carrying dry goods is fine: the same two orders on fridge truck VEH003.
@@ -81,7 +81,7 @@ describe('rules for what a vehicle carries', () => {
     const cartons = [order('cartons', 'OUT001', 'fresh-dry-carton', 48)];
     expect(carried('Peliyagoda', 'VEH008', cartons)).toEqual([{
       code: 'van_only', level: 'block', vehicleId: 'VEH008', tripNo: 1, stopSeq: 1, outletId: 'OUT001',
-      message: 'VEH008 trip 1 stops at OUT001, which only a van can reach, and VEH008 is a truck.',
+      message: 'OUT001 only takes vans, and it is on the dry truck VEH008.', fix: 'Move it to a van.',
     }]);
 
     expect(carried('Peliyagoda', 'VEH035', cartons)).toEqual([]);
@@ -92,13 +92,13 @@ describe('rules for what a vehicle carries', () => {
     const cartons = [order('cartons', 'OUT084', 'fresh-dry-carton', 48)];
     expect(carried('Peliyagoda', 'VEH008', cartons)).toEqual([{
       code: 'wrong_depot', level: 'block', vehicleId: 'VEH008', tripNo: 1, stopSeq: 1, outletId: 'OUT084',
-      message: 'VEH008 trip 1 stops at OUT084, which belongs to the Kandy depot, and VEH008 belongs to Peliyagoda.',
+      message: 'OUT084 belongs to the Kandy depot, and it is on the dry truck VEH008 from Peliyagoda.',
     }]);
 
     // Kandy's van VEH059 may serve OUT084, but not in Peliyagoda's plan.
     expect(carried('Peliyagoda', 'VEH059', cartons)).toEqual([{
       code: 'wrong_depot', level: 'block', vehicleId: 'VEH059', tripNo: 1,
-      message: 'VEH059 trip 1 is in the Peliyagoda plan, and VEH059 belongs to the Kandy depot.',
+      message: 'The van VEH059 belongs to the Kandy depot, and it is in the Peliyagoda plan.', fix: 'Move this trip to a Peliyagoda vehicle.',
     }]);
 
     expect(carried('Kandy', 'VEH059', cartons)).toEqual([]);
@@ -108,7 +108,7 @@ describe('rules for what a vehicle carries', () => {
     // Two crates of washing machines, 420.0 kg, for OUT093 on van VEH059.
     expect(carried('Kandy', 'VEH059', [order('washers', 'OUT093', 'tech-washer', 2)])).toEqual([{
       code: 'no_tail_lift', level: 'warn', vehicleId: 'VEH059', tripNo: 1, stopSeq: 1, outletId: 'OUT093', orderId: 'washers',
-      message: 'VEH059 trip 1 carries the 420 kg dry order for OUT093, which needs a tail lift, and VEH059 is a van without one.',
+      message: 'The 420 kg dry order for OUT093 needs a tail lift, and it is on the van VEH059, which has none.', fix: 'Move it to a truck.',
     }]);
 
     // Trucks have a tail lift (D-24), and a van with nothing that needs one is fine.
@@ -121,7 +121,7 @@ describe('rules for what a vehicle carries', () => {
     const orders = [order('style', 'OUT019', 'style-folded', 15), order('tech', 'OUT024', 'tech-tv', 1)];
     expect(carried('Peliyagoda', 'VEH012', orders)).toEqual([{
       code: 'mixed_brands', level: 'warn', vehicleId: 'VEH012', tripNo: 1,
-      message: 'VEH012 trip 1 mixes shops of 2 brands, Style and Tech.',
+      message: 'The dry truck VEH012 has Style and Tech shops on one trip.', fix: 'Split them, or turn on Mix brands.',
     }]);
 
     expect(carried('Peliyagoda', 'VEH012', orders, { mixBrands: true })).toEqual([]);

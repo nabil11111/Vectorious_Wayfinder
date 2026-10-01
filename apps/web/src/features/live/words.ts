@@ -130,7 +130,8 @@ export const NOT_RECORDED_YET = 'Not recorded yet';
 export const TRIP_GONE = 'That trip is no longer in this view.';
 export const ANSWERED_ALREADY = 'That problem was already answered.';
 export const LOAD_FAILED = 'Could not load the day.';
-export const staleLine = (readAt: string) => `Could not update. Showing the last read at ${clockTime(readAt)}.`;
+// On both depots together the line names the depot whose read it is (spec 021).
+export const staleLine = (readAt: string, depot?: string) => `Could not update${depot ? ` ${depot}'s day` : ''}. Showing the last read at ${clockTime(readAt)}.`;
 export const stillOutFrom = (date: string) => `Still out from ${shortDay(date)}`;
 
 // A truck's place: "Fresh · Colombo", "Mixed · Colombo".

@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { Brand, HistoryStop, HistoryTrip, LookupHistory } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { CARD, Chip } from '@/features/live/parts/ui';
@@ -18,6 +19,8 @@ const tripAnchor = (tripId: string) => `history-trip-${tripId}`;
 export function HistoryTrips({ read, trips, axis, selectedId, onToggle }: {
   read: LookupHistory; trips: HistoryTrip[]; axis: Axis | null; selectedId: string | null; onToggle: (tripId: string) => void;
 }) {
+  // Its own ids, as History on both depots together draws the trips per depot (spec 021).
+  const id = useId();
   const shown = new Set(trips.map((trip) => trip.tripId));
   const byBrand = new Map<Brand | null, LookupHistory['groups']>();
   for (const group of read.groups) {
@@ -30,10 +33,10 @@ export function HistoryTrips({ read, trips, axis, selectedId, onToggle }: {
       {[...byBrand].map(([brand, groups]) => {
         const count = groups.reduce((n, group) => n + group.tripIds.filter((id) => shown.has(id)).length, 0);
         return (
-          <section key={brand ?? 'mixed'} aria-labelledby={`history-${brand ?? 'mixed'}`} className={cn(CARD, 'px-4 pt-3 pb-2')}>
+          <section key={brand ?? 'mixed'} aria-labelledby={`${id}-${brand ?? 'mixed'}`} className={cn(CARD, 'px-4 pt-3 pb-2')}>
             <div className="flex items-center gap-2.5">
               <img src={brandIcon(brand)} alt="" className="size-[26px] object-contain" />
-              <h2 id={`history-${brand ?? 'mixed'}`} className="text-[15px] leading-5 font-bold">{brand ?? 'Mixed'}</h2>
+              <h2 id={`${id}-${brand ?? 'mixed'}`} className="text-[15px] leading-5 font-bold">{brand ?? 'Mixed'}</h2>
               <span className="text-[11px] leading-[14px] text-muted-foreground">{whole(count)} {count === 1 ? 'trip' : 'trips'}</span>
             </div>
             {groups.map((group) => (

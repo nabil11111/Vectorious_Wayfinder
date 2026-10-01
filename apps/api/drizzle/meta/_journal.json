@@ -78,6 +78,13 @@
       "when": 1790843945741,
       "tag": "0010_depot_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790855807655,
+      "tag": "0011_both_depots",
+      "breakpoints": true
     }
   ]
 }

@@ -16,8 +16,8 @@ const CARD = 'rounded-[14px] bg-card shadow-[0_2px_6px_color-mix(in_srgb,var(--f
 
 // Live day's "Needs you" column (spec 012, D-39): the green line of the answer just sent, then the depot's open
 // problems, oldest first, each in full in its own outlined card, or "Nothing needs you right now." A7 builds the
-// rest of Live day around it and keeps it as it is.
-export function NeedsYou({ query, answering, className }: { query: UseQueryResult<IssueList>; answering: Answering; className?: string }) {
+// rest of Live day around it and keeps it as it is. depot is the depot whose problems it lists (spec 021).
+export function NeedsYou({ query, depot, answering, className }: { query: UseQueryResult<IssueList>; depot: string; answering: Answering; className?: string }) {
   if (!query.data) {
     return (
       <section aria-label="Needs you" className={className}>
@@ -46,7 +46,7 @@ export function NeedsYou({ query, answering, className }: { query: UseQueryResul
             <Check className="size-4 stroke-[2.5]" aria-hidden="true" />
             Sent {answering.sent.decidedAt ? clockTime(answering.sent.decidedAt) : ''}
           </p>
-          <p className="mt-3 text-xs leading-4 font-semibold"><AnsweredLine issue={answering.sent} /></p>
+          <p className="mt-3 text-xs leading-4 font-semibold"><AnsweredLine issue={answering.sent} depot={depot} /></p>
           {/* Open next brings the oldest problem still open into view, in full (spec 016, rule 5). There is no Undo. */}
           {open.length > 0 && (
             <Button className={orangeButton('mt-4 h-[34px] w-full text-xs')} onClick={() => focusIssue(open[0]!.id)}>Open next</Button>
@@ -65,7 +65,7 @@ export function NeedsYou({ query, answering, className }: { query: UseQueryResul
                 <RaisedAt issue={issue} />
               </div>
             )}
-            <IssueCard issue={issue} answering={answering} time={i > 0} className={i > 0 ? 'pt-1' : undefined} />
+            <IssueCard issue={issue} depot={depot} answering={answering} time={i > 0} className={i > 0 ? 'pt-1' : undefined} />
           </div>
         ))
       ) : (

@@ -1,5 +1,5 @@
 import type { Response } from 'express';
-import type { LiveEvent, Me } from '@wayfinder/contracts';
+import { BOTH_DEPOTS, type LiveEvent, type Me } from '@wayfinder/contracts';
 import { config } from './config';
 import { HttpError } from './errors';
 import { logger } from './logger';
@@ -9,8 +9,8 @@ import { logger } from './logger';
 // are a list in memory, which is right for one process (D-01).
 
 // What changed and who it concerns. No depot and no outlet means everyone, such as the clock. A depot means
-// that depot's dispatcher, loaders and drivers. An outlet adds that outlet's store manager, so a change about
-// a shop passes both its outlet and its depot. Admins hear everything.
+// that depot's dispatcher, loaders and drivers, and a dispatcher on both depots. An outlet adds that outlet's
+// store manager, so a change about a shop passes both its outlet and its depot. Admins hear everything.
 export interface Announcement {
   topic: string;
   id?: string;
@@ -45,10 +45,13 @@ function send(res: Response, text: string): void {
 }
 
 // The rule above Announcement. A store manager is matched on the outlet alone: her shop belongs to a depot
-// too, but a change about the depot is not hers to hear.
+// too, but a change about the depot is not hers to hear. A dispatcher on both depots together hears every
+// depot's changes (spec 021), and still none that concerns an outlet alone.
 function hears(user: Me, change: Announcement): boolean {
   if (user.role === 'admin' || (change.depotId === undefined && change.outletId === undefined)) return true;
-  return user.role === 'store_manager' ? user.outletId === change.outletId : user.depotId === change.depotId;
+  if (user.role === 'store_manager') return user.outletId === change.outletId;
+  if (user.role === 'dispatcher' && user.depotId === BOTH_DEPOTS) return change.depotId !== undefined;
+  return user.depotId === change.depotId;
 }
 
 // Sends the stream's headers on this response, keeps it open and adds it to the list with the person's

@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { OperationsDay, OperationsEvent } from '@wayfinder/contracts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -12,14 +13,16 @@ import { Card } from './ui';
 // read sends them. The list is replaced on every read, never added to, so a retry cannot repeat an event. A photo is
 // the words "· photo" only: no link and no picture.
 export function Events({ day, className }: { day: OperationsDay | undefined; className?: string }) {
+  // Its own heading's id, as Live day on both depots together shows a card per depot (spec 021).
+  const title = useId();
   if (!day) return <EventsSkeleton className={className} />;
   // A stop's own figures say how many were delivered or refused there; the event's lines are not added up.
   const figures = new Map(allTrips(day).filter(isRecorded).flatMap((trip) => trip.stopDetails.map((stop) => [stop.id, stop.figures] as const)));
   return (
-    <Card aria-labelledby="events-title" className={cn('px-5 pt-[18px] pb-4', className)}>
+    <Card aria-labelledby={title} className={cn('px-5 pt-[18px] pb-4', className)}>
       <div className="flex items-center gap-2.5">
         <img src={ICON.events} alt="" className="size-[26px] object-contain" />
-        <h2 id="events-title" className="text-[15px] leading-5 font-bold">Drops and events</h2>
+        <h2 id={title} className="text-[15px] leading-5 font-bold">Drops and events</h2>
       </div>
       {day.events.length === 0 ? (
         <p className="mt-3 text-xs leading-4 text-muted-foreground">{NO_EVENTS}</p>

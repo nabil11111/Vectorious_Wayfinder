@@ -12,6 +12,7 @@ import { DashboardPage } from './DashboardPage';
 import { DepotSwitch } from './DepotSwitch';
 import { useFollowSwitches, usePressedDepot } from './depots';
 import { SwitchingSkeleton } from './parts/SwitchingSkeleton';
+import { scopeName } from './scope';
 
 export const DISPATCHER_NAV: NavItem[] = [
   { to: '/dispatcher', label: 'Dashboard' },
@@ -25,7 +26,8 @@ export const DISPATCHER_NAV: NavItem[] = [
 // The dispatcher's area. The router hands over everything under /dispatcher, so the area's own routes live here.
 // The plan board and View plan are spec 010, Live day's "Needs you" column and the bell spec 012, and the dashboard and
 // the rest of Live day spec 016; the lookup mounts are handed to spec 017's screens builder. The depot is the one the
-// dispatcher chose (spec 020), and a switch made in another tab of the session is followed here too.
+// dispatcher chose (spec 020), or both together, which the line under the name calls "Both depots" (spec 021), and a
+// switch made in another tab of the session is followed here too.
 // While a switch is on its way, the loading state stands in place of the page, so no page shows the depot before under
 // the depot pressed. The page stays mounted but hidden: a switch that fails brings it back exactly as it was, and one
 // that goes through has emptied its reads, so it shows its own loading state until the new depot's arrive.
@@ -39,7 +41,7 @@ export function DispatcherHome() {
   const wide = pathname === '/dispatcher' || pathname === '/dispatcher/' || pathname.startsWith('/dispatcher/plan') || pathname.startsWith('/dispatcher/live') || ['/dispatcher/orders', '/dispatcher/history', '/dispatcher/fleet'].includes(pathname);
 
   return (
-    <AppShell nav={DISPATCHER_NAV} place={depot ?? undefined} bar={depot && <DepotSwitch depot={depot} />} bell={<Bell />} wide={wide}>
+    <AppShell nav={DISPATCHER_NAV} place={depot ? scopeName(depot) : undefined} bar={depot && <DepotSwitch depot={depot} />} bell={<Bell />} wide={wide}>
       {pressed !== null && <SwitchingSkeleton depot={pressed} />}
       {/* The page belongs to the depot on show: a switch that goes through starts it afresh, so nothing a page kept for
           the depot before (an answered problem, a selection, an open card) stays under the new one. */}

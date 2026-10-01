@@ -119,6 +119,34 @@ describe('the exact seeded planner day without a database', () => {
     }
   });
 
+  it('AC-17 keeps every reason within 200 characters and whole words on varied days made from the seeded one', async () => {
+    // A fixed sample of days: some of the day's orders on a few of its working vehicles, about a third of them waiting
+    // and larger, so splits and refused remainders come up, and on half the days drivers with long three-part names.
+    const { input } = await demoFixture();
+    let seed = 7;
+    const next = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const some = <T>(rows: T[], n: number) => rows.map((row) => [next(), row] as const).sort(([a], [b]) => a - b).slice(0, n).map(([, row]) => row);
+    const names = ['Chaminda Kumara Wickramasinghe', 'Dilshan Pradeep Jayawardena', 'Lasantha Bandara Ekanayake', 'Priyantha Gamini Senanayake'];
+    const reasons: string[] = [];
+    for (let day = 0; day < 60; day += 1) {
+      const fleet = some(input.vehicles.filter((v) => v.available), 2 + Math.floor(next() * 6));
+      const named = next() < 0.5;
+      const orders = some(input.orders, 10 + Math.floor(next() * 40)).map((order) => (next() < 0.3
+        ? { ...order, deliveryDate: '2026-06-24', timesDeferred: 1, lines: order.lines.map((line) => ({ ...line, quantity: line.quantity * (2 + Math.floor(next() * 4)) })) }
+        : order));
+      const result = buildSuggestedPlan({ ...input, orders, vehicles: fleet.map((v, i) => (named ? { ...v, driverName: names[i % names.length]! } : v)) });
+      if (result.status !== 'unavailable') reasons.push(...[...result.choices, ...result.decisions].map((entry) => entry.reason));
+    }
+    expect(reasons.length).toBeGreaterThan(1000);
+    for (const reason of reasons) {
+      expect(reason.length, reason).toBeLessThanOrEqual(200);
+      expect(reason, reason).not.toContain('…');
+    }
+    // The sample reaches every wording: drivers' names where they fit, and the tight form where even kind and id do not.
+    expect(reasons.some((reason) => names.some((name) => reason.includes(`${name}'s `)))).toBe(true);
+    expect(reasons.some((reason) => / wait: reached at /.test(reason))).toBe(true);
+  });
+
   it('AC-17 says fridge truck in every seeded chilled deferral', async () => {
     // Each of these shops also gets its dry cartons from a truck before 08:00 on this plan, so only the
     // fridge vehicles the search tried make the sentence true.

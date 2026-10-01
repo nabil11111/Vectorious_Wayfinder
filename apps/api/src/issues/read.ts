@@ -1,8 +1,8 @@
 import { IssueReason, IssueDecision, PlanCheck, type Issue, type IssueList } from '@wayfinder/contracts';
 import { and, eq, inArray, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { Tx } from '../db/client';
-import { issueLines, issues, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, photos } from '../db/schema';
+import { db, type Tx } from '../db/client';
+import { depots, issueLines, issues, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, photos } from '../db/schema';
 import { depotDate, depotMinutes } from '../lib/clock';
 import { HttpError } from '../lib/errors';
 import { byLoadOrder, loaderDay, sentTrip } from '../loading/loader-day';
@@ -89,6 +89,17 @@ export async function issueListOf(tx: Tx, depotId: string, at: Date): Promise<Is
 // GET /issues, in one read-only snapshot that a reset waits behind.
 export function listIssues(caller: DepotCaller): Promise<IssueList> {
   return snapshot(async (tx) => issueListOf(tx, caller.depotId, (await readMoment(tx)).at));
+}
+
+// The depot a problem belongs to, for an answer given on both depots together (spec 021): the depot of the plan its
+// truck is on, which must be on the depots' list. A problem on no depot's list is unknown, as one on another depot's is
+// on one depot.
+export async function issueDepotOf(issueId: string): Promise<string> {
+  const [row] = await db.select({ depotId: depots.id }).from(issues)
+    .innerJoin(stops, eq(stops.id, issues.stopId)).innerJoin(trips, eq(trips.id, stops.tripId)).innerJoin(plans, eq(plans.id, trips.planId))
+    .innerJoin(depots, eq(depots.id, plans.depotId)).where(eq(issues.id, issueId));
+  if (!row) throw new HttpError(400, 'unknown_record', 'That problem is not on either depot\'s list.', { id: issueId });
+  return row.depotId;
 }
 
 // Photos belong to a problem in the caller's depot, including after the dispatcher has answered it.
