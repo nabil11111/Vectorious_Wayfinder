@@ -111,6 +111,11 @@ export class DraftForm {
   private placing = false;
   // The place on its way, from the press until its answer is taken in, so a sign-out never overtakes it.
   private placingNow: Promise<void> | null = null;
+  // Aborts the form's saves and places. A sign-out that could wait no longer abandons the form: its request on the
+  // way is aborted, which frees the writes queued behind it, and the form sends nothing more of its own until its
+  // person changes something again (Q-04).
+  private requests = new AbortController();
+  private abandoned = false;
   // The drafts the last place from this form named, so a place whose answer was lost is known as its own (Q-07).
   private tried: DraftRefs | null = null;
   private timer = 0;
@@ -245,8 +250,8 @@ export class DraftForm {
     window.clearTimeout(this.retryTimer);
     this.timer = 0;
     if (this.running) return;
-    // Nothing goes out for someone who has signed out. The sign-out waited for the form first (Q-04).
-    if (!this.stillMine()) return;
+    // Nothing goes out for someone who has signed out, nor from a form the sign-out abandoned (Q-04).
+    if (!this.stillMine() || this.abandoned) return;
     if (this.seq === this.savedSeq) { this.tell({ saving: 'saved' }); return; }
     // Nothing is saved while a box holds something that is not a whole number from 0 to 999 (Q-01).
     if (this.invalid()) { this.tell({ saving: 'held' }); return; }
@@ -265,7 +270,7 @@ export class DraftForm {
     try {
       // A read that started before this save would answer with the draft as it was.
       await this.qc.cancelQueries({ queryKey: nextOrderKey });
-      const answer = await saveDraft(this.request());
+      const answer = await saveDraft(this.request(), this.requests.signal);
       this.running = false;
       if (!this.stillMine()) return;
       this.failed = false;
@@ -280,6 +285,8 @@ export class DraftForm {
       if (this.seq !== this.savedSeq) { if (this.timer === 0) void this.flush(); } else this.tell({ saving: 'saved' });
     } catch (error) {
       this.running = false;
+      // Aborted by a sign-out that could wait no longer: it has told the person, and nothing is tried again.
+      if (this.abandoned) return;
       if (error instanceof ApiRequestError && error.status === 401) {
         // Signed out, here or in another tab. The change cannot be saved, and the person is told on the screen
         // that comes next (Q-04).
@@ -312,7 +319,7 @@ export class DraftForm {
     this.failed = false;
     for (;;) {
       if (this.current) { await this.current; continue; }
-      if (this.invalid() || this.failed || !this.stillMine()) return false;
+      if (this.invalid() || this.failed || this.abandoned || !this.stillMine()) return false;
       if (this.seq === this.savedSeq) return sameValues(this.saved, wanted);
       await this.flush();
     }
@@ -331,9 +338,12 @@ export class DraftForm {
     else if (!kept) notKept();
   };
 
-  // The sign-out could not wait any longer for an answer. Nothing more is tried, the person is told the change, or
+  // The sign-out could not wait any longer for an answer. The request on its way is aborted, so the writes queued
+  // behind it, the next person's too, are not held, and nothing more is tried. The person is told the change, or
   // the order, could not be confirmed, and a form already left lets go of the sign-out, so none waits for it again.
   private letGo() {
+    this.abandoned = true;
+    this.requests.abort();
     window.clearTimeout(this.timer);
     window.clearTimeout(this.retryTimer);
     this.timer = 0;
@@ -347,6 +357,11 @@ export class DraftForm {
   // behind the place, and once the drafts are placed, as a new draft nobody asked for.
   private change(values: FormValues) {
     if (this.placing) return;
+    // The person is still here after all, as when the sign-out itself failed: their new change goes as usual.
+    if (this.abandoned) {
+      this.abandoned = false;
+      this.requests = new AbortController();
+    }
     this.values = values;
     this.seq += 1;
     // A box that holds something else holds the save until it is fixed, so what is saved is what the form shows.
@@ -414,7 +429,7 @@ export class DraftForm {
     try {
       await this.qc.cancelQueries({ queryKey: nextOrderKey });
       this.tried = this.base.refs;
-      const answer = await placeOrders({ deliveryDate: this.base.deliveryDate, refs: this.base.refs });
+      const answer = await placeOrders({ deliveryDate: this.base.deliveryDate, refs: this.base.refs }, this.requests.signal);
       if (!this.stillMine()) return;
       this.takeOver(answer);
       this.qc.setQueryData<StoreNextOrder>(nextOrderKey, answer);
@@ -422,6 +437,12 @@ export class DraftForm {
       void this.qc.invalidateQueries({ queryKey: ['orders', 'store'] });
       this.placed(answer.placedOrders);
     } catch (error) {
+      // Aborted by a sign-out that could wait no longer, which has told the person.
+      if (this.abandoned) {
+        this.placing = false;
+        this.tell({ placing: false });
+        return;
+      }
       if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
         // Nothing was placed. The manager sees the new day and decides again.
         void this.qc.invalidateQueries({ queryKey: nextOrderKey });

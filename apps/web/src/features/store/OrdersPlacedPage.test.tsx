@@ -137,12 +137,21 @@ describe('Q-03 places made while the demo clock waits at 15:59:59', () => {
     for (const claim of ['Submission confirmation', 'Placed earlier', '60 boxes', 'Your order is placed']) expect(text).not.toContain(claim);
   });
 
-  it('opened from Today, shows a Fresh day of one chilled and one dry order with each order’s own time', () => {
+  it('opened from Today, shows a Fresh day of one chilled and one dry order with each order’s own time and item', () => {
     const chilled = order(FRESH, AT_HOLD, { 'fresh-chilled-carton': 8 }, 'chilled');
     const dry = order(FRESH, AT_HOLD, { 'fresh-dry-carton': 4 });
     const text = draw(nextOrder('Fresh', FRESH, [chilled, dry]));
     expect(text).toContain('Your 2 orders are placed');
-    expect(text).toContain('8 chilled cartons placed 15:59 4 dry cartons placed 15:59');
+    expect(text).toContain('8 chilled cartons placed 15:59 Chilled 8 cartons 4 dry cartons placed 15:59 Dry 4 cartons');
     expect(text).not.toContain('Submission confirmation');
+  });
+
+  it('opened from Today, names the item of an order of one item, with its quantity and unit', () => {
+    const TECH = [item('tech-tv', 'Televisions', 'pallet of 8'), item('tech-washer', 'Washing machines', 'crate of 3'), item('tech-fridge', 'Refrigerators', 'crate of 2')];
+    const fridges = order(TECH, AT_HOLD, { 'tech-fridge': 2 });
+    const tech = { ...nextOrder('Style', TECH, [fridges]), outlet: { id: 'OUT064', name: 'Tech Matara', brand: 'Tech' as const, windowOpen: '09:00', windowClose: '11:00', dockType: 'rear_dock' as const } };
+    const text = draw(tech);
+    expect(text).toContain('Your order is placed');
+    expect(text).toContain('2 items placed 15:59 Refrigerators 2 crates of 2');
   });
 });
