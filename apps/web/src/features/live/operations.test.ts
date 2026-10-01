@@ -56,17 +56,17 @@ afterEach(() => {
 
 // The page's view of the read, as both dispatcher pages hold it.
 async function watch() {
-  const observer = new QueryObserver(client, operationsOptions(ruwan));
+  const observer = new QueryObserver(client, operationsOptions(ruwan, 'Peliyagoda'));
   stop = observer.subscribe(() => {});
   await settle();
   return observer;
 }
-const shown = () => client.getQueryData<OperationsDay>(operationsKey(ruwan));
+const shown = () => client.getQueryData<OperationsDay>(operationsKey(ruwan, 'Peliyagoda'));
 
 it('AC-34 older operations response cannot replace a newer day', async () => {
-  expect(operationsKey(ruwan)).toEqual(['operations', 'dispatcher-ruwan', 'Peliyagoda']);
+  expect(operationsKey(ruwan, 'Peliyagoda')).toEqual(['operations', 'dispatcher-ruwan', 'Peliyagoda']);
   await watch();
-  expect(requests).toEqual(['/api/v1/operations']);
+  expect(requests).toEqual(['/api/v1/operations?depot=Peliyagoda']);
   respond(0, thursday('2026-06-24T22:00:00.000Z'));
   await settle();
   expect(shown()?.readAt).toBe('2026-06-24T22:00:00.000Z');
@@ -112,7 +112,7 @@ it('AC-34 an app clock day change asks for the newly watched day and drops the o
   void client.refetchQueries({ queryKey: ['operations'] });
   await settle();
   expect(requests).toHaveLength(2);
-  void followDay(client, ruwan);
+  void followDay(client, ruwan, 'Peliyagoda');
   await settle();
   // The new day is asked for at once, without waiting for the held read or a reload.
   expect(requests).toHaveLength(3);
@@ -154,7 +154,7 @@ it('AC-32 a live message while the first read is out asks again once that read l
 it('AC-34 a day change while the first read is out asks for the new day once that read lands', async () => {
   const unfollow = followMessages(client);
   await watch();
-  void followDay(client, ruwan);
+  void followDay(client, ruwan, 'Peliyagoda');
   await settle();
   respond(0, thursday('2026-06-25T10:29:59.000Z'));
   await settle();
@@ -192,7 +192,29 @@ it('AC-34 another account or depot never sees the day kept for the last one', as
   respond(0, thursday('2026-06-25T10:25:00.000Z'));
   await settle();
   const other: Me = { ...ruwan, id: 'dispatcher-other' };
-  expect(operationsKey(other)).not.toEqual(operationsKey(ruwan));
-  expect(client.getQueryData(operationsKey(other))).toBeUndefined();
-  expect(operationsOptions({ ...ruwan, depotId: null }).enabled).toBe(false);
+  expect(operationsKey(other, 'Peliyagoda')).not.toEqual(operationsKey(ruwan, 'Peliyagoda'));
+  expect(client.getQueryData(operationsKey(other, 'Peliyagoda'))).toBeUndefined();
+  expect(client.getQueryData(operationsKey(ruwan, 'Kandy'))).toBeUndefined();
+  expect(operationsOptions(ruwan, null).enabled).toBe(false);
+  expect(operationsOptions(null, 'Peliyagoda').enabled).toBe(false);
+});
+
+it('AC-6 on both depots each depot is its own read, keyed and asked for by the depot it reads', async () => {
+  const onBoth: Me = { ...ruwan, depotId: 'Both' };
+  expect(operationsKey(onBoth, 'Peliyagoda')).toEqual(['operations', 'dispatcher-ruwan', 'Peliyagoda']);
+  expect(operationsKey(onBoth, 'Kandy')).toEqual(['operations', 'dispatcher-ruwan', 'Kandy']);
+  const observers = (['Peliyagoda', 'Kandy'] as const).map((depot) => new QueryObserver(client, operationsOptions(onBoth, depot)));
+  const stops = observers.map((observer) => observer.subscribe(() => {}));
+  stop = () => stops.forEach((each) => each());
+  await settle();
+  expect(requests).toEqual(['/api/v1/operations?depot=Peliyagoda', '/api/v1/operations?depot=Kandy']);
+  respond(1, { ...thursday('2026-06-24T22:01:00.000Z'), depot: { id: 'Kandy', name: 'Kandy' } });
+  respond(0, thursday('2026-06-24T22:02:00.000Z'));
+  await settle();
+  expect(client.getQueryData<OperationsDay>(operationsKey(onBoth, 'Peliyagoda'))?.depot.id).toBe('Peliyagoda');
+  expect(client.getQueryData<OperationsDay>(operationsKey(onBoth, 'Kandy'))?.depot.id).toBe('Kandy');
+  // A live message asks both again, each for its own depot.
+  void client.invalidateQueries({ queryKey: ['operations'] });
+  await settle();
+  expect(requests.slice(2)).toEqual(['/api/v1/operations?depot=Peliyagoda', '/api/v1/operations?depot=Kandy']);
 });

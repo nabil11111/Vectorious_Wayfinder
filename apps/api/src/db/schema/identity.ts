@@ -30,6 +30,9 @@ export const sessions = pgTable('sessions', {
   // The depot a dispatcher switched this session to (spec 020, D-93). Null until they switch: their own depot. A new
   // sign-in is a new session, so it starts there.
   depotId: text('depot_id').references(() => depots.id),
+  // The dispatcher switched this session to both depots together (spec 021, D-96). depot_id is then null. A new
+  // sign-in starts with neither set.
+  allDepots: boolean('all_depots').notNull().default(false),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

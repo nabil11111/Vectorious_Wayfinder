@@ -9,13 +9,9 @@ import { api, ApiRequestError, DEPOT_CHANGED, nameDepot } from '@/lib/api';
 import { clockKey } from '@/lib/clock';
 
 // The dispatcher's depot switch (spec 020, D-93): the top bar's and the dashboard map card's. The server keeps the
-// chosen depot on the session, so every read and write after a switch is for it, and answers Me with it.
+// chosen depot on the session, so every read and write after a switch is for it, and answers Me with it. Both is a
+// choice like a depot (spec 021, D-96): the session then works on both depots together, and Me says 'Both'.
 
-// The booklet's two depots (outlets.csv, vehicles.csv), as the frames' switches list them.
-export const DEPOTS = ['Peliyagoda', 'Kandy'] as const;
-
-// What Both says when pointed at or pressed: a dispatcher works on one depot at a time for now.
-export const BOTH_LATER = 'Both depots together come later.';
 // What a switch that did not go through says. The switch shows the depot before again.
 export const SWITCH_FAILED = 'Could not switch depots. Try again.';
 // What a tab says when a switch made elsewhere retired a plan board that still held changes the server had not saved.
@@ -27,10 +23,10 @@ export const depotSwitchKey = ['depot-switch'] as const;
 // What a press does: it switches to a depot other than the one on show, and not while a switch is on its way.
 export const switchTo = (pressed: string, chosen: string, switching: boolean) => (switching || pressed === chosen ? null : pressed);
 
-// A switch on this screen, whichever tab made it. Every read on screen was for the depot before, and some keys (the
-// plan board's, the problems') do not name it, so no read stays or lands: each is cancelled, the account's too, so an
-// older answer cannot land on the new one, and all but the account and the clock (the same for both depots) are
-// dropped. Each page then shows its loading state until the new depot's read arrives, and the new account opens the
+// A switch on this screen, whichever tab made it. Every read on screen was for the depot before, some keys (the plan
+// board's) do not name it, and a depot read on Both is read again under the new session, so no read stays or lands:
+// each is cancelled, the account's too, so an older answer cannot land on the new one, and all but the account and the
+// clock (the same for both depots) are dropped. Each page then shows its loading state until the new depot's read arrives, and the new account opens the
 // live stream again (lib/live.ts), since a stream carries the depot it opened with.
 // It answers whether the plan board held changes the server had not saved, which went with it.
 export async function takeSwitch(qc: QueryClient, me: Me) {

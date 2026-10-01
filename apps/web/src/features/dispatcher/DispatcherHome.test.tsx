@@ -13,12 +13,13 @@ import { switchDepotMutation } from './depots';
 // the depot before under a switch that says the depot pressed. A switch that fails brings the page back as it was. The
 // shell and the dashboard are stand-ins: the shell draws its bar and the page, and the dashboard shows the read it holds.
 
-// What the shell was last handed to draw in place of the page.
-const shell = vi.hoisted(() => ({ children: undefined as unknown }));
+// What the shell was last handed: the page to draw, and the place the line under the name says.
+const shell = vi.hoisted(() => ({ children: undefined as unknown, place: undefined as string | undefined }));
 vi.mock('sonner', () => ({ toast: vi.fn() }));
 vi.mock('@/components/layout/AppShell', () => ({
-  AppShell: ({ bar, children }: { bar?: ReactNode; children: ReactNode }) => {
+  AppShell: ({ bar, place, children }: { bar?: ReactNode; place?: string; children: ReactNode }) => {
     shell.children = children;
+    shell.place = place;
     return <div>{bar}<main>{children}</main></div>;
   },
 }));
@@ -59,6 +60,27 @@ function pageKey(qc: QueryClient) {
   const page = parts.find((part): part is ReactElement<{ hidden?: boolean }> => isValidElement(part) && (part.props as { hidden?: boolean }).hidden !== undefined);
   return page?.key ?? null;
 }
+
+it('AC-7 the line under the name says the depot, and Dispatcher · Both depots on both together', () => {
+  drawn(screenOf());
+  expect(shell.place).toBe('Peliyagoda');
+  const qc = screenOf();
+  qc.setQueryData(meKey, { ...RUWAN, depotId: 'Both' });
+  const markup = drawn(qc);
+  expect(shell.place).toBe('Both depots');
+  expect(chosen(markup)).toBe('Both');
+});
+
+it('AC-7 a pending switch to Both shows the loading state for both depots, with Both chosen', async () => {
+  const qc = screenOf();
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
+  void new MutationObserver(qc, switchDepotMutation(qc)).mutate('Both');
+  await settled();
+  const markup = drawn(qc);
+  expect(chosen(markup)).toBe('Both');
+  expect(markup).toMatch(/<main><div role="status" aria-label="Switching to both depots"/);
+  expect(markup).toMatch(/<div hidden="" class="contents"><p data-page="">Peliyagoda · 102 orders<\/p><\/div>/);
+});
 
 it('AC-6 the page shows as it is with no switch on its way', () => {
   const markup = drawn(screenOf());

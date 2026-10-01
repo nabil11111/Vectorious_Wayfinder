@@ -1,25 +1,36 @@
 import { useRef, useState } from 'react';
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { queryOptions, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { DecideIssueRequest, DecideIssueResponse, Issue, IssueDecision, IssueList } from '@wayfinder/contracts';
 import { workingFor } from '@/features/auth/api';
 import { ANSWER_WITHIN_MS, fetchAgain, worthRetrying } from '@/features/loader/loading';
 import { reasonOf } from '@/features/store/words';
-import { api, apiBytes } from '@/lib/api';
+import { api, apiBytes, forDepot } from '@/lib/api';
 
 // What needs the dispatcher (spec 012, plan.md "The screen"): Live day's column and the bell read GET /issues under
-// ['issues'], so the live stream's issues message fetches it again on every dispatcher page (spec 008).
+// ['issues'], so the live stream's issues message fetches it again on every dispatcher page (spec 008). Each read names
+// the depot it reads, in its request and its key, so on both depots together each depot's problems are a read of their
+// own (spec 021).
 export const issuesKey = ['issues'] as const;
+export const issuesKeyOf = (depot: string | null) => ['issues', depot] as const;
 
-const fetchIssues = () => api<IssueList>('/issues');
+export const issuesOptions = (depot: string | null) => queryOptions({
+  queryKey: issuesKeyOf(depot),
+  queryFn: ({ signal }) => {
+    if (depot === null) throw new Error('No depot to read the problems of.');
+    return api<IssueList>(forDepot('/issues', depot), { signal });
+  },
+  enabled: depot !== null,
+});
 
-export function useIssues() {
-  return useQuery({ queryKey: issuesKey, queryFn: fetchIssues });
+// Every depot's open problems the pages show: the session's depot, or Peliyagoda's and Kandy's in that order.
+export function useIssueLists(depots: readonly string[]) {
+  return useQueries({ queries: depots.map((depot) => issuesOptions(depot)) });
 }
 
-// The day a replacement placed now would be for (spec 015, rule 12), or null with no day open, from the list the
-// column already holds. It never fetches by itself: the column's own read keeps it current.
-export function useReplaceOn(): string | null {
-  const { data } = useQuery({ queryKey: issuesKey, queryFn: fetchIssues, enabled: false, select: (list) => list.replaceOn });
+// The day a replacement placed now would be for (spec 015, rule 12), or null with no day open, from the list of the
+// problem's depot the column already holds. It never fetches by itself: the column's own read keeps it current.
+export function useReplaceOn(depot: string | null): string | null {
+  const { data } = useQuery({ ...issuesOptions(depot), enabled: false, select: (list) => list.replaceOn });
   return data ?? null;
 }
 
@@ -38,17 +49,18 @@ export interface Answering {
 }
 
 // A problem's photo in a tab of its own (spec 013). Its bytes come the shared way, which names the depot the tab shows
-// (D-95), so a tab that fell behind hears the session moved. The tab is opened at the press, before the bytes arrive,
-// since a browser lets only a press open one, and the photo's address is given back once it has had time to open. It
-// answers the line to show when the photo could not be opened, or null. Once signal aborts, because the card that asked
-// went away with a sign-out or a depot switch, its answer is dropped, so an old session's 401 signs nobody out.
+// (D-95), so a tab that fell behind hears the session moved, and the read names the problem's own depot (spec 021). The
+// tab is opened at the press, before the bytes arrive, since a browser lets only a press open one, and the photo's
+// address is given back once it has had time to open. It answers the line to show when the photo could not be opened,
+// or null. Once signal aborts, because the card that asked went away with a sign-out or a depot switch, its answer is
+// dropped, so an old session's 401 signs nobody out.
 export const PHOTO_TAB_BLOCKED = 'The browser kept the photo from opening in a new tab.';
 const PHOTO_KEPT_MS = 60_000;
-export async function openIssuePhoto(issue: Pick<Issue, 'id'>, signal?: AbortSignal): Promise<string | null> {
+export async function openIssuePhoto(issue: Pick<Issue, 'id'>, depot: string, signal?: AbortSignal): Promise<string | null> {
   const tab = window.open('', '_blank');
   if (!tab) return PHOTO_TAB_BLOCKED;
   try {
-    const jpeg = await apiBytes(`/issues/${encodeURIComponent(issue.id)}/photo`, { signal });
+    const jpeg = await apiBytes(forDepot(`/issues/${encodeURIComponent(issue.id)}/photo`, depot), { signal });
     const address = URL.createObjectURL(jpeg);
     tab.location.href = address;
     window.setTimeout(() => URL.revokeObjectURL(address), PHOTO_KEPT_MS);

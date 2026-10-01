@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { LookupOrderRow, OrderStatus } from '@wayfinder/contracts';
 import { CARD, Chip } from '@/features/live/parts/ui';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,8 @@ const deferredOnListedDay = (row: LookupOrderRow) => row.days.some((day) => day.
 export function OrderTable({ groups, range, selectedId, onSelect }: {
   groups: OrderGroup[]; range: Range; selectedId: string | null; onSelect: (orderId: string) => void;
 }) {
+  // Its own ids, as Orders on both depots together draws a table per depot (spec 021).
+  const id = useId();
   return (
     <div className={cn('space-y-2.5', MIN_WIDTH[range])}>
       <div aria-hidden="true" className={cn('grid gap-x-2 px-6 text-[10px] leading-3 font-semibold text-muted-foreground', COLUMNS[range])}>
@@ -35,10 +38,10 @@ export function OrderTable({ groups, range, selectedId, onSelect }: {
         {HEADS.map((head) => <span key={head}>{head}</span>)}
       </div>
       {groups.map((group) => (
-        <section key={group.brand} aria-labelledby={`orders-${group.brand}`} className={cn(CARD, 'px-4 pt-3 pb-2')}>
+        <section key={group.brand} aria-labelledby={`${id}-${group.brand}`} className={cn(CARD, 'px-4 pt-3 pb-2')}>
           <div className="flex items-center gap-2.5">
             <img src={brandIcon(group.brand)} alt="" className="size-[26px] object-contain" />
-            <h2 id={`orders-${group.brand}`} className="text-[15px] leading-5 font-bold">{group.brand}</h2>
+            <h2 id={`${id}-${group.brand}`} className="text-[15px] leading-5 font-bold">{group.brand}</h2>
             <span className="text-[11px] leading-[14px] text-muted-foreground">{whole(group.rows.length)} {group.rows.length === 1 ? 'order' : 'orders'}</span>
           </div>
           {group.districts.map(({ district, rows }) => (

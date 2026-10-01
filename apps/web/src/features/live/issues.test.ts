@@ -1,9 +1,9 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import type { Issue, Me } from '@wayfinder/contracts';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { meKey } from '@/features/auth/api';
 import { DEPOT_CHANGED, DEPOT_HEADER, nameDepot } from '@/lib/api';
-import { PHOTO_TAB_BLOCKED, answerOnItsWay, openIssuePhoto, sendAnswer } from './issues';
+import { PHOTO_TAB_BLOCKED, answerOnItsWay, issuesKeyOf, issuesOptions, openIssuePhoto, sendAnswer } from './issues';
 
 // A problem's answer across a dispatcher's depot switch (spec 020, AC-6): it holds a switch while it is on its way, and
 // an answer that lands after the depot changed is not this screen's to show.
@@ -80,10 +80,10 @@ it('D-95 a problem\'s photo opens from bytes that name the depot the tab shows, 
     const { browser, photoTab, released } = photoBrowser(true);
     const fetch = vi.fn(async () => new Response(new Blob(['photo'], { type: 'image/jpeg' })));
     vi.stubGlobal('fetch', fetch);
-    expect(await openIssuePhoto(FLAG)).toBeNull();
+    expect(await openIssuePhoto(FLAG, 'Peliyagoda')).toBeNull();
     expect(browser.open).toHaveBeenCalledWith('', '_blank');
     expect(photoTab.location.href).toBe('blob:photo');
-    expect(fetch).toHaveBeenCalledWith('/api/v1/issues/7c000000-0000-4000-8000-000000000001/photo', expect.objectContaining({ headers: expect.objectContaining({ [DEPOT_HEADER]: 'Peliyagoda' }) }));
+    expect(fetch).toHaveBeenCalledWith('/api/v1/issues/7c000000-0000-4000-8000-000000000001/photo?depot=Peliyagoda', expect.objectContaining({ headers: expect.objectContaining({ [DEPOT_HEADER]: 'Peliyagoda' }) }));
     expect(released).not.toHaveBeenCalled();
     vi.advanceTimersByTime(60_000);
     expect(released).toHaveBeenCalledWith('blob:photo');
@@ -97,7 +97,7 @@ it('D-95 a problem\'s photo opens from bytes that name the depot the tab shows, 
 it('D-95 a problem\'s photo the server refuses closes its tab and says why, and a refusal for a depot the session left is heard', async () => {
   const { photoTab, heard } = photoBrowser(true);
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'depot_changed', message: 'The depot was switched in another tab.' } }, { status: 409 })));
-  expect(await openIssuePhoto(FLAG)).toBe('The depot was switched in another tab.');
+  expect(await openIssuePhoto(FLAG, 'Peliyagoda')).toBe('The depot was switched in another tab.');
   expect(photoTab.close).toHaveBeenCalled();
   expect(heard()).toBe(1);
 
@@ -105,7 +105,7 @@ it('D-95 a problem\'s photo the server refuses closes its tab and says why, and 
   const fetch = vi.fn();
   vi.stubGlobal('fetch', fetch);
   photoBrowser(false);
-  expect(await openIssuePhoto(FLAG)).toBe(PHOTO_TAB_BLOCKED);
+  expect(await openIssuePhoto(FLAG, 'Peliyagoda')).toBe(PHOTO_TAB_BLOCKED);
   expect(fetch).not.toHaveBeenCalled();
   vi.restoreAllMocks();
 });
@@ -120,8 +120,38 @@ it('a photo whose card went away before its old session\'s 401 landed signs nobo
     gone.abort();
     return Response.json({ error: { code: 'signed_out', message: 'Please sign in.' } }, { status: 401 });
   }));
-  expect(await openIssuePhoto(FLAG, gone.signal)).toBeNull();
+  expect(await openIssuePhoto(FLAG, 'Peliyagoda', gone.signal)).toBeNull();
   expect(photoTab.close).toHaveBeenCalled();
   expect(signedOut).toBe(0);
   vi.restoreAllMocks();
+});
+
+it('AC-6 on both depots each depot\'s problems are a read of its own, and an answer asks both lists again', async () => {
+  expect(issuesKeyOf('Peliyagoda')).toEqual(['issues', 'Peliyagoda']);
+  expect(issuesKeyOf('Kandy')).toEqual(['issues', 'Kandy']);
+  const qc = signedIn();
+  qc.setQueryData(meKey, { ...RUWAN, depotId: 'Both' });
+  // The bell and Live day watch both lists.
+  const watching = ['Peliyagoda', 'Kandy'].map((depot) => new QueryObserver(qc, issuesOptions(depot)).subscribe(() => {}));
+  await settled();
+  expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual(['/api/v1/issues?depot=Peliyagoda', '/api/v1/issues?depot=Kandy']);
+  // Kandy's photo names Kandy, though the tab names Both.
+  nameDepot('Both');
+  const { photoTab } = photoBrowser(true);
+  vi.mocked(fetch).mockClear();
+  vi.mocked(fetch).mockImplementationOnce(async () => new Response(new Blob(['photo'], { type: 'image/jpeg' })));
+  expect(await openIssuePhoto(FLAG, 'Kandy')).toBeNull();
+  expect(fetch).toHaveBeenCalledWith('/api/v1/issues/7c000000-0000-4000-8000-000000000001/photo?depot=Kandy', expect.objectContaining({ headers: expect.objectContaining({ [DEPOT_HEADER]: 'Both' }) }));
+  expect(photoTab.location.href).toBe('blob:photo');
+  vi.restoreAllMocks();
+  nameDepot(null);
+
+  // The answer names no depot: the server saves it on the problem's own (spec 021, rule 3). Both lists are read again.
+  vi.mocked(fetch).mockClear();
+  const sending = sendAnswer(qc, FLAG, 'go_short');
+  await settled();
+  answer(Response.json({ issues: [], replaceOn: null, decided: DECIDED }));
+  expect(await sending).toEqual({ decided: DECIDED });
+  expect(vi.mocked(fetch).mock.calls.map(([url]) => url).sort()).toEqual(['/api/v1/issues/7c000000-0000-4000-8000-000000000001/decide', '/api/v1/issues?depot=Kandy', '/api/v1/issues?depot=Peliyagoda']);
+  watching.forEach((stop) => stop());
 });

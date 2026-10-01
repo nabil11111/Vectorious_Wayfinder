@@ -1,22 +1,28 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { onlineManager, queryOptions, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { onlineManager, queryOptions, useQueries, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { Me, OperationsDay } from '@wayfinder/contracts';
 import { useMe } from '@/features/auth/api';
-import { api } from '@/lib/api';
+import { api, forDepot } from '@/lib/api';
 import { useAppClock } from '@/lib/clock';
 
 // The day the dispatcher watches (spec 016, plan.md "Live updates and query ordering"): one GET /operations that the
 // dashboard and Live day share. The key starts with the topic, so the live stream's plans, loading, driver, orders
 // and issues messages fetch it again (T0's fan-out in lib/live.ts), and a clock or demo message fetches everything.
-// It names the account and the depot, so another account never starts from the last one's day.
-export const operationsKey = (me: Pick<Me, 'id' | 'depotId'> | null | undefined) => ['operations', me?.id ?? null, me?.depotId ?? null] as const;
+// It names the account and the depot it reads, so another account never starts from the last one's day, and on both
+// depots together each depot's day is a read of its own (spec 021).
+type Account = Pick<Me, 'id'> | null | undefined;
+export const operationsKey = (me: Account, depot: string | null) => ['operations', me?.id ?? null, depot] as const;
 
-// The request carries the query's signal: a newer read cancels an older one, whose answer then never lands, so an
-// older day can never replace a newer one (AC-34). Each answer replaces the whole day in one step.
-export const operationsOptions = (me: Pick<Me, 'id' | 'depotId'> | null | undefined) => queryOptions({
-  queryKey: operationsKey(me),
-  queryFn: ({ signal }) => api<OperationsDay>('/operations', { signal }),
-  enabled: Boolean(me?.id && me.depotId),
+// The request names the depot it reads and carries the query's signal: a newer read cancels an older one, whose answer
+// then never lands, so an older day can never replace a newer one (AC-34). Each answer replaces the whole day in one
+// step.
+export const operationsOptions = (me: Account, depot: string | null) => queryOptions({
+  queryKey: operationsKey(me, depot),
+  queryFn: ({ signal }) => {
+    if (depot === null) throw new Error('No depot to read the day of.');
+    return api<OperationsDay>(forDepot('/operations', depot), { signal });
+  },
+  enabled: Boolean(me?.id && depot),
 });
 
 // The watched day changes at 16:00 (D-66), which the read names as dayChangesAt. From then on the app clock has
@@ -25,8 +31,8 @@ export const dayHasChanged = (day: OperationsDay | undefined, at: number | null)
   Boolean(day?.dayChangesAt) && at !== null && at >= Date.parse(day!.dayChangesAt!);
 
 // Asks for the new day at once. A read still out for the old day is cancelled, so it cannot land after the new one.
-export const followDay = (qc: QueryClient, me: Pick<Me, 'id' | 'depotId'> | null | undefined) =>
-  qc.invalidateQueries({ queryKey: operationsKey(me), exact: true }, { cancelRefetch: true });
+export const followDay = (qc: QueryClient, me: Account, depot: string | null) =>
+  qc.invalidateQueries({ queryKey: operationsKey(me, depot), exact: true }, { cancelRefetch: true });
 
 // A live message, or the 16:00 day change, while a read is out and no day is on screen yet would be lost: TanStack
 // hands it the read already on its way, whose snapshot is from before the change. Such a message asks again once
@@ -48,18 +54,21 @@ export const isLive = (query: { data: unknown; isError: boolean; isPaused: boole
   query.data !== undefined && !query.isError && !query.isPaused && online;
 export const useOnline = () => useSyncExternalStore((change) => onlineManager.subscribe(change), () => onlineManager.isOnline());
 
-// Both dispatcher pages read the day through here. The page moves to the next day when the app clock reaches 16:00,
-// even with no clock message on the stream, and the existing one-minute refetch keeps it current besides.
-export function useOperations() {
+// Both dispatcher pages read the day through here, one read per depot they show: the session's depot, or on both
+// depots together Peliyagoda's and Kandy's (spec 021), in that order. Each moves to its next day when the app clock
+// reaches its 16:00, even with no clock message on the stream, and the existing one-minute refetch keeps it current
+// besides.
+export function useOperations(depots: readonly string[]) {
   const qc = useQueryClient();
   const { data: me } = useMe();
   useEffect(() => followMessages(qc), [qc]);
-  const query = useQuery(operationsOptions(me));
+  const queries = useQueries({ queries: depots.map((depot) => operationsOptions(me, depot)) });
   const { at } = useAppClock();
-  const changed = dayHasChanged(query.data, at);
-  const changesAt = query.data?.dayChangesAt ?? null;
+  // The depots whose day has changed, each with the change it was read with, so a new read that is still past its
+  // change asks again.
+  const changed = JSON.stringify(depots.flatMap((depot, i) => (dayHasChanged(queries[i]?.data, at) ? [[depot, queries[i]!.data!.dayChangesAt]] : [])));
   useEffect(() => {
-    if (changed) void followDay(qc, me);
-  }, [changed, changesAt, qc, me]);
-  return query;
+    for (const [depot] of JSON.parse(changed) as [string, string][]) void followDay(qc, me, depot);
+  }, [changed, qc, me]);
+  return queries;
 }

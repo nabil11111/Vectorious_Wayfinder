@@ -1,8 +1,8 @@
-import type { OperationsDay, OperationsMap } from '@wayfinder/contracts';
+import { BOTH_DEPOTS, type OperationsDay, type OperationsMap, type OperationsMapDistrict } from '@wayfinder/contracts';
 import { clockTime, whole } from '@/features/loader/words';
 import { countOf } from '@/features/store/words';
 import { angleAt, pointAt } from '@/lib/map/geometry';
-import { tripsOut } from './trips-out';
+import { tripsOut, type OutTrip } from './trips-out';
 
 // The dashboard's district map (spec 019) as the design's map-fleet-overview.js draws it on Dispatcher · Dashboard
 // (53:11540). Every size and offset here is that script's, in the frame's pixels: the card is 520 by 407 and its map
@@ -64,13 +64,45 @@ export interface MapDrawing {
 
 const plus = (a: Point, b: Point | undefined): Point | null => (b ? [a[0] + b[0], a[1] + b[1]] : null);
 
+// What the card draws from: the view of the shapes module (a depot, or Both), whose districts it names, the read's time,
+// the map's shops by district, the fleet and trips, and the trips on the road. One depot's comes from its read; on both
+// depots together (spec 021) it is the two reads added up, never one depot's standing for both.
+export interface MapRead {
+  view: string; whose: string; name: string; readAt: string; map: OperationsMap;
+  counts: { vehiclesTotal: number; tripsTotal: number; vehiclesOut: number }; out: OutTrip[];
+}
+export const mapReadOf = (day: OperationsDay): MapRead => ({
+  view: day.depot.id, whose: `${day.depot.name}'s`, name: day.depot.name, readAt: day.readAt, map: day.map,
+  counts: { vehiclesTotal: day.counts.vehiclesTotal, tripsTotal: day.counts.tripsTotal, vehiclesOut: day.counts.vehiclesOut }, out: tripsOut(day),
+});
+// Both depots' reads as one map: the shops of a district both serve added up, every district's, the fleets, trips and
+// trucks out added up, and the read's time the older of the two, so the card never says it is newer than either part.
+export function bothMapRead(days: OperationsDay[]): MapRead {
+  const byDistrict = new Map<string, OperationsMapDistrict>();
+  for (const row of days.flatMap((day) => day.map.districts)) {
+    const held = byDistrict.get(row.district);
+    byDistrict.set(row.district, held ? {
+      district: row.district, shops: held.shops + row.shops,
+      shopsDelivered: held.shopsDelivered === null || row.shopsDelivered === null ? null : held.shopsDelivered + row.shopsDelivered,
+    } : row);
+  }
+  const sum = (key: keyof MapRead['counts']) => days.reduce((n, day) => n + day.counts[key], 0);
+  return {
+    view: BOTH_DEPOTS, whose: days.map((day) => `${day.depot.name}'s`).join(' and '), name: 'both depots',
+    readAt: days.map((day) => day.readAt).sort()[0]!,
+    map: { shops: days.reduce((n, day) => n + day.map.shops, 0), districts: [...byDistrict.values()].sort((a, b) => a.district.localeCompare(b.district)) },
+    counts: { vehiclesTotal: sum('vehiclesTotal'), tripsTotal: sum('tripsTotal'), vehiclesOut: sum('vehiclesOut') },
+    out: days.flatMap((day) => tripsOut(day)),
+  };
+}
+
 // What the map draws for the read: the depot's districts are the ones the read lists, and the trips on the road are
 // the ones the "trucks out now" tile counts, ordered by vehicle on each line as the design orders them. A truck the
 // chip counts keeps its line and arrow even when its district has no active shop left; the fill, the shop totals and
 // Stores delivered stay the active shops'.
-export function drawingOf(day: OperationsDay, shapes: MapShapes): MapDrawing {
-  const served = new Set(day.map.districts.map((row) => row.district));
-  const out = tripsOut(day);
+export function drawingOf(read: MapRead, shapes: MapShapes): MapDrawing {
+  const served = new Set(read.map.districts.map((row) => row.district));
+  const out = read.out;
   const drawn = new Set([...served, ...out.map((trip) => trip.district)]);
   const lines = shapes.connections.filter((line) => drawn.has(line.district))
     .map((line) => ({ district: line.district, points: line.points, active: out.some((trip) => trip.district === line.district) }));
@@ -92,12 +124,12 @@ export function drawingOf(day: OperationsDay, shapes: MapShapes): MapDrawing {
 
 // The header (rule 3's table): "Live · 07:30" at the read's time, the depot's shops, its fleet, the plan's trips and
 // the trucks out now.
-export const liveLine = (day: Pick<OperationsDay, 'readAt'>) => `Live · ${clockTime(day.readAt)}`;
-export const statsOf = (day: OperationsDay) => ({
-  stores: countOf(day.map.shops, 'store'),
-  vehicles: countOf(day.counts.vehiclesTotal, 'vehicle'),
-  routes: countOf(day.counts.tripsTotal, 'route'),
-  active: `${whole(day.counts.vehiclesOut)} active`,
+export const liveLine = (read: Pick<MapRead, 'readAt'>) => `Live · ${clockTime(read.readAt)}`;
+export const statsOf = (read: Pick<MapRead, 'map' | 'counts'>) => ({
+  stores: countOf(read.map.shops, 'store'),
+  vehicles: countOf(read.counts.vehiclesTotal, 'vehicle'),
+  routes: countOf(read.counts.tripsTotal, 'route'),
+  active: `${whole(read.counts.vehiclesOut)} active`,
 });
 
 // Stores delivered: "29 of 75 stores", then each district by name with "7/24" and a bar. An unknown count is a dash,
