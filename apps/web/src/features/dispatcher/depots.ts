@@ -236,15 +236,12 @@ export const switchDepotMutation = (qc: QueryClient): UseMutationOptions<Me, Err
     // again, and a switch whose answer was lost can still have gone through, so the tab reads the session and takes it.
     // With no word on the session, a switch that answered takes its answer (should it be stale, the server refuses the
     // tab's next request and the tab reads again), and one that did not changes nothing.
-    const read = await readOnce(qc);
+    // A newer read that overtook this one (a request refused as the switch landed, another tab's message, the account's
+    // own refresh) says nothing of whether the switch went through, so being overtaken is never success: the switch
+    // reads the session again until its own read is the newest, and decides on that (Q-12).
+    let read = await readOnce(qc);
+    while (signedInAs(qc, asker.id) && !read.newest()) read = await readOnce(qc);
     if (!signedInAs(qc, asker.id)) return asker;
-    // A newer read overtook this one, and that read decides here. A request named for the depot before that the server
-    // refused as the switch landed reads the session too, and is such a read. The switch may have gone through all the
-    // same, so the other tabs are told, and each reads the session for itself (Q-12).
-    if (!read.newest()) {
-      channelOf(qc).postMessage({ id: asker.id });
-      return asker;
-    }
     let session = read.session;
     if (session === null) {
       if (answer === null) throw noAnswer;

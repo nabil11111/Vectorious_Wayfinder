@@ -202,13 +202,13 @@ it('D-95 only the newest read of the session applies: an answer a later read ove
   expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
 });
 
-it('D-95 a switch whose read of the session was overtaken leaves the depot to the newer read and shows no line, and the other tabs still hear of it', async () => {
+it('D-95 a switch whose read of the session was overtaken reads it again and takes what it finds, and says nothing', async () => {
   const tab = tabOf();
   inTab(tab);
   useDispatcherPage();
   // The switch answers Kandy, but its read of the session is slow; meanwhile another tab switched back, and a refusal
-  // starts a newer read that finds Peliyagoda.
-  sessionReads({ session: IN_KANDY, after: 40 }, { session: RUWAN, after: 0 });
+  // starts a newer read that finds Peliyagoda. The switch then reads the session again, and finds Peliyagoda too.
+  sessionReads({ session: IN_KANDY, after: 40 }, { session: RUWAN, after: 0 }, { session: RUWAN, after: 0 });
   const switched = switching(tab, 'Kandy');
   await later(5, null);
   window.dispatchEvent(new Event(DEPOT_CHANGED));
@@ -216,9 +216,8 @@ it('D-95 a switch whose read of the session was overtaken leaves the depot to th
   await later(10, null);
   expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
   expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
-  // The switch may have gone through, so the other tabs are told all the same (Q-12). The message names the account
-  // only: each tab reads the session, which is on Peliyagoda again, and changes nothing.
-  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  // The tab that switched the session back told the other tabs itself.
+  expect(Channel.sent).toEqual([]);
   expect(toast).not.toHaveBeenCalled();
 });
 
@@ -811,6 +810,26 @@ it('Q-12 a switch whose answer was lost, when a refused request\'s read took the
   expect(toast).not.toHaveBeenCalled();
   expect(Channel.sent).toEqual([{ id: 'u1' }]);
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+});
+
+it('Q-12 a switch that failed, whose read of the session the account\'s own refresh overtook, still says it could not switch', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  // The server answers the switch 500 without switching. The switch's read of the session is slow, and the account's own
+  // refresh (the minute's, or the window's focus) lands meanwhile, still on Peliyagoda.
+  const sessionAfter = [40, 0];
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('/api/v1/me/depot')
+    ? Response.json({ error: { code: 'internal', message: 'Something went wrong on our side.' } }, { status: 500 })
+    : later(sessionAfter.shift() ?? 0, Response.json(RUWAN)))));
+  const switched = switching(tab, 'Kandy');
+  await later(5, null);
+  await tab.qc.fetchQuery({ queryKey: meKey, queryFn: async () => RUWAN });
+  await expect(switched).rejects.toMatchObject({ status: 500 });
+  expect(toast).toHaveBeenCalledWith(SWITCH_FAILED, expect.objectContaining({ id: 'depot-switch' }));
+  expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  expect(Channel.sent).toEqual([]);
 });
 
 // ── A plan change on its way as another tab switches (Q-13) ─────────────────────────────────────────────────────
