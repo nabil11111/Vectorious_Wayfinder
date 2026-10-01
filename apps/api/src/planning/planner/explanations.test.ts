@@ -31,7 +31,7 @@ describe('reviewed explanations through the complete planner', () => {
     ], { vehicles: [vehicle('VEH001'), vehicle('VEH004')] })));
     expect(result.choices[0]!.reason).toMatch(/Rank 1.*waited since Tuesday.*chilled.*07:59/);
     expect(result.choices[0]!.reason).toMatch(/VEH004.*(?:largest|more volume)/);
-    expect(result.choices[1]!.reason).toMatch(/joined VEH004/);
+    expect(result.choices[1]!.reason).toMatch(/joined the reefer truck VEH004/);
     expect(result.choices[1]!.reason).toMatch(/existing|fill/);
     clearReasons(result);
   });
@@ -61,7 +61,7 @@ describe('reviewed explanations through the complete planner', () => {
     ], { vehicles: [vehicle('VEH012')] });
     const result = success(buildSuggestedPlan(day));
     expect(result.input.plan.deferrals[0]).toMatchObject({ code: 'window', reason: 'No truck could reach Colombo before 08:00 on Thursday.' });
-    expect(result.choices[1]!.reason).toMatch(/VEH012.*trip 2.*\d\d:\d\d/);
+    expect(result.choices[1]!.reason).toMatch(/Colombo is reached at \d\d:\d\d by the second trip of the dry truck VEH012/);
     clearReasons(result);
   });
 
@@ -125,6 +125,8 @@ describe('reviewed explanations through the complete planner', () => {
     expect(result.splits).toHaveLength(1);
     expect(result.choices[0]!.reason).toContain('Colombo');
     expect(result.choices[0]!.reason).toMatch(/07:59|08:00/);
+    // The van is named once in full; the remainder's refusal then calls it "its" (spec 024), which keeps the cap.
+    expect(result.choices[0]!.reason).toBe('Rank 1: waited since Wed; chilled; Colombo by 07:59; 150 cartons on the reefer van VEH035 (only usable run); 30 wait: Colombo is reached at 11:34 by its second trip, after the 08:00 deadline.');
     clearReasons(result);
   });
 

@@ -171,10 +171,10 @@ describe('shop-facing deferrals and dispatcher explanations', () => {
     const day = plannerInput([order], { vehicles: [vehicle('VEH012')] });
     const attempt = tryCandidate(planInput(day), order, { vehicleId: 'VEH012', tripNo: 1, existing: false });
     const reason = placementReason(day, order, { ...attempt, selectionReason: 'the largest free truck' });
-    expect(reason).toMatch(/new run on VEH012/);
+    expect(reason).toMatch(/new run on the dry truck VEH012/);
     expect(reason).toContain('Gampaha');
     expect(reason).toContain('largest free truck');
-    expect(placementReason(day, order, { ...attempt, slot: { ...attempt.slot, existing: true }, selectionReason: 'to fill an existing run' })).toMatch(/joined VEH012/);
+    expect(placementReason(day, order, { ...attempt, slot: { ...attempt.slot, existing: true }, selectionReason: 'to fill an existing run' })).toMatch(/joined the dry truck VEH012/);
     plain(reason);
   });
 
@@ -198,7 +198,7 @@ describe('shop-facing deferrals and dispatcher explanations', () => {
     expect(priority).toMatch(/Rank 1.*Wed.*chilled.*07:30/);
     expect(priority.length).toBeLessThan(65);
     const placement = placementReason(day, order, { ...attempt, selectionReason: 'keeps the usual leaving times' }, true);
-    expect(placement).toMatch(/VEH035 trip 1.*usual/);
+    expect(placement).toMatch(/on the reefer van VEH035.*usual/);
     expect(placement.length).toBeLessThan(55);
     const refusal = refusedReason(day, order, [attempt], 'over_capacity', true);
     expect(refusal).toContain('2,760 kg');
@@ -249,15 +249,20 @@ describe('the planner\'s own sentences in plain words', () => {
     expect(refusedReason(day, fresh, [late], 'window', true)).toBe('Colombo is reached at 10:56 by the second trip of the dry truck VEH012, after the 08:00 deadline.');
     // The long form is the checker's own sentence, with the shop's id read as its district.
     expect(refusedReason(day, fresh, [late], 'window')).toBe('Colombo is reached at 10:56 by the second trip of the dry truck VEH012, 176 minutes after its window closes at 08:00, and Fresh shops must be reached before 08:00.');
+    // Once the explanation has named the vehicle, as a split does for its first part, the short form says "its".
+    expect(refusedReason(day, fresh, [late], 'window', true, 'VEH012')).toBe('Colombo is reached at 10:56 by its second trip, after the 08:00 deadline.');
+    // Another vehicle named before changes nothing.
+    expect(refusedReason(day, fresh, [late], 'window', true, 'VEH008')).toBe('Colombo is reached at 10:56 by the second trip of the dry truck VEH012, after the 08:00 deadline.');
   });
 
   it('says what a refused vehicle carries against its limits, and its fuel, by its kind', () => {
-    const refused = (order: ReturnType<typeof plannerOrder>, fleet: PlannerInput['vehicles'], code: PlannerDeferralCode) => {
+    const refused = (order: ReturnType<typeof plannerOrder>, fleet: PlannerInput['vehicles'], code: PlannerDeferralCode, named?: string) => {
       const day = plannerInput([order], { vehicles: fleet });
-      return refusedReason(day, order, [tryCandidate(planInput(day), order, { vehicleId: fleet[0]!.id, tripNo: 1, existing: false })], code, true);
+      return refusedReason(day, order, [tryCandidate(planInput(day), order, { vehicleId: fleet[0]!.id, tripNo: 1, existing: false })], code, true, named);
     };
     const waiting = plannerOrder('big', 'OUT001', 'fresh-chilled-carton', 400, { deliveryDate: '2026-06-24', timesDeferred: 1 });
     expect(refused(waiting, [vehicle('VEH035')], 'over_capacity')).toBe('The reefer van VEH035 carries 2,760 kg, over its 1,040 kg limit.');
+    expect(refused(waiting, [vehicle('VEH035')], 'over_capacity', 'VEH035')).toBe('It carries 2,760 kg, over its 1,040 kg limit.');
     expect(refused(plannerOrder('rails', 'OUT019', 'style-hanging', 80), [vehicle('VEH008')], 'over_capacity')).toBe('The dry truck VEH008 carries 24 m³, over its 22 m³ limit.');
     // A week's quota of 3.5 litres, which a 24 km trip to Colombo needs all of and a little more.
     expect(refused(plannerOrder('fuel', 'OUT006'), [{ ...vehicle('VEH012'), weeklyFuelQuotaL: 3.5, litresUsedThisWeek: 0 }], 'fuel'))
@@ -265,16 +270,18 @@ describe('the planner\'s own sentences in plain words', () => {
   });
 
   it('says why a mall shop whose window never meets its slot is refused, the shop first', () => {
-    const refused = (hours: { windowOpen: number; windowClose: number; mallOpen: number; mallClose: number }) => {
+    const refused = (hours: { windowOpen: number; windowClose: number; mallOpen: number; mallClose: number }, named?: string) => {
       const order = plannerOrder('mall', 'OUT017', 'style-folded');
       const day = plannerInput([order], { vehicles: [vehicle('VEH012')] });
       Object.assign(day.outlets.find((shop) => shop.id === 'OUT017')!, hours);
-      return refusedReason(day, order, [tryCandidate(planInput(day), order, { vehicleId: 'VEH012', tripNo: 1, existing: false })], 'window', true);
+      return refusedReason(day, order, [tryCandidate(planInput(day), order, { vehicleId: 'VEH012', tripNo: 1, existing: false })], 'window', true, named);
     };
     expect(refused({ windowOpen: 600, windowClose: 620, mallOpen: 700, mallClose: 750 }))
       .toBe('Colombo closes at 10:20, before its mall opens at 11:40, so the dry truck VEH012 can never reach it in time.');
     expect(refused({ windowOpen: 700, windowClose: 750, mallOpen: 600, mallClose: 620 }))
       .toBe('Colombo opens at 11:40, after its mall closes at 10:20, so the dry truck VEH012 can never reach it in time.');
+    expect(refused({ windowOpen: 600, windowClose: 620, mallOpen: 700, mallClose: 750 }, 'VEH012'))
+      .toBe('Colombo closes at 10:20, before its mall opens at 11:40, so it can never be reached in time.');
   });
 
   it('names the order that makes a trip leave early first, then the vehicle by its kind', () => {
