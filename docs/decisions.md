@@ -403,3 +403,9 @@ another tab or through an answer that never arrived, then never shows or changes
 the session and takes the depot the session is on. Requests without the header pass, so scripts and the other roles
 work as before. The account, sign-in and sign-out routes, the switch itself, the demo clock and its reset, health
 and the live stream ignore it, and photos go through the same check as every other read (spec 020's follow-up).
+
+**D-99 · 1 Oct · Every role's bell opens its updates, derived from what the app already records.** No notifications
+table: each person's updates are read from orders, plans, problems and trips at their own times, so the seeded day
+and a reset give the same updates. Which ones a person has seen is kept in their browser. A new update also shows as
+a toast, and as a system notification when the tab is hidden and the person allowed it from the pop-up (Nabil, 1 Oct,
+spec 025).
