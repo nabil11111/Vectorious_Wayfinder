@@ -4,16 +4,17 @@ import { FLAG_REASONS, type FlagReason, type LoadingLine, type LoadingStop, type
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useLogout } from '@/features/auth/api';
 import { orangeButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
 import { flagCounts, wholeCount } from './count';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { GOODS_ICON } from './parts/icons';
 import { BackLink } from './parts/LoadCard';
-import { LoadFailed, NotOnList } from './parts/LoadFailed';
+import { LoadFailed, TruckGone } from './parts/LoadFailed';
 import { ActionBar, Card, LeaveUnsent, NotSaved, Refused, SendingFirst, TickBox } from './parts/ui';
 import { useTicks } from './ticks';
-import { asksBeforeLeaving } from './unsent';
+import { asksBeforeLeaving, useAsksBeforeSignOut } from './unsent';
 import { brandOfStop, countHint, countLine, countWhere, leaves, lineKind, lineWords, truckName, whole } from './words';
 
 // "Won't fit" is a truck that cannot take all of a line (Q-20).
@@ -39,7 +40,8 @@ function FlagScreen({ tripId, stopId }: { tripId: string; stopId: string }) {
       : <FlagSkeleton />;
   }
   const truck = query.data.trucks.find((t) => t.tripId === tripId);
-  if (!truck) return <NotOnList />;
+  // A truck its driver drove away says who and when (Q-34); any other left the plan.
+  if (!truck) return <TruckGone day={query.data} tripId={tripId} />;
   const stop = truck.stops.find((s) => s.id === stopId);
   // A flag is raised while the truck loads, on one of its stops. Anything else goes back to the truck.
   if (!stop || truck.status !== 'loading') return <Navigate to={`/loader/trucks/${truck.tripId}`} replace />;
@@ -98,6 +100,10 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
   // form goes on to the truck as before, and a flag the server refused lets them go, as the refusal says why.
   const blocker = useBlocker(({ currentLocation, nextLocation }) => asksBeforeLeaving(writes.holding('flag'), currentLocation, nextLocation));
   const unsent = writes.out === 'flag' && writes.phase !== 'idle';
+  // Sign out asks the same way, as signing out would take the form and its flag with it.
+  const logout = useLogout();
+  const [signOutAsked, setSignOutAsked] = useState(false);
+  useAsksBeforeSignOut(() => writes.holding('flag'), () => setSignOutAsked(true));
   useEffect(() => {
     if (blocker.state === 'blocked' && !unsent) blocker.reset();
   }, [blocker, unsent]);
@@ -115,9 +121,15 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
       <div className="mt-2.5 lg:mt-3.5">
         {stale}
         {writes.refused && <Refused>{writes.refused}</Refused>}
-        {leaving && writes.phase === 'unsaved' && <LeaveUnsent onRetry={() => { leaving.reset(); writes.retry(); }} onLeave={() => leaving.proceed()} />}
-        {leaving && writes.phase === 'saving' && <SendingFirst />}
-        {!leaving && writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
+        {signOutAsked && unsent ? (
+          <LeaveUnsent signingOut onRetry={() => { setSignOutAsked(false); writes.retry(); }} onLeave={() => { setSignOutAsked(false); logout.signOutAnyway(); }} />
+        ) : (
+          <>
+            {leaving && writes.phase === 'unsaved' && <LeaveUnsent onRetry={() => { leaving.reset(); writes.retry(); }} onLeave={() => leaving.proceed()} />}
+            {leaving && writes.phase === 'saving' && <SendingFirst />}
+            {!leaving && writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
+          </>
+        )}
       </div>
       <div className="grid grid-cols-1 gap-y-3 lg:grid-cols-[minmax(0,680fr)_minmax(0,420fr)] lg:items-start lg:gap-x-6">
         <Card className="px-4 pt-4 pb-3 lg:px-5 lg:pt-[19px]">

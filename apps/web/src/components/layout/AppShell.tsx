@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router';
 import type { Role } from '@wayfinder/contracts';
 import alertIcon from '@/assets/icons/icon-alert.png';
@@ -36,6 +36,9 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
   // The app's own time, never the device's, and the stream that keeps every open screen current (spec 008).
   const clock = useAppClock();
   useLive();
+  // The avatar menu. Sign out asks the page first; a page that holds it, such as the loader's flag form with a flag not
+  // sent (Q-22), asks its own question, and the menu closes so the question is in view.
+  const [menu, setMenu] = useState(false);
   if (!me) return null;
   const who = `${ROLE_LABEL[me.role]}${place ? ` · ${place}` : ''}`;
 
@@ -64,7 +67,7 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
             small badge. */}
         {bell ?? <button type="button" aria-label="Notifications" className="shrink-0 rounded-full p-1 hover:bg-muted max-lg:order-last"><img src={alertIcon} alt="" className="size-7" /></button>}
         {/* The frames draw no sign-out in the bar, so it sits behind the avatar. */}
-        <Popover>
+        <Popover open={menu} onOpenChange={setMenu}>
           <PopoverTrigger aria-label={me.displayName} className="flex shrink-0 items-center gap-2.5 rounded-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-border"><img src={AVATAR[me.role]} alt="" className="size-6" /></span>
             {/* Between 1024 and 1280 the tabs take the room, so the name waits behind the avatar. */}
@@ -78,7 +81,7 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
               <PopoverTitle className="text-sm font-bold">{me.displayName}</PopoverTitle>
               <p className="text-xs text-muted-foreground">{who}</p>
             </div>
-            <Button variant="outline" className="h-10 w-full rounded-[10px] bg-card font-semibold dark:border-border dark:bg-card dark:hover:bg-muted" disabled={logout.isPending} onClick={() => logout.mutate()}>
+            <Button variant="outline" className="h-10 w-full rounded-[10px] bg-card font-semibold dark:border-border dark:bg-card dark:hover:bg-muted" disabled={logout.isPending} onClick={() => { if (!logout.signOut()) setMenu(false); }}>
               {logout.isPending ? 'Signing out…' : 'Sign out'}
             </Button>
           </PopoverContent>

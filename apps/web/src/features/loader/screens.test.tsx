@@ -10,8 +10,9 @@ import { loadingKey } from './loading';
 import { LeaveUnsent, SendingFirst } from './parts/ui';
 import { lastLoaded } from './stops';
 import { TruckPage } from './TruckPage';
+import { TrucksPage } from './TrucksPage';
 import { asksBeforeLeaving } from './unsent';
-import { answerSentence, countHint, countLine, countWhere, loadFigure, undoFirstWords, undoStopWords } from './words';
+import { answerSentence, countHint, countLine, countWhere, leftLine, loadFigure, outOnLine, outOnWords, undoFirstWords, undoStopWords } from './words';
 
 // The loader's screens as the live QA run found them (phase 3, Q-16 to Q-23). The pages are drawn as the server would
 // draw them, from a loading day in the query and the app clock at Thu 25 Jun 02:35. These fixtures live in the test only.
@@ -48,12 +49,12 @@ function veh038(loaded: number[], changes: Partial<LoadingTruck> = {}, short: Re
   return {
     tripId: TRIP, revision: 4, vehicleId: 'VEH038', vehicleType: 'van', vehicleTemp: 'ambient', tripNo: 1, brand: 'Fresh', district: 'Colombo',
     status: 'loading', leavesAt: '2026-06-24T23:06:00.000Z', readyAt: null, driver: 'Dilshan', weightCapKg: 1200, volumeCapM3: 9,
-    units: 108, on: { units: on, kg: on * 7, m3: on * 0.04 }, short: stops.reduce((total, stop) => total + stop.short, 0), stops, issues: [], ...changes,
+    units: 108, on: { units: on, kg: on * 7, m3: on * 0.04 }, short: stops.reduce((total, stop) => total + stop.short, 0), stops, issues: [], outOn: null, ...changes,
   };
 }
 
 const dayOf = (...trucks: LoadingTruck[]): LoadingDay => ({
-  depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: { id: '0c000000-0000-4000-8000-000000000001', revision: 3, publishedAt: '2026-06-24T10:36:00.000Z', publishedBy: 'Ruwan' }, trucks,
+  depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: { id: '0c000000-0000-4000-8000-000000000001', revision: 3, publishedAt: '2026-06-24T10:36:00.000Z', publishedBy: 'Ruwan' }, trucks, left: [],
 });
 
 // Thu 25 Jun 02:35 at the depot.
@@ -65,6 +66,7 @@ function page(path: string, day: LoadingDay): string {
   qc.setQueryData(loadingKey, day);
   qc.setQueryData(clockKey, { ...CLOCK, heldAt: performance.now() });
   const router = createMemoryRouter([
+    { path: '/loader', element: <TrucksPage /> },
     { path: '/loader/trucks/:tripId', element: <TruckPage /> },
     { path: '/loader/trucks/:tripId/flag', element: <FlagPage /> },
   ], { initialEntries: [path] });
@@ -233,6 +235,17 @@ describe('Q-21 the load\'s weight never rounds up to look full', () => {
     expect(figure(2000, 1999.9, 0, 9)).toBe('1.9 / 2.0 t · 0.0 / 9.0 m³');
   });
 
+  it('reads the limit\'s own figure once the vehicle is full or over it, and never while weight is free', () => {
+    // VEH002's limit is 3,990 kg, which its one place writes 4.0 t.
+    expect(figure(3990, 3990, 0, 22)).toBe('4.0 / 4.0 t · 0.0 / 22.0 m³');
+    expect(figure(3990, 4100, 0, 22)).toBe('4.0 / 4.0 t · 0.0 / 22.0 m³');
+    expect(figure(3990, 3989.9, 0, 22)).toBe('3.9 / 4.0 t · 0.0 / 22.0 m³');
+    expect(figure(6840, 7000, 0, 33.4)).toBe('6.8 / 6.8 t · 0.0 / 33.4 m³');
+    expect(figure(1040, 1040)).toBe('1,040 / 1,040 kg · 0.0 / 7.0 m³');
+    expect(figure(1040, 1045.5)).toBe('1,040 / 1,040 kg · 0.0 / 7.0 m³');
+    expect(figure(1040, 1039.9)).toBe('1,039 / 1,040 kg · 0.0 / 7.0 m³');
+  });
+
   it('keeps the cubic metres to the nearest tenth, as the walkthrough reads them', () => {
     // The walkthrough's VEH035 with stop 2 on: 94 cartons, 648.6 kg and 3.478 m³.
     expect(figure(1040, 648.6, 3.478)).toBe('648 / 1,040 kg · 3.5 / 7.0 m³');
@@ -260,6 +273,13 @@ describe('Q-22 a flag that was not sent is never left behind without a word', ()
     expect(html).toMatch(/role="alertdialog"/);
     expect(html).toContain('This flag is not sent. If you leave now, the dispatcher may never see it.');
     expect([...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(([, words]) => words)).toEqual(['Try again', 'Leave without sending']);
+  });
+
+  it('asks the same way before signing out, with Sign out anyway', () => {
+    const html = renderToStaticMarkup(<LeaveUnsent signingOut onRetry={() => {}} onLeave={() => {}} />);
+    expect(html).toMatch(/role="alertdialog"/);
+    expect(html).toContain('This flag is not sent. If you sign out now, the dispatcher may never see it.');
+    expect([...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(([, words]) => words)).toEqual(['Try again', 'Sign out anyway']);
   });
 
   it('holds the loader while the flag is still on its way, and says so', () => {
@@ -308,5 +328,73 @@ describe('Q-23 "Waiting for the dispatcher" stays with the flagged stop', () => 
     expect(cards).toContain('All stops loaded');
     expect(cards).not.toContain('Waiting for the dispatcher');
     expect(row('Fresh Kotahena')).toContain(WAITING);
+  });
+});
+
+// VEH038's trip 2 while the van is still out on trip 1, due back at 06:38, and VEH035 ahead of it at the dock.
+const secondTrip = (changes: Partial<LoadingTruck> = {}) => veh038([], { tripId: '0b000000-0000-4000-8000-000000000382', tripNo: 2, status: 'planned', leavesAt: '2026-06-25T01:38:00.000Z', outOn: { tripNo: 1, backBy: '2026-06-25T01:08:00.000Z' }, ...changes });
+const veh035 = () => veh038([], { tripId: '0b000000-0000-4000-8000-000000000035', vehicleId: 'VEH035', status: 'planned' });
+
+describe('Q-26 a second trip whose vehicle is still out on its first', () => {
+  it('names the trip it is out on and when it is back, from the API\'s figures, in the brand\'s units', () => {
+    expect(outOnWords(secondTrip().outOn!)).toBe('out on trip 1 · back by 06:38');
+    expect(outOnLine(secondTrip())).toBe('VEH038 is out on trip 1 · back by 06:38. Put the cartons ready on the dock; they go on when it is back.');
+    expect(outOnLine(secondTrip({ brand: 'Style' }))).toBe('VEH038 is out on trip 1 · back by 06:38. Put the boxes ready on the dock; they go on when it is back.');
+    expect(outOnLine(secondTrip({ brand: null }))).toBe('VEH038 is out on trip 1 · back by 06:38. Put the units ready on the dock; they go on when it is back.');
+  });
+
+  it('says so in its Today\'s trucks row in place of when it leaves', () => {
+    const html = page('/loader', dayOf(veh035(), secondTrip()));
+    const row = html.slice(html.indexOf('VEH038 trip 2'));
+    expect(row).toContain('out on trip 1 · back by 06:38');
+    expect(row).not.toContain('leaves 07:08');
+  });
+
+  it('says so on the Next out card when it is the next truck out', () => {
+    expect(page('/loader', dayOf(secondTrip()))).toContain('out on trip 1 · back by 06:38');
+  });
+
+  it('says so at the top of its load page, and still lets it start', () => {
+    const html = truckPage(secondTrip());
+    expect(html).toContain('VEH038 is out on trip 1 · back by 06:38. Put the cartons ready on the dock; they go on when it is back.');
+    expect(html.indexOf('VEH038 is out on trip 1')).toBeLessThan(html.indexOf('Load in this order'));
+    const start = [...html.matchAll(/<button[^>]*>Start loading VEH038 trip 2<\/button>/g)].map(([tag]) => tag);
+    expect(start.length).toBeGreaterThan(0);
+    expect(start.every((tag) => !/\sdisabled=""/.test(tag))).toBe(true);
+  });
+
+  it('says nothing of it once the vehicle is back', () => {
+    expect(truckPage(secondTrip({ outOn: null }))).not.toContain('is out on trip');
+    expect(page('/loader', dayOf(veh035(), secondTrip({ outOn: null })))).not.toContain('out on trip');
+  });
+});
+
+// VEH011 trip 1, which Asanka drove away at 04:11 while its ready screen was open.
+const LEFT = { tripId: TRIP, vehicleId: 'VEH011', tripNo: 1, driver: 'Asanka', leftAt: '2026-06-24T22:41:00.000Z' };
+const PLAN_CHANGED = 'This truck is not on the list any more. The plan may have changed.';
+
+describe('Q-34 a truck that has left the dock', () => {
+  it('says who drove it away and when, with Back to trucks, in place of "The plan may have changed"', () => {
+    const html = page(`/loader/trucks/${TRIP}`, { ...dayOf(), left: [LEFT] });
+    expect(html).toContain('VEH011 left with Asanka at 04:11.');
+    expect(html).toMatch(/<button[^>]*>Back to trucks<\/button>/);
+    expect(html).not.toContain('The plan may have changed');
+  });
+
+  it('says the same on the flag form of a truck that has left', () => {
+    const html = page(`/loader/trucks/${TRIP}/flag?stop=stop-2`, { ...dayOf(), left: [LEFT] });
+    expect(html).toContain('VEH011 left with Asanka at 04:11.');
+    expect(html).not.toContain('The plan may have changed');
+  });
+
+  it('keeps "The plan may have changed" for a truck the plan took away', () => {
+    expect(page(`/loader/trucks/${TRIP}`, dayOf())).toContain(PLAN_CHANGED);
+    expect(page(`/loader/trucks/${TRIP}`, { ...dayOf(), left: [{ ...LEFT, tripId: '0b000000-0000-4000-8000-000000000999' }] })).toContain(PLAN_CHANGED);
+  });
+
+  it('names a second trip, and leaves out a driver or a time the day does not have', () => {
+    expect(leftLine({ ...LEFT, tripNo: 2 })).toBe('VEH011 trip 2 left with Asanka at 04:11.');
+    expect(leftLine({ ...LEFT, driver: null })).toBe('VEH011 left at 04:11.');
+    expect(leftLine({ ...LEFT, leftAt: null })).toBe('VEH011 left with Asanka.');
   });
 });
