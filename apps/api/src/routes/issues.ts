@@ -1,7 +1,7 @@
 import { DecideIssueRequest, Issue } from '@wayfinder/contracts';
 import { Router } from 'express';
 import { decideIssue } from '../issues/decide';
-import { listIssues } from '../issues/read';
+import { issuePhoto, listIssues } from '../issues/read';
 import { depotCallerOf, requireDepot, requireRole } from '../middleware/auth';
 
 // What needs the dispatcher (spec 012): the depot's open problems, and the answer to one. Every route works on the
@@ -11,6 +11,11 @@ issuesRouter.use(requireRole('dispatcher'), requireDepot);
 
 // GET /issues: the depot's open problems, oldest first, and the loader's day (IssueList).
 issuesRouter.get('/', async (req, res) => { res.json(await listIssues(depotCallerOf(req))); });
+
+issuesRouter.get('/:issueId/photo', async (req, res) => {
+  const jpeg = await issuePhoto(depotCallerOf(req), Issue.shape.id.parse(req.params.issueId));
+  res.type('image/jpeg').send(jpeg);
+});
 
 // POST /issues/:issueId/decide: the answer, naming the problem's revision (DecideIssueRequest). It answers the open list
 // and the problem just answered (DecideIssueResponse).

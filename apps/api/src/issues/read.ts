@@ -4,6 +4,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import type { Tx } from '../db/client';
 import { issueLines, issues, orderLines, orders, outlets, plans, products, stops, trips, users, photos } from '../db/schema';
 import { depotDate, depotMinutes } from '../lib/clock';
+import { HttpError } from '../lib/errors';
 import { byLoadOrder, loaderDay, sentTrip } from '../loading/loader-day';
 import type { DepotCaller } from '../middleware/auth';
 import { snapshot } from '../orders/store-orders';
@@ -77,4 +78,16 @@ export async function issueListOf(tx: Tx, depotId: string, at: Date): Promise<Is
 // GET /issues, in one read-only snapshot that a reset waits behind.
 export function listIssues(caller: DepotCaller): Promise<IssueList> {
   return snapshot(async (tx) => issueListOf(tx, caller.depotId, (await readMoment(tx)).at));
+}
+
+// Photos belong to a problem in the caller's depot, including after the dispatcher has answered it.
+export function issuePhoto(caller: DepotCaller, issueId: string): Promise<Buffer> {
+  return snapshot(async tx => {
+    const [row] = await tx.select({ id: issues.id, jpeg: photos.jpeg }).from(issues)
+      .innerJoin(stops, eq(stops.id, issues.stopId)).innerJoin(trips, eq(trips.id, stops.tripId)).innerJoin(plans, eq(plans.id, trips.planId))
+      .leftJoin(photos, eq(photos.issueId, issues.id)).where(and(eq(issues.id, issueId), eq(plans.depotId, caller.depotId)));
+    if (!row) throw new HttpError(400, 'unknown_record', 'That problem is not on this depot\'s list.', { id: issueId });
+    if (row.jpeg === null) throw new HttpError(404, 'not_found', 'This problem has no photo.');
+    return row.jpeg;
+  });
 }
