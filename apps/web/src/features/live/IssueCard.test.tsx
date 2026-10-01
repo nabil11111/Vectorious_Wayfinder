@@ -27,7 +27,7 @@ const SHORT: Issue = {
 };
 
 const ANSWERING: Answering = { sending: null, failed: null, refused: null, sent: null, decide: () => {} };
-const card = (issue: Issue) => renderToStaticMarkup(<IssueCard issue={issue} answering={ANSWERING} time />).replaceAll('&#x27;', '\'');
+const card = (issue: Issue, depot: string) => renderToStaticMarkup(<IssueCard issue={issue} depot={depot} answering={ANSWERING} time />).replaceAll('&#x27;', '\'');
 
 describe('Q-20 the dispatcher reads a won\'t fit flag as no room on the truck', () => {
   it('titles it "won\'t fit" on Live day\'s card, the dashboard\'s row and a truck\'s row', () => {
@@ -38,7 +38,7 @@ describe('Q-20 the dispatcher reads a won\'t fit flag as no room on the truck', 
   });
 
   it('shows the count that fits and the same two answers, in words about room and not about stock', () => {
-    const html = card(WONT_FIT);
+    const html = card(WONT_FIT, 'Kandy');
     expect(html).toContain('4 chilled cartons won\'t fit');
     expect(html).toMatch(/Fits<\/dt><dd[^>]*>5 of 9 chilled cartons</);
     expect(html).toContain('Go short');
@@ -52,7 +52,7 @@ describe('Q-20 the dispatcher reads a won\'t fit flag as no room on the truck', 
   });
 
   it('keeps a short flag\'s words as they were', () => {
-    const html = card(SHORT);
+    const html = card(SHORT, 'Peliyagoda');
     expect(html).toContain('1 dry carton short');
     expect(html).toMatch(/At the dock<\/dt><dd[^>]*>3 of 4 dry cartons</);
     expect(html).toContain('The truck leaves with what is at the dock.');
