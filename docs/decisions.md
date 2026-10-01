@@ -423,6 +423,12 @@ makes, checked by the same checker. The empty middle offers "Build the suggested
 "Start a blank trip". Drag and drop uses `@dnd-kit`, which handles the pointer, the keyboard and announcements (Nabil,
 1 Oct, spec 023).
 
+**D-99 · 1 Oct · Every role's bell opens its updates, derived from what the app already records.** No notifications
+table: each person's updates are read from orders, plans, problems and trips at their own times, so the seeded day
+and a reset give the same updates. Which ones a person has seen is kept in their browser. A new update also shows as
+a toast, and as a system notification when the tab is hidden and the person allowed it from the pop-up (Nabil, 1 Oct,
+spec 025).
+
 **D-100 · 1 Oct · Trucks are picked as crews and named by their drivers.** A dispatcher remembers drivers, not truck
 numbers, and the same driver mostly drives the same truck on the same roads. So the plan board picks a truck and its
 driver together from one list sorted by fit, district last run and fuel. The "Unassigned trucks" panel goes, giving
