@@ -66,14 +66,14 @@ export function OrdersPlacedPage() {
                 </li>
               );
             })
-            // Each order of the day with its own time, and its items when it has more than one.
+            // Each order of the day with its own time, and a row for each of its items, also when it has one.
             : orders.map((order) => (
               <Fragment key={order.id}>
                 <li className={cn(row, 'py-4 text-sm leading-[17px]')}>
                   <span className="font-semibold">{orderTitle(outlet.brand, order)}</span>
                   <span className="text-[13px]">{order.placedAt && `placed ${clockTime(order.placedAt)}`}</span>
                 </li>
-                {order.lines.length > 1 && inListOrder(order.lines, products).map((line) => {
+                {inListOrder(order.lines, products).map((line) => {
                   const words = lineWords(outlet.brand, line, products);
                   return (
                     <li key={line.productId} className={cn(row, 'py-3 pl-3 text-[13px] leading-4 text-muted-foreground')}>
