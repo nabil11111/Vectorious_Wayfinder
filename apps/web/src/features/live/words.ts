@@ -191,11 +191,18 @@ export function problemWord(kind: IssueKind, issue: Issue | undefined) {
   if (issue?.kind === 'loading') return issue.reason === 'wont_fit' ? `${whole(issue.short)} won't fit` : `${whole(issue.short)} short`;
   return PROBLEM_WORD[kind];
 }
-export function problemLine(issue: Issue) {
-  if (issue.kind === 'loading') return `${issue.stop.shopName} · ${issueTitle(issue)}`;
-  if (issue.kind === 'receipt') return `${issue.stop.shopName} · ${reportTitle(issue)}`;
-  return `${issue.stop.shopName} · ${driverIssueTitle(issue)}`;
+// A problem's title as Live day's card gives it, by its kind: the loader's flag "1 dry carton short", the driver's
+// "3 chilled cartons refused" or "Nobody at Fresh Mulgampola", and the shop's report by its reason, "1 chilled carton
+// damaged" or "Chilled goods not cold" (Q-39).
+export function problemTitle(issue: Issue) {
+  if (issue.kind === 'loading') return issueTitle(issue);
+  if (issue.kind === 'receipt') return reportTitle(issue);
+  return driverIssueTitle(issue);
 }
+
+// A problem in a row, the dashboard's Needs you and a truck's row on Live day: its shop and its card's title, "Fresh
+// Peradeniya · 1 chilled carton damaged", or the title alone where it names the shop, "Nobody at Fresh Mulgampola".
+export const problemLine = (issue: Issue) => (issue.kind === 'closed' ? problemTitle(issue) : `${issue.stop.shopName} · ${problemTitle(issue)}`);
 
 // The dispatcher's answers, as Drops and events names them.
 export const DECISION_WORDS: Record<IssueDecision, string> = {

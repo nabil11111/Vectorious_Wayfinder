@@ -7,8 +7,8 @@ import { ICON, problemIcon } from '@/features/live/parts/icons';
 import { allTrips, isRecorded, isWatched, type RecordedTrip } from '@/features/live/parts/rows';
 import { CARD } from '@/features/live/parts/ui';
 import { openOf } from '@/features/live/sums';
-import { NOTHING_NEEDS_YOU, NO_NEXT_DAY, driverIssueTitle, nextRunTitle, ordersClose, statusSentence } from '@/features/live/words';
-import { clockTime, countOf, issueTitle, truckName, whole } from '@/features/loader/words';
+import { NOTHING_NEEDS_YOU, NO_NEXT_DAY, nextRunTitle, ordersClose, problemLine, statusSentence } from '@/features/live/words';
+import { clockTime, countOf, truckName, whole } from '@/features/loader/words';
 import { inkButton, orangeButton, plainButton } from '@/features/plan/parts/look';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { reasonOf } from '@/features/store/words';
@@ -76,9 +76,10 @@ const BUTTON = 'h-10 w-full shrink-0 text-[13px] sm:w-[150px]';
 // A row's depot, on both depots together, at the head of its second line.
 const Depot = ({ depot }: { depot: string | null }) => (depot ? <DepotTag depot={depot} className="mr-1.5 align-[1px]" /> : null);
 
-// "Fresh Wellawatte · 2 chilled cartons refused", "Dilshan · 03:48 · stop 2 · VEH035", and Decide.
+// "Fresh Wellawatte · 2 chilled cartons refused", "Dilshan · 03:48 · stop 2 · VEH035", and Decide. Each problem is named
+// as Live day's card names it, a shop's report by what it reports (Q-39).
 function ProblemRow({ issue, depot, first }: { issue: Issue; depot: string | null; first: boolean }) {
-  const title = issue.kind === 'loading' ? `${issue.stop.shopName} · ${issueTitle(issue)}` : issue.kind === 'refused' ? `${issue.stop.shopName} · ${driverIssueTitle(issue)}` : driverIssueTitle(issue);
+  const title = problemLine(issue);
   return (
     <li className={ROW}>
       <div className="flex min-w-0 flex-1 items-center gap-3.5">

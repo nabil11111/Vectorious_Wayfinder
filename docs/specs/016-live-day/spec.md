@@ -146,7 +146,10 @@ five orders, 118 cartons ordered, 117 loaded and one dry carton short. Times are
    problem, sorted by their oldest open issue's `raisedAt` then id; then Watching trips by their unreported planned
    time; then other out trips by planned leave. Break remaining ties by plan date, vehicle id and trip number.
 5. **Open, filters and decisions (D-72).** The dashboard's problem summaries link to
-   `/dispatcher/live?issue=<id>`, and its truck Open to `?trip=<id>`. Live day opens the named trip's inline details
+   `/dispatcher/live?issue=<id>`, and its truck Open to `?trip=<id>`. A summary, like a truck's row on Live day, names
+   its problem as Live day's card does, the shop first: "Fresh Nugegoda · 1 dry carton short", "Fresh Kotahena · 3
+   chilled cartons refused", a shop's report by its reason, "Fresh Peradeniya · 1 chilled carton damaged" or "Fresh
+   Ampitiya · Chilled goods not cold" (spec 015, rule 12), and only a closed shop "Nobody at Fresh Mulgampola" (Q-39). Live day opens the named trip's inline details
    and focuses the issue card if named. All trucks shows the complete list. Problems only shows trips with an open
    issue or rule 4's unreported-departure/arrival attention; totals stay unfiltered. Needs you remains all open issues.
    Needs you keeps 012's departure 10: **every open problem in full**, oldest first; it is not one focused card
