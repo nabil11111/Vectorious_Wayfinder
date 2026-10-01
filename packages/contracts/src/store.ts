@@ -105,13 +105,16 @@ export const OrderReceipt = z.object({ at: Moment, sentAt: Moment.nullable(), un
 export type OrderReceipt = z.infer<typeof OrderReceipt>;
 
 // A problem at the order's latest stop that counts it: a refusal, a closed shop or the shop's own report, the units it
-// counts on this order, the answer (null while open) and the day of the replacements an answer placed.
+// counts on this order, the answer (null while open), the day of the replacements an answer placed, and the card's line
+// for it, which the server words: the cartons it is about and what happens to them, "3 expired chilled cartons:
+// replacements come on Fri 26 Jun" (Q-36).
 export const OrderProblem = z.object({
   id: z.uuid(),
   kind: z.enum(['refused', 'closed', 'receipt']),
   units: Count,
   decision: IssueDecision.nullable(),
   replacementDay: Day.nullable(),
+  line: z.string(),
 });
 export type OrderProblem = z.infer<typeof OrderProblem>;
 

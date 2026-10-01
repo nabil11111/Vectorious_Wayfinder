@@ -187,17 +187,21 @@ Thu 08:30. Times are depot time and depend on the judge's pace.
       window" when the truck arrived after the shop's window closed (its mall slot, as spec 007 times it). The short from
       the depot or refused line stays.
     - Nobody at the shop: "Nobody at the shop at 03:45 · VEH035", also once the order is placed again.
-    - One line per problem of that stop that counts the order: a refusal "The depot decides what happens to the 2
-      refused cartons.", "The 2 refused cartons go back to the depot." or "2 replacements come on Fri 26 Jun."; nobody
-      at the shop "The depot decides: today or another day.", "The driver comes back after the other stops." or "It
-      goes on the next plan."; a report "The depot is reviewing your report.", "1 replacement comes on Fri 26 Jun." or
-      "No replacement is coming."
+    - One line per problem of that stop that counts the order, which the server words: the cartons on this order it is
+      about, then what happens to them (Q-36), so two answers on one card never read as one taking back the other. A
+      refusal "2 damaged chilled cartons: the depot decides what happens to them", "…: they go back to the depot" or
+      "…: replacements come on Fri 26 Jun" ("3 expired chilled cartons", "2 chilled cartons you did not order"); nobody
+      at the shop "48 chilled cartons: the depot decides, today or another day", "…: the driver comes back after the
+      other stops" or "…: they go on the next plan"; a report by the shop's reasons on the order, "1 missing chilled
+      carton: the depot is reviewing your report", "…: a replacement comes on Fri 26 Jun" or "…: no replacement", "1
+      damaged item and 1 missing item: …" when they differ, and "Chilled cartons that came warm: no replacement" for
+      warm goods, which a replacement never covers.
     - A replacement: "Replacement for Thu 25 Jun", the day of the delivery it replaces, also on each part when the plan
       splits it.
     - A card whose receipt reported something opens that receipt, as the design's "View shortage report" does.
 
-    *Nadeesha's 12-carton card after the answer: "11 received · 1 short", "Received 08:31", "1 replacement comes on Fri 26
-    Jun."*
+    *Nadeesha's 12-carton card after the answer: "11 received · 1 short", "Received 08:31", "1 missing chilled carton: a
+    replacement comes on Fri 26 Jun".*
 12. **What the dispatcher sees.** A shop's report is a card in "Needs you", oldest first with the others (spec 012): the
     title by reason, "1 chilled carton missing", "1 chilled carton damaged" or "Chilled goods not cold"; the place line
     with the stop, truck, driver and handover time; the rows "Shop", "Received" (each counted line as received of handed
@@ -464,7 +468,8 @@ closed the trip at 03:55. The times below are examples.
    1 replacement on Fri 26 Jun, Nadeesha told". The bell clears.
 8. On the phone, without a reload: "Replacement on Fri 26 Jun", "The depot is sending 1 chilled carton on Fri 26 Jun." and
    "Sent at 08:33 · replacement on Fri 26 Jun". Tap "View past orders": under "Thu 25 Jun", "12 chilled cartons · 11
-   received · 1 short", "Received 08:31" and "1 replacement comes on Fri 26 Jun."; "8 chilled cartons · All 8 received";
+   received · 1 short", "Received 08:31" and "1 missing chilled carton: a replacement comes on Fri 26 Jun"; "8 chilled
+   cartons · All 8 received";
    "4 dry cartons · 3 received · 1 short" with "1 short from the depot". The first card opens its receipt. Open holds "1
    chilled carton · Waiting for the delivery plan", "Fri 26 Jun · 05:00–07:30 · street" and "Replacement for Thu 25 Jun".
 9. Today shows the three cards "Received 08:31", with "11 received · 1 short", "All 8 received" and "3 received · 1 short".

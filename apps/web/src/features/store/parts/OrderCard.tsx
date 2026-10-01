@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import type { StoreOrder, StoreOutlet } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import {
-  deliveredLine, ENTRANCE, lateLine, lessLine, nobodyLine, orderTitle, problemLine, receivedAtLine, receivedWords, replacementForLine, shortDay,
+  deliveredLine, ENTRANCE, lateLine, lessLine, nobodyLine, orderTitle, receivedAtLine, receivedWords, replacementForLine, shortDay,
   shortLine, windowShort,
 } from '../words';
 import { goodsIcon, ICON } from './icons';
@@ -28,7 +28,7 @@ function linesOf(order: StoreOrder, outlet: StoreOutlet): string[] {
 // nobody at the shop, the handover and what came short of the order, or what the shop received, and a line per problem
 // of that stop that counts the order. A received card on Today says how many in its line and when in its chip; in
 // Orders the other way round, or that the truck came after the window.
-function factsOf(order: StoreOrder, outlet: StoreOutlet, look: Look): string[] {
+function factsOf(order: StoreOrder, look: Look): string[] {
   const { delivery, receipt } = order;
   const facts: string[] = [];
   if (order.replacementFor) facts.push(replacementForLine(order.replacementFor));
@@ -42,7 +42,8 @@ function factsOf(order: StoreOrder, outlet: StoreOutlet, look: Look): string[] {
     const less = lessLine(order, delivery);
     if (less) facts.push(less);
   }
-  for (const problem of order.problems) facts.push(problemLine(problem, outlet.brand));
+  // Each problem's line as the server words it, naming the cartons it is about (Q-36).
+  for (const problem of order.problems) facts.push(problem.line);
   return facts;
 }
 
@@ -53,7 +54,7 @@ export function OrderCard({ order, outlet, look }: { order: StoreOrder; outlet: 
   const today = look === 'today';
   const icon = today ? goodsIcon(outlet.brand, order.temp) : look === 'open' && order.status === 'deferred' ? ICON.waiting : null;
   const lines = linesOf(order, outlet);
-  const facts = factsOf(order, outlet, look);
+  const facts = factsOf(order, look);
   const reported = order.delivery && order.problems.some((problem) => problem.kind === 'receipt') ? order.delivery.stopId : null;
   const card = (
     <Panel line={!today} className={cn(reported && 'transition-colors group-hover:border-foreground/25')}>

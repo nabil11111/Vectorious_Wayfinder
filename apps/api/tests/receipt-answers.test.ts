@@ -187,7 +187,7 @@ it('AC-24 answers Wellawatte\'s refusal "Send 2 replacements": a chilled order o
   expect(seen).toEqual([{ ...refusal, decision: 'send_replacements', decidedBy: 'Ruwan', decidedAt: at(3 * 60 + 52).toISOString() }]);
   freeze(THU, 9 * 60);
   const card = (await factsOf(db, 'OUT002', [WELLAWATTE_CHILLED])).get(WELLAWATTE_CHILLED)!;
-  expect(card.problems).toEqual([{ id: refusal.id, kind: 'refused', units: 2, decision: 'send_replacements', replacementDay: FRI }]);
+  expect(card.problems).toEqual([{ id: refusal.id, kind: 'refused', units: 2, decision: 'send_replacements', replacementDay: FRI, line: '2 damaged chilled cartons: replacements come on Fri 26 Jun' }]);
   expect(told()).toEqual([{ topic: 'issues', depotId: 'Peliyagoda' }, { topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT002', depotId: 'Peliyagoda' }]);
 });
 

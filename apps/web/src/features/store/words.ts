@@ -1,5 +1,5 @@
 import {
-  DEPOT_TIME_ZONE, reportReasons, type Brand, type DeliveryFigures, type DockType, type OrderDelivery, type OrderLine, type OrderProblem, type OrderReceipt,
+  DEPOT_TIME_ZONE, reportReasons, type Brand, type DeliveryFigures, type DockType, type OrderDelivery, type OrderLine, type OrderReceipt,
   type RefusalReason, type ShortReason, type StoreDelivery, type StoreDeliveryLine, type StoreOrder, type StoreOutlet, type StoreProduct,
   type StoreReceipt, type Temp,
 } from '@wayfinder/contracts';
@@ -338,26 +338,3 @@ export const receivedAtLine = (receipt: OrderReceipt) => `Received ${clockTime(r
 export const lateLine = (delivery: OrderDelivery) => `Arrived ${clockTime(delivery.arrivedAt)}, after your window`;
 export const nobodyLine = (delivery: OrderDelivery) => `Nobody at the shop at ${clockTime(delivery.arrivedAt)} · ${delivery.vehicleId}`;
 export const replacementForLine = (day: string) => `Replacement for ${shortDay(day)}`;
-
-// One line per problem of the order's stop that counts it.
-export function problemLine(problem: OrderProblem, brand: Brand) {
-  const n = problem.units;
-  const day = problem.replacementDay ? shortDay(problem.replacementDay) : null;
-  const replacements = (count: number) => (count > 0 ? `${WHOLE.format(count)} ${count === 1 ? 'replacement comes' : 'replacements come'}` : 'Replacements come');
-  switch (problem.kind) {
-    case 'refused': {
-      const them = n === 1 ? `refused ${unitOf(brand, 1)}` : `${WHOLE.format(n)} refused ${unitOf(brand, n)}`;
-      if (problem.decision === 'send_replacements' && day) return `${replacements(n)} on ${day}.`;
-      if (problem.decision === 'bring_back') return `The ${them} ${n === 1 ? 'goes' : 'go'} back to the depot.`;
-      return `The depot decides what happens to the ${them}.`;
-    }
-    case 'closed':
-      if (problem.decision === 'try_again') return 'The driver comes back after the other stops.';
-      if (problem.decision === 'bring_back') return 'It goes on the next plan.';
-      return 'The depot decides: today or another day.';
-    case 'receipt':
-      if (problem.decision === 'send_replacements' && day) return `${replacements(n)} on ${day}.`;
-      if (problem.decision === 'no_replacement') return 'No replacement is coming.';
-      return 'The depot is reviewing your report.';
-  }
-}

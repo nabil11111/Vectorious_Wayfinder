@@ -169,7 +169,7 @@ are what the demo clock shows.
     "Received · 11 of 12 chilled cartons, 1 missing", "Cold on arrival · yes", with **Send 1 replacement on Fri 26 Jun** chosen.
     Press **Send to shop**: "✓ Sent · Fresh Nugegoda · 1 replacement on Fri 26 Jun, Nadeesha told".
 22. **The shop sees it.** On Nadeesha's phone, without a reload, the receipt says "replacement on Fri 26 Jun". Orders,
-    Past: "12 chilled cartons · 11 received · 1 short" with "1 replacement comes on Fri 26 Jun.", "8 chilled cartons ·
+    Past: "12 chilled cartons · 11 received · 1 short" with "1 missing chilled carton: a replacement comes on Fri 26 Jun", "8 chilled cartons ·
     All 8 received" and "4 dry cartons · 3 received · 1 short". Open: "1 chilled carton · Waiting for the delivery plan ·
     Replacement for Thu 25 Jun".
 
@@ -339,6 +339,9 @@ Anything we built differently from our Designathon submission, and why.
   not accept says so at its foot. No frame draws these.
 - **A shop's report on Live day** uses the issue-open card with "Send N replacements on <day>", "No replacement" and
   "Send to shop"; the design draws only the "Next" line for it.
+- **A card's answer lines name their cartons,** "3 expired chilled cartons: replacements come on Fri 26 Jun" beside "2
+  missing chilled cartons: no replacement": no frame draws two answers on one order, and plain "No replacement is
+  coming" under a refusal's replacements read as taking them back.
 - **States the design lacks:** something wrong, a photo, sending, sent and all received, sent and answered, nothing to
   confirm, not accepted, sign in again, could not save, could not load, another tab, not on your list, and the shop's
   cards for a delivery not yet confirmed, nobody at the shop, the depot's answers and a replacement.
