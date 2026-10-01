@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { BRANDS, type LoadingDay } from '@wayfinder/contracts';
 import { z } from 'zod';
 import { meKey, useMe } from '@/features/auth/api';
-import { useLoadingDay } from './loading';
-import { brandOfShop, clockTime, unitsWords } from './words';
+import { dismissRefusal, useLoadingDay } from './loading';
+import { brandOfShop, clockTime, lineWords, unitsWords } from './words';
 
 // The loader's Plan changed notice (spec 016 rule 9, D-70, D-71). The tablet keeps the last two publications it read,
 // in this tab's session storage for this account, depot, demo day and day, and compares them: by vehicle and trip
@@ -102,6 +102,28 @@ export function comparePublications(before: Publication, after: Publication): Ch
 
 // The trucks on the current list that a row names: they get the changed chip. The bell counts the rows.
 export const changedKeys = (rows: ChangeRow[]) => new Set(rows.flatMap((row) => (row.after ? [truckKey(row.after)] : [])));
+
+// The order lines a goods change moved: those that left the trip, at the count it had, and those that joined it, at
+// the count it has now. A line whose count changed is in both. Shown on the change card, so two trips to the same
+// shops that swapped orders never read the same before and after.
+export interface LineAt { lineId: string; shopName: string; quantity: number; temp: 'chilled' | 'dry'; unit: string; name: string }
+const linesAt = (trip: KeptTrip | null) => new Map<string, LineAt>((trip?.stops ?? []).flatMap((stop) => stop.lines.map((line) => [line.lineId,
+  { lineId: line.lineId, shopName: stop.shopName, quantity: line.quantity, temp: line.temp, unit: line.unit, name: line.name }] as const)));
+export function goodsChange(row: ChangeRow): { left: LineAt[]; joined: LineAt[] } {
+  const before = linesAt(row.before);
+  const after = linesAt(row.after);
+  return {
+    left: [...before.values()].filter((line) => after.get(line.lineId)?.quantity !== line.quantity),
+    joined: [...after.values()].filter((line) => before.get(line.lineId)?.quantity !== line.quantity),
+  };
+}
+
+// What the change page shows: the wait sentence while the plan is back in edit (never the old cards), the
+// comparison once there is one, or that nothing is kept.
+export function pageOf(snapshot: Snapshot, day: LoadingDay | undefined): 'withdrawn' | 'compare' | 'none' {
+  if (snapshot.kept && day && day.day !== null && day.plan === null) return 'withdrawn';
+  return snapshot.kept?.changes ? 'compare' : 'none';
+}
 
 // The chips of the list on screen: only while that list is the publication the comparison was made for.
 export function chipsOf(snapshot: Snapshot, day: LoadingDay | undefined) {
@@ -225,6 +247,10 @@ export const changeTitle = (trip: KeptTrip) => `${trip.district} · ${unitsWords
 export const leavesLine = (trip: KeptTrip) => `leaves ${clockTime(trip.leavesAt)}`;
 const place = (shopName: string) => { const brand = brandOfShop(shopName); return brand ? shopName.slice(brand.length + 1) : shopName; };
 export const stopsLine = (trip: KeptTrip) => trip.stops.map((stop) => place(stop.shopName)).join(', ');
+// A moved order line: "5 cartons dry for Borella", "10 boxes · Folded clothing for Maharagama".
+export const lineAtWords = (line: LineAt, brand: KeptTrip['brand']) => `${lineWords(line, brand ?? brandOfShop(line.shopName))} for ${place(line.shopName)}`;
+export const LEFT_TRIP = 'Left this trip';
+export const JOINED_TRIP = 'Joined this trip';
 
 // ── The tablet's store, and the hooks the loader's screens use ──────────────────────────────────────────────────
 const store = createChangeStore(() => {
@@ -247,6 +273,6 @@ export function usePlanWatch() {
     store.observe(account && day.day ? { account, depot: day.depot, demoDay: day.demoDay, day: day.day } : null, day);
   }, [day, account]);
   useEffect(() => qc.getQueryCache().subscribe((event) => {
-    if (event.type === 'updated' && event.query.queryKey[0] === meKey[0] && event.query.state.data === null) store.forget();
+    if (event.type === 'updated' && event.query.queryKey[0] === meKey[0] && event.query.state.data === null) { store.forget(); dismissRefusal(); }
   }), [qc]);
 }

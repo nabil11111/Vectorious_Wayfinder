@@ -1,6 +1,6 @@
 import type { LoadingDay, LoadingTruck } from '@wayfinder/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { changedKeys, comparePublications, createChangeStore, noticeOf, publicationOf, truckKey, type Scope } from './changes';
+import { changedKeys, comparePublications, createChangeStore, goodsChange, noticeOf, pageOf, publicationOf, truckKey, type Scope } from './changes';
 
 // Spec 016 rule 9 (D-70, D-71): the loader's tablet compares two publications it has read. These fixtures live in the
 // test only. Trips and stops get new ids on every publication, as a save replaces them; orders and lines keep theirs.
@@ -88,6 +88,30 @@ describe('AC-21 publication comparison pairs whole trip moves once by exact orde
     const lookalike = compare(published(2, [veh002()]), published(4, [veh002({ vehicleId: 'VEH009', stops: [['OUT042', 'Fresh Kalutara', [['o10', 'l10', 25], ['o11', 'l11', 16, 'dry']]]] })]));
     expect(lookalike.map((row) => row.kind).sort()).toEqual(['added', 'removed']);
     expect(changedKeys(lookalike)).toEqual(new Set([truckKey({ vehicleId: 'VEH009', tripNo: 1 })]));
+  });
+
+  it('names the order lines that left and joined, with their quantities, when goods move between trips to the same shop', () => {
+    const borella = (lines: Line[]): Stop => ['OUT004', 'Fresh Borella', lines];
+    const before = published(2, [
+      { vehicleId: 'VEH004', leavesAt: '2026-06-24T22:10:00.000Z', driver: 'Chaminda', district: 'Colombo', stops: [borella([['o1', 'l1', 10], ['o2', 'l2', 5, 'dry']])] },
+      { vehicleId: 'VEH005', leavesAt: '2026-06-24T22:15:00.000Z', driver: 'Nuwan', district: 'Colombo', stops: [borella([['o3', 'l3', 5, 'dry']])] },
+    ]);
+    const after = published(4, [
+      { vehicleId: 'VEH004', leavesAt: '2026-06-24T22:10:00.000Z', driver: 'Chaminda', district: 'Colombo', stops: [borella([['o1', 'l1', 10], ['o3', 'l3', 5, 'dry']])] },
+      { vehicleId: 'VEH005', leavesAt: '2026-06-24T22:15:00.000Z', driver: 'Nuwan', district: 'Colombo', stops: [borella([['o2', 'l2', 5, 'dry']])] },
+    ]);
+    const rows = compare(before, after);
+    // The same shops and the same units on each truck: only the lines tell the two publications apart.
+    expect(rows.map((row) => [row.after!.vehicleId, row.details])).toEqual([['VEH004', ['goods']], ['VEH005', ['goods']]]);
+    expect(rows[0]!.before!.units).toBe(rows[0]!.after!.units);
+    expect(goodsChange(rows[0]!)).toEqual({
+      left: [{ lineId: 'l2', shopName: 'Fresh Borella', quantity: 5, temp: 'dry', unit: 'carton', name: 'Dry carton' }],
+      joined: [{ lineId: 'l3', shopName: 'Fresh Borella', quantity: 5, temp: 'dry', unit: 'carton', name: 'Dry carton' }],
+    });
+    // A line whose quantity changed leaves at the old count and joins at the new one.
+    const fewer: Stop = ['OUT002', 'Fresh Wellawatte', [['o4', 'l4', 48], ['o5', 'l5', 40, 'dry']]];
+    const changed = compare(published(2, [veh035()]), published(4, [veh035({ stops: [NUGEGODA, fewer] })]))[0]!;
+    expect(goodsChange(changed)).toMatchObject({ left: [{ lineId: 'l5', quantity: 46 }], joined: [{ lineId: 'l5', quantity: 40 }] });
   });
 
   it('does not pair a trip whose orders the publication lists twice', () => {
@@ -192,6 +216,27 @@ describe('AC-22 withdrawal reload got it and scope changes preserve or clear com
     store.forget();
     expect(kept()).toEqual([]);
     expect(store.snapshot().kept).toBeNull();
+  });
+});
+
+describe('AC-22 the change page while the plan is back in edit', () => {
+  it('says to wait while the plan is withdrawn, instead of the old cards, and compares again on resend', () => {
+    const store = createChangeStore(() => storage);
+    store.observe(scope, published(2, [veh035()]));
+    expect(pageOf(store.snapshot(), published(2, [veh035()]))).toBe('none');
+    const resent = published(4, [veh035({ leavesAt: '2026-06-24T23:10:00.000Z' })]);
+    store.observe(scope, resent);
+    expect(pageOf(store.snapshot(), resent)).toBe('compare');
+    // The loader is on the change page when the dispatcher takes the plan back again.
+    const back = withdrawn();
+    store.observe(scope, back);
+    expect(pageOf(store.snapshot(), back)).toBe('withdrawn');
+    const again = published(6, [veh035({ leavesAt: '2026-06-24T23:20:00.000Z' })]);
+    store.observe(scope, again);
+    expect(pageOf(store.snapshot(), again)).toBe('compare');
+    expect(store.snapshot().kept).toMatchObject({ previous: { revision: 4 }, latest: { revision: 6 } });
+    // A tab that never read a publication has nothing to compare, withdrawn or not.
+    expect(pageOf({ kept: null, failed: false }, back)).toBe('none');
   });
 });
 

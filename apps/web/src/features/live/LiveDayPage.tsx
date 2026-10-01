@@ -11,7 +11,7 @@ import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
 import { NeedsYou } from './NeedsYou';
 import { useAnswer, useIssues } from './issues';
-import { useOperations } from './operations';
+import { isLive, useOnline, useOperations } from './operations';
 import { Events } from './parts/Events';
 import { focusIssue, focusOpener, showTrip } from './parts/focus';
 import { CountsSkeleton, TripsSkeleton } from './parts/LiveSkeleton';
@@ -34,6 +34,8 @@ export function LiveDayPage() {
   const issues = useIssues();
   const answering = useAnswer();
   const { at } = useAppClock();
+  // Live only while the last read worked and this browser is online; a held or failed read shows the last one.
+  const live = isLive(ops, useOnline());
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>('all');
   // A problem a link or a Decide named that the open list no longer holds, even after reading it again.
@@ -101,9 +103,9 @@ export function LiveDayPage() {
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h1 className="text-xl leading-7 font-bold">Live day{day?.day ? ` · ${shortDay(day.day)}` : ''}</h1>
         {day ? (
-          ops.isError
-            ? <StaleLine busy={ops.isFetching} onRetry={() => { void ops.refetch(); }}>{staleLine(day.readAt)}</StaleLine>
-            : <LiveLine updated={clockTime(day.readAt)} />
+          live
+            ? <LiveLine updated={clockTime(day.readAt)} />
+            : <StaleLine busy={ops.isFetching && !ops.isPaused} onRetry={() => { void ops.refetch(); }}>{staleLine(day.readAt)}</StaleLine>
         ) : ops.isPending && <Skeleton aria-hidden="true" className="h-2.5 w-28 rounded-full" />}
         {trips.length > 0 && <Switch label="Trucks shown" value={filter} options={FILTERS} onChange={setFilter} className="lg:ml-auto" />}
         {!day && ops.isPending && <Skeleton soft aria-hidden="true" className="h-[27px] w-[212px] rounded-full lg:ml-auto" />}

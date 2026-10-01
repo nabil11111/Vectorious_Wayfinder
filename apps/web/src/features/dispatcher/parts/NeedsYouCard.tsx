@@ -6,10 +6,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ICON, problemIcon } from '@/features/live/parts/icons';
 import { allTrips, isRecorded, type RecordedTrip } from '@/features/live/parts/rows';
 import { CARD } from '@/features/live/parts/ui';
-import { NOTHING_NEEDS_YOU, NO_NEXT_DAY, nextRunTitle, ordersClose } from '@/features/live/words';
-import { driverIssueTitle } from '@/features/live/words';
-import { clockTime, countOf, issueTitle, truckName, untilLeaving, whole } from '@/features/loader/words';
+import { NOTHING_NEEDS_YOU, NO_NEXT_DAY, driverIssueTitle, nextRunTitle, ordersClose } from '@/features/live/words';
+import { clockTime, countOf, issueTitle, truckName, whole } from '@/features/loader/words';
 import { inkButton, orangeButton, plainButton } from '@/features/plan/parts/look';
+import { StaleNotice } from '@/features/store/parts/LoadError';
 import { reasonOf } from '@/features/store/words';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 // summary whose Decide opens its full card on Live day (D-72). Below them the trucks whose report is missing, as the
 // frame's Watching row, which are not problems and not counted. The map's place goes to these cards, and the next
 // run sits at the foot.
-export function NeedsYouCard({ issues, day, at }: { issues: UseQueryResult<IssueList>; day: OperationsDay | undefined; at: number | null }) {
+export function NeedsYouCard({ issues, day }: { issues: UseQueryResult<IssueList>; day: OperationsDay | undefined }) {
   const open = issues.data?.issues ?? [];
   const watching = day ? allTrips(day).filter(isRecorded).filter((trip) => trip.openIssueIds.length === 0 && (trip.attention.kind === 'departure_unreported' || trip.attention.kind === 'arrival_unreported'))
     .sort((a, b) => plannedOf(a).localeCompare(plannedOf(b))) : [];
@@ -29,6 +29,8 @@ export function NeedsYouCard({ issues, day, at }: { issues: UseQueryResult<Issue
         {issues.data && open.length > 0 && <span className="ml-auto text-xs leading-4 text-muted-foreground">{countOf(open.length, 'problem')} to answer</span>}
       </div>
 
+      {/* A refresh that fails keeps the last list and says it may be out of date, as Live day's column does. */}
+      {issues.data && issues.isError && <div className="mt-3"><StaleNotice busy={issues.isFetching} onRetry={() => { void issues.refetch(); }} /></div>}
       {!issues.data && issues.isError && (
         <div role="alert" className="mt-3">
           <p className="text-[13px] leading-[18px] font-semibold">Could not load what needs you.</p>
@@ -45,7 +47,7 @@ export function NeedsYouCard({ issues, day, at }: { issues: UseQueryResult<Issue
         </ul>
       )}
 
-      <NextRun day={day} at={at} />
+      <NextRun day={day} />
     </section>
   );
 }
@@ -90,8 +92,9 @@ function WatchingRow({ trip }: { trip: RecordedTrip }) {
   );
 }
 
-// The next run (rule 3): the next operating day, its orders, when they close, and View plan for that day.
-function NextRun({ day, at }: { day: OperationsDay | undefined; at: number | null }) {
+// The next run (rule 3): the next operating day, its orders, when they close, and View plan for that day. Only the
+// read's own cutoff: the screen works out no countdown to it.
+function NextRun({ day }: { day: OperationsDay | undefined }) {
   if (!day) return null;
   const next = day.nextRun;
   return (
@@ -101,7 +104,7 @@ function NextRun({ day, at }: { day: OperationsDay | undefined; at: number | nul
         {next ? (
           <div className="min-w-0">
             <h3 className="text-sm leading-5 font-semibold">{nextRunTitle(next.date)}</h3>
-            <p className="mt-0.5 text-xs leading-4 text-muted-foreground">{[countOf(next.orders, 'order'), ordersClose(next.cutoffAt), untilLeaving(next.cutoffAt, at)].filter(Boolean).join(' · ')}</p>
+            <p className="mt-0.5 text-xs leading-4 text-muted-foreground">{countOf(next.orders, 'order')} · {ordersClose(next.cutoffAt)}</p>
           </div>
         ) : <p className="text-[13px] leading-[18px] font-semibold">{NO_NEXT_DAY}</p>}
       </div>

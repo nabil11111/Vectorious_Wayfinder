@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIssues } from '@/features/live/issues';
-import { useOperations } from '@/features/live/operations';
+import { isLive, useOnline, useOperations } from '@/features/live/operations';
 import { CARD, LiveLine, StaleLine } from '@/features/live/parts/ui';
 import { LOAD_FAILED, NO_DAY, staleLine } from '@/features/live/words';
 import { clockTime, shortDay } from '@/features/loader/words';
@@ -22,6 +22,7 @@ export function DashboardPage() {
   const ops = useOperations();
   const issues = useIssues();
   const clock = useAppClock();
+  const online = useOnline();
   const day = ops.data;
 
   return (
@@ -31,9 +32,9 @@ export function DashboardPage() {
         <span aria-hidden="true" className="text-muted-foreground">·</span>
         <span className="font-mono text-base leading-6 font-bold tabular-nums">{clock.time}</span>
         {day ? (
-          ops.isError
-            ? <StaleLine busy={ops.isFetching} onRetry={() => { void ops.refetch(); }}>{staleLine(day.readAt)}</StaleLine>
-            : <LiveLine updated={clockTime(day.readAt)} />
+          isLive(ops, online)
+            ? <LiveLine updated={clockTime(day.readAt)} />
+            : <StaleLine busy={ops.isFetching && !ops.isPaused} onRetry={() => { void ops.refetch(); }}>{staleLine(day.readAt)}</StaleLine>
         ) : ops.isPending && <Skeleton aria-hidden="true" className="h-2.5 w-28 rounded-full" />}
       </header>
 
@@ -47,7 +48,7 @@ export function DashboardPage() {
             </Button>
           </div>
         ) : <TilesSkeleton />}
-        <NeedsYouCard issues={issues} day={day} at={clock.at} />
+        <NeedsYouCard issues={issues} day={day} />
         {day ? <TrucksOut day={day} issues={issues.data?.issues} /> : !ops.isError && <TrucksSkeleton />}
       </div>
     </div>

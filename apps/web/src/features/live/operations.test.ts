@@ -1,7 +1,7 @@
-import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import { QueryClient, QueryObserver, onlineManager } from '@tanstack/react-query';
 import { OperationsDay, type Me } from '@wayfinder/contracts';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { dayHasChanged, followDay, operationsKey, operationsOptions } from './operations';
+import { dayHasChanged, followDay, followMessages, isLive, operationsKey, operationsOptions } from './operations';
 
 // AC-34 (spec 016, plan.md "Live updates and query ordering"): the dashboard and Live day share one operations read.
 // A held older answer must never replace a newer one, and once the app clock passes the watched day's 16:00 the next
@@ -42,9 +42,13 @@ beforeEach(() => {
     });
   }));
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  // Mounted as the app's provider mounts it, so going back online resumes a held read.
+  client.mount();
 });
 afterEach(() => {
+  onlineManager.setOnline(true);
   stop();
+  client.unmount();
   client.clear();
   vi.unstubAllGlobals();
 });
@@ -119,6 +123,67 @@ it('AC-34 an app clock day change asks for the newly watched day and drops the o
   await settle();
   expect(shown()?.day).toBe('2026-06-26');
   expect(dayHasChanged(shown(), Date.parse(THU_1600) + 1000)).toBe(false);
+});
+
+it('AC-32 a live message while the first read is out asks again once that read lands', async () => {
+  const unfollow = followMessages(client);
+  await watch();
+  expect(requests).toHaveLength(1);
+  // The stream says the driver's records changed while the first read is still on its way. TanStack hands the
+  // message that same read, whose snapshot is from before the change.
+  void client.invalidateQueries({ queryKey: ['operations'] });
+  await settle();
+  expect(requests).toHaveLength(1);
+  respond(0, thursday('2026-06-24T22:01:00.000Z'));
+  await settle();
+  expect(requests).toHaveLength(2);
+  respond(1, thursday('2026-06-24T22:02:00.000Z'));
+  await settle();
+  expect(shown()?.readAt).toBe('2026-06-24T22:02:00.000Z');
+  // With the day on screen a message asks once, as before, and nothing more follows its answer.
+  void client.invalidateQueries({ queryKey: ['operations'] });
+  await settle();
+  expect(requests).toHaveLength(3);
+  respond(2, thursday('2026-06-24T22:03:00.000Z'));
+  await settle();
+  expect(requests).toHaveLength(3);
+  unfollow();
+});
+
+it('AC-34 a day change while the first read is out asks for the new day once that read lands', async () => {
+  const unfollow = followMessages(client);
+  await watch();
+  void followDay(client, ruwan);
+  await settle();
+  respond(0, thursday('2026-06-25T10:29:59.000Z'));
+  await settle();
+  expect(requests).toHaveLength(2);
+  respond(1, friday('2026-06-25T10:30:01.000Z'));
+  await settle();
+  expect(shown()?.day).toBe('2026-06-26');
+  unfollow();
+});
+
+it('AC-33 a read held back with the browser offline, or a failed refresh, is not live', async () => {
+  const observer = await watch();
+  respond(0, thursday('2026-06-24T22:00:00.000Z'));
+  await settle();
+  expect(isLive(observer.getCurrentResult(), true)).toBe(true);
+  // The browser goes offline: the next read waits, paused, and the page must not call itself live.
+  onlineManager.setOnline(false);
+  void client.invalidateQueries({ queryKey: ['operations'] });
+  await settle();
+  expect(observer.getCurrentResult().isPaused).toBe(true);
+  expect(isLive(observer.getCurrentResult(), false)).toBe(false);
+  // Offline with no read waiting is not live either.
+  expect(isLive({ ...observer.getCurrentResult(), isPaused: false }, false)).toBe(false);
+  onlineManager.setOnline(true);
+  await settle();
+  respond(1, thursday('2026-06-24T22:05:00.000Z'));
+  await settle();
+  expect(isLive(observer.getCurrentResult(), true)).toBe(true);
+  expect(isLive({ ...observer.getCurrentResult(), isError: true }, true)).toBe(false);
+  expect(isLive({ ...observer.getCurrentResult(), data: undefined }, true)).toBe(false);
 });
 
 it('AC-34 another account or depot never sees the day kept for the last one', async () => {
