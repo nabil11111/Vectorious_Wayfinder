@@ -2,6 +2,7 @@ import { MutationObserver, QueryClient, QueryClientProvider } from '@tanstack/re
 import type { Me } from '@wayfinder/contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it, vi } from 'vitest';
+import { meKey } from '@/features/auth/api';
 import { DepotSwitch } from './DepotSwitch';
 import { BOTH_LATER, switchDepotMutation } from './depots';
 
@@ -40,6 +41,8 @@ it('AC-6 Both stays greyed and says both depots together come later', () => {
 
 it('AC-6 the pressed depot shows chosen at once, and a switch that failed shows the depot before again', async () => {
   const qc = new QueryClient();
+  // Only a signed-in dispatcher has the switch.
+  qc.setQueryData(meKey, RUWAN);
   let fail: (error: Error) => void = () => undefined;
   // The switch gets no answer when told, and the session, read after it, is still on Peliyagoda.
   vi.stubGlobal('fetch', vi.fn((url: string) => (String(url).endsWith('/auth/me')

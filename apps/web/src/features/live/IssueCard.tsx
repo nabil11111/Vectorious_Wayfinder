@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LOADING_DECISIONS, type Issue, type IssueDecision, type LoadingDecision } from '@wayfinder/contracts';
 import storeManager from '@/assets/icons/icon-person-store-manager.png';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import {
   REPORT_QUESTION, reportPlace, reportReplacementLine, reportSentLine, reportTitle, sendReplacementsTitle,
 } from '@/features/loader/words';
 import { cn } from '@/lib/utils';
-import { useReplaceOn, type Answering } from './issues';
+import { openIssuePhoto, useReplaceOn, type Answering } from './issues';
 import {
   answeredLine, atTheDock, driverAnswers, driverIssuePlace, driverIssueTitle, driverQuestion, driverRaised, stillOnLabel, stillOnValue,
 } from './words';
@@ -64,10 +64,28 @@ function FlagCard({ issue, answering, time, className }: { issue: Issue; answeri
   );
 }
 
-// The photo of a driver's problem or a shop's report, opened in a tab of its own.
-const photoLink = (issue: Issue) => (
-  <a href={`/api/v1/issues/${encodeURIComponent(issue.id)}/photo`} target="_blank" rel="noreferrer" className="font-semibold text-foreground underline underline-offset-2">Open</a>
-);
+// The photo of a driver's problem or a shop's report, opened in a tab of its own from bytes fetched the shared way, which
+// names the depot the tab shows (D-95). A photo that could not be opened says why beside the link.
+function PhotoLink({ issue }: { issue: Issue }) {
+  const [problem, setProblem] = useState<string | null>(null);
+  // A photo still on its way when the card goes (a sign-out, a depot switch) is dropped, so a late answer from the old
+  // session cannot sign out whoever signs in next.
+  const onItsWay = useRef<AbortController | null>(null);
+  useEffect(() => () => onItsWay.current?.abort(), []);
+  const open = () => {
+    setProblem(null);
+    onItsWay.current?.abort();
+    const asked = new AbortController();
+    onItsWay.current = asked;
+    void openIssuePhoto(issue, asked.signal).then((line) => { if (!asked.signal.aborted) setProblem(line); });
+  };
+  return (
+    <>
+      <button type="button" onClick={open} className="font-semibold text-foreground underline underline-offset-2">Open</button>
+      {problem && <span role="alert" className="ml-1.5 text-bad">{problem}</span>}
+    </>
+  );
+}
 
 // The first answer is chosen until the dispatcher picks another; one no longer offered falls back to it.
 function useChoice(options: { decision: IssueDecision }[]) {
@@ -92,7 +110,7 @@ function DriverCard({ issue, answering, time, className }: { issue: Issue; answe
   const rows: { label: string; value: ReactNode }[] = [
     ...(issue.kind === 'refused' ? [{ label: 'Driver', value: driverRaised(issue) }] : []),
     ...(issue.note ? [{ label: 'Note', value: issue.note }] : []),
-    ...(issue.hasPhoto ? [{ label: 'Photo', value: photoLink(issue) }] : []),
+    ...(issue.hasPhoto ? [{ label: 'Photo', value: <PhotoLink issue={issue} /> }] : []),
     ...(issue.kind === 'refused' ? [{ label: 'At the dock', value: atTheDock(issue) }] : []),
     { label: stillOnLabel(issue), value: stillOnValue(issue) },
   ];
@@ -132,7 +150,7 @@ function ReportCard({ issue, answering, time, className }: { issue: Issue; answe
     },
     { key: 'received', label: 'Received', value: receivedOf(issue) },
     ...(issue.cold !== null ? [{ key: 'cold', label: 'Cold on arrival', value: coldWords(issue.cold) }] : []),
-    ...(issue.hasPhoto ? [{ key: 'photo', label: 'Photo', value: photoLink(issue) }] : []),
+    ...(issue.hasPhoto ? [{ key: 'photo', label: 'Photo', value: <PhotoLink issue={issue} /> }] : []),
   ];
   return (
     <article aria-label={reportTitle(issue)} className={className}>

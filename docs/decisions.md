@@ -395,3 +395,11 @@ back or sign out. The choice lives on the session, so the routes that read the c
 the seed gives each of the 120 shops a store manager (S-001 to S-120), Kandy a driver per working vehicle and a loader,
 and the seeded day Kandy's Thursday orders by Peliyagoda's rules. Peliyagoda's numbers stay as the walkthrough has
 them (Nabil, 1 Oct, spec 020).
+
+**D-95 · 1 Oct · Every dispatcher request names the depot its tab shows.** The web app sends `x-wayfinder-depot`
+with each request while a dispatcher is signed in, and the server answers 409 `depot_changed` when it differs from
+the session's depot, before the route reads or writes anything. A tab that fell behind a switch made elsewhere, by
+another tab or through an answer that never arrived, then never shows or changes the other depot's records: it reads
+the session and takes the depot the session is on. Requests without the header pass, so scripts and the other roles
+work as before. The account, sign-in and sign-out routes, the switch itself, the demo clock and its reset, health
+and the live stream ignore it, and photos go through the same check as every other read (spec 020's follow-up).

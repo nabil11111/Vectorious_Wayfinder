@@ -2,6 +2,7 @@ import { MutationObserver, QueryClient, QueryClientProvider } from '@tanstack/re
 import { renderToStaticMarkup } from 'react-dom/server';
 import { OperationsDay } from '@wayfinder/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { meKey } from '@/features/auth/api';
 import { FLEET_MAP } from '@/lib/map/fleet-map-shapes';
 import { BOTH_LATER, switchDepotMutation } from '../depots';
 import { FleetMap } from './FleetMap';
@@ -262,6 +263,8 @@ describe('the view switch and the chosen depot (spec 020)', () => {
 
   it('AC-6 a depot pressed on either switch shows chosen on the card at once', async () => {
     const qc = new QueryClient();
+    // Only a signed-in dispatcher has the switch.
+    qc.setQueryData(meKey, { id: 'u1', username: 'ruwan', staffId: 'P-001', displayName: 'Ruwan', role: 'dispatcher', depotId: 'Peliyagoda', outletId: null });
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
     void new MutationObserver(qc, switchDepotMutation(qc)).mutate('Kandy');
     await new Promise((resolve) => setTimeout(resolve, 0));

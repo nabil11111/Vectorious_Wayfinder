@@ -4,7 +4,7 @@ import type { DecideIssueRequest, DecideIssueResponse, Issue, IssueDecision, Iss
 import { workingFor } from '@/features/auth/api';
 import { ANSWER_WITHIN_MS, fetchAgain, worthRetrying } from '@/features/loader/loading';
 import { reasonOf } from '@/features/store/words';
-import { api } from '@/lib/api';
+import { api, apiBytes } from '@/lib/api';
 
 // What needs the dispatcher (spec 012, plan.md "The screen"): Live day's column and the bell read GET /issues under
 // ['issues'], so the live stream's issues message fetches it again on every dispatcher page (spec 008).
@@ -35,6 +35,28 @@ export interface Answering {
   // A loader's flag takes "Go short" or "Load it all", a driver's problem "Bring them back" or "Try again" (D-48), a
   // refusal "Send N replacements" too, and a shop's report "Send N replacements" or "No replacement" (D-58, D-59).
   decide: (issue: Issue, decision: IssueDecision) => void;
+}
+
+// A problem's photo in a tab of its own (spec 013). Its bytes come the shared way, which names the depot the tab shows
+// (D-95), so a tab that fell behind hears the session moved. The tab is opened at the press, before the bytes arrive,
+// since a browser lets only a press open one, and the photo's address is given back once it has had time to open. It
+// answers the line to show when the photo could not be opened, or null. Once signal aborts, because the card that asked
+// went away with a sign-out or a depot switch, its answer is dropped, so an old session's 401 signs nobody out.
+export const PHOTO_TAB_BLOCKED = 'The browser kept the photo from opening in a new tab.';
+const PHOTO_KEPT_MS = 60_000;
+export async function openIssuePhoto(issue: Pick<Issue, 'id'>, signal?: AbortSignal): Promise<string | null> {
+  const tab = window.open('', '_blank');
+  if (!tab) return PHOTO_TAB_BLOCKED;
+  try {
+    const jpeg = await apiBytes(`/issues/${encodeURIComponent(issue.id)}/photo`, { signal });
+    const address = URL.createObjectURL(jpeg);
+    tab.location.href = address;
+    window.setTimeout(() => URL.revokeObjectURL(address), PHOTO_KEPT_MS);
+    return null;
+  } catch (error) {
+    tab.close();
+    return signal?.aborted ? null : reasonOf(error);
+  }
 }
 
 // Answers sent and not answered yet. A dispatcher's depot switch waits for none of them (spec 020).

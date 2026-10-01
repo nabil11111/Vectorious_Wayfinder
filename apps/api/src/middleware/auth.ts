@@ -35,6 +35,21 @@ export const loadUser: RequestHandler = async (req, _res, next) => {
   next();
 };
 
+// D-95: every request a dispatcher's tab makes names the depot the tab shows. The session can have switched in another
+// tab since, and then the request is refused before any route reads or writes anything, rather than acting on the other
+// depot. Signing in and out, the switch itself, the clock with the demo control's move and reset, the live stream and
+// the health check belong to no depot and go on whatever depot is named. A request that names none passes as before,
+// as do other roles, so walk scripts and older tabs keep working.
+export const DEPOT_HEADER = 'x-wayfinder-depot';
+const ANY_DEPOT = [
+  /^\/auth(\/|$)/, /^\/me\/depot\/?$/, /^\/clock(\/|$)/, /^\/demo\/clock(\/|$)/, /^\/demo\/reset\/?$/, /^\/events(\/|$)/, /^\/health(\/|$)/,
+];
+export const requireShownDepot: RequestHandler = (req, _res, next) => {
+  const shown = req.get(DEPOT_HEADER);
+  if (shown === undefined || req.user?.role !== 'dispatcher' || shown === req.user.depotId || ANY_DEPOT.some((path) => path.test(req.path))) return next();
+  next(new HttpError(409, 'depot_changed', 'The depot was switched in another tab.'));
+};
+
 // Put this on every route. With no roles it only needs a signed-in user; admin can open everything.
 export const requireRole = (...roles: Role[]): RequestHandler => (req, _res, next) => {
   if (!req.user) return next(new HttpError(401, 'signed_out', 'Please sign in.'));
