@@ -19,7 +19,8 @@ const measure = (values: (number | null)[]): HistoryMeasure => {
 };
 const stagesOf = (lines: HistoryLine[]) => ({
   ordered: lines.reduce((sum, line) => sum + line.quantity, 0), loaded: measure(lines.map((line) => line.loaded)), handedOver: measure(lines.map((line) => line.delivered)),
-  received: measure(lines.map((line) => line.received)), depotShort: measure(lines.map((line) => line.depotShort)), refused: measure(lines.map((line) => line.refused)),
+  received: measure(lines.map((line) => line.received)), depotShort: measure(lines.map((line) => line.depotShort)),
+  wontFit: measure(lines.map((line) => (line.depotShort === null ? null : line.wontFit))), refused: measure(lines.map((line) => line.refused)),
   receiptShort: measure(lines.map((line) => line.receiptShort)), notDelivered: measure(lines.map((line) => line.notDelivered)),
 });
 const line = (n: number, temp: 'chilled' | 'dry', counts: Partial<HistoryLine> & { quantity: number }): HistoryLine => ({
@@ -155,4 +156,16 @@ it('Q-40 History gives each line of the shop\'s report its own reason, and the r
   const old = textOf(<HistoryDetail trip={before} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />);
   expect(old).toContain('Report · 1 chilled carton missing');
   expect(old).not.toContain('Note ·');
+});
+
+// L-21: the dry carton the loader flagged as won't fit is said as not fitting on the truck, never as short from the depot.
+it('L-21 History says a carton that did not fit on the truck did not fit, not that the depot was short of it', () => {
+  const lines = [nugegodaLines[0]!, nugegodaLines[1]!, line(3, 'dry', { quantity: 4, loaded: 3, wontFit: 1, delivered: 3, received: 3, depotShort: 0, refused: 0, receiptShort: 0, notDelivered: 0 })];
+  const first = { ...trip.stops[0]!, lines, stages: stagesOf(lines) };
+  const fitting = HistoryTrip.parse({ ...trip, stops: [first, trip.stops[1]!], stages: stagesOf([...lines, ...wellawatteLines]) });
+  const text = textOf(<HistoryDetail trip={fitting} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />).replaceAll('&#x27;', '\'');
+  expect(text).toContain('1 carton didn\'t fit on the truck · 1 carton short on the receipt');
+  // The trip's totals keep the depot's own shortage, none here, apart from what did not fit.
+  expect(text).toContain('Short from the depot 0 Didn\'t fit on the truck 1 Refused 2');
+  expect(text).not.toContain('short from the depot');
 });

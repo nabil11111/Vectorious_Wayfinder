@@ -66,8 +66,10 @@ export type LookupPhoto = z.infer<typeof LookupPhoto>;
 // "4,031 loaded so far" and "not recorded yet (130 of 163 lines)".
 export const HistoryMeasure = z.object({ units: Count.nullable(), known: Count, total: Count, missing: Count, soFar: Count });
 export type HistoryMeasure = z.infer<typeof HistoryMeasure>;
+// depotShort is what the depot was short of in stock, and wontFit what the loader flagged as not fitting on the truck:
+// together, what was ordered and not loaded (L-21).
 export const HistoryStages = z.object({ ordered: Count, loaded: HistoryMeasure, handedOver: HistoryMeasure, received: HistoryMeasure,
-  depotShort: HistoryMeasure, refused: HistoryMeasure, receiptShort: HistoryMeasure, notDelivered: HistoryMeasure });
+  depotShort: HistoryMeasure, wontFit: HistoryMeasure, refused: HistoryMeasure, receiptShort: HistoryMeasure, notDelivered: HistoryMeasure });
 export type HistoryStages = z.infer<typeof HistoryStages>;
 export const HistoryLine = DriverLine.extend({ received: Count.nullable(), depotShort: Count.nullable(), refused: Count.nullable(),
   receiptShort: Count.nullable(), notDelivered: Count.nullable() });

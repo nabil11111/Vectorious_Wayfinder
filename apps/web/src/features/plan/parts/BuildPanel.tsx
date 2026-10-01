@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardScreen } from '../board';
 import type { CrewRef } from '../draft';
-import { BUILD, BUILDING, buildingLine, KEEP_DRAFT, REPLACE_TITLE, replaceLine, suggestedAt, toMake } from '../words';
-import { buildPlan, type BuildAct } from './build';
+import { BUILD, BUILDING, buildingLine, KEEP_DRAFT, REPLACE_TITLE, replaceLine } from '../words';
+import { buildPlan, suggestionLine, type BuildAct } from './build';
 import { CrewMenu } from './CrewMenu';
 import type { Pick } from './crews';
 import { useLanding } from './dragging';
@@ -24,7 +24,7 @@ const DROP_HERE = 'or drag an order here to start a trip';
 // Over a draft with a trip or a deferral the build asks first (D-52). While the build is out the column shows Building
 // and the board holds still. A refusal shows the server's sentence in red with Try again, and one that loads the board
 // again says so in spec 010's line. After a build, the line says when it was suggested and how many of the planner's
-// decisions are still to make.
+// decisions are still to make, while the draft still holds the suggestion (L-18).
 export function BuildPanel({ screen, act, onBuilding, index, dropped, onCrew, onDropClose }: {
   screen: BoardScreen;
   act: BuildAct;
@@ -43,8 +43,8 @@ export function BuildPanel({ screen, act, onBuilding, index, dropped, onCrew, on
   const dropArea = useRef<HTMLParagraphElement>(null);
   // The whole empty middle takes the drop. Its dashed area says so and shows the drag over it.
   const { setNodeRef: middleRef, look: middleLook } = useLanding('middle', { kind: 'middle' }, 'the middle, to start a trip');
-  // The rows View plan lists as open: the screen counts them, nothing else.
-  const open = board.suggestion?.decisions.filter((decision) => decision.open).length ?? 0;
+  // The suggested plan's line, while the draft holds it (L-18).
+  const suggested = suggestionLine(board.suggestion);
 
   // A build that goes through opens View plan for its day (spec 023). A refused one stays here with its line.
   const build = async () => {
@@ -76,9 +76,9 @@ export function BuildPanel({ screen, act, onBuilding, index, dropped, onCrew, on
     <div ref={middleRef} className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
       <img src={ICON.route} alt="" className="size-[72px] object-contain" />
       <h2 className="mt-3.5 text-xl leading-6 font-bold">No trip open</h2>
-      {board.suggestion && (
+      {suggested && (
         <p className="mt-1.5 text-[13px] leading-4 text-muted-foreground">
-          {suggestedAt(board.suggestion.builtAt)} · <span className={open > 0 ? 'font-semibold text-warn-ink' : undefined}>{toMake(open)}</span>
+          {suggested.at} · <span className={suggested.open > 0 ? 'font-semibold text-warn-ink' : undefined}>{suggested.toMake}</span>
         </p>
       )}
       <div className="mt-3.5 flex flex-wrap justify-center gap-2.5">

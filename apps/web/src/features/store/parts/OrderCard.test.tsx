@@ -2,6 +2,7 @@ import type { StoreOrder, StoreOutlet } from '@wayfinder/contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
+import { lessLine, shortLine } from '../words';
 import { OrderCard } from './OrderCard';
 
 // The shop's order card as Kotahena's chilled order read in phase 5 (Q-36): a refusal answered with replacements and a
@@ -13,7 +14,7 @@ const chilled: StoreOrder = {
   id: id(1), deliveryDate: '2026-06-25', scheduledDate: '2026-06-25', temp: 'chilled', status: 'received',
   lines: [{ productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 53 }], units: 53, placedAt: '2026-06-24T09:30:00.000Z', deferralReason: null,
   delivery: { stopId: id(2), vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: '2026-06-24T22:00:00.000Z', doneAt: '2026-06-24T22:08:00.000Z', outcome: 'refused', late: false,
-    delivered: 50, shortFromDepot: 0, refused: 3, refusalReason: 'expired' },
+    delivered: 50, shortFromDepot: 0, wontFit: 0, refused: 3, refusalReason: 'expired' },
   receipt: { at: '2026-06-25T03:10:00.000Z', sentAt: '2026-06-25T03:10:00.000Z', units: 48, short: 5 },
   problems: [
     { id: id(3), kind: 'refused', units: 3, decision: 'send_replacements', replacementDay: '2026-06-26', line: '3 expired chilled cartons: replacements come on Fri 26 Jun' },
@@ -42,7 +43,7 @@ const broughtBack: StoreOrder = {
   ...chilled, id: id(5), scheduledDate: '2026-06-25', status: 'placed', units: 39, receipt: null, broughtBack: true,
   lines: [{ productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 39 }],
   delivery: { stopId: id(6), vehicleId: 'VEH057', driver: 'Nuwan', arrivedAt: '2026-06-24T22:20:00.000Z', doneAt: '2026-06-24T22:21:00.000Z', outcome: 'closed', late: false,
-    delivered: null, shortFromDepot: 0, refused: 0, refusalReason: null },
+    delivered: null, shortFromDepot: 0, wontFit: 0, refused: 0, refusalReason: null },
   problems: [{ id: id(7), kind: 'closed', units: 39, decision: 'bring_back', replacementDay: null, line: '39 chilled cartons: brought back to the depot, waiting for the next plan' }],
 };
 
@@ -57,5 +58,16 @@ describe('Q-41 a brought-back order', () => {
     // An order placed for a day still names its day.
     expect(renderToStaticMarkup(<MemoryRouter><OrderCard order={{ ...broughtBack, broughtBack: false, delivery: null, problems: [] }} outlet={mulgampola} look="open" /></MemoryRouter>))
       .toContain('>Thu 25 Jun · 04:00–07:45 · street<');
+  });
+});
+
+// L-21: Nugegoda's 12 chilled cartons with 4 the loader flagged as won't fit: the card says they did not fit on the
+// truck, not that the depot ran short.
+describe('L-21 cartons that did not fit on the truck', () => {
+  it('says they did not fit, on Today\'s line and on the received card, and the depot\'s own shortage apart', () => {
+    const delivery = { ...chilled.delivery!, outcome: 'delivered' as const, delivered: 8, shortFromDepot: 0, wontFit: 4, refused: 0, refusalReason: null };
+    expect(lessLine({ units: 12 }, delivery)).toBe('8 of 12 delivered · 4 didn\'t fit on the truck');
+    expect(shortLine(delivery)).toBe('4 didn\'t fit on the truck');
+    expect(lessLine({ units: 12 }, { ...delivery, delivered: 7, shortFromDepot: 1 })).toBe('7 of 12 delivered · 1 short from the depot · 4 didn\'t fit on the truck');
   });
 });

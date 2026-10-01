@@ -13,7 +13,7 @@ const id = (n: number) => `9c000000-0000-4000-8000-${String(n).padStart(12, '0')
 const handed: StoreDelivery = {
   stopId: id(1), revision: 2, day: '2026-06-25', vehicleId: 'VEH038', driver: 'Lahiru', arrivedAt: '2026-06-24T22:33:00.000Z', doneAt: '2026-06-24T22:37:00.000Z',
   outcome: 'delivered', late: false, refusalReason: null, receipt: null,
-  lines: [{ lineId: id(2), orderId: id(3), temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', ordered: 57, loaded: 57, delivered: 57, received: null }],
+  lines: [{ lineId: id(2), orderId: id(3), temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', ordered: 57, loaded: 57, wontFit: 0, delivered: 57, received: null }],
 };
 const depot: StoreDelivery = { ...handed, revision: 3, lines: [{ ...handed.lines[0]!, received: 57 }],
   receipt: { at: '2026-06-25T03:12:00.000Z', sentAt: '2026-06-25T03:12:13.000Z', cold: null, report: null } };

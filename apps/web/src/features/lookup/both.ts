@@ -31,7 +31,7 @@ export function sumHistory(all: HistoryCounts[]): HistoryCounts {
     late: sum('late'), short: sum('short'), returned: sum('returned'), deferred: sum('deferred'), confirmations: sum('confirmations'), receivedOrders: sum('receivedOrders'),
     stages: {
       ordered: added(all.map((counts) => counts.stages.ordered)), loaded: stage('loaded'), handedOver: stage('handedOver'), received: stage('received'),
-      depotShort: stage('depotShort'), refused: stage('refused'), receiptShort: stage('receiptShort'), notDelivered: stage('notDelivered'),
+      depotShort: stage('depotShort'), wontFit: stage('wontFit'), refused: stage('refused'), receiptShort: stage('receiptShort'), notDelivered: stage('notDelivered'),
     },
   };
 }

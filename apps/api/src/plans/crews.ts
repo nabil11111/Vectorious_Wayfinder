@@ -98,7 +98,11 @@ export function findCrews(caller: Planner, date: string, { orders: asked }: Crew
       const own = board.plan.trips.filter((t) => t.vehicleId === vehicle.id);
       const ran = districts.get(vehicle.id) ?? [];
       const readyAt = own.length > 0 ? readyOf(vehicle.id) : null;
-      const misfits = [...misfitsOf(vehicle.id), ...(readyAt !== null && orders.length > 0 && readyAt > closes ? [{ code: 'ready_late' as const, orderId: null, outletId: null }] : [])];
+      // Ready only after every window closes says it all (L-04); otherwise the trial's own times say whether the trip
+      // would reach a shop late (L-17).
+      const readyLate = readyAt !== null && orders.length > 0 && readyAt > closes;
+      const trial = misfitsOf(vehicle.id).filter((m) => !readyLate || m.code !== 'arrives_late');
+      const misfits = [...trial, ...(readyLate ? [{ code: 'ready_late' as const, orderId: null, outletId: null }] : [])];
       return {
         vehicleId: vehicle.id, driverId: driverOf(vehicle, own),
         type: vehicle.type, temp: vehicle.temp, weightCapKg: vehicle.weightCapKg, volumeCapM3: vehicle.volumeCapM3, fuelLeftPct: vehicle.fuelLeftPct, readyAt,
@@ -123,8 +127,11 @@ const offReasonOf = (vehicle: PlanBoard['vehicles'][number]) => {
   return vehicle.offReason;
 };
 
-// The checker on a trip of a truck carrying the orders alone, one stop a shop in the orders' own order: the cargo rules
-// of spec 007 that the truck breaks. No orders, nothing to break.
+// The checker on the trip a pick would make: the truck's trips on the draft as they are, without these orders, then a
+// trip carrying the orders alone, one stop a shop in the orders' own order, leaving when the truck is ready. What it
+// says of that trip: the cargo rules of spec 007 that the truck breaks, and each shop the checker's timeline has it
+// reach after the shop's window closes, by how many minutes (L-17). A truck on two trips already is tried on a first
+// trip alone, for its cargo. No orders, nothing to break.
 function trialOf(input: PlanInput, orders: { id: string; outletId: string }[]) {
   const tripStops: { outletId: string; orderIds: string[] }[] = [];
   for (const order of orders) {
@@ -133,8 +140,19 @@ function trialOf(input: PlanInput, orders: { id: string; outletId: string }[]) {
     else tripStops.push({ outletId: order.outletId, orderIds: [order.id] });
   }
   const named = new Set(orders.map((o) => o.id));
-  const day: PlanInput = { ...input, orders: input.orders.filter((o) => named.has(o.id)) };
-  return (vehicleId: string): CrewMisfit[] => (orders.length === 0 ? [] : checkPlan({ ...day, plan: { trips: [{ vehicleId, tripNo: 1, stops: tripStops }], deferrals: [] } }).problems
-    .filter((p) => p.vehicleId === vehicleId && FITS.has(p.code))
-    .map((p) => ({ code: misfitOf(p.code), orderId: p.orderId ?? null, outletId: p.outletId ?? null })));
+  return (vehicleId: string): CrewMisfit[] => {
+    if (orders.length === 0) return [];
+    const own = input.plan.trips.filter((t) => t.vehicleId === vehicleId).sort((a, b) => a.tripNo - b.tripNo)
+      .map((t) => ({ ...t, stops: t.stops.map((s) => ({ ...s, orderIds: s.orderIds.filter((id) => !named.has(id)) })).filter((s) => s.orderIds.length > 0) }));
+    const before = own.length >= 2 ? [] : own;
+    const tripNo = before.length + 1;
+    const carried = new Set([...named, ...before.flatMap((t) => t.stops.flatMap((s) => s.orderIds))]);
+    const day: PlanInput = { ...input, orders: input.orders.filter((o) => carried.has(o.id)), plan: { trips: [...before, { vehicleId, tripNo, stops: tripStops }], deferrals: [] } };
+    const check = checkPlan(day);
+    const cargo = check.problems.filter((p) => p.vehicleId === vehicleId && p.tripNo === tripNo && FITS.has(p.code))
+      .map((p): CrewMisfit => ({ code: misfitOf(p.code), orderId: p.orderId ?? null, outletId: p.outletId ?? null }));
+    const stops = check.trips.find((t) => t.vehicleId === vehicleId && t.tripNo === tripNo)?.times?.stops ?? [];
+    const late = stops.filter((stop) => stop.late).map((stop): CrewMisfit => ({ code: 'arrives_late', orderId: null, outletId: stop.outletId, lateMin: stop.lateMin }));
+    return [...cargo, ...late];
+  };
 }

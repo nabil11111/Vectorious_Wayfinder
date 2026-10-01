@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { clockKey } from '@/lib/clock';
 import { Counter } from './parts/Counter';
 import { NO_PAIR, readBox, refusalPair, tallyFor } from './tally';
-import { DayDone, TripDone } from './DonePage';
+import { DayDone, HandBackCard, TripDone } from './DonePage';
 import { NextStopPage } from './NextStopPage';
 import { TodaysTrip } from './TripPage';
 import { UnloadPage } from './UnloadPage';
@@ -497,8 +497,35 @@ describe('L-09 a line the loader found would not fit', () => {
       { label: 'Short from the depot', value: '1 dry · Nugegoda' },
       { label: 'Won\'t fit on the truck', value: '4 chilled · Nugegoda' },
     ]));
-    expect(handBack(trip, figures).text).toBe('The 4 chilled cartons for Nugegoda did not fit on the truck. The dry carton for Nugegoda never left the depot.');
+    // L-20: what did not fit is never said under "Still on the truck", but under a heading of its own.
+    expect(handBack(trip, figures)).toEqual({
+      title: 'Nothing to hand back', text: 'The dry carton for Nugegoda never left the depot.',
+      wontFit: { title: 'Didn\'t fit on the truck', text: 'The 4 chilled cartons for Nugegoda stayed at the depot.' },
+    });
     const refused = { ...trip.stops[0]!, outcome: 'refused' as const };
     expect(refusedLine(refused, tripFigures({ ...trip, stops: [refused] }).byStop[0]!)).toBe('Stop 1 · 0 delivered · 11 refused · 1 short · 4 won\'t fit');
+  });
+
+  it('L-20 puts the cartons that did not fit under "Didn\'t fit on the truck" on Trip done, and keeps "Still on the truck" for what is on it', () => {
+    // Wellawatte was closed and its 48 came back; Nugegoda's 4 never went on.
+    const closed = stopOf(904, 2, 'Fresh Wellawatte', [{ n: 905, quantity: 48 }], { arrivedAt: at('03:40'), doneAt: at('03:40'), outcome: 'closed' });
+    const nugegoda = { ...trip.stops[0]!, lines: [trip.stops[0]!.lines[0]!], arrivedAt: at('03:30'), doneAt: at('03:31'), outcome: 'delivered' as const };
+    const done = { ...trip, status: 'done' as const, backAt: at('03:45'), stops: [{ ...nugegoda, lines: [{ ...nugegoda.lines[0]!, delivered: 8 }] }, closed] };
+    const back = handBack(done, tripFigures(done));
+    expect(back).toEqual({
+      title: 'Still on the truck', text: '48 cartons for Wellawatte, nobody at the shop. The depot decides what happens to them.',
+      wontFit: { title: 'Didn\'t fit on the truck', text: 'The 4 chilled cartons for Nugegoda stayed at the depot.' },
+    });
+    const text = textOf(draw(<HandBackCard trip={done} figures={tripFigures(done)} />));
+    expect(text).toBe('Still on the truck 48 cartons for Wellawatte, nobody at the shop. The depot decides what happens to them. Didn\'t fit on the truck The 4 chilled cartons for Nugegoda stayed at the depot.');
+  });
+
+  it('L-19 counts the line against the 8 loaded, not the 12 ordered, and a stock-short line still against what was ordered', () => {
+    expect(figures.byStop[0]!.byLine.map((line) => line.countTo)).toEqual([8, 4]);
+    const stop = { ...trip.stops[0]!, arrivedAt: '2026-06-24T22:17:00.000Z' };
+    const html = unload({ trip: { ...trip, stops: [stop] }, stop });
+    const card = (label: string) => textOf(html.match(new RegExp(`aria-label="${label}"[\\s\\S]*?One more: ${label}`))?.[0] ?? '');
+    expect(card('Chilled')).toContain('/8');
+    expect(card('Dry')).toContain('/4');
   });
 });

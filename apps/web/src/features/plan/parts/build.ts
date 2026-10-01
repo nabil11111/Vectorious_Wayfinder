@@ -1,5 +1,6 @@
-import type { PlanBoard, PlanRef } from '@wayfinder/contracts';
+import type { BoardSuggestion, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { suggestPlan, type Undo } from '../board';
+import { suggestedAt, toMake } from '../words';
 
 // The board's queue running a write (board.ts act): it says why the write was refused, or null, and hands on the board
 // it answered once the board has taken it.
@@ -17,4 +18,13 @@ export async function buildPlan(act: BuildAct, open: (date: string) => void): Pr
   const day = taken.board?.day;
   if (refused === null && day) open(day.date);
   return refused;
+}
+
+// The line under "No trip open" after a build: "Suggested plan · 16:01 · 6 decisions to make", the rows View plan lists
+// as open counted and nothing else. None while the draft holds nothing of the suggestion, as after Start over or an
+// Undo back past the build, so it never says there is nothing to decide about a plan that is not there (L-18).
+export function suggestionLine(suggestion: BoardSuggestion | null): { at: string; open: number; toMake: string } | null {
+  if (!suggestion?.inDraft) return null;
+  const open = suggestion.decisions.filter((decision) => decision.open).length;
+  return { at: suggestedAt(suggestion.builtAt), open, toMake: toMake(open) };
 }

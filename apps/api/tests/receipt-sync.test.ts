@@ -167,7 +167,7 @@ it('AC-16 judges a receipt that waited behind a driver\'s write on the trip on t
   const handedOver: StoreDelivery = { stopId: stop1.id, revision: stop1.revision + 1, day: THU, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: stop1.arrivedAt!,
     doneAt: at(HANDED_OVER).toISOString(), outcome: 'delivered', late: false, refusalReason: null, receipt: null,
     lines: stop1.lines.map((line) => ({ lineId: line.lineId, orderId: line.orderId, temp: line.temp, productId: line.productId, name: line.name, unit: line.unit,
-      ordered: line.quantity, loaded: line.loaded!, delivered: line.loaded!, received: null })) };
+      ordered: line.quantity, loaded: line.loaded!, wontFit: line.wontFit, delivered: line.loaded!, received: null })) };
   const write = receiptOf(handedOver, [12, 8, 3]);
   const waiting = shop.send(write).then((res) => res);
   try {

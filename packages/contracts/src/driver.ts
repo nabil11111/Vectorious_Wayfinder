@@ -112,9 +112,11 @@ export function tripFigures(trip: DriverTrip) {
       const delivered = line.delivered ?? 0;
       const refused = stop.outcome === 'refused' ? loaded - delivered : 0;
       const notDelivered = stop.outcome === 'closed' ? loaded : 0;
+      const wontFit = line.loaded === null ? 0 : Math.min(line.wontFit, line.quantity - line.loaded);
+      // countTo is what the unload counter counts against (L-19): what was ordered, less what did not fit on the truck,
+      // which never went on it. A line short of stock still counts against the order, as "3 /4" (spec 013).
       return { lineId: line.lineId, temp: line.temp, ordered: line.quantity, loaded, delivered, refused, notDelivered,
-        short: line.loaded === null ? 0 : line.quantity - line.loaded, wontFit: line.loaded === null ? 0 : Math.min(line.wontFit, line.quantity - line.loaded),
-        onTruck: refused + notDelivered };
+        short: line.loaded === null ? 0 : line.quantity - line.loaded, wontFit, onTruck: refused + notDelivered, countTo: line.quantity - wontFit };
     });
     return { stopId: stop.id, seq: stop.seq, ...add(byLine), byLine,
       byTemp: { chilled: add(byLine.filter(line => line.temp === 'chilled')), dry: add(byLine.filter(line => line.temp === 'dry')) } };

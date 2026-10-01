@@ -96,11 +96,22 @@ export function decisionOpen(decision: SuggestionDecision, suggested: DraftPlan,
   return planned !== undefined && now !== undefined && now.code === planned.code && now.reason === planned.reason;
 }
 
-// The suggestion as the board answers it, each decision judged on the board's draft. The saved draft stays here.
+// Whether the draft still holds anything of the suggestion (L-18): an order on the truck and trip the suggestion gave
+// it, or an order the suggestion deferred, for whatever reason now.
+function holdsAny(suggested: DraftPlan, draft: DraftPlan): boolean {
+  const placed = new Set(suggested.trips.flatMap((trip) => trip.stops.flatMap((stop) => stop.orderIds.map((id) => `${trip.vehicleId}:${trip.tripNo}:${id}`))));
+  const deferred = new Set(suggested.deferrals.map((deferral) => deferral.orderId));
+  return draft.trips.some((trip) => trip.stops.some((stop) => stop.orderIds.some((id) => placed.has(`${trip.vehicleId}:${trip.tripNo}:${id}`))))
+    || draft.deferrals.some((deferral) => deferred.has(deferral.orderId));
+}
+
+// The suggestion as the board answers it, each decision judged on the board's draft, and whether the draft still holds
+// any of it. The saved draft stays here.
 export function boardSuggestion(stored: Suggestion, draft: DraftPlan): BoardSuggestion {
   return {
     builtAt: stored.builtAt,
     choices: stored.choices,
+    inDraft: holdsAny(stored.plan, draft),
     decisions: stored.decisions.map((decision) => ({ ...decision, open: decisionOpen(decision, stored.plan, draft) })),
   };
 }

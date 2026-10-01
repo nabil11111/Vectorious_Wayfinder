@@ -7,7 +7,7 @@ import { applyReceipt, deliveryFigures, lineReason, receiptView, ReceiptWrite, r
 const at = (time: string) => new Date(`2026-06-25T${time}:00+05:30`).toISOString();
 
 function line(temp: 'chilled' | 'dry', ordered: number, loaded: number, delivered: number): StoreDeliveryLine {
-  return { lineId: randomUUID(), orderId: randomUUID(), temp, productId: `fresh-${temp}-carton`, name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', ordered, loaded, delivered, received: null };
+  return { lineId: randomUUID(), orderId: randomUUID(), temp, productId: `fresh-${temp}-carton`, name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', ordered, loaded, wontFit: 0, delivered, received: null };
 }
 function delivery(doneAt: string, lines: StoreDeliveryLine[], outcome: 'delivered' | 'refused' = 'delivered'): StoreDelivery {
   return { stopId: randomUUID(), revision: 2, day: '2026-06-25', vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at('03:34'), doneAt: at(doneAt), outcome,

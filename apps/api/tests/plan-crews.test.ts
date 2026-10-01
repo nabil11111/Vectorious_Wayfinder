@@ -207,6 +207,38 @@ it('L-04 calls no crew ready too late for an empty trip\'s swap, so its trucks w
   expect(inPickerOrder(list)).toBe(true);
 });
 
+it('L-17 does not call a crew fitting whose trip would reach a shop after its window closes, and says by how much, as the checker does', async () => {
+  // Wasantha's fridge van runs Fresh Nugegoda first, so it is ready again early, before Puttalam's window closes at
+  // 08:00, but Puttalam is 173 minutes out: a second trip there arrives after its window.
+  const puttalam = board.orders.find((o) => o.outletId === 'OUT075' && o.temp === 'chilled')!;
+  const first = { vehicleId: 'VEH035', tripNo: 1 as const, leaveAt: null, driverId: null, stops: [{ outletId: 'OUT001', orderIds: [NUGEGODA] }] };
+  const put = async (plan: DraftPlan, ref: { planId: null } | { planId: string; revision: number }) => {
+    const res = await ruwan.put(`/api/v1/plans/${THU}/draft`).send({ ...ref, demoDay: board.demoDay, plan });
+    expect(res.status, JSON.stringify(res.body.error)).toBe(200);
+    return PlanBoard.parse(res.body);
+  };
+  const saved = await put({ mixBrands: false, deferrals: [], trips: [first] }, { planId: null });
+  const readyAt = saved.check!.trips.find((t) => t.vehicleId === 'VEH035')!.times!.readyAgainAt;
+  expect(readyAt).toBeLessThan(480);
+  const list = await crews(THU, [puttalam.id]);
+  const van = crewOf(list, 'VEH035');
+  expect(van).toMatchObject({ readyAt, fits: false });
+  const late = van.misfits.find((m) => m.code === 'arrives_late')!;
+  expect(late).toMatchObject({ code: 'arrives_late', orderId: null, outletId: 'OUT075' });
+  expect(van.misfits.some((m) => m.code === 'ready_late')).toBe(false);
+  // The minutes are the checker's own once the trip is made.
+  const made = await put({ mixBrands: false, deferrals: [], trips: [first, { vehicleId: 'VEH035', tripNo: 2, leaveAt: null, driverId: null, stops: [{ outletId: 'OUT075', orderIds: [puttalam.id] }] }] }, { planId: saved.plan.id!, revision: saved.plan.revision });
+  const stop = made.check!.trips.find((t) => t.vehicleId === 'VEH035' && t.tripNo === 2)!.times!.stops[0]!;
+  expect(stop.late).toBe(true);
+  expect(late.lateMin).toBe(stop.lateMin);
+  expect(late.lateMin).toBeGreaterThan(0);
+  // A fridge truck with no trip yet leaves early enough to be there in time, and fits.
+  const fresh = list.crews.filter((crew) => crew.temp === 'reefer' && crew.unavailable === null && crew.readyAt === null);
+  expect(fresh.length).toBeGreaterThan(0);
+  for (const crew of fresh) expect(crew.misfits.filter((m) => m.code === 'arrives_late'), crew.vehicleId).toEqual([]);
+  expect(inPickerOrder(list)).toBe(true);
+});
+
 it('reads the crews of the depot the dispatcher has switched to', async () => {
   expect((await ruwan.put('/api/v1/me/depot').send({ depotId: 'Kandy' })).status).toBe(200);
   try {

@@ -23,8 +23,8 @@ export const MORNING_DONE = 8 * 60 + 30;
 
 // Up to Nugegoda handed over at 03:38, and Wellawatte's ending when asked, with the clock left at Thu 08:30. It answers
 // VEH035's trip as the driver's last answer has it.
-export async function deliveredWalkthrough(walk: ReceiptWalk, { wellawatte, stopAt }: { wellawatte?: 'refused' | 'closed'; stopAt?: 'arrived' } = {}): Promise<DriverTrip> {
-  await readyWalkthrough(walk);
+export async function deliveredWalkthrough(walk: ReceiptWalk, { wellawatte, stopAt, reason }: { wellawatte?: 'refused' | 'closed'; stopAt?: 'arrived'; reason?: 'short' | 'wont_fit' } = {}): Promise<DriverTrip> {
+  await readyWalkthrough(walk, { reason });
   const driver = driverScreen(walk.dilshan);
   const send = async (trip: DriverTrip, kind: ReceiptWriteKind, minute: number, seq?: number, more: object = {}) => {
     walk.freeze(THU, minute);

@@ -11,8 +11,7 @@ import { cn } from '@/lib/utils';
 import { editable, type BoardScreen, type Undo } from '../board';
 import { setMixBrands } from '../draft';
 import { clockTime, figure, planFor, space, whole } from '../words';
-import { startOverChange } from './changes';
-import { START_OVER_LINE } from './history-keys';
+import { historyTip, START_OVER_LINE } from './history-keys';
 import { inkButton, plainButton } from './look';
 import { Tag } from './ui';
 
@@ -21,7 +20,7 @@ export type Tab = 'unplanned' | 'planning' | 'done';
 // The top of the board (Edit plan's header): the day, the three columns as tabs, whether the draft is saved,
 // the counts of rule 12, "Mix brands" and "View plan". Below 1024 px the tabs choose the column on screen; on a
 // desktop they only mark the column being worked in.
-export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedCount, doneCount, change, retry, onViewPlan, stale, onRefresh, refreshing, onUndo, onRedo }: {
+export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedCount, doneCount, change, retry, onViewPlan, stale, onRefresh, refreshing, onUndo, onRedo, onStartOver }: {
   screen: BoardScreen;
   tab: Tab;
   working: Tab;
@@ -38,6 +37,8 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
   // The history's Undo and Redo (spec 027).
   onUndo: () => void;
   onRedo: () => void;
+  // Start over, once asked (spec 027).
+  onStartOver: () => void;
 }) {
   const [asking, setAsking] = useState(false);
   const { board, draft } = screen;
@@ -111,7 +112,7 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
           </AlertDialogHeader>
           <AlertDialogFooter className="-mx-5 -mb-5 rounded-b-lg px-5 py-3.5">
             <AlertDialogCancel className={plainButton('h-10 px-5 text-[13px]')}>Keep the plan</AlertDialogCancel>
-            <Button className={inkButton('h-10 px-5 text-[13px]')} onClick={() => { const over = startOverChange(draft); change(over.plan, over.said); setAsking(false); }}>Start over</Button>
+            <Button className={inkButton('h-10 px-5 text-[13px]')} onClick={() => { onStartOver(); setAsking(false); }}>Start over</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -120,23 +121,22 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
 }
 
 // Undo or Redo (spec 027): an icon button named by the change it would undo or redo, also in its tooltip, and off with
-// nothing to do.
+// nothing to do. Off is the app's disabled look and Base UI's disabled button, which ignores presses; it stays
+// focusable (as View plan does) so the tooltip can still say "Nothing to undo" (L-15).
 function HistoryButton({ icon: Icon, verb, line, onPress }: { icon: typeof Undo2; verb: 'Undo' | 'Redo'; line: string | null; onPress: () => void }) {
-  const label = line ? `${verb}: ${line}` : verb;
   return (
     <Tooltip.Root>
       <Tooltip.Trigger
-        render={<button type="button" />}
-        aria-label={label}
-        disabled={line === null}
+        render={<Button variant="outline" disabled={line === null} focusableWhenDisabled />}
+        aria-label={line ? `${verb}: ${line}` : verb}
         onClick={onPress}
-        className="flex size-8 items-center justify-center rounded-[10px] border bg-card text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:text-muted-foreground/50"
+        className={plainButton('size-8 p-0 text-foreground data-disabled:hover:bg-card')}
       >
         <Icon aria-hidden="true" className="size-4" />
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Positioner sideOffset={6} className="z-50">
-          <Tooltip.Popup className="max-w-72 rounded-md bg-secondary px-2.5 py-1.5 text-xs leading-[15px] text-secondary-foreground shadow-md">{label}</Tooltip.Popup>
+          <Tooltip.Popup className="max-w-72 rounded-md bg-secondary px-2.5 py-1.5 text-xs leading-[15px] text-secondary-foreground shadow-md">{historyTip(verb, line)}</Tooltip.Popup>
         </Tooltip.Positioner>
       </Tooltip.Portal>
     </Tooltip.Root>

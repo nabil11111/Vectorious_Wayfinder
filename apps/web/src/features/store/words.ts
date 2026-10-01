@@ -200,8 +200,10 @@ export const receiptLineName = (brand: Brand, line: Pick<StoreDeliveryLine, 'tem
 export const expectedWords = (expected: number) => `${WHOLE.format(expected)} expected`;
 // Under a line counted lower: "1 carton missing", "2 cartons damaged".
 export const shortChip = (short: number, unit: string, reason: ShortReason) => `${countOf(short, unit)} ${reason}`;
-// Under a line the depot sent short, and one the shop refused some of at the door.
+// Under a line the depot sent short, one with cartons that did not fit on the truck (L-21), and one the shop refused
+// some of at the door.
 export const shortFromDepotLine = (units: number) => `${WHOLE.format(units)} short from the depot`;
+export const wontFitLine = (units: number) => `${WHOLE.format(units)} didn't fit on the truck`;
 export const refusedAtDoorLine = (units: number) => `${WHOLE.format(units)} refused at the door`;
 // Under a receipt's count box that holds more than was handed over (Q-38): it stays as typed, and this says why it
 // cannot go. A minus or a fraction gets the loader's "Whole numbers from 0 to 50." instead.
@@ -319,9 +321,10 @@ const REFUSAL_WORDS: Record<RefusalReason, string> = { damaged: 'damaged', expir
 // "Delivered 03:38 · VEH035 · Dilshan"
 export const deliveredLine = (delivery: OrderDelivery) => [`Delivered ${clockTime(delivery.doneAt)}`, delivery.vehicleId, delivery.driver].filter(Boolean).join(' · ');
 
-// "1 short from the depot", "2 refused, damaged"
+// "1 short from the depot", "4 didn't fit on the truck", "2 refused, damaged"
 const shortParts = (delivery: OrderDelivery) => [
   delivery.shortFromDepot > 0 && shortFromDepotLine(delivery.shortFromDepot),
+  delivery.wontFit > 0 && wontFitLine(delivery.wontFit),
   delivery.refused > 0 && `${WHOLE.format(delivery.refused)} refused${delivery.refusalReason ? `, ${REFUSAL_WORDS[delivery.refusalReason]}` : ''}`,
 ].filter((part): part is string => Boolean(part));
 

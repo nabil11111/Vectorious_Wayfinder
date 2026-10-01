@@ -27,7 +27,8 @@ export function ClosedBand({ line, waiting }: { line: string; waiting: number })
   );
 }
 
-// The hand-back card: "Still on the truck" with what is on it and why, or "Nothing to hand back".
+// The hand-back card: "Still on the truck" with what is on it and why, or "Nothing to hand back", and under it "Didn't fit
+// on the truck" for what never went on (L-20).
 export function HandBackCard({ trip, figures, className }: { trip: DriverTrip; figures: Figures; className?: string }) {
   const back = handBack(trip, figures);
   return (
@@ -37,6 +38,15 @@ export function HandBackCard({ trip, figures, className }: { trip: DriverTrip; f
         {back.title}
       </p>
       {back.text && <p className="mt-2.5 text-xs leading-[17px]">{back.text}</p>}
+      {back.wontFit && (
+        <>
+          <p className="mt-3.5 flex items-center gap-2.5 text-sm leading-[18px] font-semibold">
+            <img src={ICON.shortfall} alt="" className="size-[22px] shrink-0 object-contain" />
+            {back.wontFit.title}
+          </p>
+          <p className="mt-2.5 text-xs leading-[17px]">{back.wontFit.text}</p>
+        </>
+      )}
     </div>
   );
 }
