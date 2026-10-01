@@ -72,25 +72,30 @@ export async function photoOf(file: File): Promise<string> {
 
 export const UNUSABLE = 'That picture could not be used. Take it again.';
 
-// A form's photo: the data URL once taken, whether the last picture could not be used, and the input to take one.
+// A form's photo: the data URL once taken, whether the last picture could not be used, the input to take one, and
+// whether a picture is being read. While one is, the form saves nothing, so a retaken photo never loses to the one
+// before it or to none. Only the last picture picked counts.
 export function usePhoto() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const latest = useRef(0);
   const [photo, setPhoto] = useState<string | null>(null);
   const [unusable, setUnusable] = useState(false);
   const [reading, setReading] = useState(false);
 
   const pick = async (file: File) => {
+    const mine = ++latest.current;
     setReading(true);
     setUnusable(false);
+    let next: string | null = null;
     try {
-      setPhoto(await photoOf(file));
+      next = await photoOf(file);
     } catch (error) {
       console.warn('The picture could not be used.', error);
-      setPhoto(null);
-      setUnusable(true);
-    } finally {
-      setReading(false);
     }
+    if (mine !== latest.current) return;
+    setPhoto(next);
+    setUnusable(next === null);
+    setReading(false);
   };
 
   return { photo, unusable, reading, inputRef, take: () => inputRef.current?.click(), pick: (file: File) => { void pick(file); } };

@@ -78,8 +78,9 @@ function Wrong({ me, stopId }: { me: Me; stopId: string }) {
   const toggle = (line: DriverLine) => setPicked((held) => (held.includes(line.lineId) ? held.filter((id) => id !== line.lineId) : [...held, line.lineId]));
   const setCount = (line: DriverLine, n: number) => setRefused((held) => ({ ...held, [line.lineId]: Math.min(loadedOf(line), Math.max(0, n)) }));
 
+  // Not while a photo is being read: the one before it, or none, would be saved instead.
   const submit = async () => {
-    if (at === null || !canSave) return;
+    if (at === null || !canSave || reading) return;
     const base = { writeId: newWriteId(), tripId: trip.tripId, stopId: stop.id, at: new Date(at).toISOString(), revision: stop.revision, note: note.trim(), ...(photo ? { photo } : {}) };
     setLeaving(true);
     const saved = kind === 'refused' && reason !== null
@@ -176,7 +177,7 @@ function Wrong({ me, stopId }: { me: Me; stopId: string }) {
       )}
 
       <ActionBar>
-        <Button className={BIG()} disabled={!canSave || saving || at === null} focusableWhenDisabled onClick={() => { void submit(); }}>
+        <Button className={BIG()} disabled={!canSave || saving || reading || at === null} focusableWhenDisabled onClick={() => { void submit(); }}>
           {saving ? 'Saving…' : kind === 'refused' ? 'Save partial delivery' : 'Save attempt and move on'}
         </Button>
         <Button variant="outline" className={PLAIN()} disabled={saving} onClick={() => navigate('/driver')}>Back to unload</Button>
