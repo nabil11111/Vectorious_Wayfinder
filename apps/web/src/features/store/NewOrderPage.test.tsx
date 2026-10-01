@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import type { Saving } from './draft-form';
-import { Checkout, PlacedElsewhere } from './NewOrderPage';
+import { Checkout, OrderSummary, PlacedElsewhere } from './NewOrderPage';
 
 // Parts of the New order form drawn once, as the browser gets them.
 
@@ -46,5 +46,22 @@ describe('Q-08 Place pressed while the draft is still saving', () => {
     expect(button(true, 'held')).toMatch(/\sdisabled=""/);
     // While placing it keeps the focus it had, so it is off for assistive technology rather than taken out.
     expect(button(true, 'saved', true)).toMatch(/\saria-disabled="true"[^>]*>Placing…</);
+  });
+});
+
+describe('L-02 Your order on a desktop', () => {
+  const product = (id: string, name: string, unit: string) => ({ id, name, unit, temp: 'dry' as const, kgPerUnit: 1, m3PerUnit: 0.01, needsTailLift: false });
+  const products = [product('style-folded', 'Folded clothing', 'box'), product('style-hanging', 'Hanging garments', 'rail box'), product('style-shoes', 'Shoes', 'carton'), product('style-bags', 'Bags and accessories', 'carton')];
+  const line = (productId: string, quantity: number) => ({ productId, name: products.find((p) => p.id === productId)!.name, unit: products.find((p) => p.id === productId)!.unit, quantity });
+  const rows = (html: string) => [...html.matchAll(/<li[^>]*>/g)].map(([tag]) => /\binvisible\b/.test(tag) ? 'held' : 'shown');
+
+  it('keeps a row\'s place for every item, so a line added to the order never moves Place order down', () => {
+    const three = draw(<OrderSummary brand="Style" products={products} lines={[line('style-folded', 5), line('style-shoes', 4), line('style-bags', 1)]} />);
+    expect(rows(three)).toEqual(['shown', 'shown', 'shown', 'held']);
+    expect(text(three)).toContain('Folded clothing 5 boxes Shoes 4 cartons Bags and accessories 1 carton');
+    const four = draw(<OrderSummary brand="Style" products={products} lines={[line('style-folded', 5), line('style-hanging', 2), line('style-shoes', 4), line('style-bags', 1)]} />);
+    expect(rows(four)).toEqual(['shown', 'shown', 'shown', 'shown']);
+    // The held row is the item's own, out of sight and out of the reading order.
+    expect(three).toMatch(/<li[^>]*aria-hidden="true"[^>]*>/);
   });
 });

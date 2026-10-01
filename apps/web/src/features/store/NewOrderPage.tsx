@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import type { StoreNextOrder, StoreProduct } from '@wayfinder/contracts';
+import type { Brand, OrderLine, StoreNextOrder, StoreProduct } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -144,27 +144,38 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
 
         <Panel className="hidden p-5 lg:block">
           <h2 className="text-lg leading-[25px] font-bold">Your order</h2>
-          {draft && (
-            <ul className="mt-3 space-y-3">
-              {inListOrder(draft.lines, products).map((line) => {
-                const words = lineWords(outlet.brand, line, products);
-                const temp = products.find((p) => p.id === line.productId)?.temp;
-                return (
-                  <li key={line.productId} className="flex min-h-7 items-center gap-2.5 text-[15px] leading-[18px]">
-                    {fresh && temp && <img src={goodsIcon(outlet.brand, temp)} alt="" className="size-7" />}
-                    <span className="font-semibold">{words.name}</span>
-                    <span className="ml-auto font-mono">{words.amount}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          {draft && <OrderSummary brand={outlet.brand} products={products} lines={draft.lines} />}
           <div className="mt-3.5">{checkout}</div>
         </Panel>
       </div>
 
       <BottomBar className="bg-card px-4 pt-4 pb-3 shadow-[0_-2px_8px_color-mix(in_srgb,var(--foreground)_6%,transparent)] md:px-6">{checkout}</BottomBar>
     </Page>
+  );
+}
+
+// Your order on a desktop: the order's lines in the list's order, then, out of sight, a row for each item not in it.
+// Those rows hold the room a line takes once it is added, so Place order under the list never moves down while
+// someone reaches for it (L-02).
+export function OrderSummary({ brand, products, lines }: { brand: Brand; products: StoreProduct[]; lines: OrderLine[] }) {
+  const held = products.filter((product) => !lines.some((line) => line.productId === product.id))
+    .map((product): OrderLine => ({ productId: product.id, name: product.name, unit: product.unit, quantity: 0 }));
+  const row = (line: OrderLine, hidden: boolean) => {
+    const words = lineWords(brand, line, products);
+    const temp = products.find((p) => p.id === line.productId)?.temp;
+    return (
+      <li key={line.productId} aria-hidden={hidden || undefined} className={cn('flex min-h-7 items-center gap-2.5 text-[15px] leading-[18px]', hidden && 'invisible')}>
+        {brand === 'Fresh' && temp && <img src={goodsIcon(brand, temp)} alt="" className="size-7" />}
+        <span className="font-semibold">{words.name}</span>
+        <span className="ml-auto font-mono">{words.amount}</span>
+      </li>
+    );
+  };
+  return (
+    <ul className="mt-3 space-y-3">
+      {inListOrder(lines, products).map((line) => row(line, false))}
+      {held.map((line) => row(line, true))}
+    </ul>
   );
 }
 
