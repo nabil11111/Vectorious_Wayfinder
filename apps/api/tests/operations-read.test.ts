@@ -5,12 +5,12 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
-import { demoDay, orders, plans, stops, trips, vehicles } from '../src/db/schema';
+import { demoDay, fuelLog, issueLines, issues, orders, plans, stops, trips, users, vehicles } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import * as board from '../src/plans/board';
 import { driverStop, heldDriverRows } from './driver-plan';
-import { code, resetDay, sendWalkthroughPlan, signIn, THU, WED } from './loading-plan';
+import { code, kandyTrip, resetDay, sendWalkthroughPlan, signIn, THU, WED } from './loading-plan';
 import { journey, operations, shownTrip, FRI } from './operations-plan';
 import { serve, stop } from './serve';
 const clock = vi.hoisted(() => ({ at: '' }));
@@ -201,4 +201,21 @@ it('AC-5 planned stop clocks come from the sent stops', async () => {
   const first = shownTrip(await read()).stopDetails[0]!;
   await db.update(stops).set({ plannedArrival: '05:01:00', plannedDepart: '05:16:00' }).where(eq(stops.id, first.id));
   expect(shownTrip(await read()).stopDetails[0]).toMatchObject({ plannedArrival: depotInstant(THU, 301).toISOString(), plannedDeparture: depotInstant(THU, 316).toISOString() });
+});
+
+it('AC-13 another depots records stay private', async () => {
+  await road.write(await road.wellawatte(), 'closed', 228, 2);
+  const before = await read();
+  expect(before.events.length).toBeGreaterThan(0);
+  const foreign = await kandyTrip();
+  const [person] = await db.select().from(users).where(eq(users.username, 'kasun'));
+  const [issue] = await db.insert(issues).values({ kind: 'loading', reason: 'short', stopId: foreign.stop.id, raisedBy: person!.id, raisedAt: depotInstant(THU, 228), note: 'Private Kandy issue' }).returning();
+  await db.insert(issueLines).values({ issueId: issue!.id, orderLineId: foreign.line.id, counted: 7 });
+  await db.update(trips).set({ status: 'out', leftAt: depotInstant(THU, 210) }).where(eq(trips.id, foreign.trip.id));
+  await db.insert(fuelLog).values({ vehicleId: 'VEH044', date: FRI, litres: '100', tripId: foreign.trip.id });
+  const after = await read();
+  expect(after).toEqual(before);
+  const attemptedSelector = await ruwan.get('/api/v1/operations?depotId=Kandy');
+  expect(attemptedSelector.status).toBe(200);
+  expect(attemptedSelector.body).toEqual(before);
 });
