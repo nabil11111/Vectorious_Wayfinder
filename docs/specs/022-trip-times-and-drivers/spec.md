@@ -53,8 +53,10 @@ only when the dispatcher picked one, and the suggested plan picks none, so a bui
 - [x] AC-2 When a stop's dot is pointed at, focused or tapped, the system shall show that stop's number, shop, arrival
   and leaving times, any wait, its window, what is unloaded, and whether it is late. Each dot shall be reachable by
   keyboard and named for screen readers.
-- [x] AC-3 When the suggested plan is built, the system shall give every vehicle on it a driver of its depot, keeping
-  a vehicle's earlier driver, with no driver on two vehicles and the same driver on a vehicle's two trips.
+- [x] AC-3 When the suggested plan is built, the system shall give every vehicle on it a driver of its depot while the
+  depot has a free one, keeping a vehicle's earlier driver, with no driver on two vehicles and the same driver on a
+  vehicle's two trips. A truck left over when the drivers run out reads "no driver" in the warning colour (AC-4), as
+  D-31 allows; the seeded depots have a driver for every working truck.
 - [x] AC-4 Done's cards and the open trip's header shall name the driver after the vehicle, or say "no driver".
 - [x] AC-5 Choosing in the driver menu a driver who is on another vehicle shall swap the two vehicles' drivers as one
   change of the draft.
