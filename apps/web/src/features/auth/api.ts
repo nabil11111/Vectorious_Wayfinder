@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient, type UseMutationOptions } from '@tanstack/react-query';
 import { Me, type LoginRequest, type Role } from '@wayfinder/contracts';
 import { api, ApiRequestError } from '@/lib/api';
 
@@ -71,18 +71,35 @@ export function useMe() {
   });
 }
 
+// The sign-in request (spec 018). It goes out whatever the browser says of the network, so with no signal it fails at
+// once into the No signal line, and never waits to send the staff ID and PIN later on its own. Once an attempt has
+// settled nothing keeps it: an attempt nobody watches leaves the cache at once, and attemptSignIn lets go of it.
+export const loginMutation = (qc: QueryClient): UseMutationOptions<Me, Error, LoginRequest> => ({
+  networkMode: 'always',
+  gcTime: 0,
+  onMutate: () => qc.cancelQueries({ queryKey: meKey }),
+  mutationFn: (body) => api<Me>('/auth/login', { method: 'POST', json: body }),
+  // A sign-in starts the screens afresh: nothing another account read stays in the cache to be shown again.
+  onSuccess: async (me) => {
+    await qc.cancelQueries({ queryKey: meKey });
+    qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] });
+    qc.setQueryData(meKey, keepAccount(me));
+  },
+});
+
 export function useLogin() {
   const qc = useQueryClient();
-  return useMutation({
-    onMutate: () => qc.cancelQueries({ queryKey: meKey }),
-    mutationFn: (body: LoginRequest) => api<Me>('/auth/login', { method: 'POST', json: body }),
-    // A sign-in starts the screens afresh: nothing another account read stays in the cache to be shown again.
-    onSuccess: async (me) => {
-      await qc.cancelQueries({ queryKey: meKey });
-      qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] });
-      qc.setQueryData(meKey, keepAccount(me));
-    },
-  });
+  return useMutation(loginMutation(qc));
+}
+
+// One sign-in attempt from the page. However it ends, the mutation lets go of it, so its staff ID and PIN stay in no
+// cache. The page keeps its own line and form, so it loses nothing by the reset.
+export async function attemptSignIn(login: { mutateAsync: (body: LoginRequest) => Promise<Me>; reset: () => void }, body: LoginRequest) {
+  try {
+    return await login.mutateAsync(body);
+  } finally {
+    login.reset();
+  }
 }
 
 export function useLogout() {

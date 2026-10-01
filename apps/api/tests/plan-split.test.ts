@@ -10,6 +10,7 @@ import { auditLog, deferrals, demoDay, orderLines, orders, plans, stopOrders, st
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { serve, stop } from './serve';
+import { signInAs } from './sign-in';
 
 const testClock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async (original) => {
@@ -51,7 +52,7 @@ async function held() {
 beforeAll(async () => {
   originalClock = (await db.select().from(demoDay))[0]!;
   for (const [agent, username] of [[as, 'ruwan'], [ishara, 'ishara']] as const) {
-    expect((await agent.post('/api/v1/auth/login').send({ username, password: process.env.SEED_PASSWORD ?? 'wayfinder-demo' })).status).toBe(200);
+    expect((await signInAs(agent, username)).status).toBe(200);
   }
 });
 beforeEach(async () => {

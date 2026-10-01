@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { hash } from '@node-rs/argon2';
-import { CutoffPassedDetails, PlaceOrdersResponse, StoreNextOrder, type DraftRefs } from '@wayfinder/contracts';
+import { CutoffPassedDetails, PlaceOrdersResponse, StoreNextOrder, type DraftRefs, type LoginRequest } from '@wayfinder/contracts';
 import { eq, inArray, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +11,7 @@ import { depotInstant, realNow, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { toMinutes } from '../src/planning/words';
 import { serve, stop } from './serve';
+import { PIN, signInAs } from './sign-in';
 
 // Spec 009: the next order, its draft and placing it. Every test runs against the real database with the
 // app's clock frozen.
@@ -51,21 +52,21 @@ const place = (as: Asker, body: object) => as.post(`${NEXT}/place`).send(body);
 const answer = (res: request.Response) => [res.status, res.body.error?.code];
 
 // One address gets ten sign-ins in 15 minutes, so each account signs in once and its cookie is reused.
-const signIn = async (username: string, password: string) => {
+// A fixture account is named by its username, and a manager made here by its staff ID and PIN.
+const signIn = async (who: string | LoginRequest) => {
   const as = request.agent(server);
-  const res = await as.post('/api/v1/auth/login').send({ username, password });
-  if (res.status !== 200) throw new Error(`Could not sign in as ${username}: ${res.status}`);
+  const res = await signInAs(as, who);
+  if (res.status !== 200) throw new Error(`Could not sign in as ${JSON.stringify(who)}: ${res.status}`);
   return as;
 };
 
 // Two managers at the Fresh shop, because the one who places a draft need not be the one who started it.
-const PASSWORD = 'a password for the test managers';
 const MANAGERS = [
-  { username: 'orders-test-fresh', outletId: FRESH },
-  { username: 'orders-test-fresh-second', outletId: FRESH },
-  { username: 'orders-test-style', outletId: STYLE },
-  { username: 'orders-test-tech', outletId: TECH },
-  { username: 'orders-test-no-shop', outletId: null },
+  { username: 'orders-test-fresh', staffId: 'S-911', outletId: FRESH },
+  { username: 'orders-test-fresh-second', staffId: 'S-912', outletId: FRESH },
+  { username: 'orders-test-style', staffId: 'S-913', outletId: STYLE },
+  { username: 'orders-test-tech', staffId: 'S-914', outletId: TECH },
+  { username: 'orders-test-no-shop', staffId: 'S-915', outletId: null },
 ];
 const userIds: Record<string, string> = {};
 let fresh: Asker;
@@ -85,22 +86,21 @@ beforeAll(async () => {
   // What a run that was stopped halfway left behind.
   await removeOrders();
   await removeManagers();
-  const passwordHash = await hash(PASSWORD);
+  const pinHash = await hash(PIN);
   const made = await db.insert(users)
-    .values(MANAGERS.map((m) => ({ ...m, displayName: m.username, role: 'store_manager' as const, passwordHash })))
+    .values(MANAGERS.map((m) => ({ ...m, displayName: m.username, role: 'store_manager' as const, pinHash })))
     .returning({ id: users.id, username: users.username });
   for (const user of made) userIds[user.username] = user.id;
 
-  fresh = await signIn('orders-test-fresh', PASSWORD);
-  second = await signIn('orders-test-fresh-second', PASSWORD);
-  style = await signIn('orders-test-style', PASSWORD);
-  tech = await signIn('orders-test-tech', PASSWORD);
-  noShop = await signIn('orders-test-no-shop', PASSWORD);
-  const seedPassword = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
-  ruwan = await signIn('ruwan', seedPassword);
-  kasun = await signIn('kasun', seedPassword);
-  dilshan = await signIn('dilshan', seedPassword);
-  admin = await signIn('admin', process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin');
+  fresh = await signIn({ staffId: 'S-911', pin: PIN });
+  second = await signIn({ staffId: 'S-912', pin: PIN });
+  style = await signIn({ staffId: 'S-913', pin: PIN });
+  tech = await signIn({ staffId: 'S-914', pin: PIN });
+  noShop = await signIn({ staffId: 'S-915', pin: PIN });
+  ruwan = await signIn('ruwan');
+  kasun = await signIn('kasun');
+  dilshan = await signIn('dilshan');
+  admin = await signIn('admin');
 });
 
 // Every test starts on Tue 2 Jun 2026 at 15:00, when the open day is Wednesday and it closes today at 16:00.

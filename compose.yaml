@@ -25,8 +25,8 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER:-wayfinder}:${POSTGRES_PASSWORD:-wayfinder}@db:5432/${POSTGRES_DB:-wayfinder}
-      SEED_PASSWORD: ${SEED_PASSWORD:-wayfinder-demo}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-wayfinder-admin}
+      SEED_PIN: ${SEED_PIN:-1234}
+      SEED_ADMIN_PIN: ${SEED_ADMIN_PIN:-9024}
       TRUST_PROXY: ${TRUST_PROXY:-0}
       DEMO_MODE: ${DEMO_MODE:-true}
       LIVE_HEARTBEAT_MS: ${LIVE_HEARTBEAT_MS:-20000}

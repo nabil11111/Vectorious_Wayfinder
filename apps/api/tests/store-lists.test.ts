@@ -9,6 +9,7 @@ import { deferrals, orderLines, orders, outlets, plans, stopOrders, stops, trips
 import { depotInstant, setClockForTests } from '../src/lib/clock';
 import { toMinutes } from '../src/planning/words';
 import { serve, stop } from './serve';
+import { PIN, signInAs } from './sign-in';
 
 // Spec 009: the lists of a shop's orders. Every test runs against the real database with the app's clock
 // frozen, and puts the orders and plans it needs straight into the tables.
@@ -32,15 +33,14 @@ const server = await serve(createApp());
 type Asker = ReturnType<typeof request.agent>;
 
 // One address gets ten sign-ins in 15 minutes, so each account signs in once and its cookie is reused.
-const signIn = async (username: string, password: string) => {
+const signIn = async (staffId: string) => {
   const as = request.agent(server);
-  const res = await as.post('/api/v1/auth/login').send({ username, password });
-  if (res.status !== 200) throw new Error(`Could not sign in as ${username}: ${res.status}`);
+  const res = await signInAs(as, { staffId, pin: PIN });
+  if (res.status !== 200) throw new Error(`Could not sign in as ${staffId}: ${res.status}`);
   return as;
 };
 
-const PASSWORD = 'a password for the test managers';
-const MANAGERS = [{ username: 'lists-test-mine', outletId: MINE }, { username: 'lists-test-theirs', outletId: THEIRS }];
+const MANAGERS = [{ username: 'lists-test-mine', staffId: 'S-901', outletId: MINE }, { username: 'lists-test-theirs', staffId: 'S-902', outletId: THEIRS }];
 let mine: Asker;
 let theirs: Asker;
 // The plans made here name this person as their maker, which is how they are found again to be removed.
@@ -58,13 +58,13 @@ beforeAll(async () => {
   // What a run that was stopped halfway left behind.
   await removeEverything();
   await removeManagers();
-  const passwordHash = await hash(PASSWORD);
+  const pinHash = await hash(PIN);
   const made = await db.insert(users)
-    .values(MANAGERS.map((m) => ({ ...m, displayName: m.username, role: 'store_manager' as const, passwordHash })))
+    .values(MANAGERS.map((m) => ({ ...m, displayName: m.username, role: 'store_manager' as const, pinHash })))
     .returning({ id: users.id });
   planner = made[0]!.id;
-  mine = await signIn('lists-test-mine', PASSWORD);
-  theirs = await signIn('lists-test-theirs', PASSWORD);
+  mine = await signIn('S-901');
+  theirs = await signIn('S-902');
 });
 
 // Every test starts on Wed 3 Jun 2026 at 09:00.

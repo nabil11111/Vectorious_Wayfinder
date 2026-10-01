@@ -9,6 +9,7 @@ import { auditLog, demoDay, fuelLog, orderLines, orders, plans, stops, trips, us
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { serve, stop } from './serve';
+import { signInAs } from './sign-in';
 
 const testClock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async (original) => {
@@ -38,7 +39,7 @@ const held = async () => ({ plans: await db.select().from(plans).orderBy(plans.i
   trips: await db.select().from(trips).orderBy(trips.id), stops: await db.select().from(stops).orderBy(stops.id), fuel: await db.select().from(fuelLog).orderBy(fuelLog.id), audits: await db.select().from(auditLog).orderBy(auditLog.id) });
 beforeAll(async () => {
   originalClock = (await db.select().from(demoDay))[0]!;
-  for (const [agent, username] of [[as, 'ruwan'], [shop, 'nadeesha'], [ishara, 'ishara']] as const) expect((await agent.post('/api/v1/auth/login').send({ username, password: process.env.SEED_PASSWORD ?? 'wayfinder-demo' })).status).toBe(200);
+  for (const [agent, username] of [[as, 'ruwan'], [shop, 'nadeesha'], [ishara, 'ishara']] as const) expect((await signInAs(agent, username)).status).toBe(200);
   driver = (await db.select().from(users).where(eq(users.username, 'dilshan')))[0]!.id;
 });
 beforeEach(async () => { await reset(); await initClock(); freeze(); board = PlanBoard.parse((await as.get('/api/v1/plans')).body); vi.mocked(announce).mockReset(); });

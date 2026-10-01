@@ -12,6 +12,7 @@ import { announce } from '../src/lib/live';
 import { buildSuggestedPlan, type PlannerResult } from '../src/planning';
 import { demoFixture } from '../src/planning/planner/testing/demo';
 import { serve, stop } from './serve';
+import { signInAs } from './sign-in';
 
 // Spec 014: building the suggested plan on the board, accepting the planner's decisions, and the send's refusal while
 // one is open. Every test starts from the seeded day at Wed 24 Jun 16:00 with no plan for Thursday.
@@ -37,8 +38,6 @@ vi.mock('../src/planning/planner/build', async (original) => {
 const WED = '2026-06-24';
 const DATE = '2026-06-25';
 const URL = `/api/v1/plans/${DATE}`;
-const PASSWORD = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 // The four carried-over orders (spec 008), by the seed's own ids.
 const CARRIED = {
   OUT060: demoId('order', '2026-06-23:OUT060:chilled'),
@@ -110,7 +109,7 @@ const announced = () => vi.mocked(announce).mock.calls.map(([event]) => event);
 beforeAll(async () => {
   originalClock = (await db.select().from(demoDay))[0]!;
   for (const [agent, username] of [[ruwan, 'ruwan'], [nadeesha, 'nadeesha'], [kasun, 'kasun'], [dilshan, 'dilshan'], [admin, 'admin']] as const) {
-    expect((await agent.post('/api/v1/auth/login').send({ username, password: username === 'admin' ? ADMIN_PASSWORD : PASSWORD })).status).toBe(200);
+    expect((await signInAs(agent, username)).status).toBe(200);
   }
   const people = await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.username, ['ruwan', 'dilshan']));
   ruwanId = people.find((p) => p.username === 'ruwan')!.id;

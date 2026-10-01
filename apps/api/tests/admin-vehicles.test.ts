@@ -7,10 +7,9 @@ import { db, pool } from '../src/db/client';
 import { auditLog, users, vehicles } from '../src/db/schema';
 import * as live from '../src/lib/live';
 import { serve, stop } from './serve';
+import { signInAs } from './sign-in';
 
 const app = await serve(createApp());
-const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
-const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 
 // Tests share one database, so VEH060 and the audit rows written here are put back.
 async function resetVeh060() {
@@ -35,14 +34,14 @@ describe('GET /api/v1/admin/vehicles', () => {
   });
 
   it('answers 403 for a dispatcher', async () => {
-    const signedIn = await dispatcher.post('/api/v1/auth/login').send({ username: 'ruwan', password });
+    const signedIn = await signInAs(dispatcher, 'ruwan');
     expect(signedIn.status).toBe(200);
     const res = await dispatcher.get('/api/v1/admin/vehicles');
     expect(res.status).toBe(403);
   });
 
   it('lists every vehicle for the admin, ordered by id', async () => {
-    const signedIn = await admin.post('/api/v1/auth/login').send({ username: 'admin', password: adminPassword });
+    const signedIn = await signInAs(admin, 'admin');
     expect(signedIn.status).toBe(200);
     const res = await admin.get('/api/v1/admin/vehicles');
     expect(res.status).toBe(200);

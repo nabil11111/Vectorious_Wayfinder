@@ -12,6 +12,7 @@ import { driverStop, driverWrite, heldDriverRows } from './driver-plan';
 import { code, resetDay, signIn, THU, WED } from './loading-plan';
 import { at, deliveredWalkthrough, receiptOf, shopScreen, type ReceiptWalk } from './receipt-plan';
 import { serve, stop } from './serve';
+import { PIN, signInAs } from './sign-in';
 
 // Every write a phone saved first is bound to the account that saved it (D-45, D-57): the phone sends that account's id
 // with it, and the server refuses it under any other session, so a write one account saved never goes out as another's,
@@ -41,7 +42,7 @@ const id: Record<string, string> = {};
 
 // A second store manager at Fresh Nugegoda, made here as spec 009's tests make theirs, and removed at the end with the
 // audit rows it wrote.
-const SECOND = { username: 'accounts-test-nugegoda', password: 'a password for the accounts test' };
+const SECOND = { username: 'accounts-test-nugegoda', staffId: 'S-941' };
 async function removeSecond() {
   const made = await db.select({ id: users.id }).from(users).where(eq(users.username, SECOND.username));
   if (!made.length) return;
@@ -53,9 +54,9 @@ beforeAll(async () => {
   originalClock = (await db.select().from(demoDay))[0]!;
   await resetDay();
   await removeSecond();
-  await db.insert(users).values({ username: SECOND.username, displayName: 'Second Nugegoda manager', role: 'store_manager', outletId: 'OUT001', passwordHash: await hash(SECOND.password) });
+  await db.insert(users).values({ ...SECOND, displayName: 'Second Nugegoda manager', role: 'store_manager', outletId: 'OUT001', pinHash: await hash(PIN) });
   for (const [agent, username] of [[kasun, 'kasun'], [ruwan, 'ruwan'], [nadeesha, 'nadeesha'], [dilshan, 'dilshan'], [chaminda, 'chaminda']] as const) await signIn(agent, username);
-  const login = await otherManager.post('/api/v1/auth/login').send({ username: SECOND.username, password: SECOND.password });
+  const login = await signInAs(otherManager, { staffId: SECOND.staffId, pin: PIN });
   expect(login.status).toBe(200);
   otherManager.set(PHONE_ACCOUNT_HEADER, login.body.id);
   for (const row of await db.select().from(users).where(inArray(users.username, ['nadeesha', 'dilshan', 'chaminda', SECOND.username]))) id[row.username] = row.id;

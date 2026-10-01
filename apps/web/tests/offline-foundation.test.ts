@@ -52,8 +52,8 @@ class MemoryStorage implements Storage {
 
 const ACCOUNT_KEY = 'wayfinder-account';
 const CLOCK_KEY = 'wayfinder-clock';
-const dilshan: Me = { id: 'driver-dilshan', username: 'dilshan', displayName: 'Dilshan', role: 'driver', depotId: 'Peliyagoda', outletId: null };
-const chaminda: Me = { ...dilshan, id: 'driver-chaminda', username: 'chaminda', displayName: 'Chaminda' };
+const dilshan: Me = { id: 'driver-dilshan', username: 'dilshan', staffId: 'D-001', displayName: 'Dilshan', role: 'driver', depotId: 'Peliyagoda', outletId: null };
+const chaminda: Me = { ...dilshan, id: 'driver-chaminda', username: 'chaminda', staffId: 'D-003', displayName: 'Chaminda' };
 const clock: ClockState = { demo: true, now: '2026-06-24T22:00:00.000Z', part: 'on_the_road', holdsAt: '2026-06-25T02:59:59.000Z',
   next: { part: 'delivered', at: '2026-06-25T03:00:00.000Z' }, revision: 4, day: 1 };
 let storage: MemoryStorage;
@@ -158,7 +158,7 @@ describe('the account kept for offline startup', () => {
     client.setQueryData(['me'], dilshan);
     client.setQueryData(['orders', 'deliveries', 'stop-1'], { stopId: 'stop-1' });
     auth.useLogin();
-    await mutation().onSuccess?.(chaminda, { username: 'chaminda', password: 'irrelevant-test-password' }, undefined, { client });
+    await mutation().onSuccess?.(chaminda, { staffId: 'D-003', pin: '1234' }, undefined, { client });
     expect(client.getQueryData(['orders', 'deliveries', 'stop-1'])).toBeUndefined();
     expect(client.getQueryData(['me'])).toEqual(chaminda);
   });
@@ -175,7 +175,7 @@ describe('the account kept for offline startup', () => {
     if (action === 'logout') auth.useLogout();
     else auth.useLogin();
     const callbacks = mutation();
-    const variables = action === 'login' ? { username: 'chaminda', password: 'irrelevant-test-password' } : undefined;
+    const variables = action === 'login' ? { staffId: 'D-003', pin: '1234' } : undefined;
     const context = await callbacks.onMutate?.(variables, { client });
     await callbacks.onSuccess?.(action === 'login' ? chaminda : undefined, variables, context, { client });
     pending.resolve(response(dilshan));

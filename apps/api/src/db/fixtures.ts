@@ -17,20 +17,22 @@ export const PRODUCTS = [
 // One account per role, named after the personas in the design, plus a Peliyagoda driver so the shop, dispatcher,
 // loader and a driver all belong to the same depot. A store manager belongs to one shop: Nadeesha's is the Fresh
 // shop of the design, and the Style and Tech brands have a manager each so all three order forms can be seen
-// (D-27).
+// (D-27). Each signs in with a staff ID, a role letter and three digits (spec 018, D-90): S shop, P dispatcher,
+// L loader, D driver, A admin.
 export const DEMO_USERS = [
-  { username: 'nadeesha', displayName: 'Nadeesha', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT001' },
-  { username: 'ishara', displayName: 'Ishara', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT017' },
-  { username: 'tharindu', displayName: 'Tharindu', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT064' },
-  { username: 'ruwan', displayName: 'Ruwan', role: 'dispatcher', depot: 'Peliyagoda', outlet: null },
-  { username: 'kasun', displayName: 'Kasun', role: 'loader', depot: 'Peliyagoda', outlet: null },
-  { username: 'dilshan', displayName: 'Dilshan', role: 'driver', depot: 'Peliyagoda', outlet: null },
-  { username: 'prasanna', displayName: 'Prasanna', role: 'driver', depot: 'Kandy', outlet: null },
-  { username: 'admin', displayName: 'Admin', role: 'admin', depot: null, outlet: null },
+  { username: 'nadeesha', staffId: 'S-001', displayName: 'Nadeesha', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT001' },
+  { username: 'ishara', staffId: 'S-002', displayName: 'Ishara', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT017' },
+  { username: 'tharindu', staffId: 'S-003', displayName: 'Tharindu', role: 'store_manager', depot: 'Peliyagoda', outlet: 'OUT064' },
+  { username: 'ruwan', staffId: 'P-001', displayName: 'Ruwan', role: 'dispatcher', depot: 'Peliyagoda', outlet: null },
+  { username: 'kasun', staffId: 'L-001', displayName: 'Kasun', role: 'loader', depot: 'Peliyagoda', outlet: null },
+  { username: 'dilshan', staffId: 'D-001', displayName: 'Dilshan', role: 'driver', depot: 'Peliyagoda', outlet: null },
+  { username: 'prasanna', staffId: 'D-002', displayName: 'Prasanna', role: 'driver', depot: 'Kandy', outlet: null },
+  { username: 'admin', staffId: 'A-001', displayName: 'Admin', role: 'admin', depot: null, outlet: null },
   // A driver for each of Peliyagoda's 35 working vehicles, so every trip on the plan board can name one as the
-  // design's frames do (spec 010, D-31). Dilshan, above, is the one the walkthrough follows.
+  // design's frames do (spec 010, D-31). Dilshan, above, is the one the walkthrough follows. They are D-003 to D-036
+  // in this order.
   ...['Chaminda', 'Lasantha', 'Priyantha', 'Sanjeewa', 'Mahesh', 'Nuwan', 'Saman', 'Pradeep', 'Asanka', 'Chathura', 'Kamal',
     'Sunil', 'Nimal', 'Janaka', 'Roshan', 'Suresh', 'Anura', 'Buddhika', 'Dinesh', 'Gayan', 'Harsha', 'Isuru', 'Jagath',
     'Kelum', 'Lahiru', 'Madushan', 'Nalin', 'Pasan', 'Rangana', 'Sampath', 'Thilak', 'Udara', 'Viraj', 'Wasantha',
-  ].map((name) => ({ username: name.toLowerCase(), displayName: name, role: 'driver', depot: 'Peliyagoda', outlet: null }) as const),
+  ].map((name, i) => ({ username: name.toLowerCase(), staffId: `D-${String(i + 3).padStart(3, '0')}`, displayName: name, role: 'driver', depot: 'Peliyagoda', outlet: null }) as const),
 ] as const;

@@ -7,7 +7,7 @@ import { dayHasChanged, followDay, followMessages, isLive, operationsKey, operat
 // A held older answer must never replace a newer one, and once the app clock passes the watched day's 16:00 the next
 // day is asked for at once, without a reload. The server is a stubbed fetch whose answers arrive when the test says.
 
-const ruwan: Me = { id: 'dispatcher-ruwan', username: 'ruwan', displayName: 'Ruwan', role: 'dispatcher', depotId: 'Peliyagoda', outletId: null };
+const ruwan: Me = { id: 'dispatcher-ruwan', username: 'ruwan', staffId: 'P-001', displayName: 'Ruwan', role: 'dispatcher', depotId: 'Peliyagoda', outletId: null };
 const THU_1600 = '2026-06-25T10:30:00.000Z';
 const FRI_1600 = '2026-06-26T10:30:00.000Z';
 

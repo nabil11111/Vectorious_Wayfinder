@@ -20,13 +20,14 @@ export const loadUser: RequestHandler = async (req, _res, next) => {
   const token = req.cookies?.[SESSION_COOKIE];
   if (!token) return next();
   const [row] = await db
-    .select({ id: users.id, username: users.username, displayName: users.displayName, role: users.role, depotId: users.depotId, outletId: users.outletId, active: users.active })
+    .select({ id: users.id, username: users.username, staffId: users.staffId, displayName: users.displayName, role: users.role, depotId: users.depotId, outletId: users.outletId, active: users.active })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.id, hashToken(token)), gt(sessions.expiresAt, new Date())));
-  if (row?.active) {
-    const { active: _a, ...me } = row;
-    req.user = me;
+  // An account with no staff ID, which only a row seeded before staff IDs can be, is signed out: the sign-in treats
+  // it as unknown too (spec 018).
+  if (row?.active && row.staffId !== null) {
+    req.user = { id: row.id, username: row.username, staffId: row.staffId, displayName: row.displayName, role: row.role, depotId: row.depotId, outletId: row.outletId };
   }
   next();
 };

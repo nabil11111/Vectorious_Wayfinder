@@ -7,6 +7,7 @@ import { createApp } from '../src/app';
 import { pool } from '../src/db/client';
 import { announce, closeStreams, type Announcement } from '../src/lib/live';
 import { address, serve, stop } from './serve';
+import { SIGN_IN, signInBody } from './sign-in';
 
 // config.ts reads the settings when it loads, so they are made small before anything imports it: a heartbeat
 // every 50 ms instead of every 20 seconds, and room for five streams instead of 200.
@@ -22,8 +23,8 @@ const base = address(server);
 const served: ServerResponse[] = [];
 server.on('request', (_req, res) => served.push(res));
 
-async function signIn(username: string, password = process.env.SEED_PASSWORD ?? 'wayfinder-demo'): Promise<string> {
-  const res = await fetch(`${base}/api/v1/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+async function signIn(username: string): Promise<string> {
+  const res = await fetch(`${base}${SIGN_IN}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(signInBody(username)) });
   if (!res.ok) throw new Error(`Could not sign in as ${username}: ${res.status} ${await res.text()}`);
   await res.body?.cancel();
   return res.headers.getSetCookie()[0]!.split(';')[0]!;
@@ -36,7 +37,7 @@ const cookies = {
   kasun: await signIn('kasun'), // loader at Peliyagoda
   dilshan: await signIn('dilshan'), // driver at Peliyagoda
   prasanna: await signIn('prasanna'), // driver at Kandy
-  admin: await signIn('admin', process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin'),
+  admin: await signIn('admin'),
 };
 type Person = keyof typeof cookies;
 

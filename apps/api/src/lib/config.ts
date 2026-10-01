@@ -6,8 +6,9 @@ const Env = z.object({
   PORT: z.coerce.number().int().default(3000),
   DATABASE_URL: z.string().url(),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
-  SEED_PASSWORD: z.string().min(8).default('wayfinder-demo'),
-  SEED_ADMIN_PASSWORD: z.string().min(8).default('wayfinder-admin'),
+  // The four-digit PIN of every demo account, and admin's own, so a hosted admin PIN can differ from the printed one.
+  SEED_PIN: z.string().regex(/^\d{4}$/, 'Four digits.').default('1234'),
+  SEED_ADMIN_PIN: z.string().regex(/^\d{4}$/, 'Four digits.').default('9024'),
   // How many proxies sit in front of the app. 0 when it is reached directly (compose), 1 on Railway.
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   // On, the app runs on its own clock and seeds one delivery day (spec 008). Off, it is the real clock and no

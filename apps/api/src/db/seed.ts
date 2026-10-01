@@ -1,13 +1,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hash } from '@node-rs/argon2';
 import { parse } from 'csv-parse/sync';
 import { sql } from 'drizzle-orm';
-import { config } from '../lib/config';
 import { logger } from '../lib/logger';
-import { moveAdminOffSharedPassword } from './admin-password';
 import { db, pool } from './client';
+import { seedDemoAccounts } from './demo-accounts';
 import { seedDemoDay } from './demo-day';
 import { DEMO_USERS, PRODUCTS } from './fixtures';
 import * as s from './schema';
@@ -95,19 +93,10 @@ await db.insert(s.serviceAllowance).values(read('service_allowance.csv').map((r)
 
 await db.insert(s.products).values(PRODUCTS.map((p) => ({ ...p }))).onConflictDoNothing();
 
-// Admin can do everything, so it does not share the password the demo accounts are handed out with.
-const passwordHash = await hash(config.SEED_PASSWORD);
-const adminPasswordHash = await hash(config.SEED_ADMIN_PASSWORD);
-await db.insert(s.users).values(DEMO_USERS.map((u) => ({
-  username: u.username,
-  displayName: u.displayName,
-  role: u.role,
-  passwordHash: u.role === 'admin' ? adminPasswordHash : passwordHash,
-  depotId: u.depot,
-  outletId: u.outlet,
-}))).onConflictDoNothing();
-
-if (await moveAdminOffSharedPassword()) logger.info('admin moved off the shared demo password');
+// Each demo account with its staff ID and PIN, and admin with a PIN of its own because it can do everything. A
+// database seeded before staff IDs gets them here once (spec 018).
+const accounts = await seedDemoAccounts();
+if (accounts.added || accounts.filled) logger.info(accounts, 'demo accounts given their staff IDs and PINs');
 
 // In demo mode: the app's clock, and the delivery day the walkthrough runs on. Written once (spec 008).
 if (await seedDemoDay()) logger.info('demo day written');

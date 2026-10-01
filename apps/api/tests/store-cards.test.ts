@@ -13,6 +13,7 @@ import { driverStop } from './driver-plan';
 import { resetDay, signIn, THU, WED } from './loading-plan';
 import { at, deliveredWalkthrough, HANDED_OVER, MORNING_DONE, receiptOf, shopScreen, type ReceiptWalk } from './receipt-plan';
 import { serve, stop } from './serve';
+import { PIN, signInAs } from './sign-in';
 
 // Spec 015, rule 11: what each of a shop's orders carries for its card, its delivery, receipt, problems and
 // replacement (AC-31 up to the receipt, AC-32), and a replacement read through its parts and left out of the next order.
@@ -40,15 +41,15 @@ const wellawatteShop = shopScreen(wellawatte);
 let originalClock: typeof demoDay.$inferSelect;
 
 // A store manager at Fresh Wellawatte, made here as spec 009's tests make theirs, and removed at the end.
-const MANAGER = { username: 'cards-test-wellawatte', password: 'a password for the cards test' };
+const MANAGER = { username: 'cards-test-wellawatte', staffId: 'S-921' };
 const removeManager = () => db.delete(users).where(eq(users.username, MANAGER.username));
 
 beforeAll(async () => {
   originalClock = (await db.select().from(demoDay))[0]!;
   await removeManager();
-  await db.insert(users).values({ username: MANAGER.username, displayName: 'Wellawatte manager', role: 'store_manager', outletId: 'OUT002', passwordHash: await hash(MANAGER.password) });
+  await db.insert(users).values({ ...MANAGER, displayName: 'Wellawatte manager', role: 'store_manager', outletId: 'OUT002', pinHash: await hash(PIN) });
   for (const [agent, username] of [[kasun, 'kasun'], [ruwan, 'ruwan'], [nadeesha, 'nadeesha'], [dilshan, 'dilshan']] as const) await signIn(agent, username);
-  expect((await wellawatte.post('/api/v1/auth/login').send({ username: MANAGER.username, password: MANAGER.password })).status).toBe(200);
+  expect((await signInAs(wellawatte, { staffId: MANAGER.staffId, pin: PIN })).status).toBe(200);
 });
 beforeEach(async () => {
   await resetDay();

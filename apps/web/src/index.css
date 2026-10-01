@@ -45,9 +45,15 @@
   --color-warn-tint: var(--warn-tint);
   --color-bad: var(--destructive);
   --color-bad-tint: var(--bad-tint);
+  --color-bad-ink: var(--bad-ink);
   --color-info: var(--info);
   --color-info-tint: var(--info-tint);
   --color-selected: var(--selected);
+  --color-mute: var(--mute);
+  --color-label: var(--label);
+  --color-ink-line: var(--ink-line);
+  --color-art-land: var(--art-land);
+  --color-art-served: var(--art-served);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -81,9 +87,15 @@
   --warn-ink: #8A6200;
   --warn-tint: #FDF4DC;
   --bad-tint: #FBE9E7;
+  --bad-ink: #AB3F2E;           /* an error line on white, such as a wrong staff ID or PIN */
   --info: #2E7DD7;
   --info-tint: #E9F2FC;
   --selected: #FFF4EA;
+  --mute: #9AA5B1;              /* quiet text and rings: placeholders, the tagline on ink, empty PIN dots */
+  --label: #465762;             /* a field's label above it */
+  --ink-line: #52606D;          /* a ring on the dark ink, such as the phone's language buttons */
+  --art-land: #34434F;          /* the sign-in artwork's districts */
+  --art-served: #138A7B;        /* the artwork's districts with shops in them */
   --radius: 0.75rem;
 }
 

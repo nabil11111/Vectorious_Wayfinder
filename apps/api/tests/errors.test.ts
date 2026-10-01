@@ -6,6 +6,7 @@ import { pool } from '../src/db/client';
 import { logger } from '../src/lib/logger';
 import { errorHandler } from '../src/middleware/errors';
 import { serve, stop } from './serve';
+import { SIGN_IN } from './sign-in';
 
 const server = await serve(createApp());
 afterAll(async () => {
@@ -19,8 +20,8 @@ const logged = (spy: { mock: { calls: unknown[][] } }) => JSON.stringify(spy.moc
 describe('error logging', () => {
   it('does not write a broken request body into the log', async () => {
     const spy = vi.spyOn(logger, 'error');
-    await request(server).post('/api/v1/auth/login').set('Content-Type', 'application/json').send('{"username":"ruwan","password":"hunter2"');
-    expect(logged(spy)).not.toContain('hunter2');
+    await request(server).post(SIGN_IN).set('Content-Type', 'application/json').send('{"staffId":"P-001","pin":"7391"');
+    expect(logged(spy)).not.toContain('7391');
   });
 
   it('logs an unexpected error without whatever else is attached to it', async () => {

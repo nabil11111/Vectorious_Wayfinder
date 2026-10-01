@@ -302,6 +302,16 @@ The driver's phone bell count remains deferred despite 013's earlier A7 promise.
 answer path, Undo, credit, write-off, warning message or replacement command in spec 016. Receipt behavior remains
 spec 015's; a driver-delivered quantity never stands in for a shop's confirmed receipt.
 
+**D-90 · 1 Oct · Sign in with a staff ID and a four-digit PIN, as designed.** Every account has a staff ID, a role
+letter and three digits (S shop, P dispatcher, L loader, D driver, A admin), and a PIN. The demo accounts share one
+PIN the README prints; admin has its own setting, so a hosted admin PIN can differ from the printed one. Five wrong
+PINs in a row lock a staff ID for 15 minutes on real time, because four digits are easy to try in turn; the address
+limit stays. This replaces the username and password we had listed as a departure (Nabil, 1 Oct, spec 018).
+
+**D-91 · 1 Oct · English only; the Sinhala and Tamil buttons show and say they come later.** Translating every
+screen is a big piece on the cut line. Showing the buttons keeps the sign-in page as designed without pretending the
+app speaks those languages (Nabil, 1 Oct).
+
 **D-92 · 1 Oct · The dashboard's map draws the live day, not the design's replay.** The frame drew February's
 training records at 07:30; that data never enters the repo, and a dispatcher needs today. The card keeps the
 frame's shapes, lines, arrows, labels and list, and takes its numbers from the operations read. Its view switch

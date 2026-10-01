@@ -3,19 +3,18 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { pool } from '../src/db/client';
 import { serve, stop } from './serve';
+import { signInAs } from './sign-in';
 
 const app = await serve(createApp());
-const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
-const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 afterAll(async () => {
   await stop(app);
   await pool.end();
 });
 
 // One address gets ten sign-ins in 15 minutes, so each account signs in once here and its cookie is reused.
-const signIn = async (username: string, pass = password) => {
+const signIn = async (username: string) => {
   const agent = request.agent(app);
-  await agent.post('/api/v1/auth/login').send({ username, password: pass });
+  await signInAs(agent, username);
   return agent;
 };
 type Asker = ReturnType<typeof request.agent>;
@@ -39,7 +38,7 @@ describe('the store endpoints', () => {
   });
 
   it('refuse an account with no shop, which is what an admin gets', async () => {
-    expect(await answers(await signIn('admin', adminPassword))).toEqual(Array(4).fill([403, 'no_outlet']));
+    expect(await answers(await signIn('admin'))).toEqual(Array(4).fill([403, 'no_outlet']));
   });
 
   it('let a store manager through both checks', async () => {

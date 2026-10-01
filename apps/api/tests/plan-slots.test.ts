@@ -11,6 +11,7 @@ import { demoDay, orderLines, orders, plans } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { serve, stop } from './serve';
+import { signInAs } from './sign-in';
 
 const testClock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async (original) => {
@@ -55,7 +56,7 @@ async function held() {
 
 beforeAll(async () => {
   originalClock = (await db.select().from(demoDay))[0]!;
-  expect((await as.post('/api/v1/auth/login').send({ username: 'ruwan', password: process.env.SEED_PASSWORD ?? 'wayfinder-demo' })).status).toBe(200);
+  expect((await signInAs(as, 'ruwan')).status).toBe(200);
 });
 beforeEach(async () => {
   await reset(); await initClock();

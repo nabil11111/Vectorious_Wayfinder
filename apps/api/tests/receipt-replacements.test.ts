@@ -14,6 +14,7 @@ import { answeredTrip, driverScreen, driverStop, driverTrip, driverWrite } from 
 import { answeredTruck, loaderScreen, resetDay, signIn, THU, truckOf, WED } from './loading-plan';
 import { at, deliveredWalkthrough, photo, receiptOf, shopScreen, type ReceiptWalk } from './receipt-plan';
 import { serve, stop } from './serve';
+import { PIN, signInAs } from './sign-in';
 
 // Spec 015, AC-28 to AC-30: a replacement in the plan. Split on Friday's board by hand (spec 010) or by the planner
 // (spec 014), and joined back, it stays a replacement of Thursday's delivery, out of the shop's next order, and the
@@ -43,8 +44,8 @@ let originalClock: typeof demoDay.$inferSelect;
 
 // Store managers at Fresh Wellawatte and at Fresh Mount Lavinia, a shop a truck can reach, made here as spec 009's
 // tests make theirs, and removed at the end.
-const MANAGER = { username: 'replacements-test-wellawatte', password: 'a password for the replacements test' };
-const TRUCK_SHOP = { username: 'replacements-test-mount-lavinia', password: 'a password for the replacements test', outletId: 'OUT006' };
+const MANAGER = { username: 'replacements-test-wellawatte', staffId: 'S-931' };
+const TRUCK_SHOP = { username: 'replacements-test-mount-lavinia', staffId: 'S-932', outletId: 'OUT006' };
 // The audit rows they wrote go with them, as the clock's and the reset's tests take theirs back. Run after a reset, so no
 // order of the day names them.
 async function removeManager() {
@@ -58,11 +59,11 @@ beforeAll(async () => {
   originalClock = (await db.select().from(demoDay))[0]!;
   await resetDay();
   await removeManager();
-  await db.insert(users).values({ username: MANAGER.username, displayName: 'Wellawatte manager', role: 'store_manager', outletId: 'OUT002', passwordHash: await hash(MANAGER.password) });
-  await db.insert(users).values({ username: TRUCK_SHOP.username, displayName: 'Mount Lavinia manager', role: 'store_manager', outletId: TRUCK_SHOP.outletId, passwordHash: await hash(TRUCK_SHOP.password) });
+  await db.insert(users).values({ ...MANAGER, displayName: 'Wellawatte manager', role: 'store_manager', outletId: 'OUT002', pinHash: await hash(PIN) });
+  await db.insert(users).values({ ...TRUCK_SHOP, displayName: 'Mount Lavinia manager', role: 'store_manager', pinHash: await hash(PIN) });
   for (const [agent, username] of [[kasun, 'kasun'], [ruwan, 'ruwan'], [nadeesha, 'nadeesha'], [dilshan, 'dilshan']] as const) await signIn(agent, username);
-  for (const [agent, { username, password }] of [[wellawatte, MANAGER], [mountLavinia, TRUCK_SHOP]] as const) {
-    const login = await agent.post('/api/v1/auth/login').send({ username, password });
+  for (const [agent, { staffId }] of [[wellawatte, MANAGER], [mountLavinia, TRUCK_SHOP]] as const) {
+    const login = await signInAs(agent, { staffId, pin: PIN });
     expect(login.status).toBe(200);
     agent.set(PHONE_ACCOUNT_HEADER, login.body.id);
   }

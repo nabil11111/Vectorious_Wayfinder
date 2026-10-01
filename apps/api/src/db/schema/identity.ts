@@ -1,13 +1,21 @@
-import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, pgTable, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { roleEnum } from './enums';
 import { depots, outlets } from './reference';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
+  // The fixtures' and the tests' handle for an account. Nobody signs in with it.
   username: text('username').notNull().unique(),
   displayName: text('display_name').notNull(),
   role: roleEnum('role').notNull(),
-  passwordHash: text('password_hash').notNull(),
+  // What a person signs in with (spec 018): a role letter, a dash and three digits, and a four-digit PIN, of which
+  // only the hash is kept. A row seeded before them has neither until the seed fills them in, and the sign-in treats
+  // a row without both as unknown.
+  staffId: text('staff_id').unique(),
+  pinHash: text('pin_hash'),
+  // Wrong PINs in a row, and when the lock the fifth one sets ends.
+  failedPins: smallint('failed_pins').notNull().default(0),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
   // A store manager belongs to one outlet; dispatchers, loaders and drivers to one depot.
   outletId: text('outlet_id').references(() => outlets.id),
   depotId: text('depot_id').references(() => depots.id),

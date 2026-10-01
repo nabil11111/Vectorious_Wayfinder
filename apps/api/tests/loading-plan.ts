@@ -9,6 +9,7 @@ import { db } from '../src/db/client';
 import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
 import { auditLog, issueLines, issues, orderLines, orders, plans, stopOrders, stops, trips, users } from '../src/db/schema';
 import { depotInstant } from '../src/lib/clock';
+import { signInAs } from './sign-in';
 
 // The day every loading test starts from (spec 012, plan.md "Test plan"). Nadeesha places her draft, and Ruwan sends
 // Thursday's plan through the endpoints of specs 009 and 010. Each test file mocks the clock itself, because a mock
@@ -17,8 +18,6 @@ import { depotInstant } from '../src/lib/clock';
 export type Agent = ReturnType<typeof request.agent>;
 export const WED = '2026-06-24';
 export const THU = '2026-06-25';
-export const PASSWORD = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
-export const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 
 export interface Walkthrough {
   nadeesha: Agent;
@@ -32,7 +31,7 @@ export const resetDay = () => db.transaction(async (tx) => { await clearDemoDay(
 
 // Signs the agent in and, as a phone does, names its own account on every write it saves first (spec 015).
 export async function signIn(agent: Agent, username: string): Promise<void> {
-  const res = await agent.post('/api/v1/auth/login').send({ username, password: username === 'admin' ? ADMIN_PASSWORD : PASSWORD });
+  const res = await signInAs(agent, username);
   expect(res.status).toBe(200);
   agent.set(PHONE_ACCOUNT_HEADER, res.body.id);
 }

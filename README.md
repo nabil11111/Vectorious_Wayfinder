@@ -48,6 +48,9 @@ npm run dev                  # API on :3000, web app on :5173
 npm test                     # needs the db running
 ```
 
+An install seeded before staff IDs and PINs gets them from the seed: after pulling, run
+`npm run db:migrate && npm run db:seed` once. `docker compose up` does both on every start.
+
 Changed the schema in `apps/api/src/db/schema`? Run `npm run db:generate` and commit the new file in
 `apps/api/drizzle` with it. CI fails if they disagree.
 
@@ -58,8 +61,8 @@ Every setting is in `.env.example`, and `docker compose up` works without a `.en
 | Variable | What it does |
 | --- | --- |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Database login used by compose |
-| `SEED_PASSWORD` | Password for the seeded demo accounts |
-| `SEED_ADMIN_PASSWORD` | Password for the seeded admin account |
+| `SEED_PIN` | Four-digit PIN of the seeded demo accounts |
+| `SEED_ADMIN_PIN` | Four-digit PIN of the seeded admin account |
 | `TRUST_PROXY` | Proxies in front of the app: `0` when reached directly, `1` on Railway |
 | `DEMO_MODE` | `true` runs the app on its own clock with the seeded delivery day. `false` uses the real clock and seeds no day |
 | `LIVE_HEARTBEAT_MS`, `LIVE_MAX_STREAMS` | The live stream to open screens: how often it sends a heartbeat, and how many streams may be open at once |
@@ -67,19 +70,18 @@ Every setting is in `.env.example`, and `docker compose up` works without a `.en
 
 ## Seeded accounts
 
-Password for the demo accounts: `wayfinder-demo` (`SEED_PASSWORD`). Admin has its own: `wayfinder-admin`
-(`SEED_ADMIN_PASSWORD`).
+PIN for the demo accounts: `1234` (`SEED_PIN`). Admin has its own: `9024` (`SEED_ADMIN_PIN`).
 
-| Role | Username | Where |
-| --- | --- | --- |
-| Store manager | `nadeesha` | Fresh Nugegoda (OUT001) |
-| Store manager | `ishara` | Style Liberty Plaza (OUT017) |
-| Store manager | `tharindu` | Tech Matara (OUT064) |
-| Dispatcher | `ruwan` | Peliyagoda depot |
-| Loader | `kasun` | Peliyagoda depot |
-| Driver | `dilshan` | Peliyagoda depot. 34 more drivers there, one per working vehicle (`chaminda`, `lasantha` and so on), for the plan board |
-| Driver | `prasanna` | Kandy depot |
-| Admin | `admin` | Everything |
+| Role | Staff ID | Name | Where |
+| --- | --- | --- | --- |
+| Store manager | `S-001` | Nadeesha | Fresh Nugegoda (OUT001) |
+| Store manager | `S-002` | Ishara | Style Liberty Plaza (OUT017) |
+| Store manager | `S-003` | Tharindu | Tech Matara (OUT064) |
+| Dispatcher | `P-001` | Ruwan | Peliyagoda depot |
+| Loader | `L-001` | Kasun | Peliyagoda depot |
+| Driver | `D-001` | Dilshan | Peliyagoda depot. 34 more drivers there, one per working vehicle (`D-003` Chaminda, `D-004` Lasantha and so on to `D-036` Wasantha), for the plan board |
+| Driver | `D-002` | Prasanna | Kandy depot |
+| Admin | `A-001` | Admin | Everything |
 
 ## Judge walkthrough
 
@@ -88,11 +90,11 @@ press **Reset the demo day** in the demo clock. Two browsers (or one normal and 
 one role's change reach another's screen within a second. Times depend on your pace, so the clock times below
 are what the demo clock shows.
 
-1. **The shop orders.** Sign in as `nadeesha` at Wed 24 Jun 15:00. Today shows her draft for Thu 25 Jun: 8
+1. **The shop orders.** Sign in as Nadeesha (`S-001`) at Wed 24 Jun 15:00. Today shows her draft for Thu 25 Jun: 8
    chilled and 4 dry cartons. Continue it, change a number if you like, and place both orders. The confirmation
    says orders for Thursday close at 16:00.
 2. **Orders close.** Open the demo clock in the top bar and move it to "Orders closed, 16:00".
-3. **The dispatcher plans.** Sign in as `ruwan` and open the Plan board: "Plan for Thu 25 Jun", 104 unplanned
+3. **The dispatcher plans.** Sign in as Ruwan (`P-001`) and open the Plan board: "Plan for Thu 25 Jun", 104 unplanned
    orders, 4 of them carried over from earlier plans (Fresh Dickwella, deferred twice, first), and 35 working
    trucks with 3 in the workshop. The seeded day is short of fridge trucks on purpose.
 4. **A trip.** On the Fresh · Colombo group press **Start a trip** and choose VEH035, the fridge van (Nugegoda
@@ -104,23 +106,23 @@ are what the demo clock shows.
    read, such as "No fridge truck was left for Colombo.", until nothing is unplanned.
 6. **Send.** Mark the trip done and open **View plan**: 5 of 104 orders on 1 trip, 99 deferred, checks all
    clear. Send the plan to loaders and drivers.
-7. **The shop sees it.** As `nadeesha`, Orders shows her three orders "Planned · Thu 25 Jun". **Back to edit**
+7. **The shop sees it.** As Nadeesha (`S-001`), Orders shows her three orders "Planned · Thu 25 Jun". **Back to edit**
    on View plan turns the plan into a draft again until loading starts, and her cards follow within a second.
 
-8. **Loading, last stop first.** Move the demo clock on to "Loading, Thu 02:30" and sign in as `kasun` on a phone (or
+8. **Loading, last stop first.** Move the demo clock on to "Loading, Thu 02:30" and sign in as Kasun (`L-001`) on a phone (or
    a narrow window). Today's trucks: VEH035 leaves 04:36, in 2 h 6 min, and "Goes in first" lists stop 2, Fresh
    Wellawatte (94 cartons), above stop 1, Fresh Nugegoda (24). Start loading, tick Wellawatte's two lines and press
    **Stop 2 loaded**: "94 /118" and "0.6 / 1.0 t · 3.5 / 7.0 m³".
 9. **A problem at the dock.** On Fresh Nugegoda press **Flag a problem**, pick the 4 dry cartons, keep Short, count 3,
    add a note and send it to the dispatcher. The dry line reads "1 short", and Mark ready waits for the answer.
-10. **The dispatcher answers.** As `ruwan`, the bell shows 1. Live day's "Needs you" holds the card "1 dry carton
+10. **The dispatcher answers.** As Ruwan (`P-001`), the bell shows 1. Live day's "Needs you" holds the card "1 dry carton
     short · Fresh Nugegoda · stop 1 · VEH035". Keep **Go short** and press **Send to loader**.
 11. **Ready.** On Kasun's phone the answer shows without a reload. Tick the chilled lines, press Stop 1 loaded and then
     **Mark ready**: "VEH035 is ready · 117 of 118 on · 1 short". Nadeesha's three orders now read "Loaded", and View plan
     no longer offers Back to edit.
 
 12. **The driver's trip.** Move the demo clock on to "Trucks leave, Thu 03:30". On a phone, or Chrome at 390 wide,
-    sign in as `dilshan`. Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda",
+    sign in as Dilshan (`D-001`). Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda",
     then "1 · Fresh Nugegoda · 23 of 24 cartons" and "2 · Fresh Wellawatte · 94 cartons". Press **Start trip**.
 13. **A delivery.** Next stop: "Stop 1 of 2 · Fresh Nugegoda", "Unload 23 cartons · 20 chilled · 3 dry" and the shop's
     note. Press **I've arrived**, count 12 and 8 chilled and 3 dry ("Loader flagged 1 carton short at the depot" sits
@@ -134,7 +136,7 @@ are what the demo clock shows.
     off: it opens on the same screen.
 15. **Back online.** Turn the network back on: within seconds "Back online · 1 stop sent · Wellawatte reached the depot",
     and the chip turns "Online".
-16. **The dispatcher answers.** As `ruwan`, the bell shows 1. Live day's card: "2 chilled cartons refused", "Fresh
+16. **The dispatcher answers.** As Ruwan (`P-001`), the bell shows 1. Live day's card: "2 chilled cartons refused", "Fresh
     Wellawatte · stop 2 · VEH035 · Dilshan · damaged, the shop took 46 of 48 chilled", with **Bring them back to
     Peliyagoda** chosen. Press **Send to driver**: "✓ Sent · VEH035 · 2 cartons back to Peliyagoda, Dilshan told".
 17. **Back at the depot.** On Dilshan's phone, without a reload: "Ruwan, dispatcher · Bring the 2 chilled cartons back to
@@ -148,7 +150,7 @@ are what the demo clock shows.
     delivered · photo" in its events, and after the refusal the Dashboard's **Decide** opens the problem's card on Live
     day, where "Send to driver" turns the truck's row to "Decided".
 
-19. **The shop confirms.** Move the demo clock on to "Delivered by 08:30". As `nadeesha` on a phone, Today shows her three
+19. **The shop confirms.** Move the demo clock on to "Delivered by 08:30". As Nadeesha (`S-001`) on a phone, Today shows her three
     Thursday orders "Delivered", the dry one "3 of 4 delivered · 1 short from the depot". Open **Deliveries**: "Confirm
     delivery", each line against what the driver handed over (12 and 8 chilled, 3 dry with "1 short from the depot"), and
     "Still cold on arrival?" with Yes. On the first card press − once: "1 carton missing", and "What's wrong?" with
@@ -156,7 +158,7 @@ are what the demo clock shows.
 20. **A receipt with no signal.** Turn the network off and press **Confirm delivery**: "Receipt saved on this phone",
     "Received 11 cartons · Missing 1 carton", "Saved at 08:30 · waiting to sync". Reload with the network still off: the
     same screen opens. Turn it back on: "Receipt sent to the depot" and "Sent at 08:31 · shortage unresolved".
-21. **The depot replaces it.** As `ruwan`, the bell shows 1. Live day: "1 chilled carton missing", "Shop · Nadeesha",
+21. **The depot replaces it.** As Ruwan (`P-001`), the bell shows 1. Live day: "1 chilled carton missing", "Shop · Nadeesha",
     "Received · 11 of 12 chilled cartons", "Cold on arrival · yes", with **Send 1 replacement on Fri 26 Jun** chosen.
     Press **Send to shop**: "✓ Sent · Fresh Nugegoda · 1 replacement on Fri 26 Jun, Nadeesha told".
 22. **The shop sees it.** On Nadeesha's phone, without a reload, the receipt says "replacement on Fri 26 Jun". Orders,
@@ -179,7 +181,7 @@ Press **Reset the demo day** first if you walked the one above.
 
 1. **Orders close.** Move the demo clock to "Orders closed, 16:00". Nadeesha's draft stays a draft, so 102 orders are
    due.
-2. **The empty board.** As `ruwan`, the Plan board shows "Unplanned · 102" with "Carried over · 4" (Fresh Dickwella,
+2. **The empty board.** As Ruwan (`P-001`), the Plan board shows "Unplanned · 102" with "Carried over · 4" (Fresh Dickwella,
    deferred twice, first), "0 / 35 trucks", "0 / 102 orders", "37% fuel this week" and "0 / 140.7 m³ fridge space".
    In the middle, "Build the suggested plan" in orange.
 3. **Build it.** Press it: "Building the plan · 102 orders · 35 trucks", then "Unplanned · 0", "Done · 27 trips",
@@ -202,9 +204,7 @@ Press **Reset the demo day** first if you walked the one above.
 
 Anything we built differently from our Designathon submission, and why.
 
-- **Sign in** uses a username and password where the design shows a staff ID and PIN. The seeded accounts are
-  easier to hand to a judge.
-- **No language choice yet.** Every screen is in English.
+- **Sinhala and Tamil come later.** The language buttons on the sign-in page show as designed and say so (D-91).
 - **The demo clock and its control are ours.** The design shows the time of day. The app keeps its own clock so
   a judge can walk a whole delivery day in minutes, and the control that moves it (and resets the day) exists
   only in demo mode.

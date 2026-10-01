@@ -11,11 +11,10 @@ import {
 import { clockState, depotDate, depotInstant, depotMinutes, initClock, realNow } from '../src/lib/clock';
 import * as live from '../src/lib/live';
 import { address, serve, stop } from './serve';
+import { signInAs } from './sign-in';
 
 const server = await serve(createApp());
 const base = address(server);
-const password = process.env.SEED_PASSWORD ?? 'wayfinder-demo';
-const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin';
 
 const MINUTE = 60_000;
 const WED = '2026-06-24';
@@ -38,7 +37,7 @@ const people = {} as Record<Role, { id: string; cookie: string }>;
 
 beforeAll(async () => {
   for (const role of ROLES) {
-    const res = await request(server).post('/api/v1/auth/login').send({ username: USERNAMES[role], password: role === 'admin' ? adminPassword : password });
+    const res = await signInAs(request(server), USERNAMES[role]);
     const cookie = res.get('Set-Cookie')?.[0]?.split(';')[0];
     if (!cookie) throw new Error(`${USERNAMES[role]} could not sign in: ${res.status}`);
     people[role] = { id: res.body.id, cookie };

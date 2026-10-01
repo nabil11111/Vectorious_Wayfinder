@@ -8,6 +8,7 @@ import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
 import { plans, orders, demoDay } from '../src/db/schema';
 import { depotInstant, initClock, realNow, setClockForTests } from '../src/lib/clock';
 import { serve, stop } from './serve';
+import { signInAs } from './sign-in';
 
 const testClock = vi.hoisted(() => ({ at: null as string | null }));
 vi.mock('../src/lib/clock', async (original) => {
@@ -30,8 +31,7 @@ beforeAll(async () => {
   freeze(depotInstant('2026-06-24', 960));
   for (const username of ['ruwan', 'nadeesha', 'ishara', 'kasun', 'dilshan', 'admin']) {
     const agent = request.agent(server);
-    const password = username === 'admin' ? process.env.SEED_ADMIN_PASSWORD ?? 'wayfinder-admin' : process.env.SEED_PASSWORD ?? 'wayfinder-demo';
-    expect((await agent.post('/api/v1/auth/login').send({ username, password })).status).toBe(200);
+    expect((await signInAs(agent, username)).status).toBe(200);
     actors.set(username, agent);
   }
 });
