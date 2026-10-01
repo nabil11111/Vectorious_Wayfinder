@@ -1,8 +1,8 @@
-import { MutationObserver, QueryClient, onlineManager } from '@tanstack/react-query';
+import { MutationObserver, QueryClient, QueryObserver, notifyManager, onlineManager } from '@tanstack/react-query';
 import type { Me } from '@wayfinder/contracts';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { meKey } from '@/features/auth/api';
+import { meKey, workingFor } from '@/features/auth/api';
 import { api, DEPOT_CHANGED, DEPOT_HEADER, nameDepot } from '@/lib/api';
 import { clockKey } from '@/lib/clock';
 import { useLive } from '@/lib/live';
@@ -202,13 +202,13 @@ it('D-95 only the newest read of the session applies: an answer a later read ove
   expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
 });
 
-it('D-95 a switch whose read of the session was overtaken leaves the depot to the newer read and shows no line, and the other tabs still hear of it', async () => {
+it('D-95 a switch whose read of the session was overtaken reads it again and takes what it finds, and says nothing', async () => {
   const tab = tabOf();
   inTab(tab);
   useDispatcherPage();
   // The switch answers Kandy, but its read of the session is slow; meanwhile another tab switched back, and a refusal
-  // starts a newer read that finds Peliyagoda.
-  sessionReads({ session: IN_KANDY, after: 40 }, { session: RUWAN, after: 0 });
+  // starts a newer read that finds Peliyagoda. The switch then reads the session again, and finds Peliyagoda too.
+  sessionReads({ session: IN_KANDY, after: 40 }, { session: RUWAN, after: 0 }, { session: RUWAN, after: 0 });
   const switched = switching(tab, 'Kandy');
   await later(5, null);
   window.dispatchEvent(new Event(DEPOT_CHANGED));
@@ -216,9 +216,8 @@ it('D-95 a switch whose read of the session was overtaken leaves the depot to th
   await later(10, null);
   expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
   expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
-  // The switch may have gone through, so the other tabs are told all the same (Q-12). The message names the account
-  // only: each tab reads the session, which is on Peliyagoda again, and changes nothing.
-  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  // The tab that switched the session back told the other tabs itself.
+  expect(Channel.sent).toEqual([]);
   expect(toast).not.toHaveBeenCalled();
 });
 
@@ -304,7 +303,7 @@ it('D-95 signing out retires the plan board\'s queue, and says nothing of change
   const tab = tabOf();
   inTab(tab);
   useDispatcherPage();
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   signOut(tab);
   expect(held.retired).toHaveBeenCalledWith(tab.qc);
   expect(toast).not.toHaveBeenCalled();
@@ -316,7 +315,7 @@ it('D-95 a switch made in another tab that drops plan changes not yet saved says
   inTab(there);
   useDispatcherPage();
   // The board on this tab still had changes waiting to be saved when another tab switched to Kandy.
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
   await followSwitch(there.qc, { id: 'u1' });
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
@@ -337,7 +336,7 @@ it('D-95 a switch that drops nothing says nothing, and this tab\'s own switch ne
   const here = tabOf();
   inTab(here);
   useDispatcherPage();
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   await switching(here, 'Kandy');
   // Its message to the other tab lands here too, which is on Kandy already.
   await later(10, null);
@@ -813,6 +812,26 @@ it('Q-12 a switch whose answer was lost, when a refused request\'s read took the
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
 });
 
+it('Q-12 a switch that failed, whose read of the session the account\'s own refresh overtook, still says it could not switch', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  // The server answers the switch 500 without switching. The switch's read of the session is slow, and the account's own
+  // refresh (the minute's, or the window's focus) lands meanwhile, still on Peliyagoda.
+  const sessionAfter = [40, 0];
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('/api/v1/me/depot')
+    ? Response.json({ error: { code: 'internal', message: 'Something went wrong on our side.' } }, { status: 500 })
+    : later(sessionAfter.shift() ?? 0, Response.json(RUWAN)))));
+  const switched = switching(tab, 'Kandy');
+  await later(5, null);
+  await tab.qc.fetchQuery({ queryKey: meKey, queryFn: async () => RUWAN });
+  await expect(switched).rejects.toMatchObject({ status: 500 });
+  expect(toast).toHaveBeenCalledWith(SWITCH_FAILED, expect.objectContaining({ id: 'depot-switch' }));
+  expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  expect(Channel.sent).toEqual([]);
+});
+
 // ── A plan change on its way as another tab switches (Q-13) ─────────────────────────────────────────────────────
 
 it('Q-13 a plan change on its way when another tab switches is waited for, and once the server kept it the tab follows and says nothing', async () => {
@@ -829,7 +848,7 @@ it('Q-13 a plan change on its way when another tab switches is waited for, and o
   expect(there.qc.getQueryData(meKey)).toEqual(RUWAN);
   // The save is answered: kept, so nothing is left unsaved.
   held.planWriting = false;
-  held.retired.mockReturnValue(false);
+  held.retired.mockReturnValue(null);
   await following;
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
   expect(held.retired).toHaveBeenCalledWith(there.qc);
@@ -848,11 +867,81 @@ it('Q-13 a plan change on its way that the server refused is said to be dropped,
   expect(toast).not.toHaveBeenCalled();
   // Refused: the session had moved first, so the change was not kept.
   held.planWriting = false;
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   await following;
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
   expect(toast).toHaveBeenCalledWith(PLAN_DROPPED, expect.objectContaining({ id: 'plan-dropped' }));
   expect(toast).toHaveBeenCalledTimes(1);
+});
+
+// Every depot the fetch was asked to name, in turn.
+const allNamed = (fetch: ReturnType<typeof vi.fn>) => fetch.mock.calls.map(([, init]) => ((init as RequestInit | undefined)?.headers as Record<string, string> | undefined)?.[DEPOT_HEADER]);
+
+it('Q-13 an account refresh that finds the session on another depot while a plan change is on its way leaves the tab all on its depot until the change is answered, then takes the new one at once', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  const fetch = vi.fn(async () => Response.json({}));
+  vi.stubGlobal('fetch', fetch);
+  // What the shell draws: the account as a page's query hears of it, a turn after each change, as React does.
+  const account = new QueryObserver<Me | null>(tab.qc, { queryKey: meKey, enabled: false });
+  const drawn: (string | null | undefined)[] = [];
+  const stopDrawing = account.subscribe(notifyManager.batchCalls(() => { drawn.push(account.getCurrentResult().data?.depotId); }));
+  held.planWriting = true;
+  // The account's own refresh (the minute's, or the window's focus) finds the session on Kandy: another tab switched.
+  await tab.qc.fetchQuery({ queryKey: meKey, queryFn: async () => IN_KANDY });
+  // Reads the page sends meanwhile, still on their way when the tab takes Kandy: the board's, and the account's own with
+  // an older answer.
+  const onTheirWay = Promise.all([
+    tab.qc.fetchQuery({ queryKey: ['plans', 'board'], queryFn: () => later(150, { depot: 'Peliyagoda', answered: 'after the switch' }) }),
+    tab.qc.fetchQuery({ queryKey: meKey, queryFn: () => later(150, RUWAN), staleTime: 0 }),
+  ]);
+  await api('/plans');
+  await later(30, null);
+  // While the change is out the tab is still all Peliyagoda: the account it draws, the reads it holds, the depot every
+  // request names, and the account and depot the board's queue works for, so the change's answer is still taken.
+  expect(drawn).not.toContain('Kandy');
+  expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  expect(workingFor(tab.qc)).toBe('u1 Peliyagoda');
+  expect(allNamed(fetch)).toEqual(['Peliyagoda']);
+  expect(held.retired).not.toHaveBeenCalled();
+  // The change is answered and was kept: the tab takes Kandy, every part of it together, and says nothing.
+  held.planWriting = false;
+  held.retired.mockReturnValue(null);
+  await later(100, null);
+  expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(drawn.at(-1)).toBe('Kandy');
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(held.retired).toHaveBeenCalledWith(tab.qc);
+  await api('/plans');
+  expect(allNamed(fetch)).toEqual(['Peliyagoda', 'Kandy']);
+  // Nothing older lands after it: the reads on their way were Peliyagoda's.
+  await onTheirWay;
+  await later(30, null);
+  expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(drawn.at(-1)).toBe('Kandy');
+  expect(toast).not.toHaveBeenCalled();
+  stopDrawing();
+});
+
+it('Q-13 a plan change whose save got no answer is never said to be dropped, even once its retry is turned down: the tab says it may not be kept', async () => {
+  const there = tabOf();
+  inTab(there);
+  useDispatcherPage();
+  // The save went out and the server kept it, but its answer was lost, and its retry is out as another tab switches.
+  held.planWriting = true;
+  serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+  const following = followSwitch(there.qc, { id: 'u1' });
+  await later(30, null);
+  // The retry is turned down, since the session left Peliyagoda: nothing is on its way, and the first save may stand.
+  held.planWriting = false;
+  held.retired.mockReturnValue('unsure');
+  await following;
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).toHaveBeenCalledWith(planUnsure('Peliyagoda'), expect.objectContaining({ id: 'plan-dropped' }));
+  expect(toast).not.toHaveBeenCalledWith(PLAN_DROPPED, expect.anything());
 });
 
 it('Q-13 a plan change still unanswered after the wait is never said to be dropped: the tab follows and says it may not be kept', async () => {
@@ -865,7 +954,7 @@ it('Q-13 a plan change still unanswered after the wait is never said to be dropp
     inTab(there);
     useDispatcherPage();
     held.planWriting = true;
-    held.retired.mockReturnValue(true);
+    held.retired.mockReturnValue('dropped');
     serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
     const following = followSwitch(there.qc, { id: 'u1' });
     await vi.advanceTimersByTimeAsync(PLAN_ANSWER_WAIT_MS - 100);
