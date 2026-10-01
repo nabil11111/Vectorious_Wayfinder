@@ -170,51 +170,68 @@ dispatcher must be able to ask why an order went where it did. The design's chip
 the suggestion are not built, because a deferral already carries its reason (spec 010, rule 7).
 
 ## Spec 017 picks
-D-43–79 belong to specs 013–016 and their reviews, including the entries already joined above. The entries below are picks for
-[017](specs/017-look-up-pages/spec.md), pending Nabil's answers to its open questions; they do not fill those gaps.
+D-43–79 belong to specs 013–016 and their reviews, including the entries already joined above. The entries below
+record [017](specs/017-look-up-pages/spec.md)'s picks, including the lead's review decisions; they do not fill those gaps.
 
 **D-80 · 1 Oct · The dispatcher's look-up pages only read what the earlier pieces record.** A8 remains the first
-piece cut if time runs short. Orders, History and Fleet add no business write or new kind of record. The exported
-six-week Book action hires reefers; neither that hire nor booking a vehicle off is included. The plan board,
-Live day, shop and admin retain their existing commands.
+piece cut if time runs short. Orders, History and Fleet add no business write or new kind of record. No forecast,
+hiring or workshop-booking command; planning, Live day, shop and admin retain their commands. T0 starts after 016
+is merged. Orders/Fleet require merged 013; History's confirmations and replacement answers additionally wait
+for merged 015, without blocking Orders or Fleet.
 
-**D-81 · 1 Oct · Orders is a wanted-date lookup with current status.** Day means the shop's wanted date; Last
-4 weeks means the 28 calendar dates ending on it. Count submitted leaf orders, not drafts or split parents.
-Show published deferrals and the latest sent-plan record separately, so returned goods do not acquire a promised
-new date. Real outlet/order identities replace the frame's example order numbers.
+**D-81 · 1 Oct · Orders lists a delivery day and starts on the board's day.** Include orders wanted that day,
+that day's published stops/deferrals, and before Send the board's eligible earlier orders. Mark wanted-earlier as
+Carried over. Count planned and deferred from that day's own plan, not current order status or a later plan.
+Count submitted leaves once, excluding private drafts and split parents. Last 4 weeks unions 28 delivery days,
+deduplicated by order id. One list includes detail; search/filters run in the browser. No detail endpoint,
+server-side search/filter/matched count or replacement ancestry. Thursday at README step 3 is 104, including
+four carried over; the manual send accounts for five planned and 99 deferred.
 
-**D-82 · 1 Oct · History shows retained sent-plan detail and recorded attempts without replay.** Open a published
-plan's date, use its kept schedule and read loading, driver outcomes, problems and shop confirmations. Each closed
-issue keeps its own counts, times and photo; its old arrival can come only from the audit matched to that existing
-stop, trip and issue/write id. Missing evidence is labelled. Deleted publication revisions, a full audit explorer
-and animated replay stay out, narrowing the earlier A8 promise explicitly.
+**D-82 · 1 Oct · History shows retained sent-plan detail and recorded attempts without replay.** Use the kept
+schedule and read loading, driver outcomes, problems and (after 015) shop confirmations/replacement answers.
+Each closed issue retains its own time, counts, photo and answer. Do not recover old arrivals from audit or borrow
+current stop times/receipts for earlier attempts. No legacy-trip state or check against plan.sent audit rows:
+no application path makes that case. Seeded publications with no trips still show their genuine deferrals.
+This explicitly narrows 013's A8 promise; deleted publication revisions and animated/full audit replay stay out.
 
 **D-83 · 1 Oct · History keeps orders, stops, attempts and shop confirmations separate.** Quantities say ordered,
 loaded, handed over or received, with null for missing evidence. Three orders confirmed at one stop are one shop
 confirmation, not three deliveries. Closed attempts never inherit later receipts. Returned means Return
 instructed, including refused goods answered Send replacements; it does not claim a depot return scan exists.
 
-**D-84 · 1 Oct · History reuses the scoped proof and problem-photo reads.** Share 016's stop-proof GET and 013's
-issue-photo GET, with depot authorization and JPEG private/no-store, no-sniff and same-origin headers. Lists carry
-metadata only. Open photos on demand and release them on close, reset or sign-out; no gallery table, public link,
-receipt signature or persistent browser photo cache.
+**D-84 · 1 Oct · A8 owns its missing proof read and reuses 013's problem-photo read.** T0 waits for 016 to merge;
+if it has no proof endpoint (the reviewed spec omits it), add the scoped GET in lookup/photo.ts through
+routes/lookup.ts, never in 016's files. Reuse an equivalent merged route unchanged if one exists. Keep 013's
+issue-photo GET, depot checks, existing JPEG/cache policy and Helmet headers; no separate header criterion.
+Lists carry metadata only. Open photos on demand and release on close/reset/sign-out, with no public link,
+synthetic receipt signature or persistent browser photo cache.
 
-**D-85 · 1 Oct · Fleet Today means the app's calendar date and reported trip state.** Out now includes any
-published out trip, even from an earlier date. Its driver/status takes precedence, then today's first unfinished
-trip, then its last returned trip. Not recorded out replaces the frame's physical At the depot claim. Workshop
-and archive are independent facts; archives remove active capacity but never erase historical trips.
+**D-85 · 1 Oct · Fleet Today uses reported trip state and an active-only header.** Out now includes a vehicle's
+published out trip even from an earlier date. Its driver/status takes precedence, then today's first unfinished
+trip, then its last returned trip. Not recorded out replaces physical At the depot. All header vehicle counts,
+including reefers, vans, Out now and workshop counts, use active vehicles only; archiving VEH003 yields 37 active,
+eight reefers and four vans. Its old trips, own fuel and any out trip remain readable in the archived row/detail.
 
-**D-86 · 1 Oct · Fleet fuel is recorded and committed litres.** Use that calendar date's ISO-week ledger once,
-including estimates already committed when plans were sent. Show quota minus that sum, with honest negative or
-unknown values and distinct recorded/remaining percentages. Count trips and planned km only from sent plans,
-not from legacy fuel rows. This is neither measured consumption nor a future fuel forecast.
+**D-86 · 1 Oct · Fleet fuel is recorded and committed litres.** Use the app calendar date's ISO-week ledger
+once, including estimates already committed on Send. Show quota minus that sum, with negative/unknown values and
+distinct recorded/remaining percentages. The header sums active vehicles and their quota; archived rows keep
+their own ledger. Count trips/planned km only from sent plans, never from unlinked fuel rows. No measured
+consumption or future fuel forecast is claimed.
 
-**D-87 · 1 Oct · Fleet next 6 weeks is 42 dates of recorded availability.** Today through today + 41 lists the
-current active inventory and recorded days off, in separate reefer, dry-truck and dry-van categories. Calendar
-operating/closed status is independent; missing dates stay unknown. No recorded day off does not promise an
-available trip or enough route capacity. No demand model, seasonal uplift, calendar extension or booking success.
+**D-87 · 1 Oct · Cut the entire Next 6 weeks view.** Hide its toggle. The two frames forecast demand and book
+hired reefers; these are not recorded facts. An availability substitute would show 38 of 42 dates outside the
+calendar ending 28 June. No forecast, hiring, availability route/view, calendar extension or Booked success.
+Fleet Today still reads its existing workshop rows. Record the two excluded frames as design departures.
 
-**D-88 · 1 Oct · Lookups keep full read access below 1024 wide.** Desktop tables/timeline and detail rail follow
-the frames; narrower screens use cards, labelled times and inline detail. Keep filters, photos and all 42 dates
-accessible without page-wide overflow. Reads use the existing live stream and refresh fallback; a failed refresh
-shows labelled last-loaded records, with no persistent offline lookup store or second phone queue.
+**D-88 · 1 Oct · Narrow lookups keep their tables in bounded scrolling boxes.** At 1024 and wider retain the
+frames' table/timeline and detail rail. Below 1024 the detail stacks below the table, which scrolls in its own
+box without page-wide sideways scroll. No custom card layout; phone-first is required for driver and loader.
+Keep filters/photos keyboard-accessible. Use the existing stream/fallback, labelled stale records on refresh
+failure and no persistent offline lookup store. Join checks use the built app in Nabil's visible Chrome.
+
+**D-89 · 1 Oct · Skipped lately counts shops left out of published plans.** Keep the small panel drawn in the
+Orders frame. Read published deferrals in the 28 dates ending on the selected delivery day; count one skip per
+shop per plan even with several orders/parts. Show count, latest date and that plan's distinct recorded reasons,
+sorted by count descending, latest date descending, shop name/id. Later delivery does not erase a skip; a
+withdrawn plan contributes nothing until sent again. Fresh seed gives four shops/five skips: Dickwella twice,
+Nugegoda, Ragama and Unawatuna once each. Table filters do not change the panel. No priority write or forecast.

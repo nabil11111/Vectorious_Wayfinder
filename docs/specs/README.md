@@ -67,4 +67,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [011](011-planner/spec.md) | The planner: the suggested plan's engine | Done |
 | [012](012-loading/spec.md) | Loading: the loader loads and flags, the dispatcher answers | Done |
 | [014](014-suggested-plan/spec.md) | The suggested plan on the board: build it, explain it, decide and send | Done |
-| [017](017-look-up-pages/spec.md) | The dispatcher's look-up pages: Orders, History, Fleet and next 6 weeks | Spec |
+| [017](017-look-up-pages/spec.md) | The dispatcher's look-up pages: Orders, History and Fleet Today | Spec |
