@@ -53,11 +53,13 @@ afterAll(async () => {
 
 it('AC-1 reads the depot day before any send, before the cutoff and after the calendar without writing', async () => {
   const before = await heldDriverRows();
-  expect(await driver.read()).toEqual({ depot: 'Peliyagoda', driver: 'Dilshan', day: THU, planSent: false, appliedWriteIds: [], trips: [] });
+  const [dilshan] = await db.select({ id: users.id }).from(users).where(eq(users.username, 'dilshan'));
+  const driverId = dilshan!.id;
+  expect(await driver.read()).toEqual({ depot: 'Peliyagoda', driver: 'Dilshan', driverId, day: THU, planSent: false, appliedWriteIds: [], trips: [] });
   freeze(WED, 15 * 60 + 59);
-  expect(await driver.read()).toEqual({ depot: 'Peliyagoda', driver: 'Dilshan', day: WED, planSent: true, appliedWriteIds: [], trips: [] });
+  expect(await driver.read()).toEqual({ depot: 'Peliyagoda', driver: 'Dilshan', driverId, day: WED, planSent: true, appliedWriteIds: [], trips: [] });
   freeze('2026-06-27', 16 * 60);
-  expect(await driver.read()).toEqual({ depot: 'Peliyagoda', driver: 'Dilshan', day: null, planSent: false, appliedWriteIds: [], trips: [] });
+  expect(await driver.read()).toEqual({ depot: 'Peliyagoda', driver: 'Dilshan', driverId, day: null, planSent: false, appliedWriteIds: [], trips: [] });
   expect(await heldDriverRows()).toEqual(before);
 });
 
