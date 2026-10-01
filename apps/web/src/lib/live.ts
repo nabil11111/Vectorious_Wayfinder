@@ -59,6 +59,8 @@ export function useLive() {
           }
           if (['plans', 'loading', 'driver', 'orders', 'issues'].includes(topic)) {
             void qc.invalidateQueries({ queryKey: ['operations'] });
+            // The bell's updates are read from the same records (spec 025), so its read is fetched again too.
+            void qc.invalidateQueries({ queryKey: ['notifications'] });
           }
           // A driver's record moves a problem's card too: "Still on VEH057 · 39 cartons · 1 stop left" follows the
           // trip on Live day and the Dashboard, to "no stops left" once the last stop is done (Q-28).

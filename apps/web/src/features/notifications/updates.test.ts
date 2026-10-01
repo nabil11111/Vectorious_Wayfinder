@@ -85,7 +85,9 @@ class Alert {
   static shown: Alert[] = [];
   onclick: (() => void) | null = null;
   close = vi.fn();
-  constructor(readonly title: string, readonly options: NotificationOptions) { Alert.shown.push(this); }
+  readonly title: string;
+  readonly options: NotificationOptions;
+  constructor(title: string, options: NotificationOptions) { this.title = title; this.options = options; Alert.shown.push(this); }
 }
 function browser(permission: NotificationPermission, hidden: boolean) {
   Alert.permission = permission;

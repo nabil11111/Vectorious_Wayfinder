@@ -1,11 +1,12 @@
-import type { Notification } from '@wayfinder/contracts';
+import type { Notification as Update } from '@wayfinder/contracts';
 
 // The system notification for a tab in the background (spec 025, AC-3). The app never asks for it on its own: only the
 // pop-up's button asks, and a refusal is the browser's to undo, so the button then says where.
 
 export type AlertsState = 'unsupported' | 'ask' | 'on' | 'blocked';
 
-const api = () => (typeof Notification === 'undefined' ? null : Notification);
+// The browser's own Notification, which an update's type of the same name would hide.
+const api = () => (typeof globalThis.Notification === 'undefined' ? null : globalThis.Notification);
 
 export function alertsState(): AlertsState {
   const browser = api();
@@ -31,7 +32,7 @@ export async function askForAlerts(): Promise<AlertsState> {
 
 // One update as a system alert, when the tab is hidden and alerts are on. Its tag is the update's id, so two tabs show it
 // once. A press brings the tab forward at the update's place. Says whether it showed.
-export function alertInBackground(item: Notification, open: (link: string) => void): boolean {
+export function alertInBackground(item: Update, open: (link: string) => void): boolean {
   const browser = api();
   if (!browser || browser.permission !== 'granted' || document.visibilityState !== 'hidden') return false;
   const alert = new browser('Wayfinder', { body: item.line, tag: item.id });

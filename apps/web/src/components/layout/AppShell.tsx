@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router';
 import type { Role } from '@wayfinder/contracts';
-import alertIcon from '@/assets/icons/icon-alert.png';
 import dispatcherIcon from '@/assets/icons/icon-person-dispatcher.png';
 import driverIcon from '@/assets/icons/icon-person-driver.png';
 import loaderIcon from '@/assets/icons/icon-person-loader.png';
@@ -9,6 +8,7 @@ import storeManagerIcon from '@/assets/icons/icon-person-store-manager.png';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { ROLE_LABEL, useLogout, useMe } from '@/features/auth/api';
+import { NotificationBell } from '@/features/notifications/Bell';
 import { useAppClock } from '@/lib/clock';
 import { useLive } from '@/lib/live';
 import { cn } from '@/lib/utils';
@@ -29,7 +29,7 @@ const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatch
 // turns its columns into tabs at the same width. Loader and driver pass no nav at all.
 // bar is a page's own control in the top bar, such as the dispatcher's depot switch (spec 010). wide lets a page use
 // the full width of a large screen, such as the plan board's three columns. bell replaces the plain bell with one that
-// counts, such as the dispatcher's open problems (spec 012).
+// keeps a role's own link at the foot of its pop-up, such as the dispatcher's "Open Live day" (spec 025).
 export function AppShell({ nav = [], place, bar, bell, status, wide = false, children }: { nav?: NavItem[]; place?: string; bar?: ReactNode; bell?: ReactNode; status?: ReactNode; wide?: boolean; children: ReactNode }) {
   const { data: me } = useMe();
   const logout = useLogout();
@@ -63,9 +63,8 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
         <span className="hidden font-mono text-lg font-bold tabular-nums lg:inline">{clock.time}</span>
         {status && <span className="hidden lg:inline-flex">{status}</span>}
         <DemoClock clock={clock} as="panel" className="hidden lg:inline-flex" />
-        {/* The design's bell, last on a phone. A count never goes into the picture: it will sit over the corner as a
-            small badge. */}
-        {bell ?? <button type="button" aria-label="Notifications" className="shrink-0 rounded-full p-1 hover:bg-muted max-lg:order-last"><img src={alertIcon} alt="" className="size-7" /></button>}
+        {/* The design's bell, last on a phone, with its red count over the corner: every role's updates (spec 025). */}
+        {bell ?? <NotificationBell />}
         {/* The frames draw no sign-out in the bar, so it sits behind the avatar. */}
         <Popover open={menu} onOpenChange={setMenu}>
           <PopoverTrigger aria-label={me.displayName} className="flex shrink-0 items-center gap-2.5 rounded-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
