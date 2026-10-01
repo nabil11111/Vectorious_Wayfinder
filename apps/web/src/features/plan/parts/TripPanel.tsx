@@ -3,10 +3,11 @@ import type { BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard,
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { splitOrder, type BoardScreen, type Undo } from '../board';
-import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setDriver, setLeaveAt, takeOff, tripOf } from '../draft';
+import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeOff, tripOf } from '../draft';
 import { countOf, figure, hhmm, litres, orderAmount, ordersAmount, vehicleSize } from '../words';
 import { DeferForm } from './DeferForm';
 import { DriverMenu } from './DriverMenu';
+import { driverChange } from './drivers';
 import { vehicleIcon } from './icons';
 import { LeaveField } from './LeaveField';
 import type { BoardIndex } from './lookup';
@@ -62,6 +63,11 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
     change(defer(draft, deferrals));
     setForm(null);
   };
+  // One change of the draft, with Undo when the driver came from another vehicle and the two swapped (spec 022).
+  const chooseDriver = (driverId: string | null) => {
+    const chosen = driverChange(draft, key, trip.vehicleId, driverId);
+    change(chosen.plan, chosen.undo);
+  };
 
   return (
     <div className="flex min-h-full flex-col">
@@ -70,7 +76,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
         <div className="min-w-0 flex-1 basis-56">
           <h2 className="text-base leading-5 font-bold">
             Planning · {trip.vehicleId} ·{' '}
-            <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={(driverId) => change(setDriver(draft, trip.vehicleId, driverId))} />
+            <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={chooseDriver} />
           </h2>
           <p className="mt-1 text-xs leading-[15px] text-muted-foreground">{vehicle ? `${vehicleSize(vehicle)} · ` : ''}trip {trip.tripNo} of 2</p>
         </div>

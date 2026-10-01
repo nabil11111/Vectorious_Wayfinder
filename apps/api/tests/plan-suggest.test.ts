@@ -312,6 +312,22 @@ it('spec 022 AC-3 gives every truck of the built plan its own driver of the depo
   expect(driversOf()).toEqual(drivers);
 });
 
+it('spec 022 AC-5 saves the driver menu\'s swap as one change: Dilshan on VEH035, and his truck takes VEH035\'s driver', async () => {
+  answered(await build());
+  const before = driversOf();
+  const vehicleId = [...before].find(([, list]) => list[0] === dilshanId)![0];
+  const was = before.get('VEH035')![0]!;
+  expect(vehicleId).not.toBe('VEH035');
+  answered(await save(dilshanOnVeh035()));
+  expect(board.plan.revision).toBe(2);
+  const after = driversOf();
+  expect(after.get('VEH035')!.every((id) => id === dilshanId)).toBe(true);
+  expect(after.get(vehicleId)!.every((id) => id === was)).toBe(true);
+  // Every other truck keeps its driver, and nobody drives two.
+  expect([...after].filter(([id]) => id !== 'VEH035' && id !== vehicleId)).toEqual([...before].filter(([id]) => id !== 'VEH035' && id !== vehicleId));
+  expect(board.counts!.drivers).toBe(26);
+});
+
 // ── Refusals and what a build tells ──────────────────────────────────────────────────────────────────────────────
 
 it('AC-7 refuses a build or an accept without a session, to another role and to an admin', async () => {
