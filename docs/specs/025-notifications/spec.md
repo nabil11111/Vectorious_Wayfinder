@@ -42,6 +42,17 @@ The loader's opens the plan's changes. The shop's and the driver's bells do noth
     - Their trip sent and changed.
     - Their truck ready.
     - The dispatcher's answer to their problem.
+- **The driver's answers, glanceable** (Nabil, 1 Oct: a driver "sees everything in text ... in case he's driving,
+  that's not a good way to show it"; he chose a glanceable card that is "dismissible ... auto-dismiss ... should just
+  pop open and go away").
+  - When the dispatcher's answer to a driver's problem arrives, it pops up as a large card over the driver's screen:
+    the design's icon for the answer, three words with the count in large type ("↩ Bring back · 3 chilled", "↻ Try
+    again · Fresh Nugegoda", "✓ Go short"), and under it, small, "Ruwan · 03:38" and the full sentence.
+  - It closes with a tap or a swipe and goes away by itself after 8 seconds.
+  - After it goes, the trip's top line keeps only the short form (icon and three words), not the full sentence. The
+    full sentence stays in the bell's pop-up and on the stop's own screen.
+  - Each answer kind has its short form, written once beside the answer's words, so the card, the top line and the
+    bell's row agree.
 - **Read state** is kept in the browser per account: the newest time the person has seen. A new device starts with
   the day's updates unread.
 
@@ -72,6 +83,9 @@ The loader's opens the plan's changes. The shop's and the driver's bells do noth
   and link, "Mark all read", and the role's own foot link.
 - [ ] AC-3 A new update shall show once as a toast with its link. When the tab is hidden and the browser allows it,
   it shall show as a system notification. The permission is asked only from the pop-up's own button.
+- [ ] AC-3b When the dispatcher's answer to a driver's problem arrives, the driver's screen shall pop up the glanceable
+  card (icon, three words with the count, then the time and the full sentence small). It shall close on a tap or swipe
+  and by itself after 8 seconds, and leave only the short form in the trip's top line.
 - [ ] AC-4 On the seeded day, each walkthrough person (Nadeesha, Ruwan, Kasun, Dilshan) shall see their updates by
   the lists above after each walkthrough step, pinned by tests.
 - [ ] AC-5 The README shall describe the bell and the pop-up in the walkthrough and list the pop-up under
