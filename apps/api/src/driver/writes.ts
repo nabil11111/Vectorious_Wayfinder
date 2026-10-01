@@ -7,7 +7,7 @@ import { lockDay, lockDepotDay } from '../lib/day-lock';
 import { HttpError } from '../lib/errors';
 import { announce, type Announcement } from '../lib/live';
 import type { DepotCaller } from '../middleware/auth';
-import { driverDayOf, driverTripsOf } from './day';
+import { driverTripsOf, getDriverDay } from './day';
 import { keptTime } from './kept-time';
 import { jpegOf } from './photo';
 
@@ -21,10 +21,10 @@ function ordered(value: unknown): unknown {
   return value;
 }
 
-// The day, depot (starts only), then trip are locked in that order. All six writes use the same clock and
-// answer from inside their transaction; nobody hears an announcement until that transaction commits.
+// The day, depot (starts only), then trip are locked in that order. All six writes use the same clock.
+// After commit, announce and read the answer in one snapshot so other trips cannot be read half changed.
 export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promise<DriverDay> {
-  const result = await db.transaction(async tx => {
+  const told = await db.transaction(async tx => {
     const locked = write.kind === 'start' ? await lockDepotDay(tx, caller.depotId) : await lockDay(tx);
     if (!locked) throw unknown(caller.depotId, 'This account\'s depot is not on the list.');
     const [row] = await tx.select({ trip: trips, plan: plans }).from(trips).innerJoin(plans, eq(plans.id, trips.planId))
@@ -50,7 +50,7 @@ export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promi
         throw new HttpError(409, 'write_reused', 'This record was already sent with other details.', { writeId: write.writeId });
       }
       await tx.update(driverWrites).set({ answeredAt: sql`now()` }).where(eq(driverWrites.id, write.writeId));
-      return { day: await driverDayOf(tx, caller, moment.at), told: [] };
+      return [];
     }
     if (write.revision !== (stop ? stop.revision : trip.revision)) {
       throw new HttpError(409, 'stale', `${stop ? stop.shopName : trip.vehicleId} was changed on another phone.`);
@@ -123,8 +123,8 @@ export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promi
     await tx.insert(auditLog).values({ actorId: caller.userId, action, entity: stop ? 'stop' : 'trip', entityId: stop?.id ?? trip.id,
       before: stop ? { revision: stop.revision, arrivedAt: stop.arrivedAt, outcome: stop.outcome } : { revision: trip.revision, status: trip.status },
       after: { writeId: write.writeId, tripId: trip.id, revision: write.revision + 1, claimedAt: write.at, keptAt: at.toISOString() } });
-    return { day: await driverDayOf(tx, caller, moment.at), told };
+    return told;
   });
-  for (const change of result.told) announce(change);
-  return result.day;
+  for (const change of told) announce(change);
+  return getDriverDay(caller);
 }

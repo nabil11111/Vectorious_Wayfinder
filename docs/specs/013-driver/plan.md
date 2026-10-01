@@ -109,8 +109,10 @@ table's lock first):
 6. The time kept is `keptTime(at, last, now)`, `last` being the trip's `last_event_at`, or its `ready_at` before the first
    write.
 7. The kind's work, its record's revision up by one, `last_event_at` set to the time kept, the `driver_writes` row with the
-   caller, trip, kind and hash, and the audit row with the phone's time and the time kept. Answer `driverDayOf` from
-   inside the transaction, and announce after the commit.
+   caller, trip, kind and hash, and the audit row with the phone's time and the time kept. After the transaction commits,
+   announce and answer both new writes and replays with `getDriverDay(caller)`, using the GET's repeatable-read snapshot
+   so concurrent changes to other trips cannot mix old stops with new problems. The locked trip's checks stay inside
+   the write transaction.
 
 A kind's checks run in the order written, so a write at a stop already done gets `stop_done`, never `not_next`: a done
 stop is never the next one.

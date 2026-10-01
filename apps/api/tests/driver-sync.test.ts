@@ -1,15 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { phoneView, type DriverDay, type DriverWrite, type DriverWriteKind } from '@wayfinder/contracts';
-import { and, eq, sql } from 'drizzle-orm';
+import { IssueList, phoneView, type DriverDay, type DriverWrite, type DriverWriteKind } from '@wayfinder/contracts';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool, type Tx } from '../src/db/client';
 import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
-import { auditLog, demoDay, driverWrites, issueLines, issues, orderLines, orders, photos, plans, stops, trips, users } from '../src/db/schema';
+import { auditLog, demoDay, driverWrites, issueLines, issues, orderLines, orders, photos, plans, stopOrders, stops, trips, users } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
-import { answeredDay, driverScreen, driverStop, driverTrip, driverWrite, heldDriverRows, readyWalkthrough } from './driver-plan';
+import { answeredDay, answeredTrip, driverScreen, driverStop, driverTrip, driverWrite, heldDriverRows, readyWalkthrough } from './driver-plan';
 import { code, resetDay, signIn, THU, WED, type Walkthrough } from './loading-plan';
 import { serve, stop } from './serve';
 
@@ -19,6 +19,19 @@ vi.mock('../src/lib/clock', async (original) => {
   return { ...clock, demoClockAt: (...args: Parameters<typeof clock.demoClockAt>) => ({ ...clock.demoClockAt(...args), now: testClock.at || clock.demoClockAt(...args).now }) };
 });
 vi.mock('../src/lib/live', async (original) => ({ ...await original<typeof import('../src/lib/live')>(), announce: vi.fn() }));
+// Pause the full answer after its stops were read, before its problems are read. The first call belongs
+// to validation under the written trip's lock; the second belongs to the answer across all owned trips.
+const answerRead = vi.hoisted(() => ({ countdown: -1, paused: false, release: Promise.resolve() }));
+vi.mock('../src/issues/read', async (original) => {
+  const read = await original<typeof import('../src/issues/read')>();
+  return { ...read, issuesOf: async (...args: Parameters<typeof read.issuesOf>) => {
+    if (answerRead.countdown >= 0 && answerRead.countdown-- === 0) {
+      answerRead.paused = true;
+      await answerRead.release;
+    }
+    return read.issuesOf(...args);
+  } };
+});
 const at = (minute: number) => depotInstant(THU, minute).toISOString();
 const setInstant = (instant: string) => { testClock.at = instant; setClockForTests(new Date(instant)); };
 const freeze = (date: string, minute: number) => setInstant(depotInstant(date, minute).toISOString());
@@ -55,6 +68,8 @@ beforeEach(async () => {
   await initClock();
   freeze(WED, 16 * 60);
   vi.mocked(announce).mockReset();
+  answerRead.countdown = -1;
+  answerRead.paused = false;
 });
 afterAll(async () => {
   await resetDay();
@@ -139,6 +154,64 @@ it('AC-22 answers a repeated start with the day as it is after a later arrival',
   const before = await durableRows();
   expect(answeredDay(await driver.send(write))).toEqual(day);
   expect(await durableRows()).toEqual(before);
+});
+
+it.each(['new', 'replayed'] as const)('AC-22 answers a %s write from one snapshot after commit while another trip is sent back', async mode => {
+  await ready({ withVeh004: true });
+  // Another owned trip is still out. Its seeded Gampaha and Kandana loads are kept whole.
+  const dilshanId = (await db.select().from(users).where(eq(users.username, 'dilshan')))[0]!.id;
+  const [second] = await db.update(trips).set({ driverId: dilshanId, status: 'ready', readyAt: new Date(at(150)) })
+    .where(eq(trips.vehicleId, 'VEH004')).returning();
+  const assigned = await db.select().from(stopOrders).innerJoin(stops, eq(stops.id, stopOrders.stopId)).where(eq(stops.tripId, second!.id));
+  const ids = assigned.map(row => row.stop_orders.orderId);
+  await db.update(orders).set({ status: 'loaded' }).where(inArray(orders.id, ids));
+  await db.update(orderLines).set({ loadedQty: sql`${orderLines.quantity}` }).where(inArray(orderLines.orderId, ids));
+  await db.update(stops).set({ loadedAt: new Date(at(149)) }).where(eq(stops.tripId, second!.id));
+  let other = driverTrip(await driver.read(), 'VEH004');
+  expect(other.stops.map(stop => stop.lines.reduce((sum, line) => sum + line.loaded!, 0))).toEqual([111, 99]);
+  for (const [kind, minute, seq] of [['start', 205, undefined], ['arrive', 206, 1], ['closed', 207, 1]] as const) {
+    freeze(THU, minute);
+    other = answeredTrip(await driver.send(driverWrite(other, kind, at(minute), seq)), 'VEH004');
+  }
+  const day = await apply(await driver.read(), 'start', 211);
+  const trip = driverTrip(day);
+  const problem = IssueList.parse((await ruwan.get('/api/v1/issues')).body).issues
+    .find(problem => problem.kind === 'closed' && problem.trip.id === other.tripId)!;
+  freeze(THU, 214);
+  const arrival = driverWrite(trip, 'arrive', at(214), 1);
+  if (mode === 'replayed') answeredDay(await driver.send(arrival));
+  vi.mocked(announce).mockClear();
+
+  let release!: () => void;
+  answerRead.release = new Promise<void>(resolve => { release = resolve; });
+  answerRead.countdown = 1;
+  const writing = driver.send(arrival).then(res => res);
+  let committedStop: typeof stops.$inferSelect | undefined;
+  let announcements = 0;
+  try {
+    await vi.waitFor(() => expect(answerRead.paused).toBe(true));
+    committedStop = (await db.select().from(stops).where(eq(stops.id, driverStop(trip, 1).id)))[0];
+    announcements = vi.mocked(announce).mock.calls.length;
+    const answer = await ruwan.post(`/api/v1/issues/${problem.id}/decide`).send({ revision: problem.revision, decision: 'try_again' });
+    expect(answer.status).toBe(200);
+  } finally {
+    release();
+    await writing;
+  }
+  const result = answeredDay(await writing);
+  expect(committedStop?.arrivedAt).toEqual(new Date(at(214)));
+  expect(announcements).toBe(mode === 'new' ? 1 : 0);
+  expect(driverStop(driverTrip(result), 1).arrivedAt).toBe(at(214));
+  expect(result.appliedWriteIds.filter(id => id === arrival.writeId)).toEqual([arrival.writeId]);
+  expect(await auditsOf(driverStop(trip, 1).id, 'stop.arrived')).toHaveLength(1);
+  expect(await db.select().from(driverWrites).where(eq(driverWrites.id, arrival.writeId))).toHaveLength(1);
+  // This answer consistently predates the concurrent retry; the next read sees it committed.
+  const beforeRetry = driverTrip(result, 'VEH004');
+  expect(driverStop(beforeRetry, 1).outcome).toBe('closed');
+  expect(beforeRetry.problems.find(item => item.id === problem.id)?.decision).toBeNull();
+  const afterRetry = driverTrip(await driver.read(), 'VEH004');
+  expect(driverStop(afterRetry, 1).outcome).toBeNull();
+  expect(afterRetry.problems.find(item => item.id === problem.id)?.decision).toBe('try_again');
 });
 
 it('AC-23 binds an id to its time, stop, kind and trip, without applying the changed records', async () => {
