@@ -6,7 +6,7 @@ import { meKey } from '@/features/auth/api';
 import { api, DEPOT_CHANGED, DEPOT_HEADER, nameDepot } from '@/lib/api';
 import { clockKey } from '@/lib/clock';
 import { useLive } from '@/lib/live';
-import { PLAN_DROPPED, SWITCH_FAILED, followSwitch, switchDepotMutation, switchTo, useFollowSwitches } from './depots';
+import { PLAN_ANSWER_WAIT_MS, PLAN_DROPPED, SWITCH_FAILED, followSwitch, planUnsure, switchDepotMutation, switchTo, useFollowSwitches } from './depots';
 
 // The depot switch away from its buttons (spec 020, AC-6): what a switch does to the reads on screen, the account and
 // the live stream, in this tab and in another tab of the same session, and what a switch that fails does. A tab here is
@@ -725,4 +725,71 @@ it('AC-7 a tab on one depot follows a switch to Both made in another tab, and th
   await followSwitch(back.qc, { id: 'u1' });
   expect(back.qc.getQueryData(meKey)).toEqual(RUWAN);
   expect(cached(back.qc)).toEqual(['["clock"]', '["me"]']);
+});
+
+// ── A plan change on its way as another tab switches (Q-13) ─────────────────────────────────────────────────────
+
+it('Q-13 a plan change on its way when another tab switches is waited for, and once the server kept it the tab follows and says nothing', async () => {
+  const there = tabOf();
+  inTab(there);
+  useDispatcherPage();
+  // The board's save went out a moment before the other tab's switch reached the server.
+  held.planWriting = true;
+  serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+  const following = followSwitch(there.qc, { id: 'u1' });
+  await later(30, null);
+  // The tab holds its depot and its board while the save is out.
+  expect(held.retired).not.toHaveBeenCalled();
+  expect(there.qc.getQueryData(meKey)).toEqual(RUWAN);
+  // The save is answered: kept, so nothing is left unsaved.
+  held.planWriting = false;
+  held.retired.mockReturnValue(false);
+  await following;
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(held.retired).toHaveBeenCalledWith(there.qc);
+  expect(toast).not.toHaveBeenCalled();
+});
+
+it('Q-13 a plan change on its way that the server refused is said to be dropped, once its answer is in', async () => {
+  expect(PLAN_DROPPED).toBe('Plan changes that were not saved were dropped: the depot was switched in another tab.');
+  const there = tabOf();
+  inTab(there);
+  useDispatcherPage();
+  held.planWriting = true;
+  serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+  const following = followSwitch(there.qc, { id: 'u1' });
+  await later(30, null);
+  expect(toast).not.toHaveBeenCalled();
+  // Refused: the session had moved first, so the change was not kept.
+  held.planWriting = false;
+  held.retired.mockReturnValue(true);
+  await following;
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).toHaveBeenCalledWith(PLAN_DROPPED, expect.objectContaining({ id: 'plan-dropped' }));
+  expect(toast).toHaveBeenCalledTimes(1);
+});
+
+it('Q-13 a plan change still unanswered after the wait is never said to be dropped: the tab follows and says it may not be kept', async () => {
+  expect(planUnsure('Peliyagoda')).toBe('The depot was switched in another tab while a plan change was on its way. Check Peliyagoda\'s plan board for it.');
+  vi.useFakeTimers();
+  // The tab's window keeps the fake clock's timers.
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { setTimeout, clearTimeout }));
+  try {
+    const there = tabOf();
+    inTab(there);
+    useDispatcherPage();
+    held.planWriting = true;
+    held.retired.mockReturnValue(true);
+    serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+    const following = followSwitch(there.qc, { id: 'u1' });
+    await vi.advanceTimersByTimeAsync(PLAN_ANSWER_WAIT_MS - 100);
+    expect(there.qc.getQueryData(meKey)).toEqual(RUWAN);
+    await vi.advanceTimersByTimeAsync(200);
+    await following;
+    expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+    expect(toast).toHaveBeenCalledWith(planUnsure('Peliyagoda'), expect.objectContaining({ id: 'plan-dropped' }));
+    expect(toast).not.toHaveBeenCalledWith(PLAN_DROPPED, expect.anything());
+  } finally {
+    vi.useRealTimers();
+  }
 });
