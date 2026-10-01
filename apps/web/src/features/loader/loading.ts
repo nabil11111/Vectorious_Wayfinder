@@ -39,14 +39,16 @@ export const worthRetrying = (error: unknown) =>
   !(error instanceof ApiRequestError) || error.code === 'network' || error.status >= 500 || error.status === 429;
 
 type Without<T> = Omit<T, 'writeId'>;
+// undo takes a stop marked loaded by mistake off again (Q-16), naming its stop as marking it loaded does.
 type WriteOf =
   | { kind: 'start'; body: Without<StartLoadingRequest> }
   | { kind: 'stop'; body: Without<StopLoadedRequest> }
+  | { kind: 'undo'; body: Without<StopLoadedRequest> }
   | { kind: 'flag'; body: Without<RaiseFlagRequest> }
   | { kind: 'ready'; body: Without<MarkReadyRequest> };
 export type WriteKind = WriteOf['kind'];
 
-const PATH: Record<WriteKind, string> = { start: 'start', stop: 'stop-loaded', flag: 'flags', ready: 'ready' };
+const PATH: Record<WriteKind, string> = { start: 'start', stop: 'stop-loaded', undo: 'undo-stop', flag: 'flags', ready: 'ready' };
 
 interface Write { kind: WriteKind; tripId: string; body: { writeId: string }; done?: () => void }
 
@@ -59,6 +61,9 @@ export interface LoaderWrites {
   refused: string | null;
   send: (tripId: string, write: WriteOf, done?: () => void) => void;
   retry: () => void;
+  // Whether a write of this kind is on its way or waits for Try again, read at the moment it is asked, so a page that
+  // asks before the loader leaves (Q-22) never holds them back once the write has gone, nor lets them go before.
+  holding: (kind: WriteKind) => boolean;
 }
 
 // A refused write's sentence stays on this tab until the loader dismisses it (spec 016, AC-31): a stale Start opens
@@ -130,5 +135,5 @@ export function useLoaderWrites(): LoaderWrites {
     void run();
   };
 
-  return { ...state, send, retry: () => { void run(); } };
+  return { ...state, send, retry: () => { void run(); }, holding: (kind) => pending.current?.kind === kind };
 }

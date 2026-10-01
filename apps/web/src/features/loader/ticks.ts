@@ -16,11 +16,21 @@ function subscribe(listener: () => void) {
   return () => { listeners.delete(listener); };
 }
 
+function changed() {
+  version += 1;
+  for (const listener of listeners) listener();
+}
+
 function toggle(tripId: string, lineId: string) {
   const key = keyOf(tripId, lineId);
   if (!ticked.delete(key)) ticked.add(key);
-  version += 1;
-  for (const listener of listeners) listener();
+  changed();
+}
+
+// A stop taken off the truck again (Q-16) is ticked again as its goods go back on.
+function clear(tripId: string, lineIds: string[]) {
+  for (const lineId of lineIds) ticked.delete(keyOf(tripId, lineId));
+  changed();
 }
 
 export function useTicks(tripId: string) {
@@ -28,5 +38,6 @@ export function useTicks(tripId: string) {
   return {
     isTicked: (lineId: string) => ticked.has(keyOf(tripId, lineId)),
     toggle: (lineId: string) => toggle(tripId, lineId),
+    clear: (lineIds: string[]) => clear(tripId, lineIds),
   };
 }

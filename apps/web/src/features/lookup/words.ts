@@ -152,7 +152,7 @@ export const tripPlace = (trip: Pick<HistoryTrip, 'brand' | 'district'>) => `${t
 const ISSUE_WORDS: Record<IssueKind, string> = { loading: 'Flagged at the dock', refused: 'Refused at the shop', closed: 'Nobody at the shop', receipt: 'Shop report' };
 export const issueWords = (kind: IssueKind) => ISSUE_WORDS[kind];
 const REASON_WORDS: Record<IssueReason, string> = {
-  short: 'short', damaged: 'damaged', wrong_item: 'wrong item', expired: 'expired', not_ordered: 'not ordered', nobody_there: 'nobody there',
+  short: 'short', damaged: 'damaged', wrong_item: 'wrong item', wont_fit: 'won\'t fit', expired: 'expired', not_ordered: 'not ordered', nobody_there: 'nobody there',
   missing: 'missing', not_cold: 'not cold',
 };
 export const reasonWords = (reason: IssueReason) => REASON_WORDS[reason];

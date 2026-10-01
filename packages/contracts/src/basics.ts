@@ -52,8 +52,9 @@ export const ISSUE_STATUSES = ['open', 'decided'] as const;
 export const IssueStatus = z.enum(ISSUE_STATUSES);
 export type IssueStatus = z.infer<typeof IssueStatus>;
 
-// What the loader found wrong at the dock.
-export const FLAG_REASONS = ['short', 'damaged', 'wrong_item'] as const;
+// What the loader found wrong at the dock. wont_fit is a truck that cannot take all of a line (Q-20): its count is what
+// fits, and it gets the same two answers as a short line.
+export const FLAG_REASONS = ['short', 'damaged', 'wrong_item', 'wont_fit'] as const;
 export const FlagReason = z.enum(FLAG_REASONS);
 export type FlagReason = z.infer<typeof FlagReason>;
 

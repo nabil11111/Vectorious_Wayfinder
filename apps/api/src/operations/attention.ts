@@ -1,6 +1,12 @@
-import { nextStop, type DriverTrip, type Issue, type OperationsStatus, type OperationsTimeline, type OperationsTrip, type TripAttention } from '@wayfinder/contracts';
+import { nextStop, type DriverTrip, type Issue, type IssueReason, type OperationsStatus, type OperationsTimeline, type OperationsTrip, type TripAttention } from '@wayfinder/contracts';
 import { depotDate, depotInstant } from '../lib/clock';
 import { progress } from './figures';
+
+// An open problem's reason as a truck's row says it, "Won't fit" (Q-20) as well as "Wrong item".
+const REASON_SUMMARY: Record<IssueReason, string> = {
+  short: 'Short', damaged: 'Damaged', wrong_item: 'Wrong item', wont_fit: 'Won\'t fit', expired: 'Expired', not_ordered: 'Not ordered',
+  nobody_there: 'Nobody there', missing: 'Missing', not_cold: 'Not cold',
+};
 
 export function attentionOf(trip: DriverTrip, arrivals: Map<string, string>, at: string): TripAttention {
   if (['planned', 'loading', 'ready'].includes(trip.status) && at > trip.leavesAt) return { kind: 'departure_unreported', plannedAt: trip.leavesAt };
@@ -16,7 +22,7 @@ export function outRowOf(trip: DriverTrip, arrivals: Map<string, string>, issues
   const next = nextStop(trip);
   const problem = issues.filter(issue => issue.status === 'open').sort((a, b) => a.raisedAt.localeCompare(b.raisedAt) || a.id.localeCompare(b.id))[0];
   const attention = attentionOf(trip, arrivals, at);
-  const status: OperationsStatus = problem ? { kind: 'open_problem', issueId: problem.id, issueKind: problem.kind, summary: problem.reason[0]!.toUpperCase() + problem.reason.slice(1).replaceAll('_', ' '), raisedAt: problem.raisedAt }
+  const status: OperationsStatus = problem ? { kind: 'open_problem', issueId: problem.id, issueKind: problem.kind, summary: REASON_SUMMARY[problem.reason], raisedAt: problem.raisedAt }
     : trip.status === 'done' && trip.backAt ? { kind: 'back', backAt: trip.backAt }
     : next?.arrivedAt ? { kind: 'at_stop', stopId: next.id, shopName: next.shopName, arrivedAt: next.arrivedAt }
     : attention.kind !== 'none' ? attention : !next && trip.status === 'out' ? { kind: 'returning' }

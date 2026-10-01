@@ -176,7 +176,8 @@ export function statusSentence(status: OperationsStatus, problem: string | null)
 const PROBLEM_WORD: Record<IssueKind, string> = { loading: 'short at the dock', refused: 'refused', closed: 'nobody there', receipt: 'reported by the shop' };
 export function problemWord(kind: IssueKind, issue: Issue | undefined) {
   if (issue?.kind === 'refused') return `${whole(issue.short)} refused`;
-  if (issue?.kind === 'loading') return `${whole(issue.short)} short`;
+  // A truck that cannot take it all (Q-20) is not short of stock.
+  if (issue?.kind === 'loading') return issue.reason === 'wont_fit' ? `${whole(issue.short)} won't fit` : `${whole(issue.short)} short`;
   return PROBLEM_WORD[kind];
 }
 export function problemLine(issue: Issue) {

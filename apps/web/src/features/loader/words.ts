@@ -1,4 +1,4 @@
-import { BRANDS, type Brand, type Issue, type IssueLine, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
+import { BRANDS, type Brand, type FlagReason, type Issue, type IssueLine, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
 import { clockTime, countOf, shortDay, unitsOf, vehicleKind } from '@/features/plan/words';
 import { countOf as amountOf, plural, TEMP_NAME } from '@/features/store/words';
 
@@ -49,10 +49,30 @@ export function untilLeaving(leavesAt: string, at: number | null): string | null
   return minutes > 0 ? `in ${span(minutes)}` : `${span(-minutes)} late`;
 }
 
-// What is on the truck so far over the vehicle's limits, in tonnes and cubic metres to one place:
-// "0.8 / 1.0 t · 4.3 / 7.0 m³". The API worked the load out; this only changes kilos to tonnes to write it.
-export const loadFigure = (truck: LoadingTruck) =>
-  `${ONE_PLACE.format(truck.on.kg / 1000)} / ${ONE_PLACE.format(truck.weightCapKg / 1000)} t · ${ONE_PLACE.format(truck.on.m3)} / ${ONE_PLACE.format(truck.volumeCapM3)} m³`;
+// A truck's load and its limit in tenths of a tonne (Q-21): the limit to the nearest tenth, as the design writes it, and
+// the load rounded down, kept a tenth below the limit's figure while it is under the limit, so the two read the same
+// only when the truck is full: a 6,840 kg truck reads 6.8 t, and 6,810 kg on it 6.7 t. Tenths of a kilo keep 807.3 kg
+// exact.
+function tonnes(kg: number, capKg: number): [on: number, cap: number] {
+  const on = Math.round(kg * 10);
+  const cap = Math.round(capKg * 10);
+  const onTenths = Math.floor(on / 1000);
+  const capTenths = Math.round(cap / 1000);
+  return [on < cap ? Math.min(onTenths, capTenths - 1) : onTenths, capTenths];
+}
+
+// A vehicle under 2 t has its weight written in kilos (Q-21): a 1,040 kg van read "1.0 / 1.0 t" with 81 kg free.
+const KILOS_UNDER_KG = 2000;
+
+// What is on the truck so far over the vehicle's limits, its weight never rounded up to look full (Q-21): a van's in
+// kilos rounded down, "959 / 1,040 kg · 5.1 / 7.0 m³", and a truck's in tonnes to one place rounded down, "4.5 / 6.8 t
+// · 21.0 / 33.4 m³". Cubic metres are to the nearest tenth. The API worked the load out; this only writes it down.
+export function loadFigure(truck: LoadingTruck) {
+  const volume = `${ONE_PLACE.format(truck.on.m3)} / ${ONE_PLACE.format(truck.volumeCapM3)} m³`;
+  if (truck.weightCapKg < KILOS_UNDER_KG) return `${whole(Math.floor(Math.round(truck.on.kg * 10) / 10))} / ${whole(truck.weightCapKg)} kg · ${volume}`;
+  const [on, cap] = tonnes(truck.on.kg, truck.weightCapKg);
+  return `${ONE_PLACE.format(on / 10)} / ${ONE_PLACE.format(cap / 10)} t · ${volume}`;
+}
 
 // "0 of 118 cartons on"
 export const onOfUnits = (truck: LoadingTruck) => `${whole(truck.on.units)} of ${unitsWords(truck.brand, truck.units)} on`;
@@ -65,12 +85,28 @@ export const lineWords = (line: Pick<LoadingLine, 'quantity' | 'unit' | 'temp' |
 // A line's name on the flag's counter: "Chilled" or "Dry" for Fresh, the item's name for Style and Tech.
 export const lineKind = (line: Pick<LoadingLine, 'temp' | 'name'>, brand: Brand | null) => (brand === 'Fresh' ? TEMP_NAME[line.temp] : line.name);
 
+// Under a count box that holds anything but a whole number from 0 to the line's count (Q-17), in the shop's words for
+// its quantity box (Q-01): "Whole numbers from 0 to 57."
+export const countLine = (most: number) => `Whole numbers from 0 to ${whole(most)}.`;
+
+// What the flag's counter counts: the good units at the dock, or for a truck that cannot take it all what fits on it
+// (Q-20). And the line in the counter's place before a line is picked.
+export const countWhere = (reason: FlagReason) => (reason === 'wont_fit' ? 'fit on the truck' : 'at the dock');
+export const countHint = (reason: FlagReason) => (reason === 'wont_fit'
+  ? 'Tap the line that will not all fit, then count what fits on the truck.'
+  : 'Tap the line that is not right, then count what is at the dock.');
+
 // A stop on a list, by what the API sent: "94 cartons" to load, "23 of 24" with a flag lowering a count, "✓ 94 on"
 // once loaded, and "23 on · 1 short" when it went on short.
 export const stopUnits = (truck: LoadingTruck, stop: LoadingStop) => unitsWords(brandOfStop(truck, stop), stop.units);
 export const stopGoingOf = (stop: LoadingStop) => `${whole(stop.going)} of ${whole(stop.units)}`;
 export const stopOn = (stop: LoadingStop) => `${whole(stop.going)} on`;
 export const stopOnShort = (stop: LoadingStop) => `${whole(stop.going)} on · ${whole(stop.short)} short`;
+
+// A loaded stop's menu (Q-16): "Undo stop 3 loaded", after the button that loaded it, and on a stop loaded before the
+// last one, which stop comes off first: "undo stop 2 first".
+export const undoStopWords = (stop: Pick<LoadingStop, 'seq'>) => `Undo stop ${stop.seq} loaded`;
+export const undoFirstWords = (stop: Pick<LoadingStop, 'seq'>) => `undo stop ${stop.seq} first`;
 
 // "117 of 118 on, 1 short" when every stop is loaded.
 export const allOnLine = (truck: LoadingTruck) =>
@@ -96,11 +132,12 @@ export function shortGoods(issue: IssueWords) {
 }
 
 // A problem's title by its reason: "1 dry carton short", "2 chilled cartons damaged", "1 dry carton was the wrong
-// item", and "3 items short" when its lines differ.
+// item", "4 chilled cartons won't fit" when the truck cannot take them (Q-20), and "3 items short" when its lines differ.
 export function issueTitle(issue: IssueWords & Pick<Issue, 'reason'>) {
   const goods = shortGoods(issue);
   if (issue.reason === 'short') return `${goods} short`;
   if (issue.reason === 'damaged') return `${goods} damaged`;
+  if (issue.reason === 'wont_fit') return `${goods} won't fit`;
   return `${goods} ${issue.short === 1 ? 'was' : 'were'} the wrong item`;
 }
 
@@ -121,15 +158,23 @@ export const raisedLine = (issue: Pick<Issue, 'raisedBy' | 'raisedAt'>) => `${is
 export const answeredBy = (issue: Pick<Issue, 'decidedBy' | 'decidedAt'>) =>
   [issue.decidedBy && `${issue.decidedBy}, dispatcher`, issue.decidedAt && clockTime(issue.decidedAt)].filter(Boolean).join(' · ');
 
+// The answer's sentence: "Go with 1 dry carton short for Fresh Nugegoda." or "Load it all for Fresh Nugegoda. The rest
+// comes from stock.", and for a truck that cannot take it all (Q-20) "Go without the 4 chilled cartons that won't fit
+// for Fresh Mahaiyawa." or "Load it all for Fresh Mahaiyawa. Make room for the rest."
 export function answerSentence(issue: Issue) {
-  if (issue.decision === 'load_all') return `Load it all for ${issue.stop.shopName}. The rest comes from stock.`;
-  return `Go with ${shortGoods(issue)} short for ${issue.stop.shopName}.`;
+  const room = issue.reason === 'wont_fit';
+  if (issue.decision === 'load_all') return `Load it all for ${issue.stop.shopName}. ${room ? 'Make room for the rest.' : 'The rest comes from stock.'}`;
+  return room ? `Go without the ${shortGoods(issue)} that won't fit for ${issue.stop.shopName}.` : `Go with ${shortGoods(issue)} short for ${issue.stop.shopName}.`;
 }
 
-// The dispatcher's line once an answer is sent: "VEH035 goes 1 dry carton short, Kasun told".
+// The dispatcher's line once an answer is sent: "VEH035 goes 1 dry carton short, Kasun told", and "VEH057 goes without
+// the 4 chilled cartons that won't fit, Sarath told" (Q-20).
 export function sentLine(issue: Issue) {
   const truck = truckName(issue.trip);
-  return issue.decision === 'load_all' ? `${truck} loads it all, ${issue.raisedBy} told` : `${truck} goes ${shortGoods(issue)} short, ${issue.raisedBy} told`;
+  if (issue.decision === 'load_all') return `${truck} loads it all, ${issue.raisedBy} told`;
+  return issue.reason === 'wont_fit'
+    ? `${truck} goes without the ${shortGoods(issue)} that won't fit, ${issue.raisedBy} told`
+    : `${truck} goes ${shortGoods(issue)} short, ${issue.raisedBy} told`;
 }
 
 // "Waiting for the dispatcher · flagged 02:33"
