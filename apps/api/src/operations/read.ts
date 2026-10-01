@@ -14,6 +14,7 @@ import { toMinutes } from '../planning';
 import { operatingDays, readMoment } from '../plans/board';
 import { percent } from '../plans/board-day';
 import { attentionOf, compareOut, outRowOf, timelineOf } from './attention';
+import { eventsOf } from './events';
 import { figuresOf, groupTrips, nextDemand, progress, stopCounts } from './figures';
 
 // Every source, including the clock and reset generation, belongs to this one read-only snapshot.
@@ -111,5 +112,5 @@ async function operationsDayOf(tx: Tx, caller: DepotCaller): Promise<OperationsD
     plan: plan ? { id: plan.id, revision: plan.revision, publishedAt: plan.publishedAt!.toISOString(), detailRecorded: plan.sentCheck !== null } : null,
     counts: { ...counts, tripsTotal: current.length, vehiclesOut, vehiclesTotal: fleet.length, deferredOrders: new Set(deferred.map(row => row.id)).size,
       deliveryProgress: progress(counts.stopsDelivered, counts.stopsTotal), truckProgress: progress(vehiclesOut, fleet.length) }, nextRun, fuel,
-    ...groupTrips(current), timeline: day ? timeline(day, current) : null, earlierOut, outTripIds: [...out].sort(compareOut).map(row => row.tripId), events: [], eventsTruncated: false });
+    ...groupTrips(current), timeline: day ? timeline(day, current) : null, earlierOut, outTripIds: [...out].sort(compareOut).map(row => row.tripId), ...await eventsOf(tx, { currentPlan: plan, plans: shownPlans, trips: shown, issues: problems }) });
 }
