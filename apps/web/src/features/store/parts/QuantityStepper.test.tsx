@@ -37,6 +37,14 @@ describe('Q-01 and Q-02 the quantity box', () => {
     expect(draw(box(8, '08'))).toMatch(/<input[^>]*value="08"/);
   });
 
+  it('L-01 keeps the box its own width for a long refused number, so the product\'s name beside it is never cut', () => {
+    const input = (html: string) => html.match(/<input[^>]*>/)?.[0] ?? '';
+    for (const typed of ['250000', '1200', '99999999']) {
+      expect(input(draw(box(8, typed)))).not.toMatch(/style=/);
+      expect(input(draw(box(8, typed)))).toMatch(/class="[^"]*\bw-\[58px\]/);
+    }
+  });
+
   it('stops − at 0 and + at 999', () => {
     const [less] = buttons(draw(box(0)));
     expect(less).toMatch(/disabled=""/);
