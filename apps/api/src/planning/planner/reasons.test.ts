@@ -284,6 +284,41 @@ describe('the planner\'s own sentences in plain words', () => {
       .toBe('Colombo closes at 10:20, before its mall opens at 11:40, so it can never be reached in time.');
   });
 
+  it('spec 026 calls a truck by its driver when the planner\'s input gives its vehicle one', () => {
+    const chaminda = { ...vehicle('VEH012'), driverName: 'Chaminda' };
+    const order = plannerOrder('dry', 'OUT030');
+    const day = plannerInput([order], { vehicles: [chaminda] });
+    const attempt = tryCandidate(planInput(day), order, { vehicleId: 'VEH012', tripNo: 1, existing: false });
+    const placed = (existing: boolean, tripNo: number, compact = false) =>
+      placementReason(day, order, { ...attempt, slot: { ...attempt.slot, existing, tripNo }, selectionReason: existing ? 'fills an existing run' : 'vehicle ID breaks the tie' }, compact);
+    expect(placed(false, 1)).toBe('new run on Chaminda\'s dry truck to Gampaha, vehicle ID breaks the tie');
+    expect(placed(true, 2)).toBe('joined Chaminda\'s dry truck on its second trip to Gampaha, fills an existing run');
+    expect(placed(false, 1, true)).toBe('on Chaminda\'s dry truck (vehicle ID tie)');
+    expect(placed(false, 2, true)).toBe('on the second trip of Chaminda\'s dry truck (vehicle ID tie)');
+
+    // The trips the planner tries carry the driver, so the checker's own sentence it quotes names him too.
+    const style = plannerOrder('style', 'OUT019', 'style-folded');
+    const fresh = plannerOrder('fresh', 'OUT006');
+    const lateDay = plannerInput([style, fresh], { vehicles: [chaminda] });
+    const trial = planInput(lateDay);
+    trial.plan.trips = [{ vehicleId: 'VEH012', tripNo: 1, driverName: 'Chaminda', stops: [{ outletId: style.outletId, orderIds: [style.id] }] }];
+    const late = tryCandidate(trial, fresh, { vehicleId: 'VEH012', tripNo: 2, existing: false });
+    expect(late.input.plan.trips.map((trip) => [trip.tripNo, trip.driverName])).toEqual([[1, 'Chaminda'], [2, 'Chaminda']]);
+    expect(refusedReason(lateDay, fresh, [late], 'window', true)).toBe('Colombo is reached at 10:56 by the second trip of Chaminda\'s dry truck, after the 08:00 deadline.');
+    expect(refusedReason(lateDay, fresh, [late], 'window'))
+      .toBe('Colombo is reached at 10:56 by the second trip of Chaminda\'s dry truck, 176 minutes after its window closes at 08:00, and Fresh shops must be reached before 08:00.');
+
+    const waiting = plannerOrder('big', 'OUT001', 'fresh-chilled-carton', 400, { deliveryDate: '2026-06-24', timesDeferred: 1 });
+    const vanDay = plannerInput([waiting], { vehicles: [{ ...vehicle('VEH035'), driverName: 'Dilshan' }] });
+    const full = tryCandidate(planInput(vanDay), waiting, { vehicleId: 'VEH035', tripNo: 1, existing: false });
+    expect(refusedReason(vanDay, waiting, [full], 'over_capacity', true)).toBe('Dilshan\'s reefer van carries 2,760 kg, over its 1,040 kg limit.');
+
+    const badulla = plannerOrder('badulla', 'OUT113');
+    const kandy = plannerInput([badulla], { depotId: 'Kandy', vehicles: [{ ...vehicle('VEH044'), driverName: 'Prasanna' }] });
+    expect(earlyLeaveReason(kandy, { vehicleId: 'VEH044', tripNo: 2, leaveAt: 400, usual: 430 }, 4, badulla))
+      .toBe('The rank 4 order for Badulla makes the second trip of Prasanna\'s dry truck leave at 06:40 instead of 07:10.');
+  });
+
   it('names the order that makes a trip leave early first, then the vehicle by its kind', () => {
     const order = plannerOrder('badulla', 'OUT113');
     const day = plannerInput([order], { depotId: 'Kandy', vehicles: [vehicle('VEH044')] });

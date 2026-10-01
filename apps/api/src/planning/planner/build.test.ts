@@ -106,6 +106,19 @@ describe('the complete suggested plan', () => {
       .toEqual(['The rank 4 order for Badulla makes the dry truck VEH044 leave at 02:59 instead of 03:30.']);
   });
 
+  it('spec 026 names the truck by the driver the input gives its vehicle, in the reasons and the final check', () => {
+    const input = plannerInput(['OUT110', 'OUT112', 'OUT111', 'OUT113'].map((s, i) => plannerOrder(`order-${i}`, s)), {
+      depotId: 'Kandy', vehicles: [{ ...vehicle('VEH044'), driverName: 'Prasanna' }],
+    });
+    const result = success(buildSuggestedPlan(input));
+    expect(result.decisions.map((d) => d.reason)).toEqual(['The rank 4 order for Badulla makes Prasanna\'s dry truck leave at 02:59 instead of 03:30.']);
+    expect(result.choices[0]!.reason).toContain('new run on Prasanna\'s dry truck to Badulla');
+    // The plan's trips carry the driver, so the checker's warnings name him.
+    expect(result.input.plan.trips.map((t) => t.driverName)).toEqual(['Prasanna']);
+    expect(result.check.problems.find((p) => p.code === 'leaves_early')!.message)
+      .toBe('Prasanna\'s dry truck leaves at 02:59, and a trip with a Fresh shop normally leaves at 03:30 or later.');
+  });
+
   it('AC-13 carries a waiting remainder whole on the idle van before considering new goods', () => {
     const input = plannerInput([
       plannerOrder('new', 'OUT002', 'fresh-chilled-carton', 30),

@@ -147,6 +147,8 @@ describe('AC-19: malformed or incomplete snapshots name their input fault', () =
     ['infinite vehicle volume', (x) => { x.vehicles[0]!.volumeCapM3 = Infinity; }, /volumeCapM3|capacity/i],
     ['negative fuel quota', (x) => { x.vehicles[0]!.weeklyFuelQuotaL = -1; }, /weeklyFuelQuotaL|quota/i],
     ['negative fuel history', (x) => { x.vehicles[0]!.litresUsedThisWeek = -1; }, /litresUsedThisWeek|fuel/i],
+    // A vehicle's driver is optional (spec 026), but one that is given has a name to call the truck by.
+    ['empty driver name', (x) => { x.vehicles[0]!.driverName = ' '; }, /driverName/i],
     ['negative travel distance', (x) => { x.travel[0]!.outKm = -1; }, /outKm|travel/i],
     ['fractional travel minute', (x) => { x.travel[0]!.betweenMin = 1.5; }, /betweenMin|travel/i],
     ['negative allowance', (x) => { x.allowances[0]!.minutes = -1; }, /allowance|minutes/i],

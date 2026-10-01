@@ -81,6 +81,13 @@ it('AC-12 stores blocked drafts and reports the exact volume problem', async () 
   expect(b.figures![0]!.m3Pct).toBe(140);
 });
 
+it('spec 026 AC-3 names a truck by the driver its trip has in the checker\'s sentences', async () => {
+  const res = await save({ ...empty(), trips: [{ ...trip(['OUT016', 'OUT017', 'OUT018', 'OUT019'], 'VEH023'), driverId: dilshan }] });
+  expect(res.status).toBe(200);
+  const b = PlanBoard.parse(res.body);
+  expect(b.check!.problems).toContainEqual(expect.objectContaining({ code: 'over_volume', message: 'Dilshan\'s dry truck carries 53.1 m³, 15.1 m³ over its 38 m³ limit.', fix: 'Take 15.1 m³ off this trip.' }));
+});
+
 it('AC-13 serializes simultaneous first saves and refuses references from before reset', async () => {
   const responses = await Promise.all([save(empty()), save(empty())]);
   expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);

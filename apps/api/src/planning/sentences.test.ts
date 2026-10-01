@@ -400,6 +400,78 @@ const day: Case[] = [
 
 const CASES = [...cargo, ...coverage, ...time, ...day];
 
+// ── Trucks named by their drivers (spec 026, AC-3) ──────────────────────────────────────────────────────────────
+// The same plans with a driver on the trips: a truck is called by its driver, "Chaminda's dry truck", and a second
+// trip is "the second trip of Chaminda's reefer truck". A trip with no driver keeps the kind and id, as above.
+const driven = (input: PlanInput, names: Record<string, string>): PlanInput => ({
+  ...input, plan: { ...input.plan, trips: input.plan.trips.map((trip) => (names[trip.vehicleId] ? { ...trip, driverName: names[trip.vehicleId] } : trip)) },
+});
+const withDriver = (code: ProblemCode, way: string, names: Record<string, string>, said: Words[]): Case => {
+  const base = CASES.find((c) => c.code === code && c.way === way);
+  if (!base) throw new Error(`No case ${code}, ${way}`);
+  return { code, way: `${way}, with a driver`, input: () => driven(base.input(), names), tripNo: base.tripNo, said };
+};
+const DRIVEN: Case[] = [
+  withDriver('over_weight', 'on its second trip', { VEH035: 'Chaminda' },
+    [{ message: 'Chaminda\'s reefer van carries 1,242 kg on its second trip, 202 kg over its 1,040 kg limit.', fix: 'Take 202 kg off this trip.' }]),
+  withDriver('over_volume', '80 rail boxes on a 22 m³ truck', { VEH008: 'Chaminda' },
+    [{ message: 'Chaminda\'s dry truck carries 24 m³, 2 m³ over its 22 m³ limit.', fix: 'Take 2 m³ off this trip.' }]),
+  withDriver('needs_reefer', 'the spec\'s example', { VEH044: 'Chaminda' },
+    [{ message: 'The 276 kg chilled order for Fresh Nugegoda needs a fridge, and it is on Chaminda\'s dry truck.', fix: 'Move it to a reefer truck or van.' }]),
+  withDriver('van_only', 'on a second trip', { VEH044: 'Chaminda' },
+    [{ message: 'Tech Kadugannawa only takes vans, and it is on the second trip of Chaminda\'s dry truck.', fix: 'Move it to a van.' }]),
+  withDriver('no_tail_lift', 'the spec\'s example on a dry van, which VEH037 is', { VEH037: 'Chaminda' },
+    [{ message: 'The 380 kg dry order for Tech Matara needs a tail lift, and it is on Chaminda\'s van, which has none.', fix: 'Move it to a truck.' }]),
+  withDriver('wrong_depot', 'a vehicle of another depot than the plan', { VEH059: 'Chaminda' },
+    [{ message: 'Chaminda\'s van belongs to the Kandy depot, and it is in the Peliyagoda plan.', fix: 'Move this trip to a Peliyagoda vehicle.' }]),
+  withDriver('wrong_depot', 'a shop of another depot than the vehicle', { VEH008: 'Chaminda' },
+    [{ message: 'OUT084 belongs to the Kandy depot, and it is on Chaminda\'s dry truck from Peliyagoda.' }]),
+  withDriver('mixed_brands', 'the spec\'s example', { VEH012: 'Chaminda' },
+    [{ message: 'Chaminda\'s dry truck has Fresh and Style shops on one trip.', fix: 'Split them, or turn on Mix brands.' }]),
+  // One vehicle with a driver and one without, in one sentence.
+  withDriver('order_twice', 'on two vehicles', { VEH012: 'Chaminda' },
+    [{ message: 'The 331.2 kg dry order for OUT004 is on Chaminda\'s dry truck at stop 1 and on the dry truck VEH008 at stop 1, and an order can be in the plan only once.', fix: 'Keep it in one place only.' }]),
+  withDriver('order_wrong_outlet', 'an order on the stop at another shop', { VEH012: 'Chaminda' },
+    [{ message: 'The 331.2 kg dry order for OUT004 goes to OUT006 on Chaminda\'s dry truck.', fix: 'Move it to a stop at OUT004.' }]),
+  withDriver('empty_trip', 'a trip with no stops', { VEH012: 'Chaminda' },
+    [{ message: 'Chaminda\'s dry truck has a trip with no stops.', fix: 'Add a stop or remove the trip.' }]),
+  withDriver('empty_trip', 'a second trip with no stops', { VEH012: 'Chaminda' },
+    [{ message: 'The second trip of Chaminda\'s dry truck has no stops.', fix: 'Add a stop or remove the trip.' }]),
+  withDriver('empty_trip', 'a stop with no orders', { VEH012: 'Chaminda' },
+    [{ message: 'OUT006 is a stop with no orders on Chaminda\'s dry truck.', fix: 'Add its orders or take the stop off.' }]),
+  withDriver('stop_repeated', 'one shop as two stops', { VEH003: 'Chaminda' },
+    [{ message: 'OUT004 is both stop 1 and stop 3 on Chaminda\'s reefer truck.', fix: 'Put its orders on one stop.' }]),
+  withDriver('cross_district', 'the spec\'s example', { VEH012: 'Chaminda' },
+    [{ message: 'Chaminda\'s dry truck goes to Kandy and Matale on one trip, and a trip stays in one district.', fix: 'Move the Matale stops to another trip.' }]),
+  withDriver('no_travel_data', 'on a second trip', { VEH008: 'Chaminda' },
+    [{ message: 'There are no travel figures from the Peliyagoda depot to Kandy, and the second trip of Chaminda\'s dry truck goes there.' }]),
+  withDriver('too_many_trips', 'more than two trips', { VEH012: 'Chaminda' },
+    [{ message: 'Chaminda\'s dry truck has 3 trips, and a vehicle runs at most two a day.' }]),
+  withDriver('trips_overlap', 'the spec\'s example', { VEH001: 'Chaminda' },
+    [{ message: 'The second trip of Chaminda\'s reefer truck leaves at 07:00, before it is back and reloaded at 08:10.', fix: 'Leave at 08:10 or later.' }]),
+  withDriver('leaves_early', 'with a Fresh shop', { VEH012: 'Chaminda' },
+    [{ message: 'Chaminda\'s dry truck leaves at 03:29, and a trip with a Fresh shop normally leaves at 03:30 or later.' }]),
+  withDriver('window_missed', 'the spec\'s example, with the data\'s window', { VEH006: 'Chaminda' },
+    [{ message: 'Fresh Koggala is reached at 08:05 by Chaminda\'s reefer truck, 35 minutes after its window closes at 07:30, and Fresh shops must be reached before 08:00.', fix: 'Leave by 05:47 to reach every stop in time.' }]),
+  withDriver('window_missed', 'a window that opens after it closes', { VEH012: 'Chaminda' },
+    [{ message: 'OUT019\'s window opens at 10:00 and closes at 09:00, so Chaminda\'s dry truck can never reach it in time.' }]),
+  withDriver('mall_slot_missed', 'after the mall slot', { VEH012: 'Chaminda' },
+    [{ message: 'OUT015 is reached at 11:37 by Chaminda\'s dry truck, 37 minutes after its mall slot of 09:00 to 11:00 ends.' }]),
+  withDriver('long_wait', 'the spec\'s example', { VEH006: 'Chaminda' },
+    [{ message: 'Fresh Hikkaduwa is reached at 05:15 by Chaminda\'s reefer truck and waits 15 minutes for its window to open at 05:30.', fix: 'Leave at 03:47 to arrive as it opens.' }]),
+  // A driver's name already has the possessive, so the trips come first.
+  withDriver('over_time_budget', 'Fresh trips', { VEH044: 'Chaminda' },
+    [{ message: 'The Fresh trips of Chaminda\'s dry truck take 277 minutes of driving and unloading, 7 over the day\'s 270.' }]),
+  withDriver('vehicle_off', 'both trips of a vehicle that is off', { VEH012: 'Chaminda' }, [
+    { message: 'Chaminda\'s dry truck has a trip on a day it is not available.', fix: 'Move this trip to another vehicle.' },
+    { message: 'Chaminda\'s dry truck has its second trip on a day it is not available.', fix: 'Move this trip to another vehicle.' },
+  ]),
+  withDriver('fuel_over_quota', 'litres over the weekly quota', { VEH006: 'Chaminda' },
+    [{ message: 'Chaminda\'s reefer truck has used 330 litres this week and this plan needs 63.6 litres more, 13.6 litres over its weekly quota of 380 litres.', fix: 'Take 13.6 litres of driving off this vehicle.' }]),
+];
+// The codes whose sentences name no vehicle.
+const NO_VEHICLE: ProblemCode[] = ['order_not_planned', 'deferral_incomplete', 'not_operating_day'];
+
 describe('the plan checker in plain words (spec 024)', () => {
   it('AC-1 pins a sentence for every code the checker has', () => {
     expect(new Set(CASES.map((c) => c.code))).toEqual(new Set(PROBLEM_CODES));
@@ -409,8 +481,16 @@ describe('the plan checker in plain words (spec 024)', () => {
     expect(wordsOf(c.input(), code, c.tripNo)).toEqual(c.said);
   });
 
+  it('spec 026 AC-3 pins the driver\'s form for every code that names a vehicle', () => {
+    expect(new Set(DRIVEN.map((c) => c.code))).toEqual(new Set(PROBLEM_CODES.filter((code) => !NO_VEHICLE.includes(code))));
+  });
+
+  it.each(DRIVEN.map((c) => [c.code, c.way, c] as const))('spec 026 AC-3 %s, %s', (code, _way, c) => {
+    expect(wordsOf(c.input(), code, c.tripNo)).toEqual(c.said);
+  });
+
   it('AC-1 writes each message and fix as one sentence, and never a trip number', () => {
-    for (const { said } of CASES) {
+    for (const { said } of [...CASES, ...DRIVEN]) {
       for (const text of said.flatMap(({ message, fix }) => (fix === undefined ? [message] : [message, fix]))) {
         expect(text).toMatch(/^[A-Z].*\.$/);
         expect(text.slice(0, -1)).not.toMatch(/[.!?]\s/);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capital, itsTrip, kg, litres, m3, orderCalled, toClock, toMinutes, tripCalled, vehicleCalled } from './words';
+import { capital, driverOf, itsTrip, kg, litres, m3, orderCalled, toClock, toMinutes, tripCalled, vehicleCalled } from './words';
 
 describe('how the checker writes times and amounts', () => {
   it('reads a time of day as minutes after midnight and back', () => {
@@ -47,6 +47,20 @@ describe('how the checker writes times and amounts', () => {
     // After a sentence has named the vehicle.
     expect(itsTrip(2)).toBe('its second trip');
     expect(itsTrip(1)).toBeNull();
+  });
+
+  it('spec 026 calls a truck by its driver when the trip has one, and by kind and id when it has none', () => {
+    const truck = { id: 'VEH044', type: 'truck', temp: 'ambient' } as const;
+    expect(vehicleCalled(truck, 'Chaminda')).toBe('Chaminda\'s dry truck');
+    expect(vehicleCalled({ id: 'VEH035', type: 'van', temp: 'reefer' }, 'Dilshan')).toBe('Dilshan\'s reefer van');
+    expect(tripCalled({ id: 'VEH001', type: 'truck', temp: 'reefer' }, 2, 'Chaminda')).toBe('the second trip of Chaminda\'s reefer truck');
+    expect(tripCalled(truck, 1, 'Chaminda')).toBe('Chaminda\'s dry truck');
+    expect(vehicleCalled(truck)).toBe('the dry truck VEH044');
+    expect(vehicleCalled(truck, '')).toBe('the dry truck VEH044');
+    // A sentence about a whole vehicle takes the driver its trips carry.
+    const trips = [{ vehicleId: 'VEH044', tripNo: 1, stops: [] }, { vehicleId: 'VEH044', tripNo: 2, stops: [], driverName: 'Chaminda' }, { vehicleId: 'VEH012', tripNo: 1, stops: [] }];
+    expect(driverOf(trips, 'VEH044')).toBe('Chaminda');
+    expect(driverOf(trips, 'VEH012')).toBeUndefined();
   });
 
   it('starts a sentence that leads with a vehicle with a capital', () => {
