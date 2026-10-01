@@ -105,6 +105,34 @@ describe('Q-05 the top-bar clock turns with the minute', () => {
       expect((await run(100)).time).toBe('15:45');
     });
 
+    it('draws the new minute when the timer read the clock just before it turned and the effect ran just after', async () => {
+      const start = performance.now();
+      hooks.clock = clockAt('2026-06-24T10:13:20.500Z', null, start);
+      expect(draw().time).toBe('15:43');
+      // The timer fires and reads 15:43:59.999; the effect of that drawing runs at 15:44:00.010.
+      for (const cleanup of cleanups.splice(0)) cleanup();
+      hooks.slots[0] = start + 39_499;
+      vi.advanceTimersByTime(39_510);
+      expect(draw().time).toBe('15:43');
+      // The effect read the clock again and draws at once, so the bar turns now and the next minute is not skipped.
+      vi.advanceTimersByTime(0);
+      expect(draw().time).toBe('15:44');
+      expect((await run(59_900)).time).toBe('15:44');
+      expect((await run(100)).time).toBe('15:45');
+    });
+
+    it('marks the clock waiting when the timer read it just before the hold and the effect ran just after', () => {
+      const start = performance.now();
+      hooks.clock = clockAt('2026-06-24T10:29:58.000Z', '2026-06-24T10:29:59.000Z', start);
+      expect(draw().waiting).toBe(false);
+      for (const cleanup of cleanups.splice(0)) cleanup();
+      hooks.slots[0] = start + 999;
+      vi.advanceTimersByTime(1005);
+      expect(draw().waiting).toBe(false);
+      vi.advanceTimersByTime(0);
+      expect(draw().waiting).toBe(true);
+    });
+
     it('marks the clock waiting once it reaches the point where it waits', async () => {
       hooks.clock = clockAt('2026-06-24T10:29:58.000Z', '2026-06-24T10:29:59.000Z', performance.now());
       expect(draw().waiting).toBe(false);

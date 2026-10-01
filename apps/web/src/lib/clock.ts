@@ -60,6 +60,12 @@ export function nextDrawIn(clock: HeldClock, reading: number): number | null {
   return at >= holds ? null : Math.min(minuteEnds, holds) - at;
 }
 
+// What a drawing made at a reading shows: its minute, and whether the clock waits there.
+function drawn(clock: HeldClock, reading: number) {
+  const at = shownAt(clock, Math.max(reading, clock.heldAt));
+  return `${Math.floor(at / MINUTE)} ${clock.holdsAt !== null && at >= Date.parse(clock.holdsAt)}`;
+}
+
 const depotFormat = new Intl.DateTimeFormat('en-GB', {
   timeZone: DEPOT_TIME_ZONE, hourCycle: 'h23',
   weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -110,11 +116,14 @@ export function useAppClock(): AppClock {
   const state = query.data;
   const retry = () => void query.refetch();
   const [reading, setReading] = useState(() => performance.now());
-  // After each drawing, and with each clock the server sends, the next drawing waits for the minute to end. A
-  // timer that fires a moment early draws the same minute and waits the rest.
+  // After each drawing, and with each clock the server sends, the clock is read again. A drawing behind that
+  // reading, such as one a timer read just before the minute turned with this effect running just after, is drawn
+  // again at once, so no minute is skipped and the wait is never missed. Otherwise the next drawing is timed from
+  // that reading, for the minute's end or the wait, whichever is first. The timer reads the clock when it fires.
   useEffect(() => {
     if (!state) return;
-    const wait = nextDrawIn(state, Math.max(performance.now(), state.heldAt));
+    const now = performance.now();
+    const wait = drawn(state, reading) !== drawn(state, now) ? 0 : nextDrawIn(state, Math.max(now, state.heldAt));
     if (wait === null) return;
     const timer = window.setTimeout(() => setReading(performance.now()), wait);
     return () => window.clearTimeout(timer);
