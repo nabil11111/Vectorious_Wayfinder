@@ -1,6 +1,6 @@
 # 023 · Planning by drag and drop
 
-**Status:** Ready  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`), Edit plan · empty
+**Status:** Done  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`), Edit plan · empty
 (`78:67860`), and the "stops swapped" state (`215:104652`)
 
 ## Why
@@ -43,18 +43,20 @@ board. The buttons and menus stay, for the keyboard and for anyone who prefers t
    build, nothing can be dragged, exactly as nothing can be changed.
 
 ## Acceptance criteria
-- [ ] AC-1 When an unplanned order or group is dropped on the open trip's stops, a Done trip card or an unassigned
+- [x] AC-1 When an unplanned order or group is dropped on the open trip's stops, a Done trip card or an unassigned
   truck, the system shall make the same change the matching button makes, as one change of the draft.
-- [ ] AC-2 When a truck is dropped in the middle, the system shall start that truck's trip and open it.
-- [ ] AC-3 When a stop is dragged up or down in "Stops in order", the system shall reorder the stops as one change. A
+- [ ] ~~AC-2 When a truck is dropped in the middle, the system shall start that truck's trip and open it.~~ Dropped
+  before the build: spec 026 removes the trucks panel (D-100), so no truck is dragged; a trip starts from an order
+  and the crew picker.
+- [x] AC-3 When a stop is dragged up or down in "Stops in order", the system shall reorder the stops as one change. A
   stop dropped on Unplanned orders shall come off its trip, and one dropped on another trip's card shall move there.
-- [ ] AC-4 The empty middle shall show "Build the suggested plan" and the drop area "or drag an order or a truck here
+- [x] AC-4 The empty middle shall show "Build the suggested plan" and the drop area "or drag an order or a truck here
   to start a trip", in place of "Start a blank trip".
-- [ ] AC-5 Every drop shall be checked by the plan checker like the same change made with a button. A dropped
+- [x] AC-5 Every drop shall be checked by the plan checker like the same change made with a button. A dropped
   change shall be undone with one Undo.
-- [ ] AC-6 Dragging shall work with the pointer and the keyboard, with each step announced. Nothing shall be draggable
+- [x] AC-6 Dragging shall work with the pointer and the keyboard, with each step announced. Nothing shall be draggable
   on a sent plan or while the board holds still.
-- [ ] AC-7 The README's "Departures from the design" shall say the empty middle has the drop area in place of "Start
+- [x] AC-7 The README's "Departures from the design" shall say the empty middle has the drop area in place of "Start
   a blank trip", and the walkthrough shall still work with its buttons.
 
 ## Out of scope
