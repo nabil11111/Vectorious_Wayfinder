@@ -77,7 +77,9 @@ export const timeTrip: TimeTrip = (input, trip, leaveAt) => {
     tripMin += unloadMin;
     // Arrival is what counts, and arriving exactly at closing time is on time (AC-32).
     const late = arriveAt > close || open > close || (shop.brand === 'Fresh' && arriveAt >= FRESH_DEADLINE);
-    stops.push({ seq: i + 1, outletId: shop.id, arriveAt, waitMin: startAt - arriveAt, startAt, leaveAt: clock, windowOpen: open, windowClose: close, late });
+    // The minutes after the window closes (spec 022). A window that never opens has none to count.
+    const lateMin = open > close ? 0 : Math.max(0, arriveAt - close);
+    stops.push({ seq: i + 1, outletId: shop.id, arriveAt, waitMin: startAt - arriveAt, startAt, leaveAt: clock, windowOpen: open, windowClose: close, late, lateMin });
   }
 
   // The data has no drive back, so it takes as long as the drive out (AC-12).

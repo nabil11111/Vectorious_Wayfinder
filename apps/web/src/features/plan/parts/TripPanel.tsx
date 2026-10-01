@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { splitOrder, type BoardScreen, type Undo } from '../board';
 import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setDriver, setLeaveAt, takeOff, tripOf } from '../draft';
-import { countOf, figure, hhmm, litres, orderAmount, vehicleSize } from '../words';
+import { countOf, figure, hhmm, litres, orderAmount, ordersAmount, vehicleSize } from '../words';
 import { DeferForm } from './DeferForm';
 import { DriverMenu } from './DriverMenu';
 import { vehicleIcon } from './icons';
@@ -47,6 +47,11 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
   const problems = inStep ? index.problems(trip.vehicleId, trip.tripNo) : [];
   const has = (code: string) => problems.some((problem) => problem.code === code);
   const undo = screen.undo?.tripKey === key ? screen.undo : null;
+  // Each stop's shop and what is unloaded there, for its dot on the timeline (spec 022).
+  const stopShops = new Map(trip.stops.flatMap((stop) => {
+    const shop = index.shop(stop.outletId);
+    return shop ? [[stop.outletId, { name: shop.name, goods: ordersAmount(shop.brand, stop.orderIds.flatMap((id) => index.order(id) ?? [])) }] as const] : [];
+  }));
 
   const split = async (order: BoardOrder, keep: { productId: string; quantity: number }[]) => {
     const refused = await act((date, ref) => splitOrder(date, { ...ref, orderId: order.id, keep }));
@@ -94,7 +99,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
       </div>
 
       <div className="px-3.5 pt-3">
-        <Timeline times={times} depot={board.depot} problems={problems} onLeaveAt={(minutes) => change(setLeaveAt(draft, key, minutes))} />
+        <Timeline times={times} depot={board.depot} shops={stopShops} problems={problems} onLeaveAt={(minutes) => change(setLeaveAt(draft, key, minutes))} />
       </div>
 
       {undo && (

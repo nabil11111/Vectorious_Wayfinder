@@ -178,7 +178,7 @@ describe('the plan checker', () => {
 
     // Every shop here opens well before the truck arrives, so nothing waits and unloading starts on arrival.
     const stop = (seq: number, outletId: string, arrive: string, leave: string, opens: string): StopTime =>
-      ({ seq, outletId, arriveAt: at(arrive), waitMin: 0, startAt: at(arrive), leaveAt: at(leave), windowOpen: at(opens), windowClose: at('08:00'), late: false });
+      ({ seq, outletId, arriveAt: at(arrive), waitMin: 0, startAt: at(arrive), leaveAt: at(leave), windowOpen: at(opens), windowClose: at('08:00'), late: false, lateMin: 0 });
     const dryLoad = { needsReefer: false, needsTailLift: false, keepUpright: false };
     expect(result.trips).toEqual([
       {

@@ -184,9 +184,9 @@ describe('trip timeline', () => {
           times: {
             district: 'Gampaha', leaveAt: at('03:30'),
             stops: [
-              { seq: 1, outletId: 'OUT026', arriveAt: at('04:07'), waitMin: 0, startAt: at('04:07'), leaveAt: at('04:22'), windowOpen: at('03:00'), windowClose: at('08:00'), late: false },
-              { seq: 2, outletId: 'OUT030', arriveAt: at('04:31'), waitMin: 0, startAt: at('04:31'), leaveAt: at('04:46'), windowOpen: at('03:00'), windowClose: at('08:00'), late: false },
-              { seq: 3, outletId: 'OUT028', arriveAt: at('04:55'), waitMin: 0, startAt: at('04:55'), leaveAt: at('05:11'), windowOpen: at('03:00'), windowClose: at('08:00'), late: false },
+              { seq: 1, outletId: 'OUT026', arriveAt: at('04:07'), waitMin: 0, startAt: at('04:07'), leaveAt: at('04:22'), windowOpen: at('03:00'), windowClose: at('08:00'), late: false, lateMin: 0 },
+              { seq: 2, outletId: 'OUT030', arriveAt: at('04:31'), waitMin: 0, startAt: at('04:31'), leaveAt: at('04:46'), windowOpen: at('03:00'), windowClose: at('08:00'), late: false, lateMin: 0 },
+              { seq: 3, outletId: 'OUT028', arriveAt: at('04:55'), waitMin: 0, startAt: at('04:55'), leaveAt: at('05:11'), windowOpen: at('03:00'), windowClose: at('08:00'), late: false, lateMin: 0 },
             ],
             lastDoneAt: at('05:11'), backAt: at('05:48'), readyAgainAt: at('06:18'), tripMin: 101, km: 70, litres: 10.3,
           },
@@ -196,10 +196,10 @@ describe('trip timeline', () => {
           times: {
             district: 'Colombo', leaveAt: at('06:18'),
             stops: [
-              { seq: 1, outletId: 'OUT006', arriveAt: at('06:42'), waitMin: 0, startAt: at('06:42'), leaveAt: at('06:58'), windowOpen: at('03:00'), windowClose: at('08:00'), late: false },
-              { seq: 2, outletId: 'OUT004', arriveAt: at('07:06'), waitMin: 0, startAt: at('07:06'), leaveAt: at('07:22'), windowOpen: at('05:30'), windowClose: at('08:00'), late: false },
-              { seq: 3, outletId: 'OUT007', arriveAt: at('07:30'), waitMin: 0, startAt: at('07:30'), leaveAt: at('07:46'), windowOpen: at('05:30'), windowClose: at('08:00'), late: false },
-              { seq: 4, outletId: 'OUT014', arriveAt: at('07:54'), waitMin: 0, startAt: at('07:54'), leaveAt: at('08:10'), windowOpen: at('05:30'), windowClose: at('08:00'), late: false },
+              { seq: 1, outletId: 'OUT006', arriveAt: at('06:42'), waitMin: 0, startAt: at('06:42'), leaveAt: at('06:58'), windowOpen: at('03:00'), windowClose: at('08:00'), late: false, lateMin: 0 },
+              { seq: 2, outletId: 'OUT004', arriveAt: at('07:06'), waitMin: 0, startAt: at('07:06'), leaveAt: at('07:22'), windowOpen: at('05:30'), windowClose: at('08:00'), late: false, lateMin: 0 },
+              { seq: 3, outletId: 'OUT007', arriveAt: at('07:30'), waitMin: 0, startAt: at('07:30'), leaveAt: at('07:46'), windowOpen: at('05:30'), windowClose: at('08:00'), late: false, lateMin: 0 },
+              { seq: 4, outletId: 'OUT014', arriveAt: at('07:54'), waitMin: 0, startAt: at('07:54'), leaveAt: at('08:10'), windowOpen: at('05:30'), windowClose: at('08:00'), late: false, lateMin: 0 },
             ],
             lastDoneAt: at('08:10'), backAt: at('08:34'), readyAgainAt: at('09:04'), tripMin: 112, km: 36, litres: 5.3,
           },
@@ -227,6 +227,25 @@ describe('trip timeline', () => {
     // Only Fresh shops have that hour. A Style shop with the same window is on time at 08:00.
     const early = outlets.map((o) => (o.id === 'OUT019' ? { ...o, windowOpen: toMinutes('05:30'), windowClose: toMinutes('08:00') } : o));
     expect(late(timesOf('Peliyagoda', trip('VEH012', 1, ['OUT019'], '07:36'), { outlets: early }))).toEqual([['OUT019', '08:00', '08:00', false]]);
+  });
+
+  it('spec 022 gives each stop the minutes it arrives after its window closes, and 0 when it is on time', () => {
+    const lateBy = (times: TripTimes) => times.stops.map((stop) => [stop.outletId, toClock(stop.arriveAt), toClock(stop.windowClose), stop.late, stop.lateMin]);
+    // OUT010 closes at 07:30: on time reached then, and 24 minutes late reached at 07:54.
+    expect(lateBy(timesOf('Peliyagoda', trip('VEH012', 1, ['OUT010'], '07:06')))).toEqual([['OUT010', '07:30', '07:30', false, 0]]);
+    expect(lateBy(timesOf('Peliyagoda', trip('VEH012', 1, ['OUT010'], '07:30')))).toEqual([['OUT010', '07:54', '07:30', true, 24]]);
+    // A Fresh shop reached at 08:00, its closing time, is late by the Fresh hour and not after its window: 0.
+    expect(lateBy(timesOf('Kandy', trip('VEH044', 1, ['OUT110', 'OUT112', 'OUT111', 'OUT113'], '03:00'))).at(-1)).toEqual(['OUT113', '08:00', '08:00', true, 0]);
+
+    // A mall shop counts from the earlier close of its own window and its mall's slot (10:30 to 12:30 for OUT017).
+    const at17 = (open: string, close: string, leaveAt: string) => {
+      const mall = outlets.map((o) => (o.id === 'OUT017' ? { ...o, windowOpen: toMinutes(open), windowClose: toMinutes(close) } : o));
+      return lateBy(timesOf('Peliyagoda', trip('VEH012', 1, ['OUT017'], leaveAt), { outlets: mall }));
+    };
+    expect(at17('09:00', '17:00', '12:07')).toEqual([['OUT017', '12:31', '12:30', true, 1]]);
+    expect(at17('10:00', '11:30', '11:07')).toEqual([['OUT017', '11:31', '11:30', true, 1]]);
+    // A window that never opens has no minutes to count, so it is late with 0.
+    expect(at17('09:00', '10:00', '10:36')).toEqual([['OUT017', '11:00', '10:00', true, 0]]);
   });
 
   it('gives no times to a trip with no stops, with stops in more than one district, or with no drive from the plan\'s depot', () => {
