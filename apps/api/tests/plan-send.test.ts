@@ -56,6 +56,21 @@ it('AC-25 refuses blocked and already-departed plans without writing', async () 
   expect(departed.body.error.details).toEqual({ vehicleId: 'VEH002', tripNo: 1 }); expect(await held()).toEqual(before);
 });
 
+// Q-47: View plan's rows read "Charith · reefer truck" while the kept warning beside them said "VEH041's Fresh trips take
+// 277 minutes". The check a plan is sent with, and View plan reads back, names a truck by its driver as the rows do, and
+// by its kind and number only when it has none.
+it('Q-47 the check a plan is sent with names each truck by its driver, and by kind and number only with none', async () => {
+  const early = { ...trip(['OUT026', 'OUT028', 'OUT030']), leaveAt: 120 }, driverless = { ...trip(['OUT006'], 'VEH002'), driverId: null, leaveAt: 120 };
+  const sent = PlanBoard.parse((await send(await save(ready([early, driverless])))).body);
+  const reread = PlanBoard.parse((await as.get(URL)).body);
+  expect(reread.check).toEqual(sent.check);
+  const said = (vehicleId: string) => reread.check!.problems.filter((p) => p.vehicleId === vehicleId).map((p) => p.message);
+  expect(said('VEH004')).toContain('Dilshan\'s reefer truck leaves at 02:00, and a trip with a Fresh shop normally leaves at 03:30 or later.');
+  expect(said('VEH004').some((message) => message.includes('VEH004'))).toBe(false);
+  expect(said('VEH002').length).toBeGreaterThan(0);
+  expect(said('VEH002').every((message) => message.includes('the reefer truck VEH002') || message.includes('The reefer truck VEH002'))).toBe(true);
+});
+
 it('AC-26 sends atomically, saves the check and times, revises orders and announces after commit', async () => {
   const b = await save(); const before = await db.select().from(orders); vi.mocked(announce).mockClear();
   let committed = false; const original = db.transaction.bind(db);
