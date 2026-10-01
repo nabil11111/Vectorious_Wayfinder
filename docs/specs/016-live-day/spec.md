@@ -44,7 +44,7 @@ Icons come from the existing design assets, with counts rendered beside them, ne
 | Dashboard `/dispatcher` | Day underway | Dispatcher · Dashboard `53:11540` | Date and app time; six tiles from rule 3. Needs you on the left, the next-run card below it, then Trucks out now with problems first. The map area is removed and the cards use the space. Open live day leads to `/dispatcher/live`. |
 | | Nothing needs you / no truck out | No frame | The tiles keep their real zeroes. "Nothing needs you right now." and "No truck is out right now." A ready truck remains visible on Live day. |
 | | No sent plan | No frame | "No plan is out for Thu 25 Jun." and View plan for that date. No delivery denominator is invented; the tile reads "0 / 0 stops delivered · no plan out". Next-run orders, fuel and depot-wide problems still show. |
-| | Next run | Dispatcher · Dashboard `53:11540`, Next run card | The next operating date after the watched day, its order count, its real cutoff and View plan for that date. "Orders close Thu 16:00". The requested "Orders closed" state has the unresolved rollover conflict below; it must not be faked. No promised draft at 16:05 and no automatic build. |
+| | Next run | Dispatcher · Dashboard `53:11540`, Next run card | The next operating date after the watched day, its order count, its real cutoff and View plan for that date. "Orders close Thu 16:00"; the next run is always still open under the 16:00 rollover. No separate closed state, promised draft at 16:05 or automatic build. |
 | Live day `/dispatcher/live` | All trips | Dispatcher · Live day `78:68047` | Date, updated time, counts, All trucks and Problems only. Brand then district groups, one labelled row per trip with stop dots, planned and recorded times. Needs you and Drops and events in a persistent right column. No Wave 2 filter. |
 | | Problem open | Dispatcher · Live day · issue open `78:68510` | Decide focuses the existing issue card, with 012's loading answers or 013's refused/closed answers. The timeline stays visible. This is a column, not a modal. |
 | | Answer sent | Dispatcher · Live day · decision sent `102:75299`; · issue open · decision sent `102:75808` | Existing green Sent line and changed dispatcher bell count. The answered row says **Decided**, the supported equivalent of the frames' Warned / Decided; no Warned claim without a warning command. The stop keeps its recorded outcome. Open next focuses the oldest remaining full issue card; no Undo. |
@@ -105,6 +105,12 @@ five orders, 118 cartons ordered, 117 loaded and one dry carton short. Times are
    | Loading progress before ready | Existing `trucksOf` / `goingOf`: quantities of loaded stops (`stops.loaded_at`), adjusted only by loading issues on this trip. Label "On so far", not final loaded quantity. |
    | Photo marker / event counts | `photos` existence and rule 7's records. Show only the words "· photo" on an event, without an action. No "signed" or "received" total inferred from a driver's delivered count. |
    | Loader changed badge / before and after | Rule 9's two observed publications, whose fields came from `LoadingDay`. Count comparison rows, pairing a removed and added trip with exactly the same orders as one Moved row; otherwise each affected logical trip appears at most once. Do not add their goods together. |
+
+   **Publication changes next-run demand.** On the manual seeded Thursday plan, Friday's count is **0 before Send,
+   99 after Send, and 0 after Back to edit**, before loading starts. Thursday's deferred orders join the eligible
+   carry-over only while Thursday's plan is published; withdrawing it removes that eligibility. This is a change
+   in the recorded plan, not a count bug. The next run's cutoff is always in the future because the watched day
+   advances at 16:00; show when its orders close, without a closed flag or state.
 
    Every bar uses the numerator and denominator of its own tile/row: Stops delivered uses delivered/total, Trucks
    out uses out/fleet, trip Progress uses finished/total, and fuel uses its returned percentage. Zero denominators
@@ -253,6 +259,7 @@ branch, not on fabricated API data. AC-19 was removed after review; the other cr
 - [ ] **AC-34** When an operations GET is held behind a newer refetch or an app-clock day change, the system shall prevent the older response replacing the newer view and request the newly watched day without waiting for a page reload.
 - [ ] **AC-35** When a reviewer reads the joined code, the system shall have only the declared aggregate GET and local comparison, one clock/stream, server-supplied brand headers and tile ratios, no business sums in screens, and no new schema, command, photo viewer, sample data, GPS/presence inference or decision undo.
 - [ ] **AC-36** When Wellawatte refuses all 94 loaded cartons, the system shall show 1 / 2 stops delivered, zero partial, one with none delivered, 2 / 2 finished, 23 cartons delivered, 94 refused and one depot short.
+- [ ] **AC-37** When the manual Thursday plan is read before Send, after Send and after Back to edit before loading starts, the system shall show Friday's next-run count as 0, 99 and 0 respectively, with its future order cutoff and no closed state.
 
 ## Walkthrough
 Keep the README's manual plan, not the separate suggested-plan walkthrough. Times below are examples of the app
@@ -261,7 +268,7 @@ clock, dependent on the judge's pace. For exact assertions the test freezes thos
 Before the steps below, at README step 3 the watched day is Thursday but its plan has not been sent. The next-run
 count for Friday is **0**, whether Nadeesha's two drafts remain unplaced (102 Thursday planning orders) or have been
 placed (104). Those are Thursday's workload, not Friday's. After the Thursday publication, its 99 deferred orders
-become eligible carry-over under rule 3.
+become eligible carry-over under rule 3; Back to edit removes them from this count again, giving **0 → 99 → 0**.
 
 1. Continue after the README's Ready step (step 11 on this branch): Kasun has VEH035 ready at about 02:36, 117 of 118 cartons on and one dry short.
    As Ruwan open Dashboard. It reads Thu 25 Jun, 0 need you, 0 / 2 stops delivered, 0 / 38 trucks out, 99 orders for
@@ -322,16 +329,6 @@ only compares publications changed before **any** loading begins, without dock/r
 The whole-trip move is one row/bell 1 as in `85:71921`; the loader badge stays after Got it as the prototype shows.
 
 ## Open questions
-**Review follow-up still needing a date rule.** The six picks below are unchanged. Under D-66, at Thu 15:59 the
-watched day is Thursday, Next run is Friday and its cutoff is Thu 16:00. At Thu 16:00 the watched day becomes Friday,
-Next run becomes Saturday and its cutoff is Fri 16:00. Thus `ordersClosed = readAt >= cutoffAt` cannot be true in
-this read. Making it reachable needs a separate next-run rollover rule; keeping the existing rule means removing
-that unreachable state/field. Neither change is silently assumed here, and T0 must settle it before implementation.
-Also distinguish a status-only Send/Back to edit of the **next-date** plan (same eligible orders in the union) from
-sending/withdrawing the **watched** plan: the approved publication gate intentionally changes carry-over eligibility
-and makes the seed's Friday count 0 before Thursday's publication, 99 after it, and 0 on withdrawal. Requiring those
-three counts to stay equal would conflict with that gate. These are the two remaining clarifications on review item 1.
-
 1. **May A7 change trucks after loading has begun?** Our pick: no for this build (D-70). It needs new commands that
    preserve goods already counted and changes to the existing locks. We explicitly defer the earlier A7 promise.
 2. **Does Live day change to tomorrow at 16:00?** Our pick: yes, with the loader/driver day, retaining older out trips

@@ -162,7 +162,9 @@ complete refusals and zero-load completions are finished but not delivered; trip
 Brand headers get their own server totals, counting each vehicle once across districts. Trucks out counts distinct
 vehicles. Until the watched plan is published, next-run demand counts only eligible leaf orders wanted after that
 watched date, so the seeded Friday count is 0 while Thursday is being planned. Afterwards eligible carry-over can
-enter. Waiting orders and next-date published membership are deduplicated by id. Deferrals name the plan that deferred them without
+enter: the manual Thursday Send/Back to edit gives Friday demand **0 → 99 → 0**, intentionally. The tile shows when
+the next run's orders close; under the 16:00 watched-day rollover that cutoff is always future, so no closed state
+or flag is defined. Waiting orders and next-date published membership are deduplicated by id. Deferrals name the plan that deferred them without
 promising a new date. Fuel is the week's recorded and committed `fuel_log` litres against the fleet's quota, not
 measured consumption. [Spec 016's source table](specs/016-live-day/spec.md#rules) defines every numerator and denominator.
 

@@ -18,7 +18,7 @@ counts, percentages and attention flags are server values. No unvalidated record
 | --- | --- |
 | `OperationsDay` | `depot` (id/name), `demoDay` (reset generation), `day` or null, `dayChangesAt` (16:00 on the watched operating day, null with no day), `readAt`, `plan` (`id`, `revision`, `publishedAt`, `detailRecorded`) or null, `counts`, `nextRun` or null, `fuel` or null when its calendar date is absent, `brandTotals`, `groups`, `earlierOut` (with its own dated brand totals), ordered `outTripIds`, `events`, `eventsTruncated`. |
 | `OperationsCounts` | `stopsTotal`, `stopsDelivered`, `stopsDone`, `partialStops`, `noGoodsStops`, `closedStops`, `tripsTotal`, `vehiclesOut`, `vehiclesTotal`, `deferredOrders`, plus `deliveryProgress` and `truckProgress`. The execution numerators are nullable when any current trip lacks recorded detail; with no stops they are zero. `noGoodsStops` counts delivered/refused outcomes with zero delivered units, distinct from closed. They describe the current day except `vehiclesOut/Total`, which are depot-wide. Needs you comes from `IssueList`, not a second count here. |
-| `NextRun` | `date`, `cutoffAt`, `orders`; `ordersClosed` remains blocked by the review follow-up in spec.md: it is unreachable with the current rollover. Resolve the date policy or remove the field before T0 fixes the contract; do not assert a fabricated closed case. Demand uses rule 3's union, not the default planning board's day. |
+| `NextRun` | `date`, `cutoffAt`, `orders`. Demand uses rule 3's publication-gated union, not the default planning board's day. The cutoff is always future under the watched-day rollover, so there is no closed flag or state. |
 | `OperationsFuel` | `isoYear`, `isoWeek`, `litres`, `quotaLitres`, `percent` or null with zero quota. Entire week's recorded/committed rows. No duplicate `sent_check` contribution. |
 | `OperationsGroup` | `brand` (existing `Brand`: `Fresh`, `Style`, `Tech`, or null for Mixed), `district`, `tripsTotal`, `vehiclesTotal`, `stopsTotal`, `stopsDone`, `trips`. Groups in Fresh, Style, Tech, Mixed order, districts in the existing planner's district order; within them scheduled leave, vehicle id, trip number. No missing brand substituted with Fresh. |
 | `OperationsBrandTotal` | `brand`, `tripsTotal`, distinct `vehiclesTotal`, `stopsTotal`, nullable `stopsDone`, and that count's progress. Aggregate directly over all trips of that brand in the dated section, never by adding district vehicle totals. Headers read this shape. |
@@ -82,7 +82,8 @@ snapshot per card, or call an exported service that opens a nested transaction.
    next-date published membership; after publication allow the eligible carry-over too. Thus README step 3 is
    Friday 0, not the watched Thursday's 102/104 workload. Status changes alone must not lose next-date demand:
    published membership supplies orders that Send moves from placed/deferred to planned, and Back to edit puts
-   them back into the waiting set. Read deferrals
+   them back into the waiting set. The watched plan's publication gate is different: its Send/Back to edit changes
+   Friday's carry-over eligibility and intentionally gives 0 → 99 → 0 in the manual walkthrough. Read deferrals
    from the published current plan, not all older deferrals or order status alone. No call to the optimizer/checker.
 6. Read issues for shown trip ids with `issuesOf` and assemble trip attention, counts, brand totals and district
    groups from the same trip inputs. Each brand deduplicates its vehicles independently of its district buckets.
@@ -215,10 +216,6 @@ specific loading skeleton `85:72127`. Keep every open Needs you card in full, an
   join, not presented as built here. The cut order stays A8, then A7's district map, then A9.
 
 ## Risks
-- Review item 1's cutoff/stability wording still needs the two clarifications recorded above the six picks in
-  spec.md. The pre-publication count is corrected to 0. The current next-date rule cannot produce a closed cutoff,
-  and the watched-plan publication gate deliberately changes carry-over eligibility. Test these real boundaries;
-  do not freeze an obsolete watched date or fabricate an early next-day publication to make a test pass.
 - The mock delivery totals conflict and its loader move conflicts with current loading locks. D-67 and D-70 are
   explicit picks for Nabil to review, not claims that those interactions already exist.
 - The 013 server helper expects a kept check. AC-12 covers the actual empty legacy seed publications, then adds
@@ -273,10 +270,13 @@ The one-to-one map below names the test/check; do not replace it with one broad 
 | AC-34 | `older operations response cannot replace a newer day` | `apps/web/src/features/live/operations.test.ts` (controlled request ordering and clock boundary) |
 | AC-35 | `source and scope review` | Independent review recorded at join |
 | AC-36 | `a complete refusal finishes a stop without delivering it` | `apps/api/tests/operations-read.test.ts` |
+| AC-37 | `Thursday publication gives Friday demand zero then ninety nine then zero` | Same file |
 
 AC-2 includes both before/after Nadeesha's placement (Friday stays 0), plus explicit Friday test orders. Its pure
 eligibility cases exercise next-date orders moving between waiting status and published membership exactly once.
-The integrated Send/Back to edit cutoff case is not claimed settled: it needs the date-policy clarification above.
+AC-37 uses the real manual-plan Send and Back to edit before loading, reads after each commit, and asserts 0 → 99 → 0.
+It also checks the future `cutoffAt`; there is no closed-state criterion to implement. AC-10's 16:00 rollover keeps
+the next run's cutoff future when the watched date changes, without freezing an obsolete watched date.
 
 Integration files use the builder's private seeded database, once-per-file sign-ins and the existing
 `loading-plan.ts` / 013 `driver-plan.ts` walkthrough helpers. `operations-plan.ts` may compose them and call real
@@ -286,7 +286,7 @@ test follows 013's Friday retry scenario; the read/reset race uses its existing 
 Permission fixtures add a Kandy trip/issue in the test only. The 50-event case makes typed issue records in the test,
 with deliberately different real audit and business times; no production sample feed is permitted.
 
-AC-19 is removed; the **35 remaining criteria keep their original ids**, and each maps to one row above. AC-15
+AC-19 is removed and AC-37 covers the publication transition; the **36 criteria** each map to one row above. AC-15
 includes a vehicle crossing two districts in one brand; AC-26 checks the closed-shop half bar and every Trucks out
 column/sort. AC-28 checks the persisted Decided state and full Needs you cards. AC-30 checks both the exact-order
 vehicle move and the seeded departure-only change. AC-33 includes Live day's named loading skeleton and withdrawal

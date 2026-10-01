@@ -4,7 +4,7 @@ One pull request per task, from the lead's integration branch after T0. Tests fi
 criteria in [plan.md](plan.md). This document assigns future implementation; the spec PR changes documents only.
 
 - [ ] **T0 · Shared parts** · lead, after spec 013's server and screens are joined, with 014/015's landed contracts
-  reconciled and review item 1's next-run cutoff/stability boundary in spec.md settled. Add/export `operations.ts`,
+  reconciled. Add/export `operations.ts`,
   widen `LoadingDay` with the publication fields and demo generation, mount
   an empty dispatcher/depot-protected `routes/operations.ts` in `app.ts`. Keep the existing loading responses valid
   while widening them: T0 owns the minimal `loading/day.ts` and `loading/writes.ts` signature/metadata work and its
@@ -18,9 +18,11 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
   `apps/web/src/lib/live.ts`, `lib/live.test.ts`,
   `assets/icons/` if an existing icon is missing; implementation status in `docs/specs/000-map.md`.
 
-- [ ] **T1 · The dispatcher reads the day** · API builder, after T0 (**AC-1 to AC-7, AC-10 to AC-12, AC-14 to AC-16, AC-25, AC-36**).
+- [ ] **T1 · The dispatcher reads the day** · API builder, after T0 (**AC-1 to AC-7, AC-10 to AC-12, AC-14 to AC-16, AC-25, AC-36, AC-37**).
   Write and run the failing reads/counts/attention tests before implementing the read model. Include the fresh-reset
-  legacy plan, depot isolation, absent day and snapshot/reset race. Reuse 013's read helpers and counts; no writes.
+  legacy plan, depot isolation, absent day and snapshot/reset race. AC-37 asserts Friday demand 0 → 99 → 0 through
+  the real Thursday Send/Back to edit; the tile shows the future cutoff without a closed state. Reuse 013's read
+  helpers and counts; no new writes.
   **Files:** `apps/api/src/operations/read.ts`, `figures.ts`, `figures.test.ts`, `attention.ts`,
   `attention.test.ts`; GET `/` in `apps/api/src/routes/operations.ts`;
   `apps/api/tests/operations-plan.ts`, `operations-read.test.ts`. API builder owns this route after T0's handoff.
@@ -71,7 +73,8 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
 loading metadata and stream fan-out belong to the lead alone; any required shared correction returns to that owner
 and is pushed before both builders adopt it. The API builder touches no web files; the screens builder touches no
 API files. T3 and T4 share one screens owner, so they do not race on their own files or routes. AC-19 is removed;
-the other 35 criteria retain their ids and task owners. No task assigns a file owned by spec 015: its issue hook,
+the other 35 retain their ids and AC-37 adds the publication transition, making 36 criteria with task owners.
+No task assigns a file owned by spec 015: its issue hook,
 IssueCard, loader problem words, driver words and store/receipt files remain outside this piece.
 
 Nobody else changes `packages/contracts`, `apps/api/src/app.ts`, `loading/day.ts`, `loading/writes.ts`,
