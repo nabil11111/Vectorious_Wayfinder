@@ -55,7 +55,9 @@ export function outRowOf(trip: DriverTrip, arrivals: Map<string, string>, issues
   const status: OperationsStatus = problem ? { kind: 'open_problem', issueId: problem.id, issueKind: problem.kind, summary: summaryOf(problem), raisedAt: problem.raisedAt }
     : trip.status === 'done' && trip.backAt ? { kind: 'back', backAt: trip.backAt }
     : next?.arrivedAt ? { kind: 'at_stop', stopId: next.id, shopName: next.shopName, arrivedAt: next.arrivedAt }
-    : attention.kind !== 'none' ? attention : !next && trip.status === 'out' ? { kind: 'returning' }
+    : attention.kind !== 'none' ? attention
+    // A planned return already past says when it was due, not when it will be (README, "What the plan assumes").
+    : !next && trip.status === 'out' ? { kind: 'returning', sentence: `Returning · ${at > trip.backBy ? 'was due back' : 'planned back'} ${clockOf(trip.backBy)}` }
     : { kind: trip.status === 'done' ? 'unrecorded' : trip.status };
   return { progress: progress(trip.stops.filter(stop => stop.outcome !== null).length, trip.stops.length),
     nextStop: next ? { id: next.id, outletId: next.outletId, shopName: next.shopName } : null,

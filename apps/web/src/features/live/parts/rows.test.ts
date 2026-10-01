@@ -35,3 +35,13 @@ describe('Q-24 Live day past a truck\'s leaving time', () => {
     expect(needsAttention(trip)).toBe(false);
   });
 });
+
+describe('spec 016 a returning truck\'s planned return', () => {
+  it('says the server\'s words, which say when it was due once that time has passed', () => {
+    const returning = (sentence: string) => ({
+      ...atDock('out', { kind: 'none' }), outRow: { status: { kind: 'returning', sentence }, plannedReturn: LEAVES, nextStop: null },
+    }) as unknown as OperationsTrip;
+    expect(rowFacts(returning('Returning · planned back 06:38'), [])).toMatchObject({ sentence: 'Returning · planned back 06:38', word: 'returning' });
+    expect(rowFacts(returning('Returning · was due back 06:38'), [])).toMatchObject({ sentence: 'Returning · was due back 06:38', word: 'returning' });
+  });
+});

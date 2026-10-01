@@ -73,7 +73,8 @@ are depot time.
    back (rule 4), with each order's wanted day, how many sent plans deferred it and its original if it is a part. The
    day's vehicles with their workshop days and the fuel they used this week, the depot's shops, travel and unloading
    times, and "Mix brands" as the draft has it. Spec 011 decides every trip, stop, leaving time, split and deferral in
-   its priority order, and the board adds nothing to it. *102 orders: 98 placed for Thursday and the 4 carried over.
+   its priority order, and before any order waits it frees a run for it where goods the plan carries can move (spec
+   011, AC-23, D-102). The board adds nothing to it. *102 orders: 98 placed for Thursday and the 4 carried over.
    VEH003, VEH005 and VEH036 are in the workshop, and VEH001 has 40 of its 340 litres left this week.*
 3. **What a build replaces (D-51, D-52).** Every trip and deferral of the draft, in one transaction with the build: a
    refused build changes nothing. A vehicle the suggestion uses keeps the driver the draft gave it, and a driver on a
@@ -86,8 +87,8 @@ are depot time.
    part and is planned whole, because a part cannot be split again (spec 011, AC-13). Each split the planner proposes
    is made as spec 010's split makes one (rule 8): the original becomes `split`, and two parts start `placed` with its
    shop, temperature, wanted day, note, placed time and placer. Each part goes exactly where the planner's plan puts
-   it: the first on the trip it chose, and the second on another trip when the planner found one for it whole (spec
-   011, AC-13), or deferred with the planner's reason. The shop sees both parts at once, as for a hand split (spec
+   it: the first on the trip it chose, and the second on another trip when the planner found one for it whole or once
+   it shared the two parts out again (spec 011, AC-13), or deferred with the planner's reason. The shop sees both parts at once, as for a hand split (spec
    010, open point 2). *A test raises OUT001's carried-over order from 12 to 180 chilled cartons. Only VEH035 can take
    it, and 1,242 kg is over its 1,040, so the planner splits it: 150 cartons (1,035 kg, 5.55 m³) go on VEH035 trip 1
    and the other 30 on VEH035 trip 2, which reaches Fresh Nugegoda at 06:34. All its goods go, so there is no
@@ -99,16 +100,20 @@ are depot time.
    removes it with the plan.
 6. **Decisions (D-54).** The planner hands the dispatcher three kinds (spec 011, AC-3 and AC-9): `early_leave`, a trip
    set to leave before its usual time to meet a window (D-19); `waited_again`, an order that waited before and some of
-   whose goods wait again (D-10); and `late_order`, an order deferred because no truck can reach the shop in its window
-   or mall slot (D-11). A decision is open while it is not accepted and the saved draft still holds the planner's own
+   whose goods wait again (D-10); and `late_order`, an order deferred because no truck of the suggestion reached the
+   shop in its window or mall slot (D-11), whether no vehicle could even alone or only this plan's other goods kept it
+   off; its sentence says which (spec 011, AC-17). A decision is open while it is not accepted and the saved draft still holds the planner's own
    choice: the trip leaves at that time, or the order is deferred with the planner's code and reason. An edit that
    changes that choice (another time, the order put on a trip or left unplanned, the reason rewritten) ends the
    decision, because the dispatcher has decided by editing. On View plan the dispatcher accepts one decision or all of
    them, and an accepted one stays accepted. *The seeded suggestion has six: four chilled orders for Kurunegala and two
-   for Puttalam wait for their windows, each a `late_order`, and no trip leaves early. With VEH035 in the workshop,
+   for Puttalam wait, each a `late_order` that did not fit this suggested plan's fridge trucks in time, though each could
+   go alone on an empty one, and no trip leaves early. With VEH035 in the workshop,
    Fresh Nugegoda's carried-over chilled cartons have no fridge van (`no_van`) and add a `waited_again`.*
 7. **why?** An order's reason is the planner's: it names the order's rank, its priority (waited since when, chilled or
-   dry, when its window closes) and what decided its trip, or why it waits (spec 011, AC-1 and AC-17). Both parts of a
+   dry, when its window closes) and what decided its trip, or why it waits (spec 011, AC-1 and AC-17). An order moved
+   to free a run for another says so ("shares a stop to free a run"), and the order on that run says "takes a run freed
+   for it" (AC-23). Both parts of a
    split show their original's. A part split by hand after the build has no "why?", since the planner never saw it.
    *Fresh Dickwella's chilled order, wanted Tue 23 Jun and deferred twice, is rank 1, and the three other carried-over
    orders are 2 to 4.*
@@ -116,7 +121,7 @@ are depot time.
    saved and checked the same way (D-29), and the suggestion stays as built. The send goes as spec 010's rule 11 once
    the checker finds no block and no decision is open. Accepting a decision clears none of the checker's warnings, and
    warnings never stop a send, so the plan is ready, with warnings, and they stay on View plan. *The seeded suggestion
-   keeps two long waits, of 59 and 73 minutes, and a Fresh workload of 278 of 270 minutes.*
+   keeps one long wait, of 43 minutes at Fresh Bambalapitiya, and a Fresh workload of 278 of 270 minutes.*
 9. **The numbers.** As spec 010's rule 12: the API works out every number shown, and the planner writes every rank
    and reason. The screen counts the rows it lists ("Decisions · N", "N decisions to make") and nothing else.
 
@@ -213,7 +218,7 @@ reset. *Unit* ones use made-up data. Screens get a click-through in Nabil's Chro
   "✓ accepted" after View plan's Accept.
 - [ ] **AC-17** View plan. With the seeded suggestion's decisions: "Decisions · 6" above Checks, each with Accept and
   Open in edit, "Accept all 6" in orange and the send greyed as "Send plan · 6 decisions open". Accepting one closes
-  it. Accepting the rest leaves the warnings listed under "Checks · 3" with "Ready, with warnings" and turns the send
+  it. Accepting the rest leaves the warnings listed under "Checks · 2" with "Ready, with warnings" and turns the send
   orange. The send gives the sent state, which keeps "Suggested plan · 16:00", the accepted decisions and the warnings
   after a reload.
 - [ ] **AC-18** View plan opened by a reload. After a fresh build, reload View plan before anything else, then press
@@ -236,14 +241,14 @@ depend on the judge's pace, so the clock times are examples.
    the middle, "No trip open" and "Build the suggested plan" in orange.
 3. Press it. "Building the plan · 102 orders · 35 trucks", then "Unplanned · 0", 27 trips under Done on "26 / 35
    trucks", "96 / 102 orders", and "Deferred · 6": the chilled orders of four Kurunegala shops and two Puttalam shops,
-   each with its sentence, such as "No truck could reach Fresh Pannala before its window closed at 07:45 on
-   Thursday." The middle says "Suggested plan · 16:00 · 6 decisions to make".
+   each with its sentence, such as "The order for Fresh Pannala didn't fit this suggested plan's fridge trucks on
+   Thursday; try it by hand on the board." The middle says "Suggested plan · 16:00 · 6 decisions to make".
 4. Under Done, open the Fresh · Matara trip with Fresh Dickwella's chilled cartons and press "why?" on its stop: rank
    1, waiting since Tuesday. Press "why?" on a deferred order: its sentence and "to decide".
 5. Open VEH035's trip 1, the fridge van with Fresh Nugegoda's chilled cartons, and choose Dilshan as its driver: an
    ordinary edit, saved and checked as spec 010's are.
 6. Open View plan: "Suggested plan · 16:00", "Decisions · 6" and "Send plan · 6 decisions open". Press "Accept all 6":
-   "Decisions · all made", and under "Checks · 3" the two long waits and the Fresh workload stay listed with "Ready,
+   "Decisions · all made", and under "Checks · 2" the long wait and the Fresh workload stay listed with "Ready,
    with warnings". Press "Send plan to loaders and drivers": "✓ Sent 16:06 · loaders and 1 driver".
 
 ## Out of scope

@@ -3,7 +3,7 @@ import { checkPlan } from '../check';
 import { computeLoad } from '../load';
 import { lookup } from '../lookup';
 import { cargoProblems } from '../rules/cargo';
-import type { EngineOrder, PlanInput } from '../types';
+import type { EngineOrder, EngineVehicle, PlanInput } from '../types';
 import { compare, effectiveWindow } from './priority';
 import type { RejectionStage } from './reasons';
 
@@ -17,20 +17,45 @@ export interface CandidateAttempt {
 }
 export interface CandidateSlots { slots: CandidateSlot[]; refusal?: 'no_reefer' | 'no_van' }
 
+// The vehicles that may carry an order at all: the depot's available ones, fridge ones for chilled goods and vans for a
+// van-only shop. With none of the kind it needs, the order is refused before any trial.
+export function compatibleFleet(input: PlanInput, order: EngineOrder): { fleet: EngineVehicle[]; refusal?: 'no_reefer' | 'no_van' } {
+  const shop = lookup(input.outlets, 'shop')(order.outletId);
+  let fleet = input.vehicles.filter((v) => v.available && v.depotId === input.depotId);
+  if (computeLoad(order.lines, input.products).needsReefer) {
+    fleet = fleet.filter((v) => v.temp === 'reefer');
+    if (!fleet.length) return { fleet, refusal: 'no_reefer' };
+  }
+  if (shop.parking === 'van_only') {
+    fleet = fleet.filter((v) => v.type === 'van');
+    if (!fleet.length) return { fleet, refusal: 'no_van' };
+  }
+  return { fleet };
+}
+
+// AC-6's structural tuple for an order's slots: no needless reefer, no needless van, an existing trip before a new one, a
+// first trip before a second, then volume, weight, km per litre and vehicle ID.
+export function slotOrder(input: PlanInput, order: EngineOrder): (a: CandidateSlot, b: CandidateSlot) => number {
+  const shop = lookup(input.outlets, 'shop')(order.outletId);
+  const load = computeLoad(order.lines, input.products);
+  const vehicleOf = lookup(input.vehicles, 'vehicle');
+  return (a, b) => {
+    const av = vehicleOf(a.vehicleId), bv = vehicleOf(b.vehicleId);
+    return Number(av.temp === 'reefer' && !load.needsReefer) - Number(bv.temp === 'reefer' && !load.needsReefer)
+      || Number(av.type === 'van' && shop.parking !== 'van_only') - Number(bv.type === 'van' && shop.parking !== 'van_only')
+      || Number(b.existing) - Number(a.existing)
+      || a.tripNo - b.tripNo
+      || bv.volumeCapM3 - av.volumeCapM3 || bv.weightCapKg - av.weightCapKg || bv.kmPerL - av.kmPerL
+      || compare(av.id, bv.id) || a.tripNo - b.tripNo;
+  };
+}
+
 // Structural selection is the planner's policy. Loads, timings and fuel remain the checker's rules.
 export function candidateSlots(input: PlanInput, order: EngineOrder): CandidateSlots {
   const shopOf = lookup(input.outlets, 'shop');
   const shop = shopOf(order.outletId);
-  const load = computeLoad(order.lines, input.products);
-  let fleet = input.vehicles.filter((v) => v.available && v.depotId === input.depotId);
-  if (load.needsReefer) {
-    fleet = fleet.filter((v) => v.temp === 'reefer');
-    if (!fleet.length) return { slots: [], refusal: 'no_reefer' };
-  }
-  if (shop.parking === 'van_only') {
-    fleet = fleet.filter((v) => v.type === 'van');
-    if (!fleet.length) return { slots: [], refusal: 'no_van' };
-  }
+  const { fleet, refusal } = compatibleFleet(input, order);
+  if (refusal) return { slots: [], refusal };
   const slots: CandidateSlot[] = [];
   for (const vehicle of fleet) {
     const trips = input.plan.trips.filter((t) => t.vehicleId === vehicle.id);
@@ -45,22 +70,15 @@ export function candidateSlots(input: PlanInput, order: EngineOrder): CandidateS
     const next = Math.max(0, ...trips.map((t) => t.tripNo)) + 1;
     if (next <= 2 && input.plan.trips.length < 76) slots.push({ vehicleId: vehicle.id, tripNo: next, existing: false });
   }
-  const vehicleOf = lookup(fleet, 'vehicle');
-  slots.sort((a, b) => {
-    const av = vehicleOf(a.vehicleId), bv = vehicleOf(b.vehicleId);
-    return Number(av.temp === 'reefer' && !load.needsReefer) - Number(bv.temp === 'reefer' && !load.needsReefer)
-      || Number(av.type === 'van' && shop.parking !== 'van_only') - Number(bv.type === 'van' && shop.parking !== 'van_only')
-      || Number(b.existing) - Number(a.existing)
-      || a.tripNo - b.tripNo
-      || bv.volumeCapM3 - av.volumeCapM3 || bv.weightCapKg - av.weightCapKg || bv.kmPerL - av.kmPerL
-      || compare(av.id, bv.id) || a.tripNo - b.tripNo;
-  });
+  slots.sort(slotOrder(input, order));
   return { slots };
 }
 
 // Only this vehicle's complete day goes to the checker during a trial. No unplanned order can produce a
-// coverage block, and every previously accepted order on its other trip is still protected.
-export function candidateInput(input: PlanInput, order: EngineOrder, slot: CandidateSlot): PlanInput {
+// coverage block, and every previously accepted order on its other trip is still protected. A new stop goes at its
+// closing-time place among the trip's stops, which keep their order (AC-7), or at the given position when AC-7's
+// search for another place tries one.
+export function candidateInput(input: PlanInput, order: EngineOrder, slot: CandidateSlot, position?: number): PlanInput {
   const vehicle = lookup(input.vehicles, 'vehicle')(slot.vehicleId);
   const trips = input.plan.trips.filter((t) => t.vehicleId === slot.vehicleId).map(({ leaveAt: _leaveAt, ...trip }) => ({
     ...trip, stops: trip.stops.map((stop) => ({ ...stop, orderIds: [...stop.orderIds] })),
@@ -73,12 +91,15 @@ export function candidateInput(input: PlanInput, order: EngineOrder, slot: Candi
   }
   const stop = changed.stops.find((s) => s.outletId === order.outletId);
   if (stop) stop.orderIds.push(order.id);
-  else changed.stops.push({ outletId: order.outletId, orderIds: [order.id] });
-  const shopOf = lookup(input.outlets, 'shop');
-  changed.stops.sort((a, b) => {
-    const aw = effectiveWindow(shopOf(a.outletId)), bw = effectiveWindow(shopOf(b.outletId));
-    return aw.close - bw.close || aw.open - bw.open || compare(a.outletId, b.outletId);
-  });
+  else {
+    const shopOf = lookup(input.outlets, 'shop');
+    const nw = effectiveWindow(shopOf(order.outletId));
+    const later = changed.stops.findIndex((s) => {
+      const sw = effectiveWindow(shopOf(s.outletId));
+      return (nw.close - sw.close || nw.open - sw.open || compare(order.outletId, s.outletId)) < 0;
+    });
+    changed.stops.splice(position ?? (later === -1 ? changed.stops.length : later), 0, { outletId: order.outletId, orderIds: [order.id] });
+  }
   const ids = new Set(trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds)));
   const orders = [...input.orders.filter((o) => ids.has(o.id) && o.id !== order.id), order];
   return {
@@ -119,14 +140,35 @@ export function fixDepartures(input: PlanInput): { input: PlanInput; check: Plan
   return { input: trial, check };
 }
 
-export function tryCandidate(input: PlanInput, order: EngineOrder, slot: CandidateSlot): CandidateAttempt {
-  const trial = candidateInput(input, order, slot);
-  if (!capacityFits(trial, slot.tripNo)) return { slot, input: trial, check: null, stage: 'over_capacity' };
+const judged = (slot: CandidateSlot, trial: PlanInput): CandidateAttempt => {
   const checked = fixDepartures(trial);
   const blocks = checked.check.problems.filter((p) => p.level === 'block');
   const stage = blocks.length === 0 ? 'accepted'
     : blocks.some((p) => p.code !== 'fuel_over_quota') ? 'window' : 'fuel';
   return { slot, ...checked, stage };
+};
+
+export function tryCandidate(input: PlanInput, order: EngineOrder, slot: CandidateSlot): CandidateAttempt {
+  const trial = candidateInput(input, order, slot);
+  if (!capacityFits(trial, slot.tripNo)) return { slot, input: trial, check: null, stage: 'over_capacity' };
+  const first = judged(slot, trial);
+  // AC-7: a new stop that misses a window at its closing-time place, even with AC-9's departure fix, is tried at each
+  // other place in the trip, first to last, before the candidate is refused. The first place that keeps the usual
+  // departures wins, else the first that passes with an earlier one; the other stops keep their order. Load and
+  // distance do not depend on the order of stops, so only windows can change.
+  if (first.stage !== 'window') return first;
+  const before = input.plan.trips.find((t) => t.vehicleId === slot.vehicleId && t.tripNo === slot.tripNo);
+  if (!before?.stops.length || before.stops.some((s) => s.outletId === order.outletId)) return first;
+  const closingPlace = trial.plan.trips.find((t) => t.tripNo === slot.tripNo)!.stops.findIndex((s) => s.outletId === order.outletId);
+  let earlier: CandidateAttempt | null = null;
+  for (let position = 0; position <= before.stops.length; position += 1) {
+    if (position === closingPlace) continue;
+    const attempt = judged(slot, candidateInput(input, order, slot, position));
+    if (attempt.stage !== 'accepted') continue;
+    if (!needsEarlierDeparture(attempt)) return attempt;
+    earlier ??= attempt;
+  }
+  return earlier ?? first;
 }
 
 const needsEarlierDeparture = (attempt: CandidateAttempt) =>
@@ -186,3 +228,24 @@ export function chooseWhole(input: PlanInput, order: EngineOrder): CandidateSlot
     stages: attempts.map((attempt) => attempt.stage as RejectionStage),
   };
 }
+
+// Spec 011, AC-17: whether an order could go at all, apart from the rest of the plan. It is tried alone on an empty
+// first run of each vehicle that may carry it, in AC-6's order, until one passes. Travel and unloading times do not
+// depend on the vehicle (spec 007), so a missed window on one is missed on all and ends the search; a vehicle too
+// small or short of fuel leaves the next to try. 'fits' means only this plan's other goods kept the order off, and
+// 'no_vehicle' that the depot has no working vehicle of the kind it needs.
+export function aloneStage(input: PlanInput, order: EngineOrder): 'fits' | 'no_vehicle' | RejectionStage {
+  const empty: PlanInput = { ...input, orders: [], plan: { trips: [], deferrals: [] } };
+  const { fleet } = compatibleFleet(empty, order);
+  if (!fleet.length) return 'no_vehicle';
+  const slots = fleet.map((v) => ({ vehicleId: v.id, tripNo: 1, existing: false })).sort(slotOrder(empty, order));
+  let furthest: RejectionStage = 'over_capacity';
+  for (const slot of slots) {
+    const { stage } = tryCandidate(empty, order, slot);
+    if (stage === 'accepted') return 'fits';
+    if (stage === 'window') return 'window';
+    if (stage === 'fuel') furthest = 'fuel';
+  }
+  return furthest;
+}
+

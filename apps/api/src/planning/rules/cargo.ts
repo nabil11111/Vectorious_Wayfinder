@@ -74,9 +74,10 @@ export const cargoProblems: CargoProblems = (input, tripLoads) => {
         if (load.needsReefer && vehicle.temp !== 'reefer') {
           report('needs_reefer', { ...here, orderId }, `The ${order} needs a fridge, and it is on ${onTrip}.`, 'Move it to a reefer truck or van.');
         }
-        // Trucks have a tail lift and vans do not (D-24).
+        // Trucks are taken to have a tail lift and vans not to (D-24): the fleet data has no such field, so the sentence
+        // says it is the assumption, not a fact about this van, and a van-only shop may have its own way to unload.
         if (load.needsTailLift && vehicle.type === 'van') {
-          report('no_tail_lift', { ...here, orderId }, `The ${order} needs a tail lift, and it is on ${onTrip}, which has none.`, 'Move it to a truck.');
+          report('no_tail_lift', { ...here, orderId }, `The ${order} needs a tail lift, and it is on ${onTrip}; vans are taken to have no tail lift.`, 'Move it to a truck, or check how the shop unloads it.');
         }
       }
     }

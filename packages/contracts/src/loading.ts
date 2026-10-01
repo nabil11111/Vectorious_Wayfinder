@@ -73,7 +73,8 @@ export const LoadingTruck = z.object({
   issues: z.array(LoadingIssue),
   // The vehicle's earlier trip it is still out on, and when that trip is due back, or null while the vehicle is at the
   // depot (Q-26). Its goods are put ready on the dock meanwhile (rule 2).
-  outOn: z.object({ tripNo: z.number().int().min(1), backBy: Moment }).nullable(),
+  // words: "out on trip 1 · back by 06:38", or "out on trip 1 · was due back 06:38" once the app clock has passed it.
+  outOn: z.object({ tripNo: z.number().int().min(1), backBy: Moment, words: z.string() }).nullable(),
 });
 export type LoadingTruck = z.infer<typeof LoadingTruck>;
 

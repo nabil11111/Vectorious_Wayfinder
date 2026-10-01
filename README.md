@@ -230,22 +230,43 @@ Press **Reset the demo day** first if you walked the one above.
    truck · Fresh · Matara"), "26 / 35 trucks", "96 / 102 orders", "41% fuel this week" and
    "57.02 / 140.7 m³ fridge space". "Deferred · 6" holds
    the chilled orders of four Kurunegala shops (Pannala, Polgahawela, Wariyapola, Mawathagama) and two Puttalam shops
-   (Wennappuwa, Puttalam), each with the sentence the shop will read, such as "No fridge truck could reach Fresh
-   Pannala before its window closed at 07:45 on Thursday." The middle says "Suggested plan · 16:00 · 6 decisions to
+   (Wennappuwa, Puttalam), each with the sentence the shop will read, such as "The order for Fresh Pannala didn't
+   fit this suggested plan's fridge trucks on Thursday; try it by hand on the board." Each could go alone on an empty
+   fridge truck, so none says it cannot be delivered. The middle says "Suggested plan · 16:00 · 6 decisions to
    make".
 4. **Ask why.** Under Done, open Priyantha's reefer truck, the Fresh · Matara trip. Its timeline runs from "Peliyagoda 03:30" to "back
    09:34", and pointing at Fresh Dickwella's dot shows "Stop 3 · Fresh Dickwella", "arrives 06:37 · leaves 06:52",
    "window 03:00 to 08:00" and "39 cartons chilled". Press **why?** on Fresh Dickwella: "Rank 1: waited since Tuesday;
-   chilled; …". Press **why?** on a deferred order: its rank, why no truck could take it, and "to decide".
+   chilled; …". Press **why?** on a deferred order: its rank, the closest run the planner tried and when that run would
+   have arrived, and "to decide".
 5. **An ordinary edit.** Open Wasantha's reefer van, the trip with Fresh Nugegoda's carried-over cartons. His name in
    the header is the driver menu: Dilshan's row says "drives VEH001 now; it will have no driver". Choose him: the
    header reads "Planning · Dilshan · reefer van", VEH001's card "reefer truck VEH001 · no driver", and "Dilshan moved
    from VEH001, which has no driver now" shows with **Undo**. It is one change, saved and checked like any other.
    Press **Undo**: Wasantha drives the van again and Dilshan VEH001.
 6. **Decide and send.** Open **View plan**: "Suggested plan · 16:00", "Decisions · 6" and a greyed "Send plan · 6
-   decisions open". Press **Accept all 6**: "Decisions · all made", and "Checks · 3" keeps the two long waits and the
-   Fresh workload listed with "Ready, with warnings". Press **Send plan to loaders and drivers**: "✓ Sent 16:06 ·
+   decisions open". Press **Accept all 6**: "Decisions · all made", and "Checks · 2" keeps the long wait and the Fresh
+   workload listed with "Ready, with warnings". Press **Send plan to loaders and drivers**: "✓ Sent 16:06 ·
    loaders and 26 drivers".
+
+## What the plan assumes
+
+Every plan, suggested or hand-made, is timed, fuelled and checked from the booklet's data, which is coarse in places.
+The checker and the planner assume the following; none of it is calibrated against real trips, so a planned time is
+the plan's estimate, not a promise.
+
+- **Legs are district averages.** A trip's drive out is the depot-to-district figure, and each hop between shops is
+  the district's average leg. Two routes through the same shops in another order come out the same in distance and
+  fuel.
+- **Clear roads.** Drive times are the free-flow figures, with no traffic, monsoon or disruption, so a checked
+  arrival can be optimistic.
+- **A fixed unloading allowance per stop.** Each stop takes the booklet's minutes for its brand and dock type,
+  whatever the quantity.
+- **The drive back takes as long as the drive out.** The data has no return leg.
+- **A 30-minute reload** between a vehicle's two trips (a setting).
+- **Every truck has a tail lift and no van does.** The fleet data has no such field (D-24). A tail-lift item on a van
+  is a warning that says "vans are taken to have no tail lift", because a van-only shop may have its own way to
+  unload.
 
 ## Departures from the design
 

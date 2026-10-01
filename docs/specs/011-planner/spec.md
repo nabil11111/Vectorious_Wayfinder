@@ -74,8 +74,13 @@ requires a stated override. The numbered priority above and the rules below are 
   over new first trips; between otherwise equal new runs, use an idle vehicle's first before a second run. This
   preserves special vehicles and avoids tying up a vehicle's whole day while other suitable trucks stand idle.
 - [ ] **AC-7** When adding orders at one outlet, the system shall use one stop there per trip, with order IDs in
-  priority order. It shall sort stops by effective closing minute, effective opening minute, then outlet ID, so
-  deadlines decide the route. Mall hours intersect shop hours; effective closing uses priority step 3.
+  priority order. A new stop goes at its place by effective closing minute, effective opening minute, then outlet ID,
+  among the trip's stops, which keep their order, so deadlines decide the route. If that misses a window even with
+  AC-9's departure fix, the system shall try the new stop at each other place in the trip, first to last, before
+  refusing the candidate, and take the first place that keeps the usual departures, else the first that passes with
+  an earlier one. A departure fix alone is not a search of the route. Mall hours intersect shop hours; effective
+  closing uses priority step 3. *Two Colombo shops on one truck, A taking deliveries 10:00 to 10:10 and B 09:00 to
+  10:20, with 20 minutes' unloading and 10 between them: A then B reaches B at 10:30, and B then A serves both.*
 - [ ] **AC-8** When checking a candidate, the system shall check both trips of its vehicle, including all earlier
   accepted orders, against 007. A new stop must not break its second trip. It shall use the checker's load,
   timeline and fuel functions, so both kg and m³, waiting, unloading, return and reload count correctly.
@@ -103,7 +108,13 @@ requires a stated override. The numbered priority above and the rules below are 
 - [ ] **AC-13** When no whole candidate fits, the system shall try a nonempty proper part on each candidate using
   AC-14, then pick the candidate by AC-6. It shall split only an original (`splitFrom: null`), once, into exactly
   two children. The first goes on the chosen trip; then try the remainder whole on the updated plan before
-  considering the next original order. Defer it only if no whole candidate passes, using AC-17's exhausted stage.
+  considering the next original order. If no whole candidate passes, share the two parts out once more before the
+  split is made: for each run the remainder could take, in its AC-6 order, that run takes the most of the original
+  it can carry by AC-14 and the chosen trip the rest, and the first pair that both pass is the split, with the same
+  two temporary IDs, whole quantities that add up exactly and no third part. *Two 1,000 kg trucks of 10 and 5 m³, one
+  run each, and two 500 kg, 1 m³ A items with two 100 kg, 4 m³ B items: both A items on the larger truck leave 8 m³ of
+  B items for the smaller one, so the A items go on the smaller truck and the B items on the larger.* Defer the
+  remainder only if that finds no pair either, using AC-17's exhausted stage.
   It is never split again: D-17 sends what fits and 010 forbids splitting a child again. A part already in the input
   must fit whole or wait whole. Both parts retain their parent's priority, so new goods cannot displace waiting goods.
   Automatic splits require at most 10 product lines, each with 1 to 999 units, to fit the split-write contract;
@@ -130,14 +141,25 @@ requires a stated override. The numbered priority above and the rules below are 
   1 to 200 characters written for the shop (010 rule 7). Use its name or district, the weekday, and the time that
   mattered when relevant. Never use an outlet ID, ISO date, "units", "tested stop order", "after earlier choices"
   or other search jargon; never promise a new date. Say cartons for Fresh, boxes for Style and items for Tech when
-  naming quantities. The sentence must be true to the actual failure and distinguish arriving late at this shop
-  from reaching it on time but making other shops late.
+  naming quantities. The sentence must be true to the actual failure and never claim more than the search proved.
+  So before writing it, try the order alone on an empty first run of each vehicle that may carry it, in AC-6's
+  order (travel and unloading do not depend on the vehicle, so a missed window ends that). If it passes, or is too big
+  only for one vehicle and could be divided, only this plan's other goods kept it off: say so plainly, without a
+  cause that sounds final, and invite a try by hand, for example "The order for Fresh Pannala didn't fit this
+  suggested plan's fridge trucks on Thursday; try it by hand on the board." For a part: "29 of the 34 boxes for
+  Kandy go on Thursday; the other 5 didn't fit this suggested plan's vans, so try them by hand on the board." The
+  code stays the search's stage. Otherwise the limit that stops it even alone is a hard one, and its code and
+  specific sentence below are that limit's: no fridge truck or van at all, no working vehicle of its kind ("No truck
+  was free for Colombo on Thursday."), an order that cannot be divided and is more than any vehicle carries ("The
+  order for Colombo is more than any truck can carry on Thursday."), a window no run reaches, distinguishing arriving
+  late at this shop from reaching it on time but making other shops late, or too little fuel on every vehicle. The
+  choice's own reason keeps the evidence of the best refused run, as the checker words it.
 
   | Stage, in order | Code if none remain | What the sentence explains |
   | --- | --- | --- |
   | Available depot reefers, for chilled | `no_reefer` | "No fridge truck was free for Gampaha on Thursday." |
   | Vans among compatible vehicles, for van-only | `no_van` | "No van was free for Fresh Wellawatte on Thursday, which takes vans only." |
-  | Trip slots in this district/brand, board and split-write limits, and room for the whole order or allowed part | `over_capacity` | "The trucks going to Kalutara on Thursday were full." Name a split limit only when some trip had room for a part. |
+  | Trip slots in this district/brand, board and split-write limits, and room for the whole order or allowed part | `over_capacity` | "The order for Kalutara is more than any truck can carry on Thursday." Name a split limit only when some trip had room for a part. |
   | On-time candidates, including AC-9 fixes | `window` | "No truck could reach Fresh Kiribathgoda before its window closed at 07:30 on Thursday." If that shop can be reached on time: "The truck that could reach Fresh Kiribathgoda in time would then have been late for its other shops on Thursday." |
   | Candidates within the remaining weekly fuel | `fuel` | "The trucks that could reach Fresh Matara on Thursday did not have enough of this week's fuel left." |
 
@@ -167,6 +189,21 @@ requires a stated override. The numbered priority above and the rules below are 
   a median below 1 second for AC-21 and below 2 seconds for a fixed 300-order case with the shared fleet, over
   10 measured runs after one warm-up, excluding fixture loading. Search bounds are input counts and quantities,
   never elapsed time; failure of this target requires work, not a different partial answer on a slower machine.
+
+### Before an order waits
+- [ ] **AC-23** When an order, or a split's second part, would still wait once every order has had its turn, the
+  system shall first try to free a run for it, taking the waiting orders in priority order (D-102). For each vehicle
+  that may carry it, in AC-6's order, only that vehicle's last run is tried: the waiting order must pass alone on it,
+  and the run's goods must all move without waiting, each stop's orders onto another run that already stops at that
+  shop (AC-6's order for those goods), or else the whole run onto a vehicle with a run free. Each move is checked by
+  007 with the vehicle's departures as they are, so nothing accepted is deferred, split, made late or made to leave
+  earlier; the first vehicle that works wins, and the whole plan is checked again at the end. A split whose two parts
+  end on one stop goes whole again. A moved order's reason says where it went now ("joined the reefer van VEH057 on its
+  second trip to Kandy, shares a stop to free a run", or "…, moved to free a run"), and the order on the freed run says
+  "takes a run freed for it". The pass never serves fewer goods than the loop left on trips. *Kandy's seeded day:
+  OUT082's dry cartons join its chilled ones on VEH057's second trip, OUT088's 34 boxes go whole on VEH060's second
+  trip and OUT093's Tech order takes VEH058's, so all 64 orders go on 26 trips with the same two time-budget
+  warnings.* The search is bounded by the fleet, never by elapsed time, and stays within AC-22.
 
 ## Out of scope
 Database reads or writes, endpoints, screens, `PlanBoard.suggestion`, future-day slot searches, changing a manual

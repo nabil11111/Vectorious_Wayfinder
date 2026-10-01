@@ -25,7 +25,7 @@ export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promi
     if (!row) throw unknown(write.tripId, 'That trip is not on your list.');
     const moment = locked.read();
     const { trip } = row;
-    const [view] = await driverTripsOf(tx, [row]);
+    const [view] = await driverTripsOf(tx, [row], moment.at);
     if (!view) throw new Error(`Trip ${trip.id} could not be read.`);
     const stop = 'stopId' in write ? view.stops.find(stop => stop.id === write.stopId) : undefined;
     if ('stopId' in write && !stop) throw unknown(write.stopId, 'That stop is not on this trip.');

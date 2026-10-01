@@ -174,8 +174,8 @@ it('AC-1 builds the seeded day into a new plan\'s draft in one write, with every
   expect(board.orders).toHaveLength(102);
   expect([...onTrips, ...deferred].sort()).toEqual(board.orders.map((o) => o.id).sort());
   expect(board.counts).toMatchObject({ trips: 27, vehiclesUsed: 26, vehiclesWorking: 35, ordersDue: 102, ordersOnTrips: 96, ordersDeferred: 6, ordersUnplanned: 0 });
-  // The walkthrough's warnings: two long waits and a Fresh workload over its budget.
-  expect(board.check!.problems.filter((p) => p.level === 'warn').map((p) => p.code).sort()).toEqual(['long_wait', 'long_wait', 'over_time_budget']);
+  // The walkthrough's warnings: a long wait and a Fresh workload over its budget.
+  expect(board.check!.problems.filter((p) => p.level === 'warn').map((p) => p.code).sort()).toEqual(['long_wait', 'over_time_budget']);
   expect(await db.select().from(plans).where(eq(plans.date, DATE))).toHaveLength(1);
   expect(PlanBoard.parse((await ruwan.get('/api/v1/plans')).body)).toEqual(board);
 });
@@ -209,7 +209,8 @@ it('AC-2 saves exactly what the planner gives for spec 011\'s seeded-day fixture
   expect(board.suggestion!.choices.map((c) => c.reason)).toEqual(named.choices.map((c) => c.reason));
   expect(board.suggestion!.decisions.map((d) => d.reason)).toEqual(named.decisions.map((d) => d.reason));
   expect(board.plan.deferrals.map((d) => [d.orderId, d.reason]).sort()).toEqual(named.input.plan.deferrals.map((d) => [d.orderId, d.reason]).sort());
-  expect(board.plan.deferrals.map((d) => d.reason)).toContain('No fridge truck could reach Fresh Pannala before its window closed at 07:45 on Thursday.');
+  // Each could go alone on an empty fridge truck, so the sentence says it did not fit this plan, not that it cannot go.
+  expect(board.plan.deferrals.map((d) => d.reason)).toContain('The order for Fresh Pannala didn\'t fit this suggested plan\'s fridge trucks on Thursday; try it by hand on the board.');
 });
 
 it('AC-3 keeps the suggestion as built on the board, through a save, a split and a join', async () => {

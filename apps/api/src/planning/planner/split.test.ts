@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { computeLoad } from '../load';
 import { vehicle } from '../testing/shared';
 import type { PlanInput, PlannerInput, PlannerOrder } from '../types';
+import { buildSuggestedPlan } from './build';
 import { candidateSlots } from './candidates';
 import { chooseAllocation, proposePart } from './split';
 import { plannerInput, plannerOrder } from './testing/input';
@@ -165,6 +166,34 @@ describe('planner splits and coverage limits', () => {
     input.outlets.find((s) => s.id === 'OUT001')!.mallOpen = 300;
     input.vehicles[0]!.litresUsedThisWeek = input.vehicles[0]!.weeklyFuelQuotaL;
     expect(chooseAllocation(empty(input), source, 1)).toMatchObject({ best: null, proposal: null, code: 'fuel' });
+  });
+  it('AC-13 shares the two parts out again when the second fits no run, whole quantities adding up, with no third part', () => {
+    // Two trucks of 1,000 kg, of 10 and 5 m³, a shop open long enough for one run each, and an order of two 500 kg, 1 m³
+    // A items and two 100 kg, 4 m³ B items, then one C item for the same shop. The first split, both A items on the
+    // larger truck, leaves 8 m³ of B items no truck can take before the C item takes the smaller one.
+    const products = [
+      { id: 'a', kgPerUnit: 500, m3PerUnit: 1, temp: 'dry' as const, needsTailLift: false, keepUpright: false },
+      { id: 'b', kgPerUnit: 100, m3PerUnit: 4, temp: 'dry' as const, needsTailLift: false, keepUpright: false },
+      { id: 'c', kgPerUnit: 50, m3PerUnit: 0.5, temp: 'dry' as const, needsTailLift: false, keepUpright: false },
+    ];
+    const source = plannerOrder('mixed', 'OUT019', 'a', 2, { lines: [{ productId: 'b', quantity: 2 }, { productId: 'a', quantity: 2 }] });
+    const input = plannerInput([source, plannerOrder('other', 'OUT019', 'c', 1)], {
+      products, vehicles: [{ ...vehicle('VEH012'), id: 'BIG', weightCapKg: 1000, volumeCapM3: 10 }, { ...vehicle('VEH012'), id: 'SMALL', weightCapKg: 1000, volumeCapM3: 5 }],
+    });
+    Object.assign(input.outlets.find((s) => s.id === 'OUT019')!, { windowOpen: 600, windowClose: 620 });
+    const result = buildSuggestedPlan(input);
+    if (result.status === 'unavailable') throw new Error('Expected a checked suggestion');
+    const [split] = result.splits;
+    expect(result.splits).toHaveLength(1);
+    expect(split!.keep).toEqual([{ productId: 'a', quantity: 0 }, { productId: 'b', quantity: 2 }]);
+    expect(SplitOrderRequest.safeParse({ planId: null, demoDay: 1, orderId: '00000000-0000-4000-8000-000000000001', keep: split!.keep }).success).toBe(true);
+    const parts = result.input.orders.filter((o) => o.id.startsWith('split:mixed:'));
+    expect(parts.map((o) => [o.id, o.lines])).toEqual([
+      ['split:mixed:keep', [{ productId: 'b', quantity: 2 }]], ['split:mixed:rest', [{ productId: 'a', quantity: 2 }]],
+    ]);
+    expect(computeLoad(parts.flatMap((o) => o.lines), products)).toEqual(computeLoad(source.lines, products));
+    expect(result.input.plan.deferrals).toEqual([]);
+    expect(result.choices[0]!.reason).toBe('Rank 1: new order; dry; Colombo closes 10:20; 2 boxes new run on the dry truck BIG to Colombo, more volume broke the tie; 2 boxes new run on the dry truck SMALL to Colombo, parts rebalanced so both go');
   });
 });
 

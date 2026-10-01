@@ -51,7 +51,8 @@ export const tripDayLine = (trip: DriverTrip) => `${shortDay(depotDay(Date.parse
 export const leavingLine = (trip: DriverTrip, at: number | null) => [leaves(trip), untilLeaving(trip.leavesAt, at)].filter(Boolean).join(' · ');
 
 // "Fresh · Colombo · back by 06:10"
-export const placeLine = (trip: DriverTrip) => `${tripPlace(trip)} · back by ${clockTime(trip.backBy)}`;
+// The return as the API words it against the app clock: "back by 06:10", or "was due back 06:10" once it has passed.
+export const placeLine = (trip: DriverTrip) => `${tripPlace(trip)} · ${trip.backByWords}`;
 
 // What the loader did not load, by why (L-09): short of stock, or won't fit on the truck. stockShort is the short ones.
 const stockShort = (counts: { short: number; wontFit: number }) => counts.short - counts.wontFit;
@@ -115,7 +116,7 @@ export const unloadLine = (brand: Brand | null, counts: StopFigures) => `Unload 
 
 // "Left Peliyagoda 03:31" and "back by 06:10" under the trip bar.
 export const leftLine = (day: DriverDay, trip: DriverTrip) => (trip.leftAt ? `Left ${day.depot} ${clockTime(trip.leftAt)}` : `Leaves ${day.depot} ${clockTime(trip.leavesAt)}`);
-export const backByLine = (trip: DriverTrip) => `back by ${clockTime(trip.backBy)}`;
+export const backByLine = (trip: DriverTrip) => trip.backByWords;
 
 // ── Unload and Something's wrong ─────────────────────────────────────────────────────────────────────────────
 
@@ -218,7 +219,7 @@ export const NOTHING_SENT_UNTIL_READ = 'Nothing is sent or saved until it is rea
 
 // ── Trip done and Day done ──────────────────────────────────────────────────────────────────────────────────
 
-export const headBackLine = (day: DriverDay, trip: DriverTrip) => `Head back to ${day.depot} · back by ${clockTime(trip.backBy)}`;
+export const headBackLine = (day: DriverDay, trip: DriverTrip) => `Head back to ${day.depot} · ${trip.backByWords}`;
 
 // "Cartons delivered", "Boxes delivered", "Units delivered" for a trip of several brands.
 export const deliveredLabel = (trip: DriverTrip) => `${capital(unitOf(trip.brand, 2))} delivered`;

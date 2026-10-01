@@ -38,7 +38,8 @@ describe('reviewed explanations through the complete planner', () => {
 
   it('AC-17 keeps no-slot capacity wording free of an irrelevant split limit', () => {
     const result = success(buildSuggestedPlan(plannerInput([plannerOrder('big', 'OUT006', 'fresh-dry-carton', 1000)], { vehicles: [] })));
-    expect(result.input.plan.deferrals[0]!.reason).toBe('The trucks going to Colombo on Thursday were full.');
+    // No truck works at all, which is a hard limit and says so, never that the trucks were full.
+    expect(result.input.plan.deferrals[0]!.reason).toBe('No truck was free for Colombo on Thursday.');
     expect(result.input.plan.deferrals[0]!.reason).not.toMatch(/999|divid|split/);
     clearReasons(result);
   });
@@ -60,7 +61,8 @@ describe('reviewed explanations through the complete planner', () => {
       plannerOrder('fresh', 'OUT006'),
     ], { vehicles: [vehicle('VEH012')] });
     const result = success(buildSuggestedPlan(day));
-    expect(result.input.plan.deferrals[0]).toMatchObject({ code: 'window', reason: 'No truck could reach Colombo before 08:00 on Thursday.' });
+    // Alone on the truck's first trip the Fresh cartons would be on time, so the plan, not the truck, kept them off.
+    expect(result.input.plan.deferrals[0]).toMatchObject({ code: 'window', reason: 'The order for Colombo didn\'t fit this suggested plan\'s trucks on Thursday; try it by hand on the board.' });
     expect(result.choices[1]!.reason).toMatch(/Colombo is reached at \d\d:\d\d by the second trip of the dry truck VEH012/);
     clearReasons(result);
   });
@@ -73,7 +75,9 @@ describe('reviewed explanations through the complete planner', () => {
     ], { vehicles: [vehicle('VEH012')] });
     day.outlets.find((shop) => shop.id === 'OUT027')!.windowOpen = 420;
     const result = success(buildSuggestedPlan(day));
-    expect(result.input.plan.deferrals).toMatchObject([{ orderId: 'added', code: 'window', reason: 'The truck that could reach Gampaha in time would then have been late for its other shops on Thursday.' }]);
+    expect(result.input.plan.deferrals).toMatchObject([{ orderId: 'added', code: 'window', reason: 'The order for Gampaha didn\'t fit this suggested plan\'s trucks on Thursday; try it by hand on the board.' }]);
+    // The choice keeps the evidence: the stop that the insertion would make late.
+    expect(result.choices.find((c) => c.orderId === 'added')!.reason).toMatch(/reached at \d\d:\d\d/);
     clearReasons(result);
   });
 
@@ -104,7 +108,7 @@ describe('reviewed explanations through the complete planner', () => {
     ], { vehicles: [vehicle('VEH001')] });
     day.outlets.find((shop) => shop.id === 'OUT027')!.windowOpen = 420;
     const result = success(buildSuggestedPlan(day));
-    expect(result.input.plan.deferrals).toMatchObject([{ orderId: 'added', code: 'window', reason: 'The fridge truck that could reach Gampaha in time would then have been late for its other shops on Thursday.' }]);
+    expect(result.input.plan.deferrals).toMatchObject([{ orderId: 'added', code: 'window', reason: 'The order for Gampaha didn\'t fit this suggested plan\'s fridge trucks on Thursday; try it by hand on the board.' }]);
     clearReasons(result);
   });
 

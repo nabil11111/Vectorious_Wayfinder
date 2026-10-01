@@ -176,7 +176,7 @@ export function markReady(caller: DepotCaller, tripId: string, body: MarkReadyRe
   return loaderWrite(caller, tripId, body.writeId, false, async (tx, { moment, trip, plan }) => {
     requireLoading(trip, body.revision);
     // The problems are read under the trip's lock, so an answer is seen whole or not at all.
-    const [truck] = await trucksOf(tx, plan, [trip]);
+    const [truck] = await trucksOf(tx, plan, [trip], [], moment.at);
     if (!truck) throw new Error(`${trip.vehicleId} trip ${trip.tripNo} could not be read.`);
     const left = truck.stops.filter((s) => !s.loaded).map((s) => s.seq).sort((a, b) => a - b);
     if (left.length) {

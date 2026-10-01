@@ -435,3 +435,13 @@ can undo and redo, up to 50, from the header's buttons or Ctrl+Z, so a dispatche
 history is the tab's own and clears when the draft is replaced from elsewhere, so it never puts back a plan someone
 else changed. Done's cards and each stop can be removed in one press, and Start over empties the draft after asking,
 as one step Undo brings back (Nabil, 1 Oct, spec 027).
+
+**D-102 · 2 Oct · Before an order waits, the planner frees a run for it.** The planner places orders one at a time in
+priority order, so an earlier order can hold a run that a later one needed while its goods could have gone elsewhere.
+Kandy's seeded day left OUT088's last 5 boxes and OUT093's Tech order waiting, though a plan within the same checks
+carried both on the same 26 trips. Once every order has had its turn, each waiting one, in priority order, may take a
+run freed by moving goods the plan already carries: onto a run that already stops at the same shop, or whole onto a
+vehicle's free run. Nothing accepted waits, every move is checked with its vehicle's departures as they are, and the
+search is bounded (each vehicle's last run, the first that works), so the planner stays within its time limits. The
+pass runs after every order has had its turn rather than at each refusal: freeing a run at once for an earlier-ranked
+order took room later orders needed and left more waiting on Peliyagoda's seeded day (Nabil, 2 Oct, spec 011, AC-23).

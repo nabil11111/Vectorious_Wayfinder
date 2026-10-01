@@ -85,11 +85,12 @@ export function loadFigure(truck: LoadingTruck) {
 // "0 of 118 cartons on"
 export const onOfUnits = (truck: LoadingTruck) => `${whole(truck.on.units)} of ${unitsWords(truck.brand, truck.units)} on`;
 
-// A trip whose vehicle is still out on an earlier one (Q-26), as the API names it: "out on trip 1 · back by 06:38" in its
-// row, and on its load page "VEH057 is out on trip 1 · back by 06:38. Put the cartons ready on the dock; they go on
-// when it is back.", in the brand's units, and "units" when the trip mixes brands.
+// A trip whose vehicle is still out on an earlier one (Q-26), as the API words it: "out on trip 1 · back by 06:38" in its
+// row, or "out on trip 1 · was due back 06:38" once that time has passed, and on its load page "VEH057 is out on trip 1
+// · back by 06:38. Put the cartons ready on the dock; they go on when it is back.", in the brand's units, and "units"
+// when the trip mixes brands.
 type OutOn = NonNullable<LoadingTruck['outOn']>;
-export const outOnWords = (outOn: OutOn) => `out on trip ${outOn.tripNo} · back by ${clockTime(outOn.backBy)}`;
+export const outOnWords = (outOn: OutOn) => outOn.words;
 export const outOnLine = (truck: Pick<LoadingTruck, 'vehicleId' | 'brand'> & { outOn: OutOn | null }) => (truck.outOn
   ? `${truck.vehicleId} is ${outOnWords(truck.outOn)}. Put the ${truck.brand ? UNIT_WORD[truck.brand][1] : 'units'} ready on the dock; they go on when it is back.`
   : null);

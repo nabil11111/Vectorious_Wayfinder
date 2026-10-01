@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkPlan } from '../check';
 import { inputFor, order, vehicle } from '../testing/shared';
 import type { EngineOrder, EngineVehicle, PlanInput, PlanTrip } from '../types';
-import { candidateSlots, chooseWhole, fixDepartures, tryCandidate } from './candidates';
+import { aloneStage, candidateInput, candidateSlots, chooseWhole, fixDepartures, tryCandidate } from './candidates';
 
 const dry = (id: string, shop = 'OUT006', quantity = 1) => order(id, shop, 'fresh-dry-carton', quantity);
 const trip = (vehicleId: string, tripNo: number, orders: EngineOrder[]): PlanTrip => ({
@@ -187,5 +187,42 @@ describe('whole-order planner candidates', () => {
     expect(timed.leaveAt).toBe(516);
     expect(timed.stops[1]).toMatchObject({ arriveAt: 607, waitMin: 23, startAt: 630 });
     expect(timed.stops[2]!.arriveAt).toBe(697);
+  });
+  it('AC-7 tries a new stop at each other place after a window miss, and a later stop leaves that order as it is', () => {
+    // Spec 011's A/B example: A takes deliveries 10:00 to 10:10 and B 09:00 to 10:20, 20 minutes' unloading and 10
+    // between them. At its closing-time place B comes after A and is reached at 10:30; before A it passes.
+    const [a, b, c] = [order('a', 'OUT019', 'style-folded', 1), order('b', 'OUT020', 'style-folded', 1), order('c', 'OUT015', 'style-folded', 1)];
+    const input = day([a], [trip('VEH012', 1, [a])]);
+    Object.assign(input.outlets.find((s) => s.id === 'OUT019')!, { windowOpen: 600, windowClose: 610 });
+    Object.assign(input.outlets.find((s) => s.id === 'OUT020')!, { windowOpen: 540, windowClose: 620 });
+    input.allowances = input.allowances.map((row) => (row.brand === 'Style' ? { ...row, minutes: 20 } : row));
+    input.travel = input.travel.map((row) => (row.district === 'Colombo' ? { ...row, betweenMin: 10 } : row));
+    const slot = { vehicleId: 'VEH012', tripNo: 1, existing: true };
+    const joined = tryCandidate(input, b, slot);
+    expect(joined.stage).toBe('accepted');
+    expect(joined.input.plan.trips[0]!.stops.map((s) => s.outletId)).toEqual(['OUT020', 'OUT019']);
+    expect(joined.input.plan.trips[0]!.leaveAt).toBeUndefined();
+    // A mall shop closing at 11:00 joins at its own closing-time place, last; B stays before A.
+    const next = { ...input, orders: [a, b], plan: { trips: joined.input.plan.trips, deferrals: [] } };
+    expect(candidateInput(next, c, slot).plan.trips[0]!.stops.map((s) => s.outletId)).toEqual(['OUT020', 'OUT019', 'OUT015']);
+    // With no place that passes, the refusal is the closing-time place's, so its reason names what that place missed.
+    Object.assign(input.outlets.find((s) => s.id === 'OUT020')!, { windowOpen: 615, windowClose: 616 });
+    const refused = tryCandidate(input, b, slot);
+    expect(refused.stage).toBe('window');
+    expect(refused.input.plan.trips[0]!.stops.map((s) => s.outletId)).toEqual(['OUT019', 'OUT020']);
+  });
+  it('AC-17 tells whether an order could go alone, apart from the rest of the plan', () => {
+    const cold = order('cold', 'OUT001', 'fresh-chilled-carton', 2);
+    // Alone on an empty first run of the fridge van, whatever the plan already carries.
+    const busy = day([order('other', 'OUT001', 'fresh-chilled-carton', 140)], [trip('VEH035', 1, [order('other', 'OUT001', 'fresh-chilled-carton', 140)])], [vehicle('VEH035')]);
+    expect(aloneStage(busy, cold)).toBe('fits');
+    expect(aloneStage(day([], [], [vehicle('VEH035')]), order('huge', 'OUT001', 'fresh-chilled-carton', 400))).toBe('over_capacity');
+    expect(aloneStage(day([], [], [{ ...vehicle('VEH035'), litresUsedThisWeek: vehicle('VEH035').weeklyFuelQuotaL }]), cold)).toBe('fuel');
+    expect(aloneStage(day([], [], [vehicle('VEH012')]), dry('far'))).toBe('fits');
+    expect(aloneStage(day([], [], []), dry('none'))).toBe('no_vehicle');
+    // A mall whose slot closes before the shop opens can never be reached in time.
+    const mall = day([], [], [vehicle('VEH012')]);
+    Object.assign(mall.outlets.find((s) => s.id === 'OUT017')!, { windowOpen: 600, windowClose: 620, mallOpen: 700, mallClose: 750 });
+    expect(aloneStage(mall, order('mall', 'OUT017', 'style-folded', 1))).toBe('window');
   });
 });

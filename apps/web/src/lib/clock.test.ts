@@ -161,7 +161,7 @@ const STOP = '7b000000-0000-4000-8000-000000000001';
 function tripOf(status: 'ready' | 'out', delivered = false): DriverTrip {
   return {
     tripId: TRIP, revision: 1, vehicleId: 'VEH035', vehicleType: 'truck', vehicleTemp: 'reefer', tripNo: 1, brand: 'Fresh', district: 'Colombo', status,
-    leavesAt: '2026-06-24T23:06:00.000Z', backBy: '2026-06-25T00:40:00.000Z', readyAt: '2026-06-24T21:06:00.000Z',
+    leavesAt: '2026-06-24T23:06:00.000Z', backBy: '2026-06-25T00:40:00.000Z', backByWords: 'back by 06:10', readyAt: '2026-06-24T21:06:00.000Z',
     leftAt: status === 'out' ? '2026-06-24T22:01:00.000Z' : null, backAt: null, problems: [],
     stops: [{
       id: STOP, seq: 1, revision: 0, retriedAt: null, outletId: 'OUT001', shopName: 'Fresh Nugegoda', district: 'Colombo', dockType: 'street',

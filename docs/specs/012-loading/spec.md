@@ -99,7 +99,8 @@ where two stops are needed, VEH004 with OUT026 and OUT028 as in spec 010's AC-11
    from 2. A trip 2 can be loaded while its truck is still out on trip 1, as loaders put goods ready on the dock. Its
    row then reads "out on trip 1 · back by 06:38" where it says when it leaves, and its page starts with "VEH057 is out
    on trip 1 · back by 06:38. Put the cartons ready on the dock; they go on when it is back.", until trip 1 is checked
-   in. The API names the trip and the time. *With VEH004's trip as well, VEH004 leaves at 03:30 and comes first, then
+   in. The API words the trip and the time against the app clock: once 06:38 has passed and trip 1 is still out, the
+   row reads "out on trip 1 · was due back 06:38", since a planned time is the plan's, not a promise. *With VEH004's trip as well, VEH004 leaves at 03:30 and comes first, then
    VEH035 at 04:36.*
 3. **Starting (D-33).** "Start loading" makes a `planned` trip `loading`. It takes the planning locks of spec 010 and
    checks that the plan is still sent at the revision the loader's screen showed. From then on the plan cannot go back

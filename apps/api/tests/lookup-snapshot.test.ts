@@ -86,7 +86,7 @@ it('AC-27 history cannot mix pre-confirmation orders with post-confirmation rece
   let entered!: () => void, release!: () => void;
   const atRead = new Promise<void>(resolve => { entered = resolve; }), resume = new Promise<void>(resolve => { release = resolve; });
   const original = driver.driverTripsOf;
-  const spy = vi.spyOn(driver, 'driverTripsOf').mockImplementationOnce(async (tx, rows) => { const value = await original(tx, rows); entered(); await resume; return value; });
+  const spy = vi.spyOn(driver, 'driverTripsOf').mockImplementationOnce(async (tx, rows, at) => { const value = await original(tx, rows, at); entered(); await resume; return value; });
   const pending = read();
   try {
     await atRead;

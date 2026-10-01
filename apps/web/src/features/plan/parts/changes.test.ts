@@ -17,7 +17,7 @@ const order = (id: string, outletId: string) => ({
 const trip: DraftTrip = { vehicleId: 'VEH004', tripNo: 1, leaveAt: null, driverId: uuid(1), stops: [{ outletId: 'OUT006', orderIds: [uuid(11), uuid(12)] }, { outletId: 'OUT051', orderIds: [uuid(13)] }] };
 const BOARD = PlanBoard.parse({
   depot: 'Peliyagoda', demoDay: 1, day: { date: '2026-06-25', cutoffAt: '2026-06-24T10:30:00.000Z', open: true },
-  plan: { mixBrands: false, trips: [trip], deferrals: [{ orderId: uuid(14), code: 'dispatcher_choice', reason: 'Friday.' }], id: uuid(100), revision: 3, status: 'draft', savedAt: null, sentAt: null, canUnsend: false },
+  plan: { mixBrands: false, trips: [trip], deferrals: [{ orderId: uuid(14), code: 'dispatcher_choice', reason: 'Friday.' }], id: uuid(100), revision: 3, status: 'draft', savedAt: null, sentAt: null, canUnsend: false, lockedReason: null },
   dropped: [], check: null, orders: [order(uuid(11), 'OUT006'), order(uuid(12), 'OUT006'), order(uuid(13), 'OUT051'), order(uuid(14), 'OUT051')],
   shops: [shop('OUT006', 'Fresh Colombo Fort'), shop('OUT051', 'Fresh Galle Fort')],
   vehicles: [{ id: 'VEH004', type: 'truck', temp: 'reefer', weightCapKg: 6840, volumeCapM3: 33.4, working: true, offReason: null, litresLeft: 300, fuelLeftPct: 80 }],
