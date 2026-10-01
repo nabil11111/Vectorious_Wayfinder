@@ -53,7 +53,9 @@ export const Notification = z.object({
 });
 export type Notification = z.infer<typeof Notification>;
 
-export const NotificationList = z.object({ items: z.array(Notification).max(MAX_NOTIFICATIONS) });
+// demoDay is the demo day the updates belong to, which a reset moves on (spec 008): a browser keeps what was seen and
+// shown per account and demo day, so a reset's earlier clock starts the bell afresh rather than reading as all seen.
+export const NotificationList = z.object({ demoDay: z.number().int().min(1), items: z.array(Notification).max(MAX_NOTIFICATIONS) });
 export type NotificationList = z.infer<typeof NotificationList>;
 
 // ── The dispatcher's answer to a driver's problem, in words both sides share ──────────────────────────────────────

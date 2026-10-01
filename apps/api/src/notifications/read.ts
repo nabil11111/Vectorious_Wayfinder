@@ -1,6 +1,6 @@
 import {
-  brandOfStop, driverAnswerSentence, driverAnswerShort, FlagReason, LoadingDecision, MAX_NOTIFICATIONS, NotificationList, PlanCheck, RefusalReason, tripFigures,
-  type Brand, type Issue, type Notification,
+  brandOfStop, driverAnswerSentence, driverAnswerShort, FlagReason, LoadingDecision, MAX_NOTIFICATIONS, Notification, PlanCheck, RefusalReason, tripFigures,
+  type Brand, type Issue, type NotificationList,
 } from '@wayfinder/contracts';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Tx } from '../db/client';
@@ -32,14 +32,18 @@ type Plan = typeof plans.$inferSelect;
 type Item = Omit<Notification, 'time'>;
 
 export function getNotifications(reader: Reader): Promise<NotificationList> {
-  return snapshot(async (tx) => notificationsOf(tx, reader, (await readMoment(tx)).at));
+  return snapshot(async (tx) => {
+    const moment = await readMoment(tx);
+    return { demoDay: moment.demoDay, items: await notificationsOf(tx, reader, moment.at) };
+  });
 }
 
-export async function notificationsOf(tx: Tx, reader: Reader, at: Date): Promise<NotificationList> {
-  if (reader.role === 'admin') return { items: [] };
+// The updates, newest first, at most 30, each with its time as the row shows it.
+export async function notificationsOf(tx: Tx, reader: Reader, at: Date): Promise<Notification[]> {
+  if (reader.role === 'admin') return [];
   const today = depotDate(at);
   const dates = await workedDays(tx, at);
-  if (!dates.length) return { items: [] };
+  if (!dates.length) return [];
   let items: Item[];
   if (reader.role === 'store_manager') items = await shopUpdates(tx, reader.outletId, dates);
   else {
@@ -49,7 +53,7 @@ export async function notificationsOf(tx: Tx, reader: Reader, at: Date): Promise
     else items = await driverUpdates(tx, day, reader.userId, at);
   }
   items.sort((a, b) => b.at.localeCompare(a.at) || a.line.localeCompare(b.line) || a.id.localeCompare(b.id));
-  return NotificationList.parse({ items: items.slice(0, MAX_NOTIFICATIONS).map((item) => ({ ...item, time: words.timeWords(new Date(item.at), today) })) });
+  return items.slice(0, MAX_NOTIFICATIONS).map((item) => Notification.parse({ ...item, time: words.timeWords(new Date(item.at), today) }));
 }
 
 // The day being worked and the operating day after it.

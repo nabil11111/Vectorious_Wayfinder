@@ -84,6 +84,9 @@ it('AC-1 AC-4 on a fresh install, Nadeesha\'s bell holds Wednesday\'s updates an
     '08:10 · Your order is placed: 46 dry cartons for Thu 25 Jun',
     '08:10 · Your order is placed: 48 chilled cartons for Thu 25 Jun',
   ]);
+  // The demo day they belong to comes with them, so a browser keeps what was seen per day and a reset starts afresh.
+  const [clock] = await db.select().from(demoDay);
+  expect(NotificationList.parse((await nadeesha.get('/api/v1/notifications')).body).demoDay).toBe(clock!.day);
   // Wednesday's seeded plan has no trucks, so it is nothing for the dock or a driver.
   for (const who of [ruwan, kasun, dilshan, sarath, prasanna, admin]) expect(await updatesOf(who)).toEqual([]);
 });
