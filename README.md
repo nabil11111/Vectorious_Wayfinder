@@ -237,6 +237,9 @@ Anything we built differently from our Designathon submission, and why.
   draws answers only for the driver's problems. There is no Undo yet, and the loader's answer line says what was chosen.
 - **The ready screen names the trip's driver,** where the design names Kasun, who is our loader.
 - **Live day shows only its "Needs you" column** for now; the trucks' timelines come with the dashboard piece.
+- **A truck cannot change after any loading begins.** Frame `150:81067` shows a changed truck while another is
+  already loading. The existing loading lock remains: spec 016's Plan changed flow will compare taking back and
+  resending before any truck starts loading, not moving already-counted goods (D-70).
 - **Small differences:** the flag form asks to tap the line first, the "loading" chip is yellow, and an answer also
   shows under its stop's lines while that stop is still loading.
 - **States the design lacks:** no plan out, nothing to load, every truck loaded, no day left, a truck no longer on the
