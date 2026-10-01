@@ -74,3 +74,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [018](018-sign-in/spec.md) | Sign-in as designed: staff ID and PIN, the district artwork, English only | Done |
 | [019](019-district-map/spec.md) | The dashboard's district map: districts, trucks on the road and shops delivered | Done |
 | [020](020-depots/spec.md) | Every shop and both depots: accounts, Kandy's day and the depot switch | Done |
+| [022](022-trip-times-and-drivers/spec.md) | The trip's depot times, each stop's times on hover, and every trip's driver | In progress |
