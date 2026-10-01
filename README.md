@@ -133,7 +133,8 @@ are what the demo clock shows.
     then "1 · Fresh Nugegoda · 23 of 24 cartons" and "2 · Fresh Wellawatte · 94 cartons". Press **Start trip**.
 13. **A delivery.** Next stop: "Stop 1 of 2 · Fresh Nugegoda", "Unload 23 cartons · 20 chilled · 3 dry" and the shop's
     note. Press **I've arrived**, count 12 and 8 chilled and 3 dry ("Loader flagged 1 carton short at the depot" sits
-    under the dry line), press **Done unloading**, then **Take photo** (on a laptop, pick any picture) and **Save
+    under the dry line; a typed 15 or -3 stays as typed with a line under it, and Done unloading waits), press **Done
+    unloading**, then **Take photo** (on a laptop, pick any picture) and **Save
     delivery**: "✓ Stop 1 Fresh Nugegoda delivered · synced" and "Stop 2 of 2 · Fresh Wellawatte".
 14. **No signal.** Turn the network off: DevTools, Network, "Offline". Press **I've arrived**: the chip turns "Offline"
     with 1 waiting. Press **Something's wrong**, keep "Shop refused some", pick "48 cartons chilled", press + on Refused
@@ -180,6 +181,12 @@ At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements
 "Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Dilshan's next stop again, and delivering it ends
 at 117 of 118. **Bring them back** ends with "Hand them in; they go on the next run.", and Wellawatte's two orders are
 placed again for Friday's plan.
+
+**A second trip.** A truck the plan sends out twice, such as VEH057 at Kandy, gives its driver both trips. **I'm back at the
+depot** on trip 1 opens trip 2's Today's trip under "✓ Trip 1 closed · 4 of 4 stops · all records sent · checked in
+03:56", with trip 1's hand-back card ("Still on the truck", what to hand in) until trip 2 starts. After trip 2, Day done
+shows a line per trip, "Trip 1 · 4 of 4 stops · 105 of 144 cartons delivered · 39 handed back", the day's totals, and
+"Trip 3 · none today".
 
 ### The look-up pages
 
