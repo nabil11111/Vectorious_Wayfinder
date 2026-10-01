@@ -9,11 +9,13 @@ import { BottomBar } from './parts/BottomBar';
 import { ICON } from './parts/icons';
 import { LoadError, StaleNotice } from './parts/LoadError';
 import { Panel } from './parts/Panel';
-import { clockTime, cutoffDay, inListOrder, lineWords, longDay, statusChip, weekday } from './words';
+import { clockTime, cutoffDay, inListOrder, lineWords, longDay, orderTitle, statusChip, weekday } from './words';
 
 // Orders placed (Shop · Orders placed): what was placed and for which day. It reads what the API holds as
 // placed for the open day, so a reload or "View confirmation" on Today shows the same screen. The form opens it
 // with the orders its place answered with, which it shows when the open day does not list them (see confirmed).
+// It confirms one place: what was just placed, with its own time. An order placed earlier for the same day is said
+// apart under it, with its own time, and never added into the new one (Q-03).
 export function OrdersPlacedPage() {
   const next = useNextOrder();
   const handed = PlacedNow.safeParse(useLocation().state);
@@ -27,7 +29,8 @@ export function OrdersPlacedPage() {
   const shown = confirmed(next.data, handed.success ? handed.data.placedOrders : null);
   // With nothing placed for the open day and nothing handed over for another, there is nothing to confirm.
   if (!shown) return <Navigate to="/store/orders" replace />;
-  const { orders, lines, day, placedAt } = shown;
+  const { orders, earlier, day, placedAt } = shown;
+  const lines = orders.flatMap((order) => order.lines);
 
   const count = orders.length;
   // One chip for each state the placed orders are in. Straight after placing that is one: waiting for the plan.
@@ -68,6 +71,19 @@ export function OrdersPlacedPage() {
           The depot has received {count === 1 ? 'your request' : count === 2 ? 'both requests' : `all ${count} requests`}. We’ll let you know
           when {count === 1 ? 'the delivery date and time' : 'delivery dates and times'} are confirmed.
         </p>
+        {earlier.length > 0 && (
+          <section className="mt-[23px]">
+            <h2 className="text-[13px] leading-[18px] font-semibold">Placed earlier for {weekday(day)}</h2>
+            <ul className="mt-1.5 space-y-1 text-[13px] leading-[18px] text-muted-foreground">
+              {earlier.map((order) => (
+                <li key={order.id} className="flex justify-between gap-3">
+                  <span>{orderTitle(outlet.brand, order)}</span>
+                  {order.placedAt && <span>{clockTime(order.placedAt)}</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {cutoffAt && day === deliveryDate && (
           // A placed order cannot be edited, so the frame's "Edits close" is said this way (spec 009, departure 1).
           // It is said only while the orders' day is the open one.
@@ -83,18 +99,28 @@ export function OrdersPlacedPage() {
   );
 }
 
-// What the screen confirms: the orders, their lines, the day they were requested for and when they were placed.
-// That is everything placed for the open day, unless the form handed over orders for another day: a place
-// made at 15:59 whose answer only came to its retry at 16:01, when Friday is open and Thursday no longer
-// listed. One place is for one day, stamps its orders with one moment and makes one order per temperature,
-// so its lines are its orders' lines.
+// What the screen confirms: the orders of one place, the day they were requested for and when they were placed,
+// and the orders placed earlier for that day. One place is for one day, stamps its orders with one moment and
+// makes one order per temperature, so its lines are its orders' lines. The place is the one the form handed over,
+// as the open day lists its orders now, or else the latest place for the open day. The form can hand over orders
+// for another day: a place made at 15:59 whose answer only came to its retry at 16:01, when Friday is open and
+// Thursday no longer listed.
 function confirmed(next: StoreNextOrder, placedNow: StoreOrder[] | null) {
   const first = placedNow?.[0];
   if (placedNow && first && first.deliveryDate !== next.deliveryDate) {
-    return { orders: placedNow, lines: placedNow.flatMap((order) => order.lines), day: first.deliveryDate, placedAt: first.placedAt };
+    return { orders: placedNow, earlier: [], day: first.deliveryDate, placedAt: first.placedAt };
   }
   if (!next.placed || !next.deliveryDate) return null;
-  return { orders: next.placed.orders, lines: next.placed.lines, day: next.deliveryDate, placedAt: next.placed.lastPlacedAt };
+  const all = next.placed.orders;
+  const handed = new Set(placedNow?.map((order) => order.id));
+  const listed = placedNow ? all.filter((order) => handed.has(order.id)) : all.filter((order) => order.placedAt === next.placed?.lastPlacedAt);
+  const orders = listed.length ? listed : placedNow ?? [];
+  const [one] = orders;
+  if (!one) return null;
+  const shown = new Set(orders.map((order) => order.id));
+  // Earliest first, each with its own time.
+  const earlier = all.filter((order) => !shown.has(order.id)).sort((a, b) => (a.placedAt ?? '').localeCompare(b.placedAt ?? ''));
+  return { orders, earlier, day: next.deliveryDate, placedAt: one.placedAt };
 }
 
 function PlacedSkeleton() {
