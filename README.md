@@ -126,8 +126,9 @@ are what the demo clock shows.
    on View plan turns the plan into a draft again until loading starts, and her cards follow within a second.
 
 8. **Loading, last stop first.** Move the demo clock on to "Loading, Thu 02:30" and sign in as Kasun (`L-001`) on a phone (or
-   a narrow window). His bell's top row reads "Thursday's plan is out: 1 truck to load". Today's trucks: VEH035 leaves 04:36, in 2 h 6 min, and "Goes in first" lists stop 2, Fresh
-   Wellawatte (94 cartons), above stop 1, Fresh Nugegoda (24). Start loading, tick Wellawatte's two lines and press
+   a narrow window). His bell's top row reads "Thursday's plan is out: 1 truck to load". Today's trucks: VEH035 leaves
+   04:36, in 2 h 6 min, and "Goes in first" lists stop 2, Fresh Wellawatte (94 cartons), above stop 1, Fresh Nugegoda
+   (24). Start loading, tick Wellawatte's two lines and press
    **Stop 2 loaded**: "94 /118" and "648 / 1,040 kg · 3.5 / 7.0 m³".
 9. **A problem at the dock.** On Fresh Nugegoda press **Flag a problem**, pick the 4 dry cartons, keep Short, count 3,
    add a note and send it to the dispatcher. The dry line reads "1 short", and Mark ready waits for the answer.
@@ -141,7 +142,8 @@ are what the demo clock shows.
 
 12. **The driver's trip.** Move the demo clock on to "Trucks leave, Thu 03:30". On a phone, or Chrome at 390 wide,
     sign in as Wasantha (`D-036`). His bell holds "Your trip for Thursday is sent: VEH035 leaves 04:36 with 2 stops" and
-    "VEH035 is loaded and ready: 117 of 118 on, 1 short". Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda",
+    "VEH035 is loaded and ready: 117 of 118 on, 1 short". Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 ·
+    1 dry short for Nugegoda",
     then "1 · Fresh Nugegoda · 23 of 24 cartons" and "2 · Fresh Wellawatte · 94 cartons". Press **Start trip**.
 13. **A delivery.** Next stop: "Stop 1 of 2 · Fresh Nugegoda", "Unload 23 cartons · 20 chilled · 3 dry" and the shop's
     note. Press **I've arrived**, count 12 and 8 chilled and 3 dry ("Loader flagged 1 carton short at the depot" sits
