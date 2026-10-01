@@ -159,6 +159,27 @@ it('AC-1 makes a build one step, which Undo puts back as the draft before it', a
   saver.stop();
 });
 
+it('AC-2 clears the history after a build that split an order, so no Undo sends a draft naming the order split since', async () => {
+  signedIn(RUWAN);
+  const { saver } = useBoardScreen(answered(START, 1));
+  saver.change(deferred(START, uuid(3)), { line: 'Fresh Pannala deferred', tripKey: null });
+  await saved(saver, 2);
+  // The build made two parts of an order: orders the board before did not have.
+  const part = (n: number) => ({
+    id: uuid(n), outletId: 'OUT005', temp: 'chilled', deliveryDate: '2026-06-25', lines: [{ productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 6 }],
+    load: { kg: 41.4, m3: 0.222, units: 6, needsReefer: true, needsTailLift: false, keepUpright: false }, carriedOver: false, timesDeferred: 0, lastDeferral: null,
+    splitFrom: uuid(1), originalUnits: 12,
+  });
+  const built = answered(withTrip(START, 'VEH011', uuid(21)), 3);
+  const building = saver.act((date, ref) => sendPlan(date, ref), undefined, { line: 'Suggested plan built', tripKey: null });
+  await settled();
+  answer(Response.json({ ...built, orders: [part(21), part(22)] }));
+  expect(await building).toBeNull();
+  expect(saver.snapshot()!.history).toEqual({ undo: null, redo: null });
+  expect(saver.undo()).toBeNull();
+  saver.stop();
+});
+
 it('L-10 answers a swap\'s old trip key on Undo, so the board opens the trip again where it was, and its new one on Redo', () => {
   signedIn(RUWAN);
   const { saver } = useBoardScreen(answered(START, 1));

@@ -563,8 +563,12 @@ class PlanSaver {
       }
       const answer = await madeBy(this, () => run(date, refOf(before)));
       if (!this.stillMine()) return null;
+      // A build is one step, unless it split an order: the draft before it names the order whole, which the server would
+      // refuse once split, so the history ends there as for a change from elsewhere.
+      const known = new Set(before.orders.map((order) => order.id));
+      const step = said !== undefined && !answer.orders.some((order) => order.splitFrom !== null && !known.has(order.id));
       if (said) {
-        this.past = [...this.past, { ...said, before: held.draft, after: planOf(answer) }].slice(-HISTORY);
+        this.past = step ? [...this.past, { ...said, before: held.draft, after: planOf(answer) }].slice(-HISTORY) : [];
         this.future = [];
       }
       this.answered(answer, true, said !== undefined);
