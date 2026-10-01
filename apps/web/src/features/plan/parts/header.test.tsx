@@ -3,7 +3,7 @@ import { PlanBoard } from '@wayfinder/contracts';
 import { expect, it, vi } from 'vitest';
 import type { BoardScreen } from '../board';
 import { planOf } from '../draft';
-import { BoardHeader } from './BoardHeader';
+import { BoardHeader, historyTip } from './BoardHeader';
 import { historyKey, START_OVER_LINE } from './history-keys';
 
 // Spec 027's header: Undo and Redo, each named by the change it undoes or redoes, and Start over while the plan is a
@@ -29,11 +29,24 @@ const buttonFor = (html: string, label: string) => html.match(new RegExp(`<butto
 
 it('AC-1 names the change Undo and Redo would undo and redo, and turns them off with nothing to do', () => {
   const html = header({ undo: 'Fresh Dehiwala added to Wasantha\'s reefer van', redo: null }).replaceAll('&#x27;', '\'');
-  expect(buttonFor(html, 'Undo: Fresh Dehiwala added to Wasantha\'s reefer van')).not.toMatch(/disabled=""/);
-  expect(buttonFor(html, 'Redo')).toMatch(/disabled=""/);
+  const on = buttonFor(html, 'Undo: Fresh Dehiwala added to Wasantha\'s reefer van');
+  expect(on).not.toMatch(/aria-disabled="true"/);
+  expect(on).not.toMatch(/data-disabled=""/);
+  // L-15: an off button is really off (aria-disabled, which Base UI's Button honours by ignoring presses) and takes
+  // the app's disabled look; it stays focusable so its tooltip can still say there is nothing to redo.
+  const off = buttonFor(html, 'Redo');
+  expect(off).toMatch(/aria-disabled="true"/);
+  expect(off).toMatch(/data-disabled=""/);
+  expect(off).toMatch(/data-disabled:opacity-50/);
   const none = header({ undo: null, redo: 'Fresh Pannala deferred' });
-  expect(buttonFor(none, 'Undo')).toMatch(/disabled=""/);
-  expect(buttonFor(none, 'Redo: Fresh Pannala deferred')).not.toMatch(/disabled=""/);
+  expect(buttonFor(none, 'Undo')).toMatch(/aria-disabled="true"/);
+  expect(buttonFor(none, 'Redo: Fresh Pannala deferred')).not.toMatch(/aria-disabled="true"/);
+});
+
+it('L-15 keeps the tooltip on an off Undo or Redo, saying there is nothing to do', () => {
+  expect(historyTip('Undo', null)).toBe('Nothing to undo');
+  expect(historyTip('Redo', null)).toBe('Nothing to redo');
+  expect(historyTip('Undo', 'Fresh Pannala deferred')).toBe('Undo: Fresh Pannala deferred');
 });
 
 it('AC-4 offers Start over while the plan is a draft, and says what it does before it does it', () => {

@@ -12,7 +12,9 @@ stop from the planning section".
 ## What it does
 - **Undo and Redo.** Two icon buttons in the board's header. Each has a label and a tooltip that names the change it
   undoes or redoes: "Undo: Fresh Dehiwala added to Wasantha's reefer van". Ctrl+Z (Cmd+Z on a Mac) undoes, and
-  Ctrl+Shift+Z, Cmd+Shift+Z or Ctrl+Y redoes; none of them fires while the focus is in a text box.
+  Ctrl+Shift+Z, Cmd+Shift+Z or Ctrl+Y redoes; none of them fires while the focus is in a text box. With nothing to
+  undo or redo, the button is off and greyed in the app's disabled look, and its tooltip says "Nothing to undo" or
+  "Nothing to redo".
 - **The history** holds this tab's changes of the draft, up to 50, each one step: a drop, a crew picked, a stop moved or
   taken off, a deferral, a leaving time, a driver, Mix brands, building the suggested plan, and starting over. It clears
   on a send, a depot switch and a reload, and when the draft is replaced by a change from elsewhere: another tab, a
@@ -42,7 +44,8 @@ stop from the planning section".
 ## Acceptance criteria
 - [ ] AC-1 When a change of the draft is made, the system shall let Undo put back the draft before it and Redo make it
   again, one step each, up to 50 steps, with the header's buttons, Ctrl or Cmd+Z, Ctrl or Cmd+Shift+Z and Ctrl+Y, and
-  never while the focus is in a text box. Each button shall name its change in its label and tooltip.
+  never while the focus is in a text box. Each button shall name its change in its label and tooltip, and with nothing
+  to undo or redo shall be off, look it, and say so in its tooltip.
 - [ ] AC-2 The history shall clear on a send, a depot switch, a reload and a draft replaced from elsewhere, and the green
   Undo line shall undo the same step as the header's Undo.
 - [ ] AC-3 Each card in Done shall offer "Remove trip", and each stop in "Stops in order" a × labelled "Take <shop> off

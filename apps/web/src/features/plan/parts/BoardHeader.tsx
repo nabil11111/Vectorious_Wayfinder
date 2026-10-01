@@ -119,24 +119,26 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
   );
 }
 
+// What Undo's or Redo's tooltip says: the change it would undo or redo, or that there is nothing to.
+export const historyTip = (verb: 'Undo' | 'Redo', line: string | null) => (line ? `${verb}: ${line}` : `Nothing to ${verb.toLowerCase()}`);
+
 // Undo or Redo (spec 027): an icon button named by the change it would undo or redo, also in its tooltip, and off with
-// nothing to do.
+// nothing to do. Off is the app's disabled look and Base UI's disabled button, which ignores presses; it stays
+// focusable (as View plan does) so the tooltip can still say "Nothing to undo" (L-15).
 function HistoryButton({ icon: Icon, verb, line, onPress }: { icon: typeof Undo2; verb: 'Undo' | 'Redo'; line: string | null; onPress: () => void }) {
-  const label = line ? `${verb}: ${line}` : verb;
   return (
     <Tooltip.Root>
       <Tooltip.Trigger
-        render={<button type="button" />}
-        aria-label={label}
-        disabled={line === null}
+        render={<Button variant="outline" disabled={line === null} focusableWhenDisabled />}
+        aria-label={line ? `${verb}: ${line}` : verb}
         onClick={onPress}
-        className="flex size-8 items-center justify-center rounded-[10px] border bg-card text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:text-muted-foreground/50"
+        className={plainButton('size-8 p-0 text-foreground data-disabled:hover:bg-card')}
       >
         <Icon aria-hidden="true" className="size-4" />
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Positioner sideOffset={6} className="z-50">
-          <Tooltip.Popup className="max-w-72 rounded-md bg-secondary px-2.5 py-1.5 text-xs leading-[15px] text-secondary-foreground shadow-md">{label}</Tooltip.Popup>
+          <Tooltip.Popup className="max-w-72 rounded-md bg-secondary px-2.5 py-1.5 text-xs leading-[15px] text-secondary-foreground shadow-md">{historyTip(verb, line)}</Tooltip.Popup>
         </Tooltip.Positioner>
       </Tooltip.Portal>
     </Tooltip.Root>
