@@ -1,13 +1,13 @@
 import { PlanCheck, LoadingIssue, type Issue, type LoadingDay, type LoadingTruck } from '@wayfinder/contracts';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Tx } from '../db/client';
-import { orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicles } from '../db/schema';
+import { auditLog, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicles } from '../db/schema';
 import { issuesOf } from '../issues/read';
 import { depotDate, depotMinutes } from '../lib/clock';
 import type { DepotCaller } from '../middleware/auth';
 import { snapshot } from '../orders/store-orders';
 import { computeLoad } from '../planning';
-import { operatingDays, readMoment } from '../plans/board';
+import { operatingDays, readMoment, type BoardMoment } from '../plans/board';
 import { goingOf, type LineFlag } from './going';
 import { byLoadOrder, loaderDay, sentTrip } from './loader-day';
 
@@ -82,15 +82,23 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[]): Prom
 }
 
 // The loading day of a depot at an instant: the loader's day, its plan while it is sent, and its trucks.
-export async function loadingDayOf(tx: Tx, depotId: string, at: Date): Promise<LoadingDay> {
-  const day = loaderDay(depotDate(at), depotMinutes(at), await operatingDays(tx));
+export async function loadingDayOf(tx: Tx, depotId: string, moment: BoardMoment): Promise<LoadingDay> {
+  const day = loaderDay(depotDate(moment.at), depotMinutes(moment.at), await operatingDays(tx));
   const [plan] = day ? await tx.select().from(plans).where(and(eq(plans.depotId, depotId), eq(plans.date, day), eq(plans.status, 'published'))) : [];
-  if (!plan) return { depot: depotId, day, plan: null, trucks: [] };
+  if (!plan) return { depot: depotId, demoDay: moment.demoDay, day, plan: null, trucks: [] };
+  if (!plan.publishedAt) throw new Error(`Sent plan ${plan.id} has no publication time.`);
+  // The exact publication's sender, not its creator or a later audit's wall time. The older seed has no send audit.
+  const [sent] = await tx.select({ name: users.displayName }).from(auditLog).leftJoin(users, eq(users.id, auditLog.actorId))
+    .where(and(eq(auditLog.entity, 'plan'), eq(auditLog.entityId, plan.id), eq(auditLog.action, 'plan.sent'),
+      sql`${auditLog.after}->>'revision' = ${String(plan.revision)}`));
+  if (plan.sentCheck !== null && !sent?.name) throw new Error(`Sent plan ${plan.id} has no sender for revision ${plan.revision}.`);
   const onTheList = await tx.select().from(trips).where(and(eq(trips.planId, plan.id), inArray(trips.status, [...ON_THE_LIST])));
-  return { depot: depotId, day, plan: { id: plan.id, revision: plan.revision }, trucks: await trucksOf(tx, plan, onTheList) };
+  return { depot: depotId, demoDay: moment.demoDay, day,
+    plan: { id: plan.id, revision: plan.revision, publishedAt: plan.publishedAt.toISOString(), publishedBy: sent?.name ?? null },
+    trucks: await trucksOf(tx, plan, onTheList) };
 }
 
 // GET /loading, in one read-only snapshot that a reset waits behind.
 export function getLoadingDay(caller: DepotCaller): Promise<LoadingDay> {
-  return snapshot(async (tx) => loadingDayOf(tx, caller.depotId, (await readMoment(tx)).at));
+  return snapshot(async (tx) => loadingDayOf(tx, caller.depotId, await readMoment(tx)));
 }

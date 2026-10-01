@@ -71,10 +71,11 @@ export type LoadingTruck = z.infer<typeof LoadingTruck>;
 
 export const LoadingDay = z.object({
   depot: z.string(),
+  demoDay: z.number().int().min(1),
   // The loader's day (D-34), or null when no operating day is left.
   day: Day.nullable(),
   // The day's sent plan, which a start names. null when the day has none, or while it is back in edit.
-  plan: z.object({ id: z.uuid(), revision: z.number().int().min(0) }).nullable(),
+  plan: z.object({ id: z.uuid(), revision: z.number().int().min(0), publishedAt: Moment, publishedBy: z.string().nullable() }).nullable(),
   // In leaving order, then by vehicle and trip number (rule 2).
   trucks: z.array(LoadingTruck),
 });
