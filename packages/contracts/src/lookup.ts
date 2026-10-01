@@ -33,10 +33,15 @@ export type LookupDeferral = z.infer<typeof LookupDeferral>;
 const OrderedLine = z.object({ lineId: z.uuid(), productId: z.string(), name: z.string(), unit: z.string(), quantity: Count });
 export const LookupOrderDetail = z.object({ id: z.uuid(), wantedDate: Day, placedAt: Moment.nullable(), temp: Temp, status: OrderStatus,
   lines: z.array(OrderedLine), note: z.string().nullable(), load: Load });
+// Each time nobody was at the shop on that day's stop, with the dispatcher's answer (Q-46).
+const ClosedVisit = z.object({ issueId: z.uuid(), at: Moment, decision: IssueDecision.nullable(), decidedAt: Moment.nullable() });
 export const LookupOrderDay = z.object({ date: Day, carriedOver: z.boolean(), publication: LookupPublication.nullable(),
-  assignment: z.object({ tripId: z.uuid(), vehicleId: z.string(), tripNo: Count, stopId: z.uuid(), seq: Count, plannedArrival: Moment }).nullable(),
+  assignment: z.object({ tripId: z.uuid(), vehicleId: z.string(), tripNo: Count, stopId: z.uuid(), seq: Count, plannedArrival: Moment,
+    closed: z.array(ClosedVisit) }).nullable(),
   deferral: Reason.nullable() });
-export const LookupOrderRow = LookupOrderDetail.extend({ outlet: LookupShop, splitFrom: z.uuid().nullable(),
+// broughtBack: placed again by "Bring them back" at a closed shop and on no later sent plan yet (Q-46), as the shop's
+// own Today says it.
+export const LookupOrderRow = LookupOrderDetail.extend({ outlet: LookupShop, splitFrom: z.uuid().nullable(), broughtBack: z.boolean(),
   original: LookupOrderDetail.nullable(), parts: z.array(LookupOrderDetail), days: z.array(LookupOrderDay),
   deferralHistory: z.array(Reason.extend({ planId: z.uuid(), date: Day })), timesDeferred: Count });
 export type LookupOrderRow = z.infer<typeof LookupOrderRow>;

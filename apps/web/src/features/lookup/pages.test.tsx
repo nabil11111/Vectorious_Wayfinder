@@ -7,6 +7,7 @@ import { expect, it, vi } from 'vitest';
 import { ApiRequestError } from '@/lib/api';
 import { FleetPage } from './FleetPage';
 import { HistoryPage } from './HistoryPage';
+import { OrderDetail } from './OrderDetail';
 import { OrdersPage } from './OrdersPage';
 import { lookupKey } from './queries';
 import { NOT_A_DATE, NO_SENT_PLANS_YET, PICK_TRIP, TRIP_NOT_ON_PLAN } from './words';
@@ -52,11 +53,11 @@ const ordersRead = (demoDay: number, depot: Depot = 'Peliyagoda') => {
     rows: [{
       id: id(base + 1), wantedDate: THU, placedAt: '2026-06-24T03:00:00.000Z', temp: 'chilled', status: kandy ? 'deferred' : 'loaded', note: null, load,
       lines: [{ lineId: id(base + 2), productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 8 }],
-      outlet: shop, splitFrom: null, original: null, parts: [], deferralHistory: [], timesDeferred: kandy ? 1 : 0,
+      outlet: shop, splitFrom: null, broughtBack: false, original: null, parts: [], deferralHistory: [], timesDeferred: kandy ? 1 : 0,
       days: [kandy
         ? { date: THU, carriedOver: true, publication: { ...sent, id: id(base + 900) }, deferral: { code: 'no_reefer', reason: 'No fridge truck was left for Kandy.' }, assignment: null }
         : { date: THU, carriedOver: false, publication: sent, deferral: null,
-          assignment: { tripId: id(base + 800), vehicleId: vehicle, tripNo: 1, stopId: id(base + 700), seq: 1, plannedArrival: at('05:00') } }],
+          assignment: { tripId: id(base + 800), vehicleId: vehicle, tripNo: 1, stopId: id(base + 700), seq: 1, plannedArrival: at('05:00'), closed: [] } }],
     }],
     skippedLately: { from: '2026-05-29', to: THU, rows: kandy ? [] : [{ outlet: { id: 'OUT060', name: 'Fresh Dickwella', brand: 'Fresh' }, count: 2, latestDate: '2026-06-24',
       reasons: [{ code: 'no_reefer', reason: 'No fridge truck was left for Matara.' }] }] },
@@ -101,6 +102,7 @@ const fleetRead = (demoDay: number, depot: Depot = 'Peliyagoda', fuel: ReturnTyp
     outTrips: [], todayTrips: [], recentTrips: [], fuel: null }],
 });
 
+const textOfMarkup = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 // A page drawn once at an address, from the reads the cache holds: its markup and its text.
 function draw(page: ReactNode, path: string, cached: [readonly unknown[], unknown][]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -258,6 +260,23 @@ it('Q-45 History\'s header says the partial, none delivered and closed stops bes
   read.counts = { ...read.counts!, stops: 64, delivered: 8, finished: 11, partial: 1, noGoods: 1, closed: 1 };
   const { text } = draw(<HistoryPage />, `/dispatcher/history?date=${THU}`, [[lookupKey('history', held.me, 'Peliyagoda', { date: THU }), read]]);
   expect(text).toContain('8 / 64 stops delivered · 1 partial · 1 with none delivered · 1 closed');
+});
+
+// Q-46: Mulgampola's order, brought back from the closed shop, read "Placed" with no closed shop or return in its history.
+it('Q-46 an order brought back from a closed shop reads as brought back, and its history shows the closed shop and the return', () => {
+  held.clockDay = 1;
+  const read = ordersRead(1);
+  const row = read.rows[0]!, day = row.days[0]!;
+  read.rows = [{ ...row, status: 'placed', broughtBack: true, days: [{ ...day, assignment: { ...day.assignment!, vehicleId: 'VEH057', seq: 3,
+    closed: [{ issueId: id(650), at: at('03:50'), decision: 'bring_back', decidedAt: at('03:52') }] } }] }];
+  const { text } = draw(<OrdersPage />, `/dispatcher/orders?date=${THU}`, [[lookupKey('orders', held.me, 'Peliyagoda', { date: THU, range: 'day' }), read]]);
+  expect(text).toContain('VEH057 · 3 05:00 Brought back · waiting for the next plan');
+  expect(text).not.toContain('Placed');
+  const detail = textOfMarkup(renderToStaticMarkup(<MemoryRouter><OrderDetail row={read.rows[0]!} anchor="order-detail" onClose={() => {}} /></MemoryRouter>));
+  expect(detail).toContain('Brought back · waiting for the next plan');
+  expect(detail).toContain('Thu 25 planned · VEH057 · 3 · arrives 05:00');
+  expect(detail).toContain('Thu 25 nobody at the shop 03:50 · VEH057 · 3');
+  expect(detail).toContain('Thu 25 brought back to the depot 03:52');
 });
 
 it('Q-14 a depot whose sent plans are all still to come says so beside their chip, offers to open the soonest, and never says none was sent', () => {

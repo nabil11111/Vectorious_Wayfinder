@@ -409,7 +409,8 @@ Anything we built differently from our Designathon submission, and why.
   and Fleet has no "Next 6 weeks", forecast or booking.
 - **Orders** shows the order's own id (8 characters in the table, all of it in the detail) where the frame shows WF
   numbers, picks other days with a date field in place of a second day chip, and has no "Late by", shop contact or
-  "orders closed" line.
+  "orders closed" line. An order brought back from a closed shop reads "Brought back · waiting for the next plan", and
+  its history names the closed visit and the return.
 - **History** draws a still timeline with a legend, without Replay or speed controls (D-82), has one row per trip, not
   per vehicle, and says "Shop confirmations" where the frame says "Receipts" and "Signed": there is no signature (D-47).
   Deferrals have their own card and filter, apart from "Not delivered", and there is no receipt-count column.

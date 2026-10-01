@@ -3,10 +3,11 @@ import { eq } from 'drizzle-orm';
 import { expect, it, vi } from 'vitest';
 import { db } from '../src/db/client';
 import { deferrals, orders, plans } from '../src/db/schema';
+import { depotInstant } from '../src/lib/clock';
 import { heldDriverRows } from './driver-plan';
 import { code, kandyTrip, sendWalkthroughPlan, THU, WED } from './loading-plan';
 import { lookupHarness } from './lookup-plan';
-import { FRI, photo } from './operations-plan';
+import { decide, FRI, photo } from './operations-plan';
 const clock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async original => {
   const actual = await original<typeof import('../src/lib/clock')>();
@@ -40,6 +41,29 @@ it('AC-4 AC-5 and AC-35 keep all five loaded orders through delivery and an unan
   trip = await h.road.write(trip, 'closed', 228, 2, { photo });
   expect(trip.problems.find(problem => problem.kind === 'closed')!.decision).toBeNull();
   await check(2, 3);
+});
+
+// Q-46: Mulgampola's order, brought back from the closed shop, read "Placed · VEH057 · 3 · never deferred" with nothing in
+// its history about the closed shop or the return. The read says it was brought back and keeps each closed visit with
+// its answer on that day's truck stop.
+it('Q-46 an order brought back from a closed shop reads as brought back, with the closed shop and the return in its history', async () => {
+  const trip = await h.road.write(await h.road.wellawatte(), 'closed', 228, 2, { photo });
+  const closed = trip.problems.find(problem => problem.kind === 'closed')!;
+  h.freeze(THU, 230);
+  await decide(h.ruwan, closed.id, 'bring_back');
+  const at = (minute: number) => depotInstant(THU, minute).toISOString();
+  const thursday = await h.orders('?date=' + THU), back = thursday.rows.filter(row => row.outlet.id === 'OUT002');
+  expect(back.map(row => [row.status, row.broughtBack])).toEqual([['placed', true], ['placed', true]]);
+  for (const row of back) expect(row.days[0]!.assignment!.closed).toEqual([{ issueId: closed.id, at: at(228), decision: 'bring_back', decidedAt: at(230) }]);
+  // Nugegoda's orders were delivered, never closed or brought back.
+  expect(thursday.rows.filter(row => row.outlet.id === 'OUT001').map(row => [row.broughtBack, row.days[0]!.assignment!.closed])).toEqual([[false, []], [false, []], [false, []]]);
+  // Friday's list carries it over, still brought back and waiting.
+  const friday = await h.orders('?date=' + FRI);
+  expect(friday.rows.filter(row => row.outlet.id === 'OUT002').map(row => [row.broughtBack, row.days[0]!.carriedOver])).toEqual([[true, true], [true, true]]);
+  // Once Friday's sent plan takes it, it is planned again and no longer waits.
+  h.freeze(THU, 960);
+  await h.publish(FRI, ['OUT002']);
+  expect((await h.orders('?date=' + THU)).rows.filter(row => row.outlet.id === 'OUT002').map(row => [row.status, row.broughtBack])).toEqual([['planned', false], ['planned', false]]);
 });
 
 it.each([

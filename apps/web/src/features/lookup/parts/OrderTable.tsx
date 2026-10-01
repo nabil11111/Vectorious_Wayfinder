@@ -4,13 +4,13 @@ import { CARD, Chip } from '@/features/live/parts/ui';
 import { cn } from '@/lib/utils';
 import type { OrderGroup } from '../filters';
 import {
-  STATUS_WORDS, clockTime, dayOfMonth, loadWords, timesShort, truckStop, whole, windowWords,
+  clockTime, dayOfMonth, loadWords, statusWords, timesShort, truckStop, whole, windowWords,
 } from '../words';
 import { brandIcon, shopIcon } from './icons';
 
 // The Orders table (Dispatcher · Orders 102:76375): a card per brand with its districts, one row per order of the
 // delivery day, and the frame's columns. The truck, stop and planned arrival are the listed day's own sent plan; the
-// status is the order's current one, a separate fact. Last 4 weeks names each listed day beside its truck.
+// status is the order's current one, a separate fact, and says an order brought back from a closed shop (Q-46). Last 4 weeks names each listed day beside its truck.
 
 const COLUMNS = {
   day: 'grid-cols-[20px_68px_minmax(150px,1fr)_48px_140px_50px_84px_96px_44px_minmax(84px,0.5fr)_40px]',
@@ -113,7 +113,7 @@ function OrderRow({ row, range, selected, onSelect }: { row: LookupOrderRow; ran
       <span role="cell" className="font-mono">
         {assigned.length > 0 ? assigned.map((day) => <span key={day.date} className="block">{clockTime(day.assignment!.plannedArrival)}</span>) : <Dash words="no planned arrival" />}
       </span>
-      <span role="cell" className={cn('truncate', STATUS_TONE[row.status])}>{STATUS_WORDS[row.status]}</span>
+      <span role="cell" title={statusWords(row)} className={cn('truncate', row.broughtBack ? 'font-semibold text-warn-ink' : STATUS_TONE[row.status])}>{statusWords(row)}</span>
       <span role="cell">
         {row.timesDeferred > 0
           ? <Chip tone={row.timesDeferred > 1 ? 'bad' : 'warn'}><span className="sr-only">deferred </span>{timesShort(row.timesDeferred)}</Chip>

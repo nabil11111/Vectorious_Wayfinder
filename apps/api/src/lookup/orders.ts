@@ -1,6 +1,6 @@
-import { DeferralCode, LookupOrders, type LookupOrderRow, type LookupOrdersQuery } from '@wayfinder/contracts';
+import { DeferralCode, IssueDecision, LookupOrders, type LookupOrderRow, type LookupOrdersQuery } from '@wayfinder/contracts';
 import { and, between, desc, eq, inArray, lte, notInArray, or } from 'drizzle-orm';
-import { deferrals, orderLines, orders, outlets, plans, products, stopOrders, stops, trips } from '../db/schema';
+import { deferrals, issues, orderLines, orders, outlets, plans, products, stopOrders, stops, trips } from '../db/schema';
 import { depotDate, depotInstant, depotMinutes } from '../lib/clock';
 import type { DepotCaller } from '../middleware/auth';
 import { snapshot } from '../orders/store-orders';
@@ -48,12 +48,28 @@ export function getLookupOrders(caller: DepotCaller, query: LookupOrdersQuery): 
         lines: own, note: order.driverNote, load: computeLoad(own, engineProducts) };
     };
     const reason = (row: typeof deferrals.$inferSelect) => ({ code: DeferralCode.parse(row.code), reason: row.reason });
+    // Every sent stop each listed order was on, on any day, and the closed visits at those stops and the listed days'
+    // (Q-46): an order whose latest stop was closed and answered "Bring them back" waits, placed, for the next plan.
+    const rowIds = admitted.map(row => row.order.id);
+    const visits = rowIds.length ? await tx.select({ orderId: stopOrders.orderId, stop: stops, date: plans.date }).from(stopOrders)
+      .innerJoin(stops, eq(stops.id, stopOrders.stopId)).innerJoin(trips, eq(trips.id, stops.tripId)).innerJoin(plans, eq(plans.id, trips.planId))
+      .where(and(inArray(stopOrders.orderId, rowIds), eq(plans.depotId, caller.depotId), eq(plans.status, 'published'))) : [];
+    const visitedStops = [...new Set([...assigned.map(row => row.stop.id), ...visits.map(row => row.stop.id)])];
+    const closedVisits = visitedStops.length ? await tx.select().from(issues).where(and(inArray(issues.stopId, visitedStops), eq(issues.kind, 'closed')))
+      .orderBy(issues.raisedAt, issues.id) : [];
+    const closedAt = (stopId: string) => closedVisits.filter(row => row.stopId === stopId).map(row => ({ issueId: row.id, at: row.raisedAt.toISOString(),
+      decision: row.decision === null ? null : IssueDecision.parse(row.decision), decidedAt: row.decidedAt?.toISOString() ?? null }));
+    const broughtBack = (order: typeof orders.$inferSelect) => {
+      if (order.status !== 'placed') return false;
+      const latest = visits.filter(row => row.orderId === order.id).sort((a, b) => b.date.localeCompare(a.date))[0];
+      return latest?.stop.outcome === 'closed' && closedVisits.some(row => row.stopId === latest.stop.id && row.decision === 'bring_back');
+    };
     const rows: LookupOrderRow[] = admitted.map(({ order, shop, days }) => {
       const inherited = histories.filter(row => row.deferral.orderId === order.id || row.deferral.orderId === order.splitFrom);
       const unique = [...new Set(inherited.map(row => row.deferral.planId))].map(id => inherited.find(row => row.deferral.planId === id && row.deferral.orderId === order.id) ?? inherited.find(row => row.deferral.planId === id)!);
       const original = order.splitFrom ? all.find(row => row.id === order.splitFrom) : null;
       if (order.splitFrom && !original) throw new Error(`No original for part ${order.id}.`);
-      return { ...detail(order), outlet: shop, splitFrom: order.splitFrom, original: original ? detail(original) : null,
+      return { ...detail(order), outlet: shop, splitFrom: order.splitFrom, broughtBack: broughtBack(order), original: original ? detail(original) : null,
         parts: original ? all.filter(row => row.splitFrom === original.id).sort((a, b) => a.id.localeCompare(b.id)).map(detail) : [],
         deferralHistory: unique.map(row => ({ ...reason(row.deferral), planId: row.deferral.planId, date: row.date })), timesDeferred: unique.length,
         days: days.map(day => {
@@ -65,7 +81,7 @@ export function getLookupOrders(caller: DepotCaller, query: LookupOrdersQuery): 
           const time = member && plan ? keptTrip(plan, member.trip).times.stops.find(row => row.seq === member.stop.seq && row.outletId === member.stop.outletId) : null;
           if (member && !time) throw new Error(`No kept arrival for ${member.stop.id}.`);
           return { date: day, carriedOver: order.deliveryDate < day, publication: plan ? publicationOf(plan) : null,
-            assignment: member ? { tripId: member.trip.id, vehicleId: member.trip.vehicleId, tripNo: member.trip.tripNo, stopId: member.stop.id, seq: member.stop.seq, plannedArrival: depotInstant(day, time!.arriveAt).toISOString() } : null,
+            assignment: member ? { tripId: member.trip.id, vehicleId: member.trip.vehicleId, tripNo: member.trip.tripNo, stopId: member.stop.id, seq: member.stop.seq, plannedArrival: depotInstant(day, time!.arriveAt).toISOString(), closed: closedAt(member.stop.id) } : null,
             deferral: skipped ? reason(skipped) : null };
         }) };
     });

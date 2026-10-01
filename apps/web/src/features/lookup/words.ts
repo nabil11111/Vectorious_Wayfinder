@@ -63,8 +63,22 @@ export const STATUS_WORDS: Record<OrderStatus, string> = {
   draft: 'Draft', placed: 'Placed', planned: 'Planned', deferred: 'Deferred', loaded: 'Loaded', delivered: 'Delivered', received: 'Received',
   cancelled: 'Cancelled', split: 'Split',
 };
+// An order placed again by "Bring them back" at a closed shop and on no later sent plan yet (Q-46), as the shop's Today
+// says it.
+export const BROUGHT_BACK = 'Brought back · waiting for the next plan';
+// The order's current status in the table: "Planned", or that it was brought back and waits (Q-46).
+export const statusWords = (row: Pick<LookupOrderRow, 'status' | 'broughtBack'>) => (row.broughtBack ? BROUGHT_BACK : STATUS_WORDS[row.status]);
 // The current status, said as now: "Now planned", which a dated sent plan never is.
-export const nowWords = (status: OrderStatus) => `Now ${STATUS_WORDS[status].toLowerCase()}`;
+export const nowWords = (row: Pick<LookupOrderRow, 'status' | 'broughtBack'>) => (row.broughtBack ? BROUGHT_BACK : `Now ${STATUS_WORDS[row.status].toLowerCase()}`);
+// A closed visit on the order's history (Q-46): "nobody at the shop 03:50 · VEH057 · 3", then its answer, "brought back
+// to the depot 03:52", "answered Try again on this trip 03:52" or "not answered yet".
+type ClosedVisit = NonNullable<LookupOrderRow['days'][number]['assignment']>['closed'][number];
+export const closedVisitWords = (visit: ClosedVisit, assignment: { vehicleId: string; tripNo: number; seq: number }) =>
+  `nobody at the shop ${clockTime(visit.at)} · ${truckStop(assignment)}`;
+export function closedAnswerWords(visit: ClosedVisit) {
+  if (visit.decision === null || visit.decidedAt === null) return 'not answered yet';
+  return visit.decision === 'bring_back' ? `brought back to the depot ${clockTime(visit.decidedAt)}` : `answered ${DECISION_WORDS[visit.decision]} ${clockTime(visit.decidedAt)}`;
+}
 
 // A deferral's short name, as the plan board writes the six reasons: "No fridge truck".
 export const deferralName = (code: DeferralCode) => DEFERRAL[code].label;
