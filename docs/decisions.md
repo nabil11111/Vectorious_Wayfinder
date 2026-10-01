@@ -429,3 +429,9 @@ driver together from one list sorted by fit, district last run and fuel. The "Un
 Unplanned orders the column. Sentences call a truck "Chaminda's dry truck". The plan board's and View plan's cards
 read "Chaminda · dry truck" with no vehicle number, which stays only where someone must find the actual truck (the
 loader, the driver, Fleet) (Nabil, 1 Oct, spec 026).
+
+**D-101 · 1 Oct · The plan board has an undo history and starts over.** Every change of the draft is one step this tab
+can undo and redo, up to 50, from the header's buttons or Ctrl+Z, so a dispatcher can try a plan and take it back. The
+history is the tab's own and clears when the draft is replaced from elsewhere, so it never puts back a plan someone
+else changed. Done's cards and each stop can be removed in one press, and Start over empties the draft after asking,
+as one step Undo brings back (Nabil, 1 Oct, spec 027).
