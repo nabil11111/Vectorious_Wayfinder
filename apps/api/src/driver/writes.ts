@@ -70,7 +70,8 @@ export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promi
       await tx.update(trips).set({ status: starting ? 'out' : 'done', revision: trip.revision + 1,
         ...(starting ? { leftAt: at } : { backAt: at }), lastEventAt: at }).where(eq(trips.id, trip.id));
       action = starting ? 'trip.started' : 'trip.finished';
-      if (starting) told.push({ topic: 'loading', depotId: caller.depotId });
+      // The shops on the trip hear that their truck left, for their bell (spec 025).
+      if (starting) told.push({ topic: 'loading', depotId: caller.depotId }, ...[...new Set(view.stops.map(stop => stop.outletId))].map(outletId => ({ topic: 'orders', outletId })));
     } else {
       if (!stop) throw new Error(`Write ${write.writeId} has no stop.`);
       const outcome = write.kind === 'deliver' ? 'delivered' : write.kind === 'refuse' ? 'refused' : 'closed';
@@ -78,6 +79,8 @@ export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promi
         ...(write.kind === 'arrive' ? { arrivedAt: at } : { doneAt: at, outcome }) }).where(eq(stops.id, stop.id));
       await tx.update(trips).set({ lastEventAt: at }).where(eq(trips.id, trip.id));
       action = write.kind === 'arrive' ? 'stop.arrived' : `stop.${outcome}`;
+      // The shop hears the driver arrive, and find it closed, for its bell (spec 025).
+      if (write.kind === 'arrive') told.push({ topic: 'orders', outletId: stop.outletId });
       if (write.kind === 'refuse' || write.kind === 'closed') {
         await tx.insert(issues).values({ id: write.writeId, kind: write.kind === 'refuse' ? 'refused' : 'closed', stopId: stop.id,
           reason: write.kind === 'closed' ? 'nobody_there' : write.reason, note: write.note || null, raisedBy: caller.userId, raisedAt: at });
@@ -88,6 +91,7 @@ export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promi
           return [{ issueId: write.writeId, orderLineId: line.lineId, counted: refused ?? line.loaded }];
         }));
         told.push({ topic: 'issues', depotId: caller.depotId });
+        if (write.kind === 'closed') told.push({ topic: 'orders', outletId: stop.outletId });
       }
       if (write.kind === 'deliver' || write.kind === 'refuse') {
         for (const line of stop.lines) {

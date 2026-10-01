@@ -121,7 +121,7 @@ it('AC-11 starts VEH035 early, advances the trip and audits, then announces driv
   expect((await db.select().from(trips).where(eq(trips.id, trip.tripId)))[0]).toMatchObject({ status: 'out', revision: trip.revision + 1,
     leftAt: at(3 * 60 + 31), lastEventAt: at(3 * 60 + 31) });
   await expectAudit(trip.tripId, 'trip.started');
-  expect(told()).toEqual([{ topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'loading', depotId: 'Peliyagoda' }]);
+  expect(told()).toEqual([{ topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'loading', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT001' }, { topic: 'orders', outletId: 'OUT002' }]);
   expect(LoadingDay.parse((await kasun.get('/api/v1/loading')).body).trucks.map(truck => truck.vehicleId)).not.toContain('VEH035');
 });
 
@@ -187,7 +187,7 @@ it('AC-14 refuses an arrival until out, then records Nugegoda’s arrival and it
   expect(driverStop(arrived, 1)).toMatchObject({ revision: before.revision + 1, arrivedAt: at(3 * 60 + 34).toISOString(), outcome: null, doneAt: null });
   expect((await db.select().from(stops).where(eq(stops.id, before.id)))[0]).toMatchObject({ revision: before.revision + 1, arrivedAt: at(3 * 60 + 34) });
   await expectAudit(before.id, 'stop.arrived');
-  expect(told()).toEqual([{ topic: 'driver', depotId: 'Peliyagoda' }]);
+  expect(told()).toEqual([{ topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT001' }]);
 });
 
 it('AC-15 refuses arrival and every save at Wellawatte before Nugegoda is done', async () => {
@@ -310,7 +310,7 @@ it('AC-20 records a closed Wellawatte at 48 and 46 still on the truck with its o
     previous.lines.map(line => ({ issueId: body.writeId, orderLineId: line.lineId, counted: line.loaded, reason: null })).sort((a, b) => a.counted! - b.counted!));
   expect(await db.select().from(photos).where(eq(photos.id, body.writeId))).toEqual([]);
   await expectAudit(previous.id, 'stop.closed');
-  expect(told()).toEqual([{ topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'issues', depotId: 'Peliyagoda' }]);
+  expect(told()).toEqual([{ topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'issues', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT002' }]);
 });
 
 it('AC-21 names unfinished stops and closes the trip only after every stop is done', async () => {
