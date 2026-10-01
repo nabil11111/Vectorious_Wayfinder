@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useDraftForm, type OpenOrder, type Saving } from './draft-form';
 import { useNextOrder } from './next-order';
-import { ORANGE } from './parts/actions';
+import { ORANGE, SENDING } from './parts/actions';
 import { BottomBar } from './parts/BottomBar';
 import { DriverNote } from './parts/DriverNote';
 import { goodsIcon } from './parts/icons';
@@ -225,7 +225,7 @@ export function Checkout({ next, saving, placing, refused, onPlace }: { next: St
       <p className="text-xs leading-[15px] text-muted-foreground" aria-live="polite">{totals && `${totals.join(' · ')} · `}{saved}</p>
       {refused && <p role="alert" className="mt-2 text-xs leading-[15px] font-semibold text-bad">{refused}</p>}
       <Button
-        className={cn(ORANGE, 'mt-2.5 h-14 w-full text-[17px] lg:mt-3', placing && 'disabled:bg-primary disabled:text-primary-foreground')}
+        className={cn(ORANGE, 'mt-2.5 h-14 w-full text-[17px] lg:mt-3', placing && SENDING)}
         disabled={nothingAdded || saving === 'held' || placing}
         focusableWhenDisabled={placing}
         onClick={onPlace}

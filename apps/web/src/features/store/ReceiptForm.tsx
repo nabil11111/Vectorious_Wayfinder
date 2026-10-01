@@ -8,7 +8,7 @@ import { PhotoInput, PhotoTile } from '@/lib/phone/PhotoTile';
 import { shopQueue } from '@/lib/phone/shop';
 import { cn } from '@/lib/utils';
 import type { ReceiptRecord, ShownReceipt } from './deliveries';
-import { ORANGE, PLAIN } from './parts/actions';
+import { ORANGE, PLAIN, SENDING } from './parts/actions';
 import { Choice } from './parts/Choice';
 import { NoteBox } from './parts/DriverNote';
 import { Panel } from './parts/Panel';
@@ -146,16 +146,20 @@ export function ReceiptForm({ delivery, outlet, today, record }: { delivery: Sto
       </div>
 
       <ReceiptFoot>
-        <Button
-          className={cn(ORANGE, 'h-[46px] w-full text-sm', off && 'disabled:bg-primary disabled:text-primary-foreground')}
-          disabled={off || reading || at === null || !tally.canConfirm}
-          focusableWhenDisabled
-          onClick={confirm}
-        >
-          {off ? 'Sending…' : RECEIPT_TITLE}
-        </Button>
+        <ConfirmButton held={off || reading || at === null || !tally.canConfirm} sending={off} onConfirm={confirm} />
       </ReceiptFoot>
     </div>
+  );
+}
+
+// Confirm delivery, at the foot of the form. Held while a count is wrong, a photo is being read or no clock is known,
+// it takes the app's grey and stays focusable (L-11); while the receipt is saved and sent it stays orange with
+// "Sending…".
+export function ConfirmButton({ held, sending, onConfirm }: { held: boolean; sending: boolean; onConfirm: () => void }) {
+  return (
+    <Button className={cn(ORANGE, 'h-[46px] w-full text-sm', sending && SENDING)} disabled={held} focusableWhenDisabled onClick={onConfirm}>
+      {sending ? 'Sending…' : RECEIPT_TITLE}
+    </Button>
   );
 }
 

@@ -8,7 +8,7 @@ import { shopQueue } from '@/lib/phone/shop';
 import { useSignal } from '@/lib/phone/signal';
 import { cn } from '@/lib/utils';
 import { markShownSaved, PAST_ORDERS, type ReceiptRecord } from './deliveries';
-import { ORANGE, orangeLink } from './parts/actions';
+import { ORANGE, SENDING, orangeLink } from './parts/actions';
 import { ReceivedCard } from './parts/ReceiptLineCard';
 import { ReceiptNote } from './parts/ReceiptNote';
 import { ReceiptFoot, StatusCard, StatusHead } from './parts/ReceiptStatusCard';
@@ -59,7 +59,7 @@ export function SavedReceipt({ record, drawn, brand, today }: { record: ReceiptR
       <StatusCard chip={NOT_SENT_YET} tone="warn" sentences={keptSentences(reports)} className="mt-[18px]" />
       <ReceiptFoot line={savedFoot(record.savedAt, today)}>
         <Button
-          className={cn(ORANGE, 'h-[46px] w-full text-sm', sending && 'disabled:bg-primary disabled:text-primary-foreground')}
+          className={cn(ORANGE, 'h-[46px] w-full text-sm', sending && SENDING)}
           disabled={sending}
           focusableWhenDisabled
           onClick={shopQueue.retrySync}
