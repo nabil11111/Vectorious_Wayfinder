@@ -65,6 +65,10 @@ export const lineWords = (line: Pick<LoadingLine, 'quantity' | 'unit' | 'temp' |
 // A line's name on the flag's counter: "Chilled" or "Dry" for Fresh, the item's name for Style and Tech.
 export const lineKind = (line: Pick<LoadingLine, 'temp' | 'name'>, brand: Brand | null) => (brand === 'Fresh' ? TEMP_NAME[line.temp] : line.name);
 
+// Under a count box that holds anything but a whole number from 0 to the line's count (Q-17), in the shop's words for
+// its quantity box (Q-01): "Whole numbers from 0 to 57."
+export const countLine = (most: number) => `Whole numbers from 0 to ${whole(most)}.`;
+
 // A stop on a list, by what the API sent: "94 cartons" to load, "23 of 24" with a flag lowering a count, "✓ 94 on"
 // once loaded, and "23 on · 1 short" when it went on short.
 export const stopUnits = (truck: LoadingTruck, stop: LoadingStop) => unitsWords(brandOfStop(truck, stop), stop.units);

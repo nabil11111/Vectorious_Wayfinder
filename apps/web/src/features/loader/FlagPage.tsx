@@ -1,19 +1,19 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
-import { NumberField } from '@base-ui/react/number-field';
 import { FLAG_REASONS, type FlagReason, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { orangeButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
+import { flagCounts, wholeCount } from './count';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { GOODS_ICON } from './parts/icons';
 import { BackLink } from './parts/LoadCard';
 import { LoadFailed, NotOnList } from './parts/LoadFailed';
 import { ActionBar, Card, NotSaved, Refused, TickBox } from './parts/ui';
 import { useTicks } from './ticks';
-import { brandOfStop, leaves, lineKind, lineWords, truckName, whole } from './words';
+import { brandOfStop, countLine, leaves, lineKind, lineWords, truckName, whole } from './words';
 
 const REASON: Record<FlagReason, string> = { short: 'Short', damaged: 'Damaged', wrong_item: 'Wrong item' };
 
@@ -53,21 +53,40 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
   const [picked, setPicked] = useState<string | null>(null);
   const [reason, setReason] = useState<FlagReason>('short');
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // What a count box holds while it is not the count the form holds: what is being typed, and a wrong number, which
+  // stays as it was typed (Q-17).
+  const [typed, setTyped] = useState<Record<string, string>>({});
   const [note, setNote] = useState('');
   // A line is flagged once while its truck loads (rule 6), so a line on a problem already cannot be picked.
   const flagged = new Set(truck.issues.flatMap((issue) => issue.lines.map((line) => line.lineId)));
-  const countAt = (line: LoadingLine) => counts[line.lineId] ?? line.quantity;
-  const lowered = stop.lines.filter((line) => !flagged.has(line.lineId) && countAt(line) < line.quantity);
+  const tally = flagCounts(stop.lines, flagged, counts, typed);
   const line = stop.lines.find((l) => l.lineId === picked && !flagged.has(l.lineId)) ?? null;
   const busy = writes.phase !== 'idle';
 
+  // − and + step from the count the form holds, and what was typed in the box goes. A whole number from 0 to the line's
+  // count is its count; anything else stays in the box as typed. Leaving the box shows its count, "054" as 54, and a
+  // wrong number stays.
+  const without = (held: Record<string, string>, lineId: string) => Object.fromEntries(Object.entries(held).filter(([id]) => id !== lineId));
+  const box = {
+    step: (l: LoadingLine, value: number) => {
+      setCounts((held) => ({ ...held, [l.lineId]: value }));
+      setTyped((held) => without(held, l.lineId));
+    },
+    type: (l: LoadingLine, text: string) => {
+      setTyped((held) => ({ ...held, [l.lineId]: text }));
+      const count = wholeCount(text, l.quantity);
+      if (count !== null) setCounts((held) => ({ ...held, [l.lineId]: count }));
+    },
+    leave: (l: LoadingLine) => setTyped((held) => (held[l.lineId] !== undefined && wholeCount(held[l.lineId]!, l.quantity) !== null ? without(held, l.lineId) : held)),
+  };
+
   const send = () => writes.send(truck.tripId, {
     kind: 'flag',
-    body: { revision: truck.revision, stopId: stop.id, reason, lines: lowered.map((l) => ({ lineId: l.lineId, counted: countAt(l) })), note: note.trim() },
+    body: { revision: truck.revision, stopId: stop.id, reason, lines: tally.lowered.map((l) => ({ lineId: l.lineId, counted: tally.countAt(l) })), note: note.trim() },
   }, () => navigate(`/loader/trucks/${truck.tripId}`));
 
   const sendButton = (
-    <Button className={orangeButton('h-16 w-full rounded-[12px] text-lg')} disabled={busy || lowered.length === 0} focusableWhenDisabled onClick={send}>
+    <Button className={orangeButton('h-16 w-full rounded-[12px] text-lg')} disabled={busy || !tally.canSend} focusableWhenDisabled onClick={send}>
       {writes.out === 'flag' && writes.phase === 'saving' ? 'Sending…' : 'Send to dispatcher'}
     </Button>
   );
@@ -86,7 +105,9 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
           <p className="mt-3 text-[13px] leading-4 text-muted-foreground">{truckName(truck)} · {leaves(truck)}</p>
           <ul className="mt-[3px]">
             {stop.lines.map((l) => {
-              const count = flagged.has(l.lineId) ? l.going : countAt(l);
+              // A flagged line shows what goes out; a line whose box holds a wrong number shows what was typed, in red.
+              const shown = flagged.has(l.lineId) ? { count: whole(l.going), wrong: false } : tally.shownOf(l);
+              const lower = shown.wrong || tally.countAt(l) < l.quantity;
               return (
                 <li key={l.lineId}>
                   <button
@@ -102,8 +123,8 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
                   >
                     <TickBox ticked={ticks.isTicked(l.lineId)} className={cn(flagged.has(l.lineId) && 'opacity-50')} />
                     <span className="min-w-0 flex-1 text-[17px] leading-6">{lineWords(l, brand)}</span>
-                    <span className={cn('shrink-0 font-mono text-base leading-6 font-bold whitespace-nowrap', flagged.has(l.lineId) ? '' : count < l.quantity ? 'text-bad' : 'text-good')}>
-                      {whole(count)} / {whole(l.quantity)}
+                    <span className={cn('shrink-0 font-mono text-base leading-6 font-bold whitespace-nowrap', flagged.has(l.lineId) ? '' : lower ? 'text-bad' : 'text-good')}>
+                      {shown.count} / {whole(l.quantity)}
                     </span>
                   </button>
                 </li>
@@ -120,9 +141,12 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
               key={line.lineId}
               line={line}
               kind={lineKind(line, brand)}
-              value={countAt(line)}
+              value={tally.countAt(line)}
+              text={typed[line.lineId]}
               disabled={busy}
-              onChange={(value) => setCounts((held) => ({ ...held, [line.lineId]: value }))}
+              onStep={(value) => box.step(line, value)}
+              onType={(text) => box.type(line, text)}
+              onLeave={() => box.leave(line)}
             />
           ) : (
             <p className="mt-3.5 rounded-[12px] bg-muted px-4 py-[18px] text-[15px] leading-5 text-muted-foreground">Tap the line that is not right, then count what is at the dock.</p>
@@ -173,39 +197,61 @@ function Reasons({ value, onChange, disabled }: { value: FlagReason; onChange: (
 
 const STEP = 'flex size-[42px] shrink-0 items-center justify-center rounded-[10px] border bg-card text-[22px] leading-none font-semibold outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:text-muted-foreground/65 lg:size-[46px]';
 
-// The picked line's counter: its picture and name, "at the dock", and − the count /quantity +. It runs from 0 to the
-// line's quantity, and the number can be typed as well.
-function Counter({ line, kind, value, disabled, onChange }: { line: LoadingLine; kind: string; value: number; disabled: boolean; onChange: (value: number) => void }) {
+// The picked line's counter: its picture and name, "at the dock", and − the count /quantity +. The count runs from 0 to
+// the line's quantity, and can be typed as well. The box keeps what is typed as it is: a minus, a fraction or more than
+// the line holds is never turned into another number. It is marked red with the fix under it, as the shop's quantity
+// box is, and Send, − and + wait until it is a whole number from 0 to the line's count (Q-17). The fix is the card's last
+// child, so it takes a row of its own under the counter.
+export function Counter({ line, kind, value, text, disabled, onStep, onType, onLeave }: {
+  line: LoadingLine; kind: string; value: number; text: string | undefined; disabled: boolean;
+  onStep: (value: number) => void; onType: (text: string) => void; onLeave: () => void;
+}) {
+  const fix = useId();
+  const wrong = text !== undefined && wholeCount(text, line.quantity) === null;
+  const shown = text ?? String(value);
+  const off = disabled || wrong;
+  const step = (by: number) => onStep(Math.min(line.quantity, Math.max(0, value + by)));
   return (
-    <div className="mt-3.5 flex items-center gap-3 rounded-[12px] bg-muted py-4 pr-4 pl-4 lg:pl-5">
+    <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] bg-muted py-4 pr-4 pl-4 lg:pl-5">
       <img src={GOODS_ICON[line.temp]} alt="" className="size-10 shrink-0 object-contain" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-lg leading-6 font-semibold">{kind}</p>
         <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">at the dock</p>
       </div>
-      <NumberField.Root
-        value={value}
-        min={0}
-        max={line.quantity}
-        disabled={disabled}
-        locale="en-GB"
-        format={{ maximumFractionDigits: 0, useGrouping: false }}
-        onValueChange={(next) => onChange(Math.min(line.quantity, Math.max(0, Math.round(next ?? 0))))}
-      >
-        <NumberField.Group className="flex items-center">
-          <NumberField.Decrement aria-label={`One less: ${kind}`} className={STEP}>−</NumberField.Decrement>
-          <span className="flex items-baseline px-2.5">
-            <NumberField.Input
-              aria-label={`${kind} at the dock`}
-              maxLength={3}
-              onClick={(event) => event.currentTarget.select()}
-              className={cn('min-w-0 bg-transparent p-0 text-right font-heading text-[26px] leading-8 font-bold tabular-nums outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-foreground', value > 99 ? 'w-[52px]' : value > 9 ? 'w-[34px]' : 'w-[18px]')}
-            />
-            <span className="ml-1.5 text-base leading-5 text-muted-foreground">/{whole(line.quantity)}</span>
-          </span>
-          <NumberField.Increment aria-label={`One more: ${kind}`} className={STEP}>+</NumberField.Increment>
-        </NumberField.Group>
-      </NumberField.Root>
+      <div role="group" className="flex items-center">
+        <button type="button" aria-label={`One less: ${kind}`} disabled={off || value <= 0} className={STEP} onClick={() => step(-1)}>−</button>
+        <span className="flex items-baseline px-2.5">
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            aria-label={`${kind} at the dock`}
+            aria-invalid={wrong || undefined}
+            aria-describedby={wrong ? fix : undefined}
+            value={shown}
+            disabled={disabled}
+            onChange={(event) => onType(event.currentTarget.value)}
+            onBlur={onLeave}
+            // A tap selects the count, so typing replaces it.
+            onClick={(event) => event.currentTarget.select()}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+              event.preventDefault();
+              if (!wrong) step(event.key === 'ArrowUp' ? 1 : -1);
+            }}
+            // A longer text than three figures widens the box, so all of it shows.
+            style={shown.length > 3 ? { width: `${shown.length + 1}ch` } : undefined}
+            className={cn(
+              'min-w-0 rounded-md bg-transparent p-0 text-right font-heading text-[26px] leading-8 font-bold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-foreground',
+              shown.length > 2 ? 'w-[52px]' : shown.length > 1 ? 'w-[34px]' : 'w-[18px]',
+              wrong && 'text-bad ring-1 ring-bad focus-visible:ring-bad',
+            )}
+          />
+          <span className="ml-1.5 text-base leading-5 text-muted-foreground">/{whole(line.quantity)}</span>
+        </span>
+        <button type="button" aria-label={`One more: ${kind}`} disabled={off || value >= line.quantity} className={STEP} onClick={() => step(1)}>+</button>
+      </div>
+      {wrong && <p id={fix} role="alert" className="basis-full text-right text-[13px] leading-4 font-semibold text-bad">{countLine(line.quantity)}</p>}
     </div>
   );
 }
