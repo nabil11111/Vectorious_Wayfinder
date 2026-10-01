@@ -99,6 +99,24 @@ export const DEFERRAL: Record<DeferralCode, { label: string; sentence: (shop: Bo
   dispatcher_choice: { label: 'Our choice', sentence: () => '' },
 };
 
+// The sentence a deferred order's shop reads takes 200 characters at most, as the API checks it (rule 7, Q-11).
+export const REASON_MOST = 200;
+export const REASON_FULL = 'The sentence is full: 200 characters at most.';
+export const REASON_REFUSED = 'The sentence takes 200 characters at most, so that was not added.';
+
+// A change to the sentence is taken whole or not at all: one that would make it longer is refused, never cut.
+export const reasonFits = (reason: string) => reason.length <= REASON_MOST;
+
+// The line under the sentence: how many characters are left once 40 or fewer are, that it is full, or that a change
+// was refused because it would have made the sentence too long.
+export function reasonLine(length: number, refused: boolean): { words: string; refused: boolean } | null {
+  if (refused) return { words: REASON_REFUSED, refused: true };
+  const left = REASON_MOST - length;
+  if (left <= 0) return { words: REASON_FULL, refused: false };
+  if (left <= 40) return { words: `${whole(left)} ${left === 1 ? 'character' : 'characters'} left`, refused: false };
+  return null;
+}
+
 // "VEH004 trip 1", the way the checker names a trip.
 export const tripName = (trip: { vehicleId: string; tripNo: number }) => `${trip.vehicleId} trip ${trip.tripNo}`;
 
