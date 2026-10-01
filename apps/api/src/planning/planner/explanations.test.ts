@@ -130,6 +130,20 @@ describe('reviewed explanations through the complete planner', () => {
     clearReasons(result);
   });
 
+  it('spec 026 gives long drivers\' names way to kind and id to keep a split explanation within 200 characters', () => {
+    const result = success(buildSuggestedPlan(plannerInput([
+      plannerOrder('new', 'OUT002', 'fresh-chilled-carton', 30),
+      plannerOrder('waiting', 'OUT001', 'fresh-chilled-carton', 180, { deliveryDate: '2026-06-24', timesDeferred: 1 }),
+    ], { vehicles: [{ ...vehicle('VEH035'), driverName: 'Chaminda Kumara Wickramasinghe' }, { ...vehicle('VEH036'), driverName: 'Dilshan Pradeep Jayawardena' }] })));
+    expect(result.choices.map((choice) => choice.reason)).toEqual([
+      // With both names this is 206 characters, so both vans are named by kind and id.
+      'Rank 1: waited since Wed; chilled; Colombo by 07:30; 150 cartons on the reefer van VEH035 (vehicle ID tie); 30 cartons on the reefer van VEH036 (first run preferred)',
+      // This one fits with its driver's name, so it keeps it.
+      'Rank 2: new order; chilled; Colombo due 07:59; Fresh, vans only; joined Dilshan Pradeep Jayawardena\'s reefer van on its run to Colombo, fills an existing run',
+    ]);
+    clearReasons(result);
+  });
+
   it('explains a fuel excess hidden by equal rounded needed and remaining litres', () => {
     const day = plannerInput([plannerOrder('fuel-rounding', 'OUT006')], { vehicles: [{ ...vehicle('VEH012'), weeklyFuelQuotaL: 3.5, litresUsedThisWeek: 0 }] });
     day.outlets.find((shop) => shop.id === 'OUT006')!.name = 'Fresh Supermarket Colombo Central Distribution';

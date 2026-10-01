@@ -24,6 +24,8 @@ export const kg = (n: number) => `${trim(n, 1)} kg`;
 export const m3 = (n: number) => `${trim(n, 3)} m³`;
 // 63.6 to '63.6 litres'.
 export const litres = (n: number) => `${trim(n, 1)} litres`;
+// 40 with no unit, where a sentence has said litres already.
+export const litreFigure = (n: number) => trim(n, 1);
 
 // What a sentence calls an order: '276 kg chilled order for Fresh Nugegoda'. A Fresh shop has a chilled and a
 // dry order most days, and a split order leaves two for one shop (D-17), so the shop alone does not say which.
@@ -35,12 +37,14 @@ export const orderCalled = (kilos: number, chilled: boolean, shop: string) => `$
 // reefer van VEH035" or "the van VEH037" (spec 024).
 type Vehicle = Pick<EngineVehicle, 'id' | 'type' | 'temp'>;
 const kindOf = ({ type, temp }: Vehicle) => (type === 'van' ? (temp === 'reefer' ? 'reefer van' : 'van') : temp === 'reefer' ? 'reefer truck' : 'dry truck');
+// "dry truck VEH044", without the "the" a sentence puts in front.
+export const kindAndId = (vehicle: Vehicle) => `${kindOf(vehicle)} ${vehicle.id}`;
 // The name a sentence calls a driver by: trimmed, and none at all when it is blank, so an optional name never spoils a
 // sentence or stops a plan (spec 026).
 export const driverNameOf = (name: unknown): string | undefined => (typeof name === 'string' && name.trim() !== '' ? name.trim() : undefined);
 export const vehicleCalled = (vehicle: Vehicle, driverName?: string) => {
   const name = driverNameOf(driverName);
-  return name ? `${name}'s ${kindOf(vehicle)}` : `the ${kindOf(vehicle)} ${vehicle.id}`;
+  return name ? `${name}'s ${kindOf(vehicle)}` : `the ${kindAndId(vehicle)}`;
 };
 // The driver a sentence about a whole vehicle names: the one its trips carry. A vehicle has one driver for both its
 // trips (D-31), so the first trip that names one is enough.
