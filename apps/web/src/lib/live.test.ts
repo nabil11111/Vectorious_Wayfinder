@@ -24,6 +24,38 @@ class Stream {
 let cleanup: void | (() => void);
 afterEach(() => { cleanup?.(); vi.unstubAllGlobals(); });
 
+it('AC-28 existing topics and reconnect refresh lookup while preserving normal and operations invalidations', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { refetchInterval: 60_000 } } });
+  held.client = client;
+  vi.stubGlobal('EventSource', Stream);
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { clearTimeout, setTimeout }));
+  const invalidate = vi.spyOn(client, 'invalidateQueries');
+  const key = ['lookup', 'orders', 'ruwan', 'Peliyagoda', { date: '2026-06-25' }];
+  useLive();
+  cleanup = held.effect!();
+  for (const topic of ['orders', 'plans', 'loading', 'driver', 'issues', 'admin']) {
+    client.setQueryData(key, {});
+    invalidate.mockClear();
+    Stream.current.change({ data: JSON.stringify({ topic }) });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: [topic] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['lookup'] });
+    if (topic !== 'admin') expect(invalidate).toHaveBeenCalledWith({ queryKey: ['operations'] });
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  }
+  for (const topic of ['clock', 'demo']) {
+    client.setQueryData(key, {});
+    Stream.current.change({ data: JSON.stringify({ topic }) });
+    await Promise.resolve();
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  }
+  client.setQueryData(key, {});
+  Stream.current.onerror();
+  Stream.current.onopen();
+  expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  expect(client.getDefaultOptions().queries?.refetchInterval).toBe(60_000);
+  client.clear();
+});
+
 it('AC-24 existing topics invalidate operations and keep normal invalidations', async () => {
   const client = new QueryClient();
   held.client = client;

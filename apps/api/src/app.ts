@@ -18,6 +18,7 @@ import { eventsRouter } from './routes/events';
 import { healthRouter } from './routes/health';
 import { issuesRouter } from './routes/issues';
 import { loadingRouter } from './routes/loading';
+import { lookupRouter } from './routes/lookup';
 import { operationsRouter } from './routes/operations';
 import { plansRouter } from './routes/plans';
 import { storeRouter } from './routes/store';
@@ -61,6 +62,7 @@ export function createApp() {
   api.use('/plans', plansRouter);
   api.use('/loading', loadingRouter);
   api.use('/operations', operationsRouter);
+  api.use('/lookup', lookupRouter);
   api.use('/driver', driverRouter);
   api.use('/issues', issuesRouter);
   // The demo control exists only in demo mode. With it off these addresses answer 404 like any unknown one.

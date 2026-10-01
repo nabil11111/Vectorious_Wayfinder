@@ -302,6 +302,73 @@ The driver's phone bell count remains deferred despite 013's earlier A7 promise.
 answer path, Undo, credit, write-off, warning message or replacement command in spec 016. Receipt behavior remains
 spec 015's; a driver-delivered quantity never stands in for a shop's confirmed receipt.
 
+## Spec 017 picks
+D-43–79 belong to specs 013–016 and their reviews, including the entries already joined above. The entries below
+record [017](specs/017-look-up-pages/spec.md)'s picks, including the lead's review decisions; they do not fill those gaps.
+
+**D-80 · 1 Oct · The dispatcher's look-up pages only read what the earlier pieces record.** A8 remains the first
+piece cut if time runs short. Orders, History and Fleet add no business write or new kind of record. No forecast,
+hiring or workshop-booking command; planning, Live day, shop and admin retain their commands. T0 starts after 016
+is merged. Orders/Fleet require merged 013; History's confirmations and replacement answers additionally wait
+for merged 015, without blocking Orders or Fleet.
+
+**D-81 · 1 Oct · Orders lists a delivery day and starts on the board's day.** Include orders wanted that day,
+that day's published stops/deferrals, and before Send the board's eligible earlier orders. Mark wanted-earlier as
+Carried over. Count planned and deferred from that day's own plan, not current order status or a later plan.
+Count submitted leaves once, excluding private drafts and split parents. Last 4 weeks unions 28 delivery days,
+deduplicated by order id. One list includes detail; search/filters run in the browser. No detail endpoint,
+server-side search/filter/matched count or replacement ancestry. Thursday at README step 3 is 104, including
+four carried over; the manual send accounts for five planned and 99 deferred.
+
+**D-82 · 1 Oct · History shows retained sent-plan detail and recorded attempts without replay.** Use the kept
+schedule and read loading, driver outcomes, problems and (after 015) shop confirmations/replacement answers.
+Each closed issue retains its own time, counts, photo and answer. Do not recover old arrivals from audit or borrow
+current stop times/receipts for earlier attempts. No legacy-trip state or check against plan.sent audit rows:
+no application path makes that case. Seeded publications with no trips still show their genuine deferrals.
+This explicitly narrows 013's A8 promise; deleted publication revisions and animated/full audit replay stay out.
+
+**D-83 · 1 Oct · History keeps orders, stops, attempts and shop confirmations separate.** Quantities say ordered,
+loaded, handed over or received, with null for missing evidence. Three orders confirmed at one stop are one shop
+confirmation, not three deliveries. Closed attempts never inherit later receipts. Returned means Return
+instructed, including refused goods answered Send replacements; it does not claim a depot return scan exists.
+
+**D-84 · 1 Oct · A8 owns its missing proof read and reuses 013's problem-photo read.** T0 waits for 016 to merge;
+if it has no proof endpoint (the reviewed spec omits it), add the scoped GET in lookup/photo.ts through
+routes/lookup.ts, never in 016's files. Reuse an equivalent merged route unchanged if one exists. Keep 013's
+issue-photo GET, depot checks, existing JPEG/cache policy and Helmet headers; no separate header criterion.
+Lists carry metadata only. Open photos on demand and release on close/reset/sign-out, with no public link,
+synthetic receipt signature or persistent browser photo cache.
+
+**D-85 · 1 Oct · Fleet Today uses reported trip state and an active-only header.** Out now includes a vehicle's
+published out trip even from an earlier date. Its driver/status takes precedence, then today's first unfinished
+trip, then its last returned trip. Not recorded out replaces physical At the depot. All header vehicle counts,
+including reefers, vans, Out now and workshop counts, use active vehicles only; archiving VEH003 yields 37 active,
+eight reefers and four vans. Its old trips, own fuel and any out trip remain readable in the archived row/detail.
+
+**D-86 · 1 Oct · Fleet fuel is recorded and committed litres.** Use the app calendar date's ISO-week ledger
+once, including estimates already committed on Send. Show quota minus that sum, with negative/unknown values and
+distinct recorded/remaining percentages. The header sums active vehicles and their quota; archived rows keep
+their own ledger. Count trips/planned km only from sent plans, never from unlinked fuel rows. No measured
+consumption or future fuel forecast is claimed.
+
+**D-87 · 1 Oct · Cut the entire Next 6 weeks view.** Hide its toggle. The two frames forecast demand and book
+hired reefers; these are not recorded facts. An availability substitute would show 38 of 42 dates outside the
+calendar ending 28 June. No forecast, hiring, availability route/view, calendar extension or Booked success.
+Fleet Today still reads its existing workshop rows. Record the two excluded frames as design departures.
+
+**D-88 · 1 Oct · Narrow lookups keep their tables in bounded scrolling boxes.** At 1024 and wider retain the
+frames' table/timeline and detail rail. Below 1024 the detail stacks below the table, which scrolls in its own
+box without page-wide sideways scroll. No custom card layout; phone-first is required for driver and loader.
+Keep filters/photos keyboard-accessible. Use the existing stream/fallback, labelled stale records on refresh
+failure and no persistent offline lookup store. Join checks use the built app in Nabil's visible Chrome.
+
+**D-89 · 1 Oct · Skipped lately counts shops left out of published plans.** Keep the small panel drawn in the
+Orders frame. Read published deferrals in the 28 dates ending on the selected delivery day; count one skip per
+shop per plan even with several orders/parts. Show count, latest date and that plan's distinct recorded reasons,
+sorted by count descending, latest date descending, shop name/id. Later delivery does not erase a skip; a
+withdrawn plan contributes nothing until sent again. Fresh seed gives four shops/five skips: Dickwella twice,
+Nugegoda, Ragama and Unawatuna once each. Table filters do not change the panel. No priority write or forecast.
+
 **D-90 · 1 Oct · Sign in with a staff ID and a four-digit PIN, as designed.** Every account has a staff ID, a role
 letter and three digits (S shop, P dispatcher, L loader, D driver, A admin), and a PIN. The demo accounts share one
 PIN the README prints; admin has its own setting, so a hosted admin PIN can differ from the printed one. Five wrong

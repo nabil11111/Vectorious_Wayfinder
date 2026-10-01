@@ -174,6 +174,22 @@ At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements
 at 117 of 118. **Bring them back** ends with "Hand them in; they go on the next run.", and Wellawatte's two orders are
 placed again for Friday's plan.
 
+### The look-up pages
+
+After step 22, Ruwan can look the day up. The three pages only read what the walkthrough recorded (D-80).
+
+23. **Orders.** As Ruwan, open **Orders**: "Orders for Thu 25 Jun", "104 orders · 5 planned · 99 deferred · 4 carried over
+    from earlier days". Nugegoda's three orders read "VEH035 · 1" and "Received"; press the one wanted Wed 24 for its
+    lines and its history ("deferred · The fridge van was full." on Wed 24, then planned on VEH035). Search and the
+    filters run on the page, and Skipped lately lists the shops deferred most in four weeks.
+24. **History.** Open **History**: "History · Thu 25 Jun", "1 trip", "118 ordered · 117 loaded · 115 handed over", "1 short
+    from the depot" and "2 refused", with "Not delivered · 1" (Fresh Wellawatte, "Return instructed") and "Shop
+    confirmations · 1" on the right. Press **Open** on VEH035: the planned and recorded times, every line at each stop,
+    Nugegoda's proof photo and the shop's confirmation ("3 orders · 22 cartons received"), Kasun's flag answered Go
+    short, and Wellawatte's refusal answered Bring them back.
+25. **Fleet.** Open **Fleet**: "38 vehicles", "3 in the workshop today" with their reasons, and each vehicle's fuel left
+    this week, lowest first. Press a vehicle for its limits, its fuel week and its latest sent trips.
+
 ### The suggested plan
 
 The planner builds the same day in one press. It has its own short walkthrough, because the one above plans by hand.
@@ -303,6 +319,21 @@ Anything we built differently from our Designathon submission, and why.
   truck.
 - **The loader's "Plan changed"** names no docks and has no "Why" line. The plan can change only before loading starts
   (D-70), where the design also draws a truck changed after loading began.
+
+**The look-up pages**
+- **They only read (D-80):** Orders has no "Plan first" and no "Call the shop" (the data has no phone numbers, D-40),
+  and Fleet has no "Next 6 weeks", forecast or booking.
+- **Orders** shows the order's own id (8 characters in the table, all of it in the detail) where the frame shows WF
+  numbers, picks other days with a date field in place of a second day chip, and has no "Late by", shop contact or
+  "orders closed" line.
+- **History** draws a still timeline with a legend, without Replay or speed controls (D-82), has one row per trip, not
+  per vehicle, and says "Shop confirmations" where the frame says "Receipts" and "Signed": there is no signature (D-47).
+  Deferrals have their own card and filter, apart from "Not delivered", and there is no receipt-count column.
+- **Fleet** says "Not recorded out" where the frame says "At the depot": the app knows whether a truck has a trip out,
+  not where it stands (D-85). Fuel is "recorded and committed" this week (D-86), and there are no no-signal, minutes-late
+  or "about N km more" chips.
+- **States the design lacks:** loading, could not load, could not update, no connection, sign in again, a date or trip
+  link that does not exist, no photo recorded and a photo that will not open.
 
 **The driver**
 - **No calls and no signature.** No "Call the shop", "Called the shop" or "Call Prasanna": the data has no phone numbers
