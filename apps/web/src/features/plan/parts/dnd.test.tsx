@@ -7,7 +7,7 @@ import type { BoardScreen } from '../board';
 import { placesOf, planOf } from '../draft';
 import { BuildPanel } from './BuildPanel';
 import { DoneList } from './DoneList';
-import { announcements, BoardChange, boardKeyboardCoordinates, landDrop } from './dragging';
+import { announcements, BoardChange, boardKeyboardCoordinates, dropLocked, landDrop, landingCollision, putBack } from './dragging';
 import type { Dragged, DropData, Landing } from './drops';
 import { indexOf } from './lookup';
 import { OrderLists } from './OrderLists';
@@ -95,7 +95,7 @@ it('spec 023 AC-1 makes a finished drag its change of the draft, with its Undo, 
   expect(plan.trips[0].stops.map((s: { outletId: string }) => s.outletId)).toEqual(['OUT001', 'OUT005', 'OUT002']);
   expect(undo).toMatchObject({ line: 'Fresh Dehiwala added to VEH035', tripKey: 'VEH035-1' });
   landDrop(planOf(BOARD), dehiwala, { kind: 'middle' }, { change, start });
-  expect(start).toHaveBeenCalledWith({ kind: 'start', group: dehiwala.group, orders: dehiwala.orders, startWith: dehiwala.orders });
+  expect(start).toHaveBeenCalledWith({ kind: 'start', group: dehiwala.group, orders: dehiwala.orders, startWith: dehiwala.orders, dropped: 'Fresh Dehiwala' });
   // Put back, or dropped where it cannot land: nothing happens.
   landDrop(planOf(BOARD), dehiwala, undefined, { change, start });
   landDrop(planOf(BOARD), dehiwala, { kind: 'unplanned' }, { change, start });
@@ -140,6 +140,44 @@ it('spec 023 AC-6 moves a picked-up order with the arrow keys to the next place 
   // Nowhere further that way, and any other key, moves nothing.
   expect(press('ArrowRight', rect(900, 200), 'card:VEH002-1')).toBeUndefined();
   expect(press('KeyA', rect(20, 300), 'unplanned')).toBeUndefined();
+});
+
+// The open trip's stops, one under the other: stop 1 with its split form open, so its row is 300 tall, then stops 2
+// and 3 at 40 each.
+const STOPS: [UniqueIdentifier, ClientRect][] = [['stop:VEH035-1:OUT001', rect(0, 0, 500, 300)], ['stop:VEH035-1:OUT002', rect(0, 300, 500, 40)], ['stop:VEH035-1:OUT003', rect(0, 340, 500, 40)]];
+const stopContainers = STOPS.map(([id]) => ({ id, key: id, disabled: false, data: { current: undefined }, node: { current: null }, rect: { current: null } }) as DroppableContainer);
+const stopMap = Object.assign(new Map(stopContainers.map((c) => [c.id, c])), { getEnabled: () => stopContainers, toArray: () => stopContainers, getNodeFor: () => undefined }) as unknown as DroppableContainers;
+const tallStop = { id: 'stop:VEH035-1:OUT001', data: { current: { dragged: { kind: 'stop', tripKey: 'VEH035-1', index: 0, label: 'Fresh Nugegoda', brand: 'Fresh' } } } } as unknown as Active;
+
+it('spec 023 AC-6 moves a picked-up stop past a shorter one with Down, where its own row is taller, and lands it there', () => {
+  const at = rect(0, 0, 500, 300);
+  const moved = boardKeyboardCoordinates({ code: 'ArrowDown', preventDefault: () => undefined } as unknown as KeyboardEvent, {
+    active: tallStop.id, currentCoordinates: { x: 0, y: 0 },
+    context: { active: tallStop, collisionRect: at, droppableRects: new Map(STOPS), droppableContainers: stopMap, over: { id: tallStop.id } as Over } as never,
+  });
+  // The tall row is centred on stop 2, so the collision the board takes after the move picks stop 2, not stop 1 again.
+  expect(moved).toEqual({ x: 0, y: 170 });
+  const collisions = landingCollision({ active: tallStop, collisionRect: rect(moved!.x, moved!.y, 500, 300), droppableRects: new Map(STOPS), droppableContainers: stopContainers, pointerCoordinates: null });
+  expect(collisions[0]?.id).toBe('stop:VEH035-1:OUT002');
+});
+
+it('spec 023 AC-6 cancels a drop that lands while the board holds still, and puts back a drag in hand when it starts holding', () => {
+  expect(dropLocked(screenOf(BOARD))).toBe(false);
+  expect(dropLocked(screenOf(BOARD, { acting: true }))).toBe(true);
+  const sent = boardWith(TRIPS);
+  expect(dropLocked(screenOf({ ...sent, plan: { ...sent.plan, status: 'published' } }))).toBe(true);
+  // Put back as Escape does: both of dnd-kit's sensors cancel on it, on the page's document.
+  class Key extends Event { code: string; key: string; constructor(type: string, init: KeyboardEventInit) { super(type, init); this.code = init.code ?? ''; this.key = init.key ?? ''; } }
+  vi.stubGlobal('KeyboardEvent', Key);
+  try {
+    const page = new EventTarget();
+    const heard: { code: string; bubbles: boolean }[] = [];
+    page.addEventListener('keydown', (event) => heard.push({ code: (event as Key).code, bubbles: event.bubbles }));
+    putBack(page);
+    expect(heard).toEqual([{ code: 'Escape', bubbles: true }]);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 it('spec 023 AC-5 shows the Undo line of a drop on a trip\'s card in that card', () => {

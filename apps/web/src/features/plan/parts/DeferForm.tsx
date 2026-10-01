@@ -1,18 +1,18 @@
 import { useId, useState } from 'react';
 import { DEFERRAL_CODES, type BoardOrder, type DeferralCode, type DraftDeferral } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
-import { countOf, DEFERRAL } from '../words';
+import { cn } from '@/lib/utils';
+import { countOf, DEFERRAL, REASON_MOST, reasonFits, reasonLine } from '../words';
 import type { BoardIndex } from './lookup';
 import { inkButton, plainButton } from './look';
 import { Pills } from './ui';
 
-// The longest reason a shop can be given (rule 7).
-const MAX_REASON = 200;
-
 // Deferring, in place (spec 010, "Deferring, splitting"): the six reasons as chips and the sentence the shop will
 // read. It defers one order, a shop row's orders or a whole group, each order with its own deferral. A carried-over
 // order starts with its last code and reason. Until the sentence is written over, each order gets its own
-// shop's sentence, so a group's "window" reasons name each shop's closing time.
+// shop's sentence, so a group's "window" reasons name each shop's closing time. The sentence takes 200 characters at
+// most: the box takes any length, so the browser never cuts a paste, and a change that would make it longer is
+// refused whole with a line in red. Near the end the line counts what is left, and at 200 it says it is full (Q-11).
 export function DeferForm({ orders, index, code, reason, onDefer, onCancel }: {
   orders: BoardOrder[];
   index: BoardIndex;
@@ -27,6 +27,9 @@ export function DeferForm({ orders, index, code, reason, onDefer, onCancel }: {
   const [text, setText] = useState(reason ?? (code && first ? DEFERRAL[code].sentence(first) : ''));
   const [written, setWritten] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [refused, setRefused] = useState(false);
+  const line = reasonLine(text.length, refused);
+  const lineId = useId();
 
   const choose = (next: DeferralCode) => {
     setChosen(next);
@@ -42,7 +45,7 @@ export function DeferForm({ orders, index, code, reason, onDefer, onCancel }: {
       return { orderId: order.id, code: chosen, reason: sentence.trim() };
     });
     if (deferrals.some((deferral) => deferral.reason === '')) return setProblem('Write the sentence the shop will read.');
-    if (deferrals.some((deferral) => deferral.reason.length > MAX_REASON)) return setProblem(`Keep the sentence to ${MAX_REASON} characters.`);
+    if (deferrals.some((deferral) => deferral.reason.length > REASON_MOST)) return setProblem(`Keep the sentence to ${REASON_MOST} characters.`);
     onDefer(deferrals);
   };
 
@@ -64,11 +67,23 @@ export function DeferForm({ orders, index, code, reason, onDefer, onCancel }: {
         <textarea
           id={id}
           rows={2}
-          maxLength={MAX_REASON}
           value={text}
-          onChange={(event) => { setText(event.target.value); setWritten(true); setProblem(null); }}
+          aria-describedby={line ? lineId : undefined}
+          onChange={(event) => {
+            const next = event.target.value;
+            setRefused(!reasonFits(next));
+            if (!reasonFits(next)) return;
+            setText(next);
+            setWritten(true);
+            setProblem(null);
+          }}
           className="block w-full resize-none rounded-lg border bg-card px-2.5 py-1.5 text-xs leading-[16px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
+        {line && (
+          <p id={lineId} role={line.refused ? 'alert' : undefined} className={cn('text-right text-[11px] leading-[14px]', line.refused ? 'font-semibold text-bad' : 'text-muted-foreground')}>
+            {line.words}
+          </p>
+        )}
       </div>
       {problem && <p role="alert" className="text-[11px] leading-[14px] font-semibold text-bad">{problem}</p>}
       <div className="flex gap-2">
