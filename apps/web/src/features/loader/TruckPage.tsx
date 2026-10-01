@@ -120,12 +120,14 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
           ) : (
             <AllOn truck={truck} />
           )}
+          {/* A flag waiting for its answer shows under its own stop's lines (Q-23): here while that stop is being
+              loaded, and in its row of "Load in this order" otherwise, so it never reads as the next stop's. */}
+          {current && open.filter((issue) => issue.stop.id === current.id).map((issue) => (
+            <p key={issue.id} className="mt-3 rounded-[10px] bg-warn-tint px-3 py-2.5 text-[13px] leading-4 font-semibold text-warn-ink">{waitingLine(issue)}</p>
+          ))}
           {/* The dispatcher's answers show as soon as they come (rule 7), so a "Load it all" reaches the stop it is
               about while it is still being loaded. */}
           {answered.map((issue) => <Answer key={issue.id} issue={issue} />)}
-          {open.map((issue) => (
-            <p key={issue.id} className="mt-3 rounded-[10px] bg-warn-tint px-3 py-2.5 text-[13px] leading-4 font-semibold text-warn-ink">{waitingLine(issue)}</p>
-          ))}
           <div className="mt-auto hidden pt-6 lg:block">{buttons}</div>
         </Card>
         {/* While the truck loads, a loaded stop's row flags a problem on it or takes it off again (Q-16). */}

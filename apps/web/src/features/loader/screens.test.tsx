@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ClockState, Issue, LoadingDay, LoadingStop, LoadingTruck } from '@wayfinder/contracts';
+import type { ClockState, FlagReason, LoadingDay, LoadingDecision, LoadingIssue, LoadingStop, LoadingTruck } from '@wayfinder/contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -63,7 +63,7 @@ const CLOCK: ClockState = { demo: true, now: '2026-06-24T21:05:00.000Z', part: '
 function page(path: string, day: LoadingDay): string {
   const qc = new QueryClient();
   qc.setQueryData(loadingKey, day);
-  qc.setQueryData(clockKey, { ...CLOCK, heldAt: 0 });
+  qc.setQueryData(clockKey, { ...CLOCK, heldAt: performance.now() });
   const router = createMemoryRouter([
     { path: '/loader/trucks/:tripId', element: <TruckPage /> },
     { path: '/loader/trucks/:tripId/flag', element: <FlagPage /> },
@@ -169,8 +169,8 @@ describe('Q-17 the flag\'s count box', () => {
   });
 });
 
-// A flag of VEH038's stop 2 as the dispatcher answered it: Kotahena's 57 dry cartons, 54 counted.
-function flagOn(truck: LoadingTruck, reason: Issue['reason'], decision: Issue['decision'] = null): Issue {
+// A flag on VEH038's stop 2, Kotahena's 57 dry cartons counted at 54, raised at 02:33: open, or answered at 02:35.
+function flagOn(truck: LoadingTruck, reason: FlagReason, decision: LoadingDecision | null = null): LoadingIssue {
   const stop = truck.stops[1]!;
   const line = stop.lines[0]!;
   return {
@@ -270,5 +270,43 @@ describe('Q-22 a flag that was not sent is never left behind without a word', ()
     const html = page(`/loader/trucks/${TRIP}/flag?stop=stop-2`, dayOf(veh038([3])));
     expect(html).not.toContain('This flag is not sent');
     expect(html).toContain('Send to dispatcher');
+  });
+});
+
+// The truck page split where "Load in this order" starts: the cards above it, and each stop's row in it.
+function sections(html: string) {
+  const at = html.indexOf('aria-labelledby="load-order"');
+  const rows = html.slice(at).split('<li>').slice(1);
+  return { cards: html.slice(0, at), row: (shop: string) => rows.find((row) => row.includes(shop)) ?? '' };
+}
+const WAITING = 'Waiting for the dispatcher · flagged 02:33';
+
+describe('Q-23 "Waiting for the dispatcher" stays with the flagged stop', () => {
+  it('shows it in the flagged stop\'s row once that stop is loaded, not under the next stop\'s lines', () => {
+    const loaded = veh038([3, 2], {}, { 'k-57': 3 });
+    const html = truckPage({ ...loaded, issues: [flagOn(loaded, 'damaged')] });
+    const { cards, row } = sections(html);
+    expect(cards).toContain('Now loading · stop 1');
+    expect(cards).not.toContain('Waiting for the dispatcher');
+    expect(row('Fresh Kotahena')).toContain(WAITING);
+    expect(row('Fresh Nugegoda')).not.toContain('Waiting for the dispatcher');
+  });
+
+  it('shows it under the lines of the stop being loaded when that stop is the flagged one', () => {
+    const loading = veh038([3], {}, { 'k-57': 3 });
+    const html = truckPage({ ...loading, issues: [flagOn(loading, 'short')] });
+    const { cards, row } = sections(html);
+    expect(cards).toContain('Now loading · stop 2');
+    expect(cards.indexOf(WAITING)).toBeGreaterThan(cards.indexOf('57 cartons dry'));
+    expect(row('Fresh Kotahena')).not.toContain('Waiting for the dispatcher');
+  });
+
+  it('shows it in the flagged stop\'s row once every stop is loaded', () => {
+    const all = veh038([3, 2, 1], {}, { 'k-57': 3 });
+    const html = truckPage({ ...all, issues: [flagOn(all, 'short')] });
+    const { cards, row } = sections(html);
+    expect(cards).toContain('All stops loaded');
+    expect(cards).not.toContain('Waiting for the dispatcher');
+    expect(row('Fresh Kotahena')).toContain(WAITING);
   });
 });

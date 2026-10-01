@@ -4,7 +4,7 @@ import type { LoadingStop, LoadingTruck } from '@wayfinder/contracts';
 import { MenuItem, MenuPopup, MenuRoot, MenuTrigger } from '@/features/plan/parts/ui';
 import { cn } from '@/lib/utils';
 import { lastLoaded } from '../stops';
-import { leaves, loadFigure, stopGoingOf, stopOn, stopOnShort, stopUnits, truckName, tripLine, undoFirstWords, undoStopWords, untilLeaving, vehicleWords, whole } from '../words';
+import { leaves, loadFigure, stopGoingOf, stopOn, stopOnShort, stopUnits, truckName, tripLine, undoFirstWords, undoStopWords, untilLeaving, vehicleWords, waitingLine, whole } from '../words';
 import { truckIcon } from './icons';
 import { Card, Label, LoadBar, StopChip, Tag } from './ui';
 
@@ -50,8 +50,10 @@ export interface StopMenu { busy: boolean; undoing: boolean; onUndo: (stop: Load
 
 // A stop in "Load in this order", last stop first: what is left to load, "23 of 24" with a flag lowering a count,
 // "✓ 94 on" once loaded, and "23 on · 1 short" in red when it went on short. The stop being loaded is outlined. While
-// the truck loads, a loaded stop's row opens its menu, and says "Saving…" while it comes off again.
+// the truck loads, a loaded stop's row opens its menu, and says "Saving…" while it comes off again. A flag waiting for
+// its answer shows under the stop's name, unless the stop is being loaded, whose lines show it (Q-23).
 function StopRow({ truck, stop, current, menu }: { truck: LoadingTruck; stop: LoadingStop; current: boolean; menu?: StopMenu }) {
+  const waiting = current ? [] : truck.issues.filter((issue) => issue.status === 'open' && issue.stop.id === stop.id);
   const value = menu?.undoing && lastLoaded(truck)?.id === stop.id
     ? <span className="shrink-0 text-sm leading-5 font-semibold text-muted-foreground">Saving…</span>
     : stop.loaded
@@ -62,7 +64,10 @@ function StopRow({ truck, stop, current, menu }: { truck: LoadingTruck; stop: Lo
   const content = (
     <>
       <StopChip seq={stop.seq} />
-      <span className="min-w-0 flex-1 truncate text-[15px] leading-5 font-semibold">{stop.shopName}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] leading-5 font-semibold">{stop.shopName}</span>
+        {waiting.map((issue) => <span key={issue.id} className="mt-1 block text-[13px] leading-4 font-semibold text-warn-ink">{waitingLine(issue)}</span>)}
+      </span>
       {value}
     </>
   );
