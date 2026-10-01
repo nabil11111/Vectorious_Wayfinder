@@ -1,6 +1,6 @@
 # 014 · The suggested plan
 
-**Status:** Spec, with two open questions at the bottom  ·  **Owner:**  ·  **Design:** Dispatcher · Edit plan · empty, Edit plan and View plan, and the in-screen states Edit plan · building, View plan · ready to send and View plan · sent.
+**Status:** Done, with two open questions at the bottom  ·  **Owner:**  ·  **Design:** Dispatcher · Edit plan · empty, Edit plan and View plan, and the in-screen states Edit plan · building, View plan · ready to send and View plan · sent.
 
 Piece B4 of [the map](../000-map.md), after the planner itself ([011](../011-planner/spec.md)). This spec puts the planner on
 spec 010's board: one button builds the day's plan, every order says why it went where it went, the dispatcher makes the
