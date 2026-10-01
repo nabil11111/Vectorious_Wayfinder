@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeO
 import { countOf, figure, hhmm, litres, orderAmount, ordersAmount, vehicleSize } from '../words';
 import { DeferForm } from './DeferForm';
 import { DepotRow } from './DepotRow';
-import { movable, useLanding } from './dragging';
+import { draggedOf, landingLook, movable, useLanding } from './dragging';
 import { DriverMenu } from './DriverMenu';
 import { driverChange } from './drivers';
 import { tripLabel } from './drops';
@@ -72,9 +73,12 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
     const chosen = driverChange(draft, key, trip.vehicleId, driverId);
     change(chosen.plan, chosen.undo);
   };
-  // Drag and drop (spec 023): the stops as a sortable list, and its end as a place to land.
+  // Drag and drop (spec 023): the stops as a sortable list, outlined as one place while something that can land there is
+  // dragged, and its end as a place to land.
   const canMove = movable(screen);
   const stopIds = trip.stops.map((stop) => `stop:${key}:${stop.outletId}`);
+  const dragging = draggedOf(useDndContext().active);
+  const listLook = dragging ? landingLook(dragging, { kind: 'stops', tripKey: key, at: trip.stops.length }, false) : '';
   const { setNodeRef: endRef, look: endLook } = useLanding(`stops-end:${key}`, { kind: 'stops', tripKey: key, at: trip.stops.length }, `the end of ${tripLabel(trip)}'s stops`);
 
   return (
@@ -126,7 +130,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
       <h3 className="px-3.5 pt-3 pb-2 text-xs leading-[15px] font-semibold text-muted-foreground">Stops in order</h3>
       {times && <DepotRow end="start" depot={board.depot} at={times.leaveAt} className="mx-3.5" />}
       <SortableContext items={stopIds} strategy={verticalListSortingStrategy}>
-        <ol className="mx-3.5">
+        <ol className={cn('mx-3.5 rounded-md', listLook)}>
           {trip.stops.map((stop, i) => {
             const shop = index.shop(stop.outletId);
             if (!shop) return null;

@@ -44,9 +44,10 @@ export function StopRow({ seq, shop, orders, time, longWait, why, first, last, d
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging, isOver, active } = useSortable({
     id: drag.id, data: { dragged: drag.dragged, landing: drag.landing, name: drag.name } satisfies DragData & DropData, disabled: !drag.movable,
   });
-  // An order dragged over the stop lands before it, so the stop shows it. Stops dragged along the list move aside instead.
+  // An order dragged over the stop lands before it, so the stop fills with its tint (the list is outlined as a whole).
+  // Stops dragged along the list move aside instead.
   const dragging = draggedOf(active);
-  const look = dragging?.kind === 'orders' ? landingLook(dragging, drag.landing, isOver) : '';
+  const look = dragging?.kind === 'orders' && isOver ? landingLook(dragging, drag.landing, true) : '';
   const number = cn('flex size-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold', late ? 'bg-bad text-white' : 'bg-secondary text-secondary-foreground');
   return (
     <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} onPointerDown={pressOf(listeners)} className={cn('border-t', isDragging && 'opacity-40', look)}>
