@@ -119,7 +119,7 @@ are depot time.
    saved and checked the same way (D-29), and the suggestion stays as built. The send goes as spec 010's rule 11 once
    the checker finds no block and no decision is open. Accepting a decision clears none of the checker's warnings, and
    warnings never stop a send, so the plan is ready, with warnings, and they stay on View plan. *The seeded suggestion
-   keeps two long waits, of 59 and 73 minutes, and a Fresh workload of 278 of 270 minutes.*
+   keeps one long wait, of 43 minutes at Fresh Bambalapitiya, and a Fresh workload of 278 of 270 minutes.*
 9. **The numbers.** As spec 010's rule 12: the API works out every number shown, and the planner writes every rank
    and reason. The screen counts the rows it lists ("Decisions · N", "N decisions to make") and nothing else.
 
@@ -216,7 +216,7 @@ reset. *Unit* ones use made-up data. Screens get a click-through in Nabil's Chro
   "✓ accepted" after View plan's Accept.
 - [ ] **AC-17** View plan. With the seeded suggestion's decisions: "Decisions · 6" above Checks, each with Accept and
   Open in edit, "Accept all 6" in orange and the send greyed as "Send plan · 6 decisions open". Accepting one closes
-  it. Accepting the rest leaves the warnings listed under "Checks · 3" with "Ready, with warnings" and turns the send
+  it. Accepting the rest leaves the warnings listed under "Checks · 2" with "Ready, with warnings" and turns the send
   orange. The send gives the sent state, which keeps "Suggested plan · 16:00", the accepted decisions and the warnings
   after a reload.
 - [ ] **AC-18** View plan opened by a reload. After a fresh build, reload View plan before anything else, then press
@@ -246,7 +246,7 @@ depend on the judge's pace, so the clock times are examples.
 5. Open VEH035's trip 1, the fridge van with Fresh Nugegoda's chilled cartons, and choose Dilshan as its driver: an
    ordinary edit, saved and checked as spec 010's are.
 6. Open View plan: "Suggested plan · 16:00", "Decisions · 6" and "Send plan · 6 decisions open". Press "Accept all 6":
-   "Decisions · all made", and under "Checks · 3" the two long waits and the Fresh workload stay listed with "Ready,
+   "Decisions · all made", and under "Checks · 2" the long wait and the Fresh workload stay listed with "Ready,
    with warnings". Press "Send plan to loaders and drivers": "✓ Sent 16:06 · loaders and 1 driver".
 
 ## Out of scope

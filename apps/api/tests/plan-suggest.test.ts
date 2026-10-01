@@ -174,8 +174,8 @@ it('AC-1 builds the seeded day into a new plan\'s draft in one write, with every
   expect(board.orders).toHaveLength(102);
   expect([...onTrips, ...deferred].sort()).toEqual(board.orders.map((o) => o.id).sort());
   expect(board.counts).toMatchObject({ trips: 27, vehiclesUsed: 26, vehiclesWorking: 35, ordersDue: 102, ordersOnTrips: 96, ordersDeferred: 6, ordersUnplanned: 0 });
-  // The walkthrough's warnings: two long waits and a Fresh workload over its budget.
-  expect(board.check!.problems.filter((p) => p.level === 'warn').map((p) => p.code).sort()).toEqual(['long_wait', 'long_wait', 'over_time_budget']);
+  // The walkthrough's warnings: a long wait and a Fresh workload over its budget.
+  expect(board.check!.problems.filter((p) => p.level === 'warn').map((p) => p.code).sort()).toEqual(['long_wait', 'over_time_budget']);
   expect(await db.select().from(plans).where(eq(plans.date, DATE))).toHaveLength(1);
   expect(PlanBoard.parse((await ruwan.get('/api/v1/plans')).body)).toEqual(board);
 });

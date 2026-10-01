@@ -113,7 +113,7 @@ describe('F8 the planner\'s quality on the seeded days', () => {
     expect(run.elapsedMs).toBeLessThan(1000);
   });
 
-  it.fails('F2 tries the new stop before an existing one when the closing-time order misses a window', () => {
+  it('F2 tries the new stop before an existing one when the closing-time order misses a window', () => {
     // Two Colombo shops on one truck. A takes deliveries 10:00 to 10:10 and B 09:00 to 10:20; unloading takes 20 minutes
     // and the drive between them 10. A then B reaches B at 10:30, and leaving earlier does not help, as A opens at 10:00.
     // B then A serves both.

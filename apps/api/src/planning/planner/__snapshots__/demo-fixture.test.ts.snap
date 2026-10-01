@@ -63,8 +63,8 @@ exports[`the exact seeded planner day without a database > AC-1/21 pins every se
   "Rank 59: new order; dry; Colombo due 07:59; Fresh; joined the dry truck VEH011 on its run to Colombo, fills an existing run",
   "Rank 60: new order; dry; Colombo due 07:59; Fresh; joined the dry truck VEH011 on its run to Colombo, fills an existing run",
   "Rank 61: new order; dry; Colombo due 07:59; Fresh; joined the dry truck VEH011 on its run to Colombo, fills an existing run",
-  "Rank 62: new order; dry; Colombo due 07:59; Fresh; new run on the dry truck VEH033 to Colombo, more volume broke the tie",
-  "Rank 63: new order; dry; Colombo due 07:59; Fresh; joined the dry truck VEH033 on its run to Colombo, fills an existing run",
+  "Rank 62: new order; dry; Colombo due 07:59; Fresh; joined the dry truck VEH011 on its run to Colombo, fills an existing run",
+  "Rank 63: new order; dry; Colombo due 07:59; Fresh; new run on the dry truck VEH033 to Colombo, more volume broke the tie",
   "Rank 64: new order; dry; Colombo due 07:59; Fresh; joined the dry truck VEH033 on its run to Colombo, fills an existing run",
   "Rank 65: new order; dry; Galle due 07:59; Fresh; joined the dry truck VEH014 on its run to Galle, fills an existing run",
   "Rank 66: new order; dry; Galle due 07:59; Fresh; joined the dry truck VEH014 on its run to Galle, fills an existing run",
@@ -74,8 +74,8 @@ exports[`the exact seeded planner day without a database > AC-1/21 pins every se
   "Rank 70: new order; dry; Gampaha due 07:59; Fresh; joined the dry truck VEH019 on its run to Gampaha, fills an existing run",
   "Rank 71: new order; dry; Gampaha due 07:59; Fresh; joined the dry truck VEH019 on its run to Gampaha, fills an existing run",
   "Rank 72: new order; dry; Gampaha due 07:59; Fresh; joined the dry truck VEH019 on its run to Gampaha, fills an existing run",
-  "Rank 73: new order; dry; Gampaha due 07:59; Fresh; new run on the dry truck VEH010 to Gampaha, vehicle ID breaks the tie",
-  "Rank 74: new order; dry; Gampaha due 07:59; Fresh; joined the dry truck VEH010 on its run to Gampaha, fills an existing run",
+  "Rank 73: new order; dry; Gampaha due 07:59; Fresh; joined the dry truck VEH019 on its run to Gampaha, fills an existing run",
+  "Rank 74: new order; dry; Gampaha due 07:59; Fresh; new run on the dry truck VEH010 to Gampaha, vehicle ID breaks the tie",
   "Rank 75: new order; dry; Kalutara due 07:59; Fresh; joined the dry truck VEH023 on its run to Kalutara, fills an existing run",
   "Rank 76: new order; dry; Kalutara due 07:59; Fresh; joined the dry truck VEH023 on its run to Kalutara, fills an existing run",
   "Rank 77: new order; dry; Kalutara due 07:59; Fresh; joined the dry truck VEH023 on its run to Kalutara, fills an existing run",
@@ -424,12 +424,6 @@ exports[`the exact seeded planner day without a database > AC-21 returns a valid
       "stops": [
         {
           "orderIds": [
-            "6dfa404e-fcdc-5095-ab51-4d79bf264cd7",
-          ],
-          "outletId": "OUT031",
-        },
-        {
-          "orderIds": [
             "d8f0d481-9117-5057-8c9e-1e3f86b10e87",
           ],
           "outletId": "OUT033",
@@ -440,6 +434,12 @@ exports[`the exact seeded planner day without a database > AC-21 returns a valid
     },
     {
       "stops": [
+        {
+          "orderIds": [
+            "7b56e0e0-2f6e-5759-8ce7-e95035640f4c",
+          ],
+          "outletId": "OUT011",
+        },
         {
           "orderIds": [
             "3b6779cb-bb23-51da-b91c-6e4c9dedda4a",
@@ -578,6 +578,12 @@ exports[`the exact seeded planner day without a database > AC-21 returns a valid
     },
     {
       "stops": [
+        {
+          "orderIds": [
+            "6dfa404e-fcdc-5095-ab51-4d79bf264cd7",
+          ],
+          "outletId": "OUT031",
+        },
         {
           "orderIds": [
             "1f977ef0-3af4-5f82-a3d9-62196f2f27dc",
@@ -872,12 +878,6 @@ exports[`the exact seeded planner day without a database > AC-21 returns a valid
     },
     {
       "stops": [
-        {
-          "orderIds": [
-            "7b56e0e0-2f6e-5759-8ce7-e95035640f4c",
-          ],
-          "outletId": "OUT011",
-        },
         {
           "orderIds": [
             "9b2d7eaa-a994-5143-acc6-903e70425f1d",

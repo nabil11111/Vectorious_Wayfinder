@@ -74,8 +74,13 @@ requires a stated override. The numbered priority above and the rules below are 
   over new first trips; between otherwise equal new runs, use an idle vehicle's first before a second run. This
   preserves special vehicles and avoids tying up a vehicle's whole day while other suitable trucks stand idle.
 - [ ] **AC-7** When adding orders at one outlet, the system shall use one stop there per trip, with order IDs in
-  priority order. It shall sort stops by effective closing minute, effective opening minute, then outlet ID, so
-  deadlines decide the route. Mall hours intersect shop hours; effective closing uses priority step 3.
+  priority order. A new stop goes at its place by effective closing minute, effective opening minute, then outlet ID,
+  among the trip's stops, which keep their order, so deadlines decide the route. If that misses a window even with
+  AC-9's departure fix, the system shall try the new stop at each other place in the trip, first to last, before
+  refusing the candidate, and take the first place that keeps the usual departures, else the first that passes with
+  an earlier one. A departure fix alone is not a search of the route. Mall hours intersect shop hours; effective
+  closing uses priority step 3. *Two Colombo shops on one truck, A taking deliveries 10:00 to 10:10 and B 09:00 to
+  10:20, with 20 minutes' unloading and 10 between them: A then B reaches B at 10:30, and B then A serves both.*
 - [ ] **AC-8** When checking a candidate, the system shall check both trips of its vehicle, including all earlier
   accepted orders, against 007. A new stop must not break its second trip. It shall use the checker's load,
   timeline and fuel functions, so both kg and m³, waiting, unloading, return and reload count correctly.

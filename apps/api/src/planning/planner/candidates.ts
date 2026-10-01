@@ -75,8 +75,10 @@ export function candidateSlots(input: PlanInput, order: EngineOrder): CandidateS
 }
 
 // Only this vehicle's complete day goes to the checker during a trial. No unplanned order can produce a
-// coverage block, and every previously accepted order on its other trip is still protected.
-export function candidateInput(input: PlanInput, order: EngineOrder, slot: CandidateSlot): PlanInput {
+// coverage block, and every previously accepted order on its other trip is still protected. A new stop goes at its
+// closing-time place among the trip's stops, which keep their order (AC-7), or at the given position when AC-7's
+// search for another place tries one.
+export function candidateInput(input: PlanInput, order: EngineOrder, slot: CandidateSlot, position?: number): PlanInput {
   const vehicle = lookup(input.vehicles, 'vehicle')(slot.vehicleId);
   const trips = input.plan.trips.filter((t) => t.vehicleId === slot.vehicleId).map(({ leaveAt: _leaveAt, ...trip }) => ({
     ...trip, stops: trip.stops.map((stop) => ({ ...stop, orderIds: [...stop.orderIds] })),
@@ -89,12 +91,15 @@ export function candidateInput(input: PlanInput, order: EngineOrder, slot: Candi
   }
   const stop = changed.stops.find((s) => s.outletId === order.outletId);
   if (stop) stop.orderIds.push(order.id);
-  else changed.stops.push({ outletId: order.outletId, orderIds: [order.id] });
-  const shopOf = lookup(input.outlets, 'shop');
-  changed.stops.sort((a, b) => {
-    const aw = effectiveWindow(shopOf(a.outletId)), bw = effectiveWindow(shopOf(b.outletId));
-    return aw.close - bw.close || aw.open - bw.open || compare(a.outletId, b.outletId);
-  });
+  else {
+    const shopOf = lookup(input.outlets, 'shop');
+    const nw = effectiveWindow(shopOf(order.outletId));
+    const later = changed.stops.findIndex((s) => {
+      const sw = effectiveWindow(shopOf(s.outletId));
+      return (nw.close - sw.close || nw.open - sw.open || compare(order.outletId, s.outletId)) < 0;
+    });
+    changed.stops.splice(position ?? (later === -1 ? changed.stops.length : later), 0, { outletId: order.outletId, orderIds: [order.id] });
+  }
   const ids = new Set(trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds)));
   const orders = [...input.orders.filter((o) => ids.has(o.id) && o.id !== order.id), order];
   return {
@@ -135,14 +140,35 @@ export function fixDepartures(input: PlanInput): { input: PlanInput; check: Plan
   return { input: trial, check };
 }
 
-export function tryCandidate(input: PlanInput, order: EngineOrder, slot: CandidateSlot): CandidateAttempt {
-  const trial = candidateInput(input, order, slot);
-  if (!capacityFits(trial, slot.tripNo)) return { slot, input: trial, check: null, stage: 'over_capacity' };
+const judged = (slot: CandidateSlot, trial: PlanInput): CandidateAttempt => {
   const checked = fixDepartures(trial);
   const blocks = checked.check.problems.filter((p) => p.level === 'block');
   const stage = blocks.length === 0 ? 'accepted'
     : blocks.some((p) => p.code !== 'fuel_over_quota') ? 'window' : 'fuel';
   return { slot, ...checked, stage };
+};
+
+export function tryCandidate(input: PlanInput, order: EngineOrder, slot: CandidateSlot): CandidateAttempt {
+  const trial = candidateInput(input, order, slot);
+  if (!capacityFits(trial, slot.tripNo)) return { slot, input: trial, check: null, stage: 'over_capacity' };
+  const first = judged(slot, trial);
+  // AC-7: a new stop that misses a window at its closing-time place, even with AC-9's departure fix, is tried at each
+  // other place in the trip, first to last, before the candidate is refused. The first place that keeps the usual
+  // departures wins, else the first that passes with an earlier one; the other stops keep their order. Load and
+  // distance do not depend on the order of stops, so only windows can change.
+  if (first.stage !== 'window') return first;
+  const before = input.plan.trips.find((t) => t.vehicleId === slot.vehicleId && t.tripNo === slot.tripNo);
+  if (!before?.stops.length || before.stops.some((s) => s.outletId === order.outletId)) return first;
+  const closingPlace = trial.plan.trips.find((t) => t.tripNo === slot.tripNo)!.stops.findIndex((s) => s.outletId === order.outletId);
+  let earlier: CandidateAttempt | null = null;
+  for (let position = 0; position <= before.stops.length; position += 1) {
+    if (position === closingPlace) continue;
+    const attempt = judged(slot, candidateInput(input, order, slot, position));
+    if (attempt.stage !== 'accepted') continue;
+    if (!needsEarlierDeparture(attempt)) return attempt;
+    earlier ??= attempt;
+  }
+  return earlier ?? first;
 }
 
 const needsEarlierDeparture = (attempt: CandidateAttempt) =>

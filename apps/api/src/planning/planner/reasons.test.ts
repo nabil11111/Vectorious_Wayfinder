@@ -414,8 +414,9 @@ describe('every reason within 200 characters', () => {
     expect(refusedReason(lateDay, fresh, [late], 'window', 'tightest')).toBe('reached at 10:56 by dry truck VEH012\'s second trip, after 08:00.');
     expect(refusedReason(lateDay, fresh, [late], 'window', 'tight', 'VEH012')).toBe('reached at 10:56 by its second trip, after 08:00.');
 
-    // Another shop made late keeps its place, as the order's own is not the one named.
-    const first = ['OUT026', 'OUT030', 'OUT028'].map((id) => plannerOrder(id, id));
+    // Another shop made late keeps its place, as the order's own is not the one named. The trip's stops are in the
+    // closing-time order the planner gives them, which a new stop joins without reordering the rest (AC-7).
+    const first = ['OUT026', 'OUT028', 'OUT030'].map((id) => plannerOrder(id, id));
     const deadline = plannerOrder('deadline', 'OUT010');
     const added = plannerOrder('added', 'OUT027');
     const nextDay = plannerInput([...first, deadline, added], { vehicles: [chaminda] });

@@ -239,8 +239,8 @@ Press **Reset the demo day** first if you walked the one above.
    from VEH001, which has no driver now" shows with **Undo**. It is one change, saved and checked like any other.
    Press **Undo**: Wasantha drives the van again and Dilshan VEH001.
 6. **Decide and send.** Open **View plan**: "Suggested plan · 16:00", "Decisions · 6" and a greyed "Send plan · 6
-   decisions open". Press **Accept all 6**: "Decisions · all made", and "Checks · 3" keeps the two long waits and the
-   Fresh workload listed with "Ready, with warnings". Press **Send plan to loaders and drivers**: "✓ Sent 16:06 ·
+   decisions open". Press **Accept all 6**: "Decisions · all made", and "Checks · 2" keeps the long wait and the Fresh
+   workload listed with "Ready, with warnings". Press **Send plan to loaders and drivers**: "✓ Sent 16:06 ·
    loaders and 26 drivers".
 
 ## Departures from the design
