@@ -5,7 +5,7 @@ import { attentionOf, outRowOf, compareOut, timelineOf } from './attention';
 import { depotInstant } from '../lib/clock';
 const at = (min: number) => depotInstant('2026-06-25', min).toISOString();
 const trip: DriverTrip = { tripId: randomUUID(), revision: 0, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1, brand: 'Fresh', district: 'Colombo', status: 'ready',
-  leavesAt: at(276), backBy: at(370), readyAt: at(156), leftAt: null, backAt: null, problems: [], stops: [{ id: randomUUID(), seq: 1, revision: 0, retriedAt: null, outletId: 'OUT001', shopName: 'Fresh Nugegoda', district: 'Colombo', dockType: 'street', windowOpen: '05:00', windowClose: '09:00', note: null, arrivedAt: null, doneAt: null, outcome: null, lines: [] }] };
+  leavesAt: at(276), backBy: at(370), backByWords: 'back by 06:10', readyAt: at(156), leftAt: null, backAt: null, problems: [], stops: [{ id: randomUUID(), seq: 1, revision: 0, retriedAt: null, outletId: 'OUT001', shopName: 'Fresh Nugegoda', district: 'Colombo', dockType: 'street', windowOpen: '05:00', windowClose: '09:00', note: null, arrivedAt: null, doneAt: null, outcome: null, lines: [] }] };
 const arrivals = new Map([[trip.stops[0]!.id, at(300)]]);
 
 it('AC-16 attention names missing reports and retries without predictions', () => {
@@ -21,6 +21,9 @@ it('AC-16 attention names missing reports and retries without predictions', () =
   expect(outRowOf(arrived, arrivals, [], at(600)).status.kind).toBe('at_stop');
   const done = { ...out, stops: [{ ...out.stops[0]!, outcome: 'closed' as const, doneAt: at(400) }] };
   expect(outRowOf(done, arrivals, [], at(500))).toMatchObject({ nextStop: null, plannedArrival: null, status: { kind: 'returning' }, progress: { percent: 100 } });
+  // A planned return already past says when it was due, never when it will be (spec 016, rule 4).
+  expect(outRowOf(done, arrivals, [], at(500)).status).toEqual({ kind: 'returning', sentence: 'Returning · was due back 06:10' });
+  expect(outRowOf(done, arrivals, [], at(370)).status).toEqual({ kind: 'returning', sentence: 'Returning · planned back 06:10' });
   const issue = { id: randomUUID(), kind: 'closed', reason: 'nobody_there', status: 'open', raisedAt: at(400) } as Issue;
   expect(outRowOf(done, arrivals, [issue], at(500)).status).toMatchObject({ kind: 'open_problem', issueId: issue.id, summary: 'Nobody there' });
 });

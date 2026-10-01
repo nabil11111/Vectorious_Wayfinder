@@ -75,7 +75,8 @@ export function rowFacts(trip: OperationsTrip, issues: Issue[] | undefined): Row
   const said = statusSentence(status, null);
   // An arrival recorded after the shop's window closed says so beside it (rule 4).
   const late = status.kind === 'at_stop' && trip.stopDetails.find((stop) => stop.id === status.stopId)?.arrivedAfterWindow ? ` · ${ARRIVED_AFTER_WINDOW}` : '';
-  const sentence = status.kind === 'returning' && trip.outRow?.plannedReturn ? `Returning · planned back ${clockTime(trip.outRow.plannedReturn)}` : said ? `${said}${late}` : factsOf(trip);
+  // A returning trip's planned return, as the server words it: "was due back 06:38" once that time has passed.
+  const sentence = status.kind === 'returning' ? status.sentence : said ? `${said}${late}` : factsOf(trip);
   return { status, sentence, word: WORD[status.kind] ?? trip.status, tone: 'plain', tint };
 }
 

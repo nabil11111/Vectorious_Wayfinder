@@ -3,7 +3,7 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 import type { Tx } from '../db/client';
 import { depots, issues, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicles } from '../db/schema';
 import { issuesOf } from '../issues/read';
-import { depotDate, depotInstant, depotMinutes } from '../lib/clock';
+import { depotDate, depotInstant, depotMinutes, dueBackWords } from '../lib/clock';
 import { appliedWriteIdsOf } from '../lib/phone-writes';
 import { byLoadOrder, loaderDay } from '../loading/loader-day';
 import type { DepotCaller } from '../middleware/auth';
@@ -15,7 +15,7 @@ type TripPlan = { trip: typeof trips.$inferSelect; plan: typeof plans.$inferSele
 
 // Shared by the day read and a write holding its trip lock. Historical closed attempts read their own counts,
 // so clearing or loading the orders for tomorrow does not change what the driver recorded today.
-export async function driverTripsOf(tx: Tx, rows: TripPlan[]): Promise<DriverTrip[]> {
+export async function driverTripsOf(tx: Tx, rows: TripPlan[], at: Date): Promise<DriverTrip[]> {
   if (!rows.length) return [];
   const tripIds = rows.map(row => row.trip.id);
   const fleet = await tx.select().from(vehicles).where(inArray(vehicles.id, rows.map(row => row.trip.vehicleId)));
@@ -44,6 +44,7 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[]): Promise<DriverTri
       tripId: trip.id, revision: trip.revision, vehicleId: trip.vehicleId, vehicleType: vehicle.type, vehicleTemp: vehicle.temp,
       tripNo: trip.tripNo, brand: brands.length === 1 ? brands[0]! : null, district: times.district, status: trip.status,
       leavesAt: depotInstant(plan.date, times.leaveAt).toISOString(), backBy: depotInstant(plan.date, times.backAt).toISOString(),
+      backByWords: dueBackWords(depotInstant(plan.date, times.backAt), at),
       readyAt: trip.readyAt?.toISOString() ?? null, leftAt: trip.leftAt?.toISOString() ?? null, backAt: trip.backAt?.toISOString() ?? null,
       stops: own.map(({ stop, shop }) => {
         const ownLines = lines.filter(line => line.stopId === stop.id).sort(byLoadOrder);
@@ -75,7 +76,7 @@ export async function driverDayOf(tx: Tx, caller: DepotCaller, at: Date): Promis
   if (!driver || !depot) throw new Error('The driver account or its depot no longer exists.');
   const rows = await tx.select({ trip: trips, plan: plans }).from(trips).innerJoin(plans, eq(plans.id, trips.planId))
     .where(and(eq(plans.depotId, caller.depotId), eq(trips.driverId, caller.userId), or(eq(trips.status, 'out'), plan ? eq(plans.id, plan.id) : undefined)));
-  const shown = await driverTripsOf(tx, rows);
+  const shown = await driverTripsOf(tx, rows, at);
   const earlier = (id: string) => rows.find(row => row.trip.id === id)!.plan.date !== day ? 0 : 1;
   shown.sort((a, b) => earlier(a.tripId) - earlier(b.tripId) || a.leavesAt.localeCompare(b.leavesAt) || a.vehicleId.localeCompare(b.vehicleId) || a.tripNo - b.tripNo);
   return { depot: depot.name, driver: driver.displayName, driverId: caller.userId, day, planSent: Boolean(plan), appliedWriteIds: await appliedWriteIdsOf(tx, caller.userId), trips: shown };

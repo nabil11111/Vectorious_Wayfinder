@@ -42,7 +42,8 @@ export const OperationsStatus = z.discriminatedUnion('kind', [
   NotLoaded, StillLoading, DepartureUnreported, ArrivalUnreported, RetryRequested,
   z.object({ kind: z.literal('open_problem'), issueId: z.uuid(), issueKind: IssueKind, summary: z.string(), raisedAt: Moment }),
   z.object({ kind: z.literal('at_stop'), stopId: z.uuid(), shopName: z.string(), arrivedAt: Moment }),
-  z.object({ kind: z.literal('returning') }), z.object({ kind: z.literal('back'), backAt: Moment }),
+  // sentence: "Returning · planned back 06:38", or "Returning · was due back 06:38" once the app clock has passed it.
+  z.object({ kind: z.literal('returning'), sentence: z.string() }), z.object({ kind: z.literal('back'), backAt: Moment }),
   z.object({ kind: z.enum(['planned', 'loading', 'ready', 'out', 'unrecorded']) }),
 ]);
 export type OperationsStatus = z.infer<typeof OperationsStatus>;

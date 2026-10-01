@@ -12,7 +12,7 @@ import { NextStopPage } from './NextStopPage';
 import { TodaysTrip } from './TripPage';
 import { UnloadPage } from './UnloadPage';
 import { tripsOf, type DriverView } from './view';
-import { backOnlineLines, lineName, overLoadedLine, wholeCountsLine } from './words';
+import { backByLine, backOnlineLines, headBackLine, lineName, overLoadedLine, placeLine, wholeCountsLine } from './words';
 
 // The driver's screens as the live QA run found them (phase 4, Q-25 to Q-32). The pages are drawn as the phone would
 // draw them, from a day as the server sends it and the app clock on Thu 25 Jun. These fixtures live in the test only.
@@ -50,7 +50,7 @@ function stopOf(n: number, seq: number, shopName: string, lines: LineSpec[], mor
 function tripOf(n: number, more: Partial<DriverTrip> = {}): DriverTrip {
   return {
     tripId: id(1, n), revision: 3, vehicleId: 'VEH057', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1, brand: 'Fresh', district: 'Kandy',
-    status: 'out', leavesAt: '2026-06-24T23:14:00.000Z', backBy: '2026-06-25T01:08:00.000Z', readyAt: '2026-06-24T21:40:00.000Z',
+    status: 'out', leavesAt: '2026-06-24T23:14:00.000Z', backBy: '2026-06-25T01:08:00.000Z', backByWords: 'back by 06:38', readyAt: '2026-06-24T21:40:00.000Z',
     leftAt: '2026-06-24T22:15:00.000Z', backAt: null, stops: [], problems: [], ...more,
   };
 }
@@ -98,7 +98,7 @@ function veh057trip2(status: DriverTrip['status'] = 'planned', more: Partial<Dri
     { n: 9, quantity: 57, loaded, delivered: delivered(57) }, { n: 10, quantity: 65, temp: 'dry', loaded, delivered: delivered(65) },
   ], status === 'done' ? { arrivedAt: at('04:00'), doneAt: at('04:01'), outcome: 'delivered' } : {});
   return tripOf(58, {
-    tripNo: 2, status, leavesAt: at('07:08'), backBy: at('07:56'), readyAt: status === 'planned' || status === 'loading' ? null : at('03:59'),
+    tripNo: 2, status, leavesAt: at('07:08'), backBy: at('07:56'), backByWords: 'back by 07:56', readyAt: status === 'planned' || status === 'loading' ? null : at('03:59'),
     leftAt: status === 'out' || status === 'done' ? at('03:59') : null, backAt: status === 'done' ? at('04:01') : null, stops: [stop], ...more,
   });
 }
@@ -254,6 +254,16 @@ function barOf(html: string) {
   const band = html.lastIndexOf('<div', html.lastIndexOf('bg-good-tint', words));
   return html.slice(band, html.indexOf('</button>', words) + '</button>'.length);
 }
+
+describe('spec 013 the planned return once it has passed', () => {
+  it('says the server\'s words, "was due back" once the time is gone, never a promise', () => {
+    const late = tripOf(1, { backByWords: 'was due back 06:38' });
+    expect(placeLine(late)).toBe('Fresh · Kandy · was due back 06:38');
+    expect(backByLine(late)).toBe('was due back 06:38');
+    expect(headBackLine(dayOf(late), late)).toBe('Head back to Kandy · was due back 06:38');
+    expect(placeLine(tripOf(1))).toBe('Fresh · Kandy · back by 06:38');
+  });
+});
 
 describe('Q-27 "Back online" names the stops that reached the depot', () => {
   it('names every stop up to three, and three and the count of the rest beyond', () => {

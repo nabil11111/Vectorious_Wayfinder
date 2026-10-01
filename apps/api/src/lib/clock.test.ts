@@ -1,6 +1,6 @@
 import { DEMO_DAY } from '@wayfinder/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
-import { depotDate, depotInstant, depotMinutes, now, realNow, setClockForTests } from './clock';
+import { depotDate, depotInstant, depotMinutes, dueBackWords, now, realNow, setClockForTests } from './clock';
 
 const serverZone = process.env.TZ;
 afterEach(() => {
@@ -48,6 +48,15 @@ describe('depot time', () => {
   it('refuses something that is not a date and whole minutes', () => {
     expect(() => depotInstant('25 June', 0)).toThrow();
     expect(() => depotInstant('2026-06-25', 1.5)).toThrow();
+  });
+});
+
+describe('a planned time once it has passed', () => {
+  it('is "back by" until the app clock passes it, then "was due back", never a promise already gone', () => {
+    const backBy = depotInstant('2026-06-25', 398);
+    expect(dueBackWords(backBy, depotInstant('2026-06-25', 397))).toBe('back by 06:38');
+    expect(dueBackWords(backBy, backBy)).toBe('back by 06:38');
+    expect(dueBackWords(backBy, depotInstant('2026-06-25', 399))).toBe('was due back 06:38');
   });
 });
 

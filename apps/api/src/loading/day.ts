@@ -3,7 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Tx } from '../db/client';
 import { auditLog, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicles } from '../db/schema';
 import { issuesOf } from '../issues/read';
-import { depotDate, depotMinutes } from '../lib/clock';
+import { depotDate, depotMinutes, dueBackWords } from '../lib/clock';
 import type { DepotCaller } from '../middleware/auth';
 import { snapshot } from '../orders/store-orders';
 import { computeLoad } from '../planning';
@@ -32,7 +32,7 @@ const openThenLatest = (a: Issue, b: Issue) => (a.status === b.status ? 0 : a.st
 
 // The trucks of these trips of one sent plan, in leaving order, then by vehicle and trip number. out holds the plan's
 // trips on the road, so a trip whose vehicle is still out on an earlier one says so, with when it is due back (Q-26).
-export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: TripRow[] = []): Promise<LoadingTruck[]> {
+export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: TripRow[], at: Date): Promise<LoadingTruck[]> {
   if (!tripRows.length) return [];
   const check = plan.sentCheck === null ? null : PlanCheck.parse(plan.sentCheck);
   const tripIds = tripRows.map((trip) => trip.id);
@@ -78,7 +78,10 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: 
       driver: drivers.find((d) => d.id === trip.driverId)?.name ?? null, weightCapKg: vehicle.weightCapKg, volumeCapM3: Number(vehicle.volumeCapM3),
       units: total(truckStops.map((s) => s.units)), on: { units: on.units, kg: on.kg, m3: on.m3 }, short: total(truckStops.map((s) => s.short)),
       stops: truckStops, issues: problems.filter((problem) => problem.trip.id === trip.id).sort(openThenLatest),
-      outOn: away ? { tripNo: away.tripNo, backBy: sentTrip(plan.date, check, away.vehicleId, away.tripNo).backBy.toISOString() } : null,
+      outOn: away ? (() => {
+        const { backBy } = sentTrip(plan.date, check, away.vehicleId, away.tripNo);
+        return { tripNo: away.tripNo, backBy: backBy.toISOString(), words: `out on trip ${away.tripNo} · ${dueBackWords(backBy, at)}` };
+      })() : null,
     };
   });
   return trucks.sort((a, b) => a.leavesAt.localeCompare(b.leavesAt) || a.vehicleId.localeCompare(b.vehicleId) || a.tripNo - b.tripNo);
@@ -105,7 +108,7 @@ export async function loadingDayOf(tx: Tx, depotId: string, moment: BoardMoment)
     .where(and(eq(trips.planId, plan.id), inArray(trips.status, ['out', 'done'])))).sort((a, b) => leftFirst(a.trip, b.trip));
   return { depot: depotId, demoDay: moment.demoDay, day,
     plan: { id: plan.id, revision: plan.revision, publishedAt: plan.publishedAt.toISOString(), publishedBy: sent?.name ?? null },
-    trucks: await trucksOf(tx, plan, onTheList, gone.map(({ trip }) => trip)),
+    trucks: await trucksOf(tx, plan, onTheList, gone.map(({ trip }) => trip), moment.at),
     left: gone.map(({ trip, driver }) => ({ tripId: trip.id, vehicleId: trip.vehicleId, tripNo: trip.tripNo, driver, leftAt: trip.leftAt?.toISOString() ?? null })) };
 }
 

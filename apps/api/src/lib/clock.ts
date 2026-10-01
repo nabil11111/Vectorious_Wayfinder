@@ -162,3 +162,16 @@ export function depotInstant(date: string, minutes: number): Date {
   };
   return new Date(wall - ahead(wall - ahead(wall)));
 }
+
+// "06:38": an instant as the depot's clock reads it.
+export function depotClock(instant: Date): string {
+  const minutes = depotMinutes(instant);
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+// A time from a sent plan is the plan's estimate, not a promise (README, "What the plan assumes"). Until the app clock
+// passes it a vehicle is "back by 06:38"; after, it "was due back 06:38", so no screen promises a time already gone.
+// Revising the plan's later times when a trip runs late is not part of this (spec 016, "Not in this piece").
+export function dueBackWords(backBy: Date, at: Date): string {
+  return at.getTime() > backBy.getTime() ? `was due back ${depotClock(backBy)}` : `back by ${depotClock(backBy)}`;
+}

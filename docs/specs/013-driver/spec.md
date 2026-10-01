@@ -101,7 +101,9 @@ alone below 640 wide beside a status chip), the avatar and the plain bell. Words
 Examples use the seeded day with the walkthroughs of specs 009, 010 and 012 done: VEH035 trip 1, van reefer, driver
 Dilshan, ready at Thu 25 Jun 02:36, leaving 04:36 and back by 06:10, stop 1 Fresh Nugegoda (OUT001: 12 and 8 chilled
 cartons and 3 of 4 dry, window 05:00 to 07:30, street) and stop 2 Fresh Wellawatte (OUT002: 48 chilled and 46 dry, window
-05:30 to 08:00, street). Times are depot time and depend on the judge's pace.
+05:30 to 08:00, street). Times are depot time and depend on the judge's pace. A planned return is the plan's, not a
+promise: the API words it against the app clock, "back by 06:10" until then and "was due back 06:10" after, on Today's
+trip, the trip bar and Trip done alike.
 
 1. **The driver's day (D-44).** Spec 012's rule 1, whose table holds for the driver too, and a trip of the driver's that
    is `out` stays on the phone, whatever day it is, until the driver ends it. *At Wed 24 Jun 16:30, Dilshan's day is

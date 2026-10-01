@@ -9,7 +9,7 @@ import { figuresOf, stopCounts } from './figures';
 const at = (min: number) => depotInstant('2026-06-25', min).toISOString();
 const line = (loaded: number, delivered: number) => ({ lineId: randomUUID(), orderId: randomUUID(), productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', temp: 'dry' as const, quantity: 4, loaded, delivered });
 const trip = (stop: Partial<DriverTrip['stops'][number]>): DriverTrip => ({ tripId: randomUUID(), revision: 0, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1,
-  brand: 'Fresh', district: 'Colombo', status: 'out', leavesAt: at(276), backBy: at(370), readyAt: at(156), leftAt: at(211), backAt: null, problems: [],
+  brand: 'Fresh', district: 'Colombo', status: 'out', leavesAt: at(276), backBy: at(370), backByWords: 'back by 06:10', readyAt: at(156), leftAt: at(211), backAt: null, problems: [],
   stops: [{ id: randomUUID(), seq: 1, revision: 0, retriedAt: null, outletId: 'OUT001', shopName: 'Fresh Nugegoda', district: 'Colombo', dockType: 'street', windowOpen: '05:00', windowClose: '09:00', note: null,
     arrivedAt: null, doneAt: null, outcome: null, lines: [line(4, 4)], ...stop }] });
 const shown = (driver: DriverTrip): OperationsTrip => ({ detailRecorded: true, tripId: driver.tripId, planId: randomUUID(), date: '2026-06-25', vehicleId: driver.vehicleId, vehicleType: driver.vehicleType,

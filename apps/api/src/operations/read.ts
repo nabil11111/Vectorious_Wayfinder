@@ -43,9 +43,9 @@ async function operationsDayOf(tx: Tx, caller: DepotCaller): Promise<OperationsD
   const ids = rows.map(row => row.trip.id);
   const people = ids.length ? await tx.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, rows.flatMap(row => row.trip.driverId ? [row.trip.driverId] : []))) : [];
   const members = ids.length ? await tx.select({ stop: stops, shop: outlets }).from(stops).innerJoin(outlets, eq(outlets.id, stops.outletId)).where(inArray(stops.tripId, ids)) : [];
-  const recorded = await driverTripsOf(tx, rows.filter(row => row.plan.sentCheck !== null));
+  const recorded = await driverTripsOf(tx, rows.filter(row => row.plan.sentCheck !== null), moment.at);
   const problems = ids.length ? await issuesOf(tx, inArray(trips.id, ids)) : [];
-  const dock = (await Promise.all(shownPlans.filter(row => row.sentCheck !== null).map(sent => trucksOf(tx, sent, rows.filter(row => row.plan.id === sent.id && ['planned', 'loading', 'ready'].includes(row.trip.status)).map(row => row.trip))))).flat();
+  const dock = (await Promise.all(shownPlans.filter(row => row.sentCheck !== null).map(sent => trucksOf(tx, sent, rows.filter(row => row.plan.id === sent.id && ['planned', 'loading', 'ready'].includes(row.trip.status)).map(row => row.trip), [], moment.at)))).flat();
   const shown: OperationsTrip[] = rows.map(({ trip, plan: sent }) => {
     const vehicle = fleet.find(vehicle => vehicle.id === trip.vehicleId);
     if (!vehicle) throw new Error(`No depot vehicle ${trip.vehicleId}.`);

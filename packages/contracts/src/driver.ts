@@ -22,7 +22,9 @@ export const DriverProblem = z.object({
 export type DriverProblem = z.infer<typeof DriverProblem>;
 export const DriverTrip = z.object({
   tripId: z.uuid(), revision: Count, vehicleId: z.string(), vehicleType: z.enum(['truck', 'van']), vehicleTemp: z.enum(['reefer', 'ambient']), tripNo: z.number().int(), brand: Brand.nullable(), district: z.string(), status: TripStatus,
-  leavesAt: Moment, backBy: Moment, readyAt: Moment.nullable(), leftAt: Moment.nullable(), backAt: Moment.nullable(), stops: z.array(DriverStop), problems: z.array(DriverProblem),
+  // backByWords is the server's wording of backBy against the app clock: "back by 06:10", or "was due back 06:10" once
+  // it has passed, as a planned time is the plan's and not a promise.
+  leavesAt: Moment, backBy: Moment, backByWords: z.string(), readyAt: Moment.nullable(), leftAt: Moment.nullable(), backAt: Moment.nullable(), stops: z.array(DriverStop), problems: z.array(DriverProblem),
 });
 export type DriverTrip = z.infer<typeof DriverTrip>;
 // driverId is the signed-in account, so a phone holding one driver's writes can tell another account apart even when

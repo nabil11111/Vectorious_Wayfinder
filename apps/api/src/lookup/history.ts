@@ -22,7 +22,7 @@ export function getLookupHistory(caller: DepotCaller, query: LookupHistoryQuery)
     if (!plan) return LookupHistory.parse({ ...base, publication: null, counts: null, groups: [], trips: [], deferrals: [] });
     const rows = await tx.select().from(trips).where(eq(trips.planId, plan.id));
     const kept = new Map(rows.map(trip => [trip.id, keptTrip(plan, trip)]));
-    const facts = await driverTripsOf(tx, rows.map(trip => ({ trip, plan })));
+    const facts = await driverTripsOf(tx, rows.map(trip => ({ trip, plan })), moment.at);
     const ids = rows.map(row => row.id);
     const members = ids.length ? await tx.select({ stop: stops, shop: outlets }).from(stops).innerJoin(outlets, eq(outlets.id, stops.outletId)).where(inArray(stops.tripId, ids)) : [];
     if (members.some(row => row.shop.depotId !== caller.depotId)) throw new Error(`Publication ${plan.id} contains a shop outside its depot.`);

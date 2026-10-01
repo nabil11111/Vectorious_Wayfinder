@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 import { districtMap, figuresOf, goodsHandedOver, groupTrips, nextDemand, progress, stopCounts } from './figures';
 
 const raw = (brand: DriverTrip['brand'] = 'Fresh'): DriverTrip => ({ tripId: randomUUID(), revision: 0, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1,
-  brand, district: 'Colombo', status: 'ready', leavesAt: '2026-06-25T00:00:00Z', backBy: '2026-06-25T03:00:00Z', readyAt: null, leftAt: null, backAt: null, problems: [],
+  brand, district: 'Colombo', status: 'ready', leavesAt: '2026-06-25T00:00:00Z', backBy: '2026-06-25T03:00:00Z', backByWords: 'back by 08:30', readyAt: null, leftAt: null, backAt: null, problems: [],
   stops: [{ id: randomUUID(), seq: 1, revision: 0, retriedAt: null, outletId: 'OUT001', shopName: 'Fresh Nugegoda', district: 'Colombo', dockType: 'street', windowOpen: '05:00', windowClose: '09:00', note: null,
     arrivedAt: '2026-06-25T00:00:00Z', doneAt: '2026-06-25T00:01:00Z', outcome: 'refused', lines: [{ lineId: randomUUID(), orderId: randomUUID(), productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', temp: 'dry', quantity: 4, loaded: 0, delivered: 0 }] }] });
 const shown = (driver = raw()): OperationsTrip => ({ detailRecorded: true, tripId: driver.tripId, planId: randomUUID(), date: '2026-06-25', vehicleId: driver.vehicleId, vehicleType: driver.vehicleType, vehicleTemp: driver.vehicleTemp, tripNo: driver.tripNo,

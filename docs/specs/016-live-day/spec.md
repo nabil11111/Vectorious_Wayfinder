@@ -133,7 +133,8 @@ five orders, 118 cartons ordered, 117 loaded and one dry carton short. Times are
    013's `nextStop`, including its retry order: an unfinished next stop past planned arrival with no arrival says
    "Arrival not reported · planned 05:00". These are amber Watching rows, not new issues or inferred lateness. Once a
    stop is sent back, say "Retry requested [time]"; the old planned arrival is not a new overdue target. An arrived
-   stop says "At [shop] · arrived 03:34". With all stops finished and trip out, say "Returning"; with trip done,
+   stop says "At [shop] · arrived 03:34". With all stops finished and trip out, say "Returning · planned back 06:38",
+   and "Returning · was due back 06:38" once that time has passed, as the server words it; with trip done,
    "Back at depot 03:55". A recorded arrival after the narrowed window closes says "Arrived after window". There is
    no "on time" claim about a future arrival, driver-offline state, GPS, congestion cause or revised ETA.
 
@@ -316,6 +317,10 @@ become eligible carry-over under rule 3; Back to edit removes them from this cou
 - A new proof read or photo viewer. Events keep only "· photo"; the existing problem-card photo belongs to 013.
 - Editing any plan after loading starts: moving goods/trucks, skipping a stop, deferring a live stop or inserting a
   new one. The existing Try again of a closed stop is still 013's, not a new route editor.
+- **Revised times and recovery for late trips.** A first trip back late does not move its second trip's leaving or
+  arrival times, and a stale planned time is only worded as the plan's ("was due back 06:38" on Live day, the loader's
+  and the driver's screens); no updated estimate, re-plan or recovery of the trips still to go is offered, and a sent
+  plan cannot be taken back once a trip has moved on from planned.
 - Predicted ETAs, GPS, driver presence, a queue count from another phone, traffic reports, "Warn the shop", calls,
   waves and docks. No new notification delivery or promised awareness by another person.
 - Reversing an issue answer, credits, write-offs or replacements. Spec 015 owns the receipt and its business writes;
