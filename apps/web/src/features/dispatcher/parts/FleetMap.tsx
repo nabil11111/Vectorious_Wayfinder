@@ -4,10 +4,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ICON } from '@/features/live/parts/icons';
 import { CARD } from '@/features/live/parts/ui';
 import { truckName } from '@/features/loader/words';
-import { FLEET_MAP, FLEET_MAP_SIZE } from '@/lib/map/fleet-map-shapes';
+import { FLEET_MAP, FLEET_MAP_SIZE, type MapView } from '@/lib/map/fleet-map-shapes';
 import { cn } from '@/lib/utils';
 import { useSwitchDepot } from '../depots';
-import { CARD_SIZE, VIEWS, deliveredList, drawingOf, liveLine, statsOf, type MapDrawing, type MapRead, type MapShapes } from './fleet-map';
+import { CARD_SIZE, OCEAN_LABEL, VIEWS, deliveredList, drawingOf, liveLine, statsOf, type MapDrawing, type MapRead } from './fleet-map';
 
 // One of the frame's pixels. The wide card sets it to its own width over 520, so it is the frame scaled to its column
 // and never scrolls sideways, up to one and a half times the frame; the narrow card sets it to 1px.
@@ -34,7 +34,8 @@ const pathOf = (points: readonly (readonly [number, number])[]) => points.map((p
 
 // The map's view is the depot the read is for, the one the dispatcher chose (D-93), or Both, which draws both depots
 // together (spec 021). A view the shapes do not have gets no drawing, and says so.
-const shapesOf = (view: string): MapShapes | null => (view === 'Peliyagoda' || view === 'Kandy' || view === 'Both' ? FLEET_MAP[view] : null);
+const viewOf = (view: string): MapView | null => (view === 'Peliyagoda' || view === 'Kandy' || view === 'Both' ? view : null);
+type Drawing = MapDrawing & { ocean: readonly [number, number] };
 
 // The dashboard's district map (spec 019), the card right of Needs you on Dispatcher · Dashboard (53:11540), as the
 // design's map-fleet-overview.js draws it, with the live day's numbers (D-92). From 640 wide it is the frame's card
@@ -43,8 +44,8 @@ const shapesOf = (view: string): MapShapes | null => (view === 'Peliyagoda' || v
 // not be.
 export function FleetMap({ view, read, failed = false }: { view: string; read: MapRead | null; failed?: boolean }) {
   if (!read) return <WaitingMap view={view} failed={failed} />;
-  const shapes = shapesOf(read.view);
-  const drawing = shapes && drawingOf(read, shapes);
+  const mapView = viewOf(read.view);
+  const drawing: Drawing | null = mapView && { ...drawingOf(read, FLEET_MAP[mapView]), ocean: OCEAN_LABEL[mapView] };
   const list = deliveredList(read.map);
   const stats = statsOf(read);
   const last = VIEWS[VIEWS.length - 1];
@@ -154,7 +155,7 @@ function ActiveChip({ active, style, className }: { active: string; style?: CSSP
 
 // The 340 by 280 map in the script's order: sea, districts, lines, arrows, the trip badges, district names and line
 // ends, the depot and "INDIAN OCEAN" last.
-function MapPicture({ drawing, read, style, className }: { drawing: MapDrawing | null; read: MapRead; style?: CSSProperties; className?: string }) {
+function MapPicture({ drawing, read, style, className }: { drawing: Drawing | null; read: MapRead; style?: CSSProperties; className?: string }) {
   const { width, height } = FLEET_MAP_SIZE;
   const trips = drawing?.arrows.map((arrow) => `${truckName(arrow)} to ${arrow.district}`) ?? [];
   const words = `${read.whose} districts on a schematic map. ${trips.length ? `On the road: ${trips.join(', ')}.` : 'No truck on the road.'}`;
@@ -193,7 +194,7 @@ function MapPicture({ drawing, read, style, className }: { drawing: MapDrawing |
               {place.label && <text x={n2(place.label[0])} y={n2(baseline(place.label[1], 9))} fontSize={9} fontWeight={600} className="fill-map-heading">{place.name}</text>}
             </g>
           ))}
-          <text x={20} y={n2(baseline(247, 7))} fontSize={7} className="fill-map-ocean">INDIAN OCEAN</text>
+          <text x={drawing.ocean[0]} y={n2(baseline(drawing.ocean[1], 7))} fontSize={7} className="fill-map-ocean">INDIAN OCEAN</text>
         </>
       ) : <text x={width / 2} y={height / 2} textAnchor="middle" fontSize={11} className="fill-map-muted">No district map for {read.name}.</text>}
     </svg>
