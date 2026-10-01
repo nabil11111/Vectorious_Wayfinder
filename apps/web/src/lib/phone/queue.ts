@@ -33,9 +33,13 @@ export interface QueueParts<Day, Write, Shown> {
   // What the waiting count counts: one record per stop, and one each for a trip's start and its end.
   recordOf: (write: Write) => string;
   // The green "Back online" line, for a queue that shows it: the name a record's place is given once it reached the
-  // depot, and whether saving a write closes the line.
-  backOnline?: { placeOf: (entry: Queued<Write, Shown>) => string; closedBy: (write: Write) => boolean };
+  // depot, what the record belongs to (for the driver, its trip), and whether saving a write closes the line.
+  backOnline?: { placeOf: (entry: Queued<Write, Shown>) => string; belongsTo: (write: Write) => string; closedBy: (write: Write) => boolean };
 }
+
+// The green line once the signal is back: the places whose records reached the depot, and what those records belong
+// to, so a screen shows the line only beside them (Q-30).
+export interface BackOnline { names: string[]; belongsTo: string[] }
 
 export interface SyncState {
   // A 401, or a session that belongs to another account: the writes wait until this account signs in again.
@@ -45,7 +49,7 @@ export interface SyncState {
   // The server's sentence when it refused to send the day, for "Could not load".
   failure: string | null;
   // The places whose records reached the depot once the signal came back, for the green line, until it is closed.
-  backOnline: string[] | null;
+  backOnline: BackOnline | null;
   // The phone could not keep a refusal the server gave: the write still waits and goes again on the retry schedule,
   // and the screens say "Could not save on this phone. Try again." until a refusal is kept.
   notSaved: boolean;
@@ -126,8 +130,9 @@ export function createPhoneQueue<Day extends { appliedWriteIds: string[] }, Writ
 
   // ── Records that waited with no signal, for the green line ─────────────────────────────────────────────────────
 
-  // The records that waited while there was no signal, with the name the green line gives each once it is sent.
-  const held = new Map<string, string>();
+  // The records that waited while there was no signal, with the name the green line gives each once it is sent and what
+  // it belongs to.
+  const held = new Map<string, { name: string; belongsTo: string }>();
 
   // The waiting writes the kept day does not list as applied yet, oldest first: what the view applies and what the loop
   // still has to send.
@@ -142,7 +147,7 @@ export function createPhoneQueue<Day extends { appliedWriteIds: string[] }, Writ
   function hold() {
     const line = parts.backOnline;
     if (!line || hasSignal()) return;
-    for (const entry of waitingOf()) held.set(parts.recordOf(entry.write), line.placeOf(entry));
+    for (const entry of waitingOf()) held.set(parts.recordOf(entry.write), { name: line.placeOf(entry), belongsTo: line.belongsTo(entry.write) });
   }
 
   // Once the signal is back and nothing waits, one green line names what reached the depot. A record the server
@@ -150,9 +155,9 @@ export function createPhoneQueue<Day extends { appliedWriteIds: string[] }, Writ
   function settle() {
     if (!hasSignal() || held.size === 0 || waitingOf().length > 0) return;
     const refused = new Set(readKept().queue.filter((entry) => entry.state === 'refused').map((entry) => parts.recordOf(entry.write)));
-    const names = [...held].filter(([record]) => !refused.has(record)).map(([, name]) => name);
+    const sent = [...held].filter(([record]) => !refused.has(record)).map(([, place]) => place);
     held.clear();
-    if (names.length > 0) update({ backOnline: names });
+    if (sent.length > 0) update({ backOnline: { names: sent.map((place) => place.name), belongsTo: [...new Set(sent.map((place) => place.belongsTo))] } });
   }
 
   const closeBackOnline = () => update({ backOnline: null });

@@ -8,6 +8,7 @@ import { clockKey } from '@/lib/clock';
 import { Counter } from './parts/Counter';
 import { NO_PAIR, readBox, refusalPair, tallyFor } from './tally';
 import { TripDone } from './DonePage';
+import { NextStopPage } from './NextStopPage';
 import { UnloadPage } from './UnloadPage';
 import type { DriverView } from './view';
 import { backOnlineLines, overLoadedLine, wholeCountsLine } from './words';
@@ -273,10 +274,36 @@ describe('Q-27 "Back online" names the stops that reached the depot', () => {
   });
 
   it('wraps its lines at the phone\'s width rather than cutting them', () => {
-    const bar = barOf(tripDone({ backOnline: ['Ampitiya', 'Mulgampola', 'Katukele'] }));
+    const bar = barOf(tripDone({ backOnline: { names: ['Ampitiya', 'Mulgampola', 'Katukele'], belongsTo: [veh057trip1().tripId] } }));
     expect(textOf(bar)).toContain('Back online · 3 stops sent Ampitiya, Mulgampola and Katukele reached the depot');
     expect(bar).not.toMatch(/truncate|text-ellipsis|whitespace-nowrap/);
     // The band grows with its lines, rather than holding them to one fixed height.
     expect(bar).not.toMatch(/class="(?:[^"]*\s)?h-\[54px\]/);
+  });
+});
+
+// ── Q-30 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// Trip 2's first stop, Fresh Watapuluwa, with trip 1 checked in, under a green bar the sync loop holds.
+const tripTwoFirstStop = (sync: Record<string, unknown>) => {
+  hooks.sync = sync;
+  const trip = veh057trip2('out');
+  const day = dayOf(veh057trip1(), trip);
+  const html = draw(<NextStopPage view={viewOf(day)} day={day} trip={trip} figures={tripFigures(trip)} stop={trip.stops[0]!} />);
+  hooks.sync = {};
+  return html;
+};
+
+describe('Q-30 the green bar belongs to its trip', () => {
+  it('leaves trip 1\'s bar off trip 2\'s first stop', () => {
+    const html = tripTwoFirstStop({ backOnline: { names: ['Ampitiya', 'Mulgampola', 'Katukele'], belongsTo: [veh057trip1().tripId] } });
+    expect(barOf(html)).toBe('');
+    expect(textOf(html)).toContain('Stop 1 of 1');
+    expect(textOf(html)).toContain('Fresh Watapuluwa');
+  });
+
+  it('shows a bar whose records are this trip\'s', () => {
+    const html = tripTwoFirstStop({ backOnline: { names: ['the start of the trip'], belongsTo: [veh057trip2().tripId] } });
+    expect(textOf(barOf(html))).toContain('Back online · 1 record sent The start of the trip reached the depot');
   });
 });
