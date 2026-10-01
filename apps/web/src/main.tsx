@@ -5,6 +5,9 @@ import { RouterProvider } from 'react-router';
 import { Toaster } from '@/components/ui/sonner';
 import { router } from '@/app/router';
 import './index.css';
+import { registerAppWorker } from './lib/service-worker';
+
+void registerAppWorker();
 
 // Every query also refetches once a minute, the backup for when the live stream is down (spec 008).
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true, refetchInterval: 60_000 } } });

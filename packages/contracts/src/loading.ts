@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Brand, Temp } from './basics';
-import { FlagReason, Issue } from './issues';
+import { FlagReason, Issue, LoadingDecision } from './issues';
 
 // The loader's day (spec 012): the day's sent trucks, each loaded last stop first, its flags, and the truck marked
 // ready. Every count, kilo and cubic metre is worked out by the API; the screen formats them. Times are ISO
@@ -38,6 +38,9 @@ export const LoadingStop = z.object({
 });
 export type LoadingStop = z.infer<typeof LoadingStop>;
 
+export const LoadingIssue = Issue.extend({ kind: z.literal('loading'), reason: FlagReason, decision: LoadingDecision.nullable() });
+export type LoadingIssue = z.infer<typeof LoadingIssue>;
+
 export const LoadingTruck = z.object({
   tripId: z.uuid(),
   // Every loader write names the revision it saw (rule 10).
@@ -62,7 +65,7 @@ export const LoadingTruck = z.object({
   // Last stop first, the order the loader loads them.
   stops: z.array(LoadingStop),
   // The open ones first, then the answered ones, latest first.
-  issues: z.array(Issue),
+  issues: z.array(LoadingIssue),
 });
 export type LoadingTruck = z.infer<typeof LoadingTruck>;
 

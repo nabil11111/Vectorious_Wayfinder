@@ -91,10 +91,10 @@ it("AC-18 lists the depot's open problems oldest first, each with its truck and 
   const dry = dryLine(truck);
   expect(list.issues[0]).toEqual({
     id: truck.issues[0]!.id, revision: 0, kind: 'loading', reason: 'short', status: 'open', raisedBy: 'Kasun', raisedAt: depotInstant(THU, 2 * 60 + 33).toISOString(),
-    note: 'Only 3 dry cartons in the store', decision: null, decidedBy: null, decidedAt: null, short: 1,
-    trip: { id: truck.tripId, vehicleId: 'VEH035', tripNo: 1, leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString() },
-    stop: { id: stopOf(truck, 1).id, seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda' },
-    lines: [{ lineId: dry.lineId, orderId: dry.orderId, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', quantity: 4, counted: 3 }],
+    note: 'Only 3 dry cartons in the store', hasPhoto: false, decision: null, decidedBy: null, decidedAt: null, short: 1,
+    trip: { id: truck.tripId, vehicleId: 'VEH035', tripNo: 1, status: 'loading', driver: 'Dilshan', stopsLeft: 2, leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString() },
+    stop: { id: stopOf(truck, 1).id, seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda', arrivedAt: null, doneAt: null, loadedAt: null, flaggedAtDock: true },
+    lines: [{ lineId: dry.lineId, orderId: dry.orderId, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', quantity: 4, counted: 3, loaded: null, delivered: null }],
   });
   expect(list.issues[1]).toMatchObject({
     reason: 'damaged', status: 'open', raisedBy: 'Kasun', raisedAt: depotInstant(THU, 2 * 60 + 34).toISOString(), note: null, short: 2,

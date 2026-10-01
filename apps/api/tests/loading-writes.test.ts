@@ -123,10 +123,10 @@ it("AC-16 flags VEH035's dry line short at 3 of 4 with a note: an open problem, 
   expect(dryLine(flagged)).toMatchObject({ quantity: 4, going: 3, short: 1 });
   expect(flagged.issues).toEqual([{
     id: problem!.id, revision: 0, kind: 'loading', reason: 'short', status: 'open', raisedBy: 'Kasun', raisedAt: depotInstant(THU, 2 * 60 + 33).toISOString(),
-    note: 'Only 3 dry cartons in the store', decision: null, decidedBy: null, decidedAt: null, short: 1,
-    trip: { id: truck.tripId, vehicleId: 'VEH035', tripNo: 1, leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString() },
-    stop: { id: stopOf(truck, 1).id, seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda' },
-    lines: [{ lineId: line.lineId, orderId: line.orderId, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', quantity: 4, counted: 3 }],
+    note: 'Only 3 dry cartons in the store', hasPhoto: false, decision: null, decidedBy: null, decidedAt: null, short: 1,
+    trip: { id: truck.tripId, vehicleId: 'VEH035', tripNo: 1, status: 'loading', driver: 'Dilshan', stopsLeft: 2, leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString() },
+    stop: { id: stopOf(truck, 1).id, seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda', arrivedAt: null, doneAt: null, loadedAt: null, flaggedAtDock: true },
+    lines: [{ lineId: line.lineId, orderId: line.orderId, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', quantity: 4, counted: 3, loaded: null, delivered: null }],
   }]);
 });
 
@@ -230,9 +230,10 @@ it('AC-23 marks VEH035 ready after "Go short": ready at the clock, the counts th
   const audits = await auditsOf(truck.tripId, 'trip.ready');
   expect(audits).toHaveLength(1);
   expect(audits[0]).toMatchObject({ actorId: kasunId, after: { status: 'ready', lines: lines.map((l) => ({ lineId: l.lineId, loadedQty: l.going })) } });
-  expect(told()).toHaveLength(3);
+  expect(told()).toHaveLength(4);
   expect(told()).toEqual(expect.arrayContaining([
-    { topic: 'loading', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT001', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT002', depotId: 'Peliyagoda' },
+    { topic: 'loading', depotId: 'Peliyagoda' }, { topic: 'driver', depotId: 'Peliyagoda' },
+    { topic: 'orders', outletId: 'OUT001', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT002', depotId: 'Peliyagoda' },
   ]));
 
   const list = StoreOrderList.parse((await nadeesha.get('/api/v1/store/orders?list=open')).body);
@@ -286,4 +287,16 @@ it('AC-24 refuses a loader write caught behind a reset with unknown_record once 
   const refused = await writing;
   expect(code(refused)).toEqual([400, 'unknown_record']);
   expect(refused.body.error.details).toEqual({ id: truck.tripId });
+});
+
+it('driver AC-7 allows a line flagged on an earlier trip to be flagged on this trip', async () => {
+  let truck = await loading('VEH035');
+  const [current] = await db.select().from(trips).where(eq(trips.id, truck.tripId));
+  const [earlier] = await db.insert(trips).values({ planId: current!.planId, vehicleId: 'VEH035', tripNo: 2, status: 'done' }).returning();
+  const [oldStop] = await db.insert(stops).values({ tripId: earlier!.id, seq: 1, outletId: 'OUT001' }).returning();
+  const [problem] = await db.insert(issues).values({ kind: 'loading', reason: 'short', stopId: oldStop!.id, raisedBy: kasunId, raisedAt: depotInstant(THU, 2 * 60) }).returning();
+  await db.insert(issueLines).values({ issueId: problem!.id, orderLineId: dryLine(truck).lineId, counted: 3 });
+  truck = answeredTruck(await loader.flag(truck, 1, [{ lineId: dryLine(truck).lineId, counted: 2 }]), 'VEH035');
+  expect(truck.issues).toHaveLength(1);
+  expect(dryLine(truck).going).toBe(2);
 });
