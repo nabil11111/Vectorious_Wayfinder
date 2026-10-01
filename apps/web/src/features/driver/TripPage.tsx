@@ -92,11 +92,11 @@ export function NoTrip({ view, day }: { view: DriverView; day: DriverDay }) {
 }
 
 // Could not load (no frame), only when nothing is kept on the phone.
-export function CouldNotLoad() {
+export function CouldNotLoad({ view }: { view: DriverView }) {
   const { failure } = useSync();
   return (
     <div>
-      <TopArea waitingRecords={0} />
+      <TopArea waitingRecords={view.waitingRecords} />
       <Card role="alert" className="px-5 py-5">
         <h1 className="font-sans text-[15px] leading-5 font-semibold">Could not load your trip.</h1>
         <p className="mt-1.5 text-[13px] leading-4 text-muted-foreground">{failure ?? 'Could not reach Wayfinder. Check the connection and try again.'}</p>

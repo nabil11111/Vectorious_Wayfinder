@@ -67,7 +67,7 @@ function NowPage({ me }: { me: Me }) {
   const { failure } = useSync();
   const signal = useSignal();
   if (!view.ready) return null;
-  if (!view.day) return failure !== null || !signal ? <CouldNotLoad /> : <TripSkeleton />;
+  if (!view.day) return failure !== null || !signal ? <CouldNotLoad view={view} /> : <TripSkeleton />;
   if (!view.trip || !view.figures) return <NoTrip view={view} day={view.day} />;
   if (view.allDone) return <DayDone view={view} day={view.day} trip={view.trip} figures={view.figures} />;
   const { trip, figures } = view;

@@ -180,7 +180,7 @@ export function backOnlineLines(names: string[]) {
   return { title: `Back online · ${what} sent`, line: `${capital(andList(names))} reached the depot` };
 }
 
-export const signInLine = (n: number) => `Sign in again to send ${whole(n)} waiting ${n === 1 ? 'record' : 'records'}.`;
+export const signInLine = (n: number) => (n > 0 ? `Sign in again to send ${whole(n)} waiting ${n === 1 ? 'record' : 'records'}.` : 'Sign in again.');
 export const NOT_SAVED = 'Could not save on this phone. Try again.';
 export const OTHER_TAB = 'Wayfinder is open in another tab.';
 
