@@ -1,15 +1,24 @@
 import type { ReactNode } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { BoardOrder, BoardShop, StopTime } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import { deferredOn, entranceAndWindow, hhmm, orderAmount, partLine } from '../words';
+import { draggedOf, keysOf, landingLook, pressOf } from './dragging';
+import type { Dragged, DragData, DropData, Landing } from './drops';
 import { MenuGroup, MenuItem, MenuLabel, MenuPopup, MenuRoot, MenuSeparator, MenuTrigger, Tag } from './ui';
 import { Why, type WhyReason } from './Why';
+
+// A stop as drag and drop knows it (spec 023): its id in the sortable list, what it is when dragged, the place it is
+// for something dropped on it, that place's name, and whether anything can move now.
+export interface StopDrag { id: string; dragged: Dragged; landing: Landing; name: string; movable: boolean }
 
 // One stop of the open trip (Edit plan, "Stops in order"): its number, when the checker says it arrives, the
 // shop, its entrance and window, the wait, the unloading and when it leaves, "why?" with the planner's reason for
 // its orders (spec 014), and "⋮" with what can be done: move it, and for each of its orders take it off, split it,
-// defer it or join a split order back.
-export function StopRow({ seq, shop, orders, time, longWait, why, first, last, onMove, onTakeOff, onSplit, onDefer, onJoin, children }: {
+// defer it or join a split order back. It can be dragged up and down, off its trip or onto another trip's card, by
+// the pointer from anywhere on it and by the keyboard from its number. An order dropped on it lands before it.
+export function StopRow({ seq, shop, orders, time, longWait, why, first, last, drag, onMove, onTakeOff, onSplit, onDefer, onJoin, children }: {
   seq: number;
   shop: BoardShop;
   orders: BoardOrder[];
@@ -20,6 +29,7 @@ export function StopRow({ seq, shop, orders, time, longWait, why, first, last, o
   why: WhyReason[];
   first: boolean;
   last: boolean;
+  drag: StopDrag;
   onMove: (by: -1 | 1) => void;
   onTakeOff: (order: BoardOrder) => void;
   onSplit: (order: BoardOrder) => void;
@@ -31,10 +41,23 @@ export function StopRow({ seq, shop, orders, time, longWait, why, first, last, o
   const carried = orders.find((order) => order.carriedOver);
   const parts = orders.filter((order) => order.splitFrom !== null);
   const doing = [time && time.waitMin > 0 && `waits ${time.waitMin}`, `unload ${shop.unloadMin}`, time && `off ${hhmm(time.leaveAt)}`].filter(Boolean).join(' · ');
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging, isOver, active } = useSortable({
+    id: drag.id, data: { dragged: drag.dragged, landing: drag.landing, name: drag.name } satisfies DragData & DropData, disabled: !drag.movable,
+  });
+  // An order dragged over the stop lands before it, so the stop shows it. Stops dragged along the list move aside instead.
+  const dragging = draggedOf(active);
+  const look = dragging?.kind === 'orders' ? landingLook(dragging, drag.landing, isOver) : '';
+  const number = cn('flex size-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold', late ? 'bg-bad text-white' : 'bg-secondary text-secondary-foreground');
   return (
-    <li className="border-t">
+    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} onPointerDown={pressOf(listeners)} className={cn('border-t', isDragging && 'opacity-40', look)}>
       <div className="flex items-center gap-2.5 py-[9px]">
-        <span className={cn('flex size-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold', late ? 'bg-bad text-white' : 'bg-secondary text-secondary-foreground')}>{seq}</span>
+        {drag.movable
+          ? (
+            <button type="button" ref={setActivatorNodeRef} {...attributes} onKeyDown={keysOf(listeners)} aria-label={`Move stop ${seq}, ${shop.name}`} className={cn(number, 'cursor-grab outline-none focus-visible:ring-3 focus-visible:ring-ring/50')}>
+              {seq}
+            </button>
+          )
+          : <span className={number}>{seq}</span>}
         <span className={cn('w-10 shrink-0 font-mono text-xs', late && 'text-bad')}>{time ? hhmm(time.arriveAt) : '--:--'}</span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
           <span className="text-[13px] leading-4 font-semibold">{shop.name}</span>

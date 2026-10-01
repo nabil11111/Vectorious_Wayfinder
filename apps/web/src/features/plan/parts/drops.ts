@@ -1,4 +1,4 @@
-import type { BoardOrder, Brand, DraftPlan, DraftTrip } from '@wayfinder/contracts';
+import type { BoardOrder, Brand, DraftPlan } from '@wayfinder/contracts';
 import type { Undo } from '../board';
 import { addOrders, moveStop, takeOff, tripOf, type TripKey } from '../draft';
 import type { Pick } from './PickTruck';
@@ -24,6 +24,10 @@ export type Landing =
 // A drop: a change of the draft with its Undo, or the truck picker for orders dropped in the empty middle.
 export type Drop = { kind: 'change'; plan: DraftPlan; undo: Undo } | { kind: 'start'; pick: Pick };
 
+// What a draggable carries, and what a place to land carries: its landing, and its name for the announcements.
+export interface DragData { dragged: Dragged }
+export interface DropData { landing: Landing; name: string }
+
 // Orders land on a trip's stops, its card or the empty middle. A stop lands among its own trip's stops, on a card or
 // back on Unplanned orders. Anything dropped anywhere else goes back.
 export function canLand(dragged: Dragged, landing: Landing): boolean {
@@ -32,7 +36,7 @@ export function canLand(dragged: Dragged, landing: Landing): boolean {
 }
 
 // A trip as its card names it: "VEH035", or "VEH011 trip 2".
-const tripLabel = (trip: DraftTrip) => (trip.tripNo === 2 ? `${trip.vehicleId} trip 2` : trip.vehicleId);
+export const tripLabel = (trip: { vehicleId: string; tripNo: number }) => (trip.tripNo === 2 ? `${trip.vehicleId} trip 2` : trip.vehicleId);
 
 // The drop as a change of the draft, or null when it lands where it cannot or changes nothing.
 export function dropOf(plan: DraftPlan, dragged: Dragged, landing: Landing): Drop | null {

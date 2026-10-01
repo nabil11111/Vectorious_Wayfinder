@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import type { BoardOrder, BoardShop, Brand, DraftDeferral, DraftPlan, DraftTrip } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -6,9 +6,12 @@ import type { BoardScreen, Undo } from '../board';
 import { addOrders, defer, keyOf, undefer, type Place } from '../draft';
 import { carriedLine, countOf, decisionTitle, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, shopLine, TO_DECIDE, whole } from '../words';
 import { DeferForm } from './DeferForm';
+import { movable, useLanding } from './dragging';
+import type { Dragged } from './drops';
 import { BRAND_ICON, ICON } from './icons';
 import { decisionShop, groupKey, listed, type BoardIndex } from './lookup';
 import { plainButton } from './look';
+import { DragRow } from './PlanDnd';
 import { Column, ColumnHead, MenuItem, MenuPopup, MenuRoot, MenuTrigger, Pills, Tag } from './ui';
 import { Why } from './Why';
 
@@ -44,8 +47,15 @@ const byWanted = (a: BoardOrder, b: BoardOrder) =>
 // What an inline defer form is for: one order, a shop row's orders or a whole group.
 interface DeferTarget { key: string; orders: BoardOrder[]; code?: DraftDeferral['code']; reason?: string }
 
+// One order dragged from its row: named by its shop, in its shop's group (spec 023).
+function orderDragged(order: BoardOrder, index: BoardIndex): Dragged | null {
+  const shop = index.shop(order.outletId);
+  return shop ? { kind: 'orders', orders: [order], group: { brand: shop.brand, district: shop.district }, label: shop.name, detail: orderAmount(shop.brand, order) } : null;
+}
+
 // The left column's upper card (Edit plan): the day's unplanned orders by brand and district, or as one list,
-// with the carried-over ones first and the deferred ones last, each deferred one with the planner's "why?".
+// with the carried-over ones first and the deferred ones last, each deferred one with the planner's "why?". An order,
+// a shop's orders or a whole group can be dragged onto a trip, and a stop dropped here comes off its trip (spec 023).
 export function OrderLists({ screen, index, places, open, outlined, change, onStartTrip, onFindSlot, onJoin }: {
   screen: BoardScreen;
   index: BoardIndex;
@@ -88,9 +98,16 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
     const last = orders.length === 1 ? orders[0]!.lastDeferral : null;
     setDeferring({ key, orders, code: last?.code, reason: last?.reason });
   };
+  const canMove = movable(screen);
+  const { setNodeRef: landingRef, look: landingLook } = useLanding('unplanned', { kind: 'unplanned' }, 'Unplanned orders');
+  // An order's row, with its grip when it can be dragged.
+  const draggable = (order: BoardOrder, row: ReactNode) => {
+    const dragged = orderDragged(order, index);
+    return dragged ? <DragRow id={`orders:order:${order.id}`} dragged={dragged} movable={canMove}>{row}</DragRow> : row;
+  };
 
   return (
-    <Column aria-label="Unplanned orders" className="min-h-[360px] flex-1 lg:min-h-0">
+    <Column ref={landingRef} aria-label="Unplanned orders" className={cn('min-h-[360px] flex-1 lg:min-h-0', landingLook)}>
       <ColumnHead icon={ICON.unplanned} title={`Unplanned orders · ${whole(unplanned.length)}`} className="px-3 pt-3.5 pb-2.5">
         <Pills tight label="Show the orders" value={view} onChange={setView} options={[{ value: 'groups', label: 'brand · district' }, { value: 'list', label: 'list' }]} />
       </ColumnHead>
@@ -103,18 +120,20 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
               <section aria-label="Carried over" className="mb-2 rounded-[10px] border-[1.5px] border-warn px-3.5 pt-2.5 pb-1">
                 <h3 className="text-xs leading-[15px] font-semibold text-warn-ink">Carried over · {whole(carried.length)}</h3>
                 {carried.map((order) => (
-                  <OrderRow
-                    key={order.id}
-                    order={order}
-                    title={titleOf(order, index)}
-                    line={carriedLine(order)}
-                    add={add}
-                    onDefer={() => deferOrders(order.id, [order])}
-                    onJoin={onJoin}
-                    extra={<Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
-                  >
+                  <Fragment key={order.id}>
+                    {draggable(order, (
+                      <OrderRow
+                        order={order}
+                        title={titleOf(order, index)}
+                        line={carriedLine(order)}
+                        add={add}
+                        onDefer={() => deferOrders(order.id, [order])}
+                        onJoin={onJoin}
+                        extra={<Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
+                      />
+                    ))}
                     {form(order.id)}
-                  </OrderRow>
+                  </Fragment>
                 ))}
               </section>
             )}
@@ -129,29 +148,41 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
                   aria-label={`${group.brand} · ${group.district}`}
                   className={cn('scroll-mt-2 rounded-[10px] border-[1.5px] px-2 pt-2.5 pb-1', outlined === group.key ? 'border-foreground' : 'border-transparent')}
                 >
-                  <div className="flex items-center gap-2 pl-1">
-                    <img src={BRAND_ICON[group.brand]} alt="" className="size-[22px] shrink-0 object-contain" />
-                    <h3 className="min-w-0 flex-1 truncate text-xs leading-[15px] font-semibold">{group.brand} · {group.district} · {whole(group.count)}</h3>
-                    <RowMenu label={`${group.brand} · ${group.district}`} items={[{ label: `Defer all ${whole(group.count)}`, onClick: () => deferOrders(group.key, group.shops.flatMap((row) => row.orders)) }]} />
-                    <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => onStartTrip({ brand: group.brand, district: group.district }, group.shops.flatMap((row) => row.orders))}>Start a trip</Button>
-                  </div>
+                  <DragRow
+                    id={`orders:group:${group.key}`}
+                    movable={canMove}
+                    dragged={{ kind: 'orders', orders: group.shops.flatMap((row) => row.orders), group: { brand: group.brand, district: group.district }, label: `${group.brand} · ${group.district}`, detail: countOf(group.count, 'order') }}
+                  >
+                    <div className="flex items-center gap-2 pl-1">
+                      <img src={BRAND_ICON[group.brand]} alt="" className="size-[22px] shrink-0 object-contain" />
+                      <h3 className="min-w-0 flex-1 truncate text-xs leading-[15px] font-semibold">{group.brand} · {group.district} · {whole(group.count)}</h3>
+                      <RowMenu label={`${group.brand} · ${group.district}`} items={[{ label: `Defer all ${whole(group.count)}`, onClick: () => deferOrders(group.key, group.shops.flatMap((row) => row.orders)) }]} />
+                      <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => onStartTrip({ brand: group.brand, district: group.district }, group.shops.flatMap((row) => row.orders))}>Start a trip</Button>
+                    </div>
+                  </DragRow>
                   {form(group.key)}
                   <ul className="mt-1.5">
                     {shops.map(({ shop, orders }) => (
                       <li key={shop.id} className="border-t py-2 pl-1">
-                        <Row
-                          title={`${placeOf(shop)} · ${ordersAmount(shop.brand, orders)}`}
-                          line={[shopLine(shop), ...orders.filter((o) => o.splitFrom !== null).map(partLine)].join(' · ')}
-                          actions={(
-                            <>
-                              {add && <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => add(orders)}>Add</Button>}
-                              <RowMenu label={shop.name} items={[
-                                { label: orders.length > 1 ? `Defer ${countOf(orders.length, 'order')}` : 'Defer', onClick: () => deferOrders(`${group.key}:${shop.id}`, orders) },
-                                ...orders.filter((o) => o.splitFrom !== null).map((o) => ({ label: `Join ${orderAmount(shop.brand, o)} back`, onClick: () => onJoin(o) })),
-                              ]} />
-                            </>
-                          )}
-                        />
+                        <DragRow
+                          id={`orders:shop:${group.key}:${shop.id}`}
+                          movable={canMove}
+                          dragged={{ kind: 'orders', orders, group: { brand: group.brand, district: group.district }, label: shop.name, detail: ordersAmount(shop.brand, orders) }}
+                        >
+                          <Row
+                            title={`${placeOf(shop)} · ${ordersAmount(shop.brand, orders)}`}
+                            line={[shopLine(shop), ...orders.filter((o) => o.splitFrom !== null).map(partLine)].join(' · ')}
+                            actions={(
+                              <>
+                                {add && <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => add(orders)}>Add</Button>}
+                                <RowMenu label={shop.name} items={[
+                                  { label: orders.length > 1 ? `Defer ${countOf(orders.length, 'order')}` : 'Defer', onClick: () => deferOrders(`${group.key}:${shop.id}`, orders) },
+                                  ...orders.filter((o) => o.splitFrom !== null).map((o) => ({ label: `Join ${orderAmount(shop.brand, o)} back`, onClick: () => onJoin(o) })),
+                                ]} />
+                              </>
+                            )}
+                          />
+                        </DragRow>
                         {form(`${group.key}:${shop.id}`)}
                       </li>
                     ))}
@@ -169,17 +200,18 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
           <ul>
             {[...unplanned].sort(byWanted).map((order) => (
               <li key={order.id} className="border-t first:border-t-0">
-                <OrderRow
-                  order={order}
-                  title={titleOf(order, index)}
-                  line={order.carriedOver ? carriedLine(order) : lineOf(order, index)}
-                  add={add}
-                  onDefer={() => deferOrders(order.id, [order])}
-                  onJoin={onJoin}
-                  extra={order.carriedOver && <Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
-                >
-                  {form(order.id)}
-                </OrderRow>
+                {draggable(order, (
+                  <OrderRow
+                    order={order}
+                    title={titleOf(order, index)}
+                    line={order.carriedOver ? carriedLine(order) : lineOf(order, index)}
+                    add={add}
+                    onDefer={() => deferOrders(order.id, [order])}
+                    onJoin={onJoin}
+                    extra={order.carriedOver && <Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
+                  />
+                ))}
+                {form(order.id)}
               </li>
             ))}
           </ul>
@@ -244,9 +276,9 @@ const lineOf = (order: BoardOrder, index: BoardIndex) => {
 
 // One order on a row of its own, a carried-over one or one in the list: two lines, with how often it was deferred
 // on the right of the first and what can be done on the right of the second.
-function OrderRow({ order, title, line, add, onDefer, onJoin, extra, children }: {
+function OrderRow({ order, title, line, add, onDefer, onJoin, extra }: {
   order: BoardOrder; title: string; line: string; add: ((orders: BoardOrder[]) => void) | null;
-  onDefer: () => void; onJoin: (order: BoardOrder) => void; extra?: ReactNode; children?: ReactNode;
+  onDefer: () => void; onJoin: (order: BoardOrder) => void; extra?: ReactNode;
 }) {
   return (
     <div className="py-1.5">
@@ -263,7 +295,6 @@ function OrderRow({ order, title, line, add, onDefer, onJoin, extra, children }:
           ...(order.splitFrom !== null ? [{ label: 'Join back', onClick: () => onJoin(order) }] : []),
         ]} />
       </div>
-      {children}
     </div>
   );
 }

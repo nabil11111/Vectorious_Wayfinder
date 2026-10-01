@@ -4,24 +4,32 @@ import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { suggestPlan, type BoardScreen } from '../board';
 import { BUILD, BUILDING, buildingLine, KEEP_DRAFT, REPLACE_TITLE, replaceLine, suggestedAt, toMake } from '../words';
+import { useLanding } from './dragging';
 import { ICON } from './icons';
 import { orangeButton, plainButton } from './look';
 
 // A write the board's queue runs once the draft is saved. It says why it was refused, or null.
 type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>) => Promise<string | null>;
 
+// The empty middle's drop area, in place of "Start a blank trip" (spec 023, with the trucks panel going in spec 026).
+const DROP_HERE = 'or drag an order here to start a trip';
+
 // The middle column with no trip open (Edit plan · empty and · building, spec 014): "Build the suggested plan" in
-// orange beside "Start a blank trip". Over a draft with a trip or a deferral it asks first (D-52). While the build is
-// out the column shows Building and the board holds still. A refusal shows the server's sentence in red with Try
-// again, and one that loads the board again says so in spec 010's line. After a build, the line says when it was
-// suggested and how many of the planner's decisions are still to make.
-export function BuildPanel({ screen, act, onBlank, onBuilding }: { screen: BoardScreen; act: Act; onBlank: () => void; onBuilding: () => void }) {
+// orange, and beside it, in place of "Start a blank trip", the place to drop an order to start its trip (spec 023).
+// Over a draft with a trip or a deferral the build asks first (D-52). While the build is out the column shows Building
+// and the board holds still. A refusal shows the server's sentence in red with Try again, and one that loads the board
+// again says so in spec 010's line. After a build, the line says when it was suggested and how many of the planner's
+// decisions are still to make.
+export function BuildPanel({ screen, act, onBuilding }: { screen: BoardScreen; act: Act; onBuilding: () => void }) {
   const { board, draft } = screen;
   const [asking, setAsking] = useState(false);
   const [building, setBuilding] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
+  // The whole empty middle takes the drop. Its dashed area says so and shows the drag over it.
+  const { setNodeRef: middleRef, look: middleLook } = useLanding('middle', { kind: 'middle' }, 'the middle, to start a trip');
   // The rows View plan lists as open: the screen counts them, nothing else.
   const open = board.suggestion?.decisions.filter((decision) => decision.open).length ?? 0;
 
@@ -51,7 +59,7 @@ export function BuildPanel({ screen, act, onBlank, onBuilding }: { screen: Board
     );
   }
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+    <div ref={middleRef} className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
       <img src={ICON.route} alt="" className="size-[72px] object-contain" />
       <h2 className="mt-3.5 text-xl leading-6 font-bold">No trip open</h2>
       {board.suggestion && (
@@ -61,7 +69,8 @@ export function BuildPanel({ screen, act, onBlank, onBuilding }: { screen: Board
       )}
       <div className="mt-3.5 flex flex-wrap justify-center gap-2.5">
         <Button className={orangeButton('h-11 px-6 text-sm')} disabled={screen.acting} focusableWhenDisabled onClick={press}>{BUILD}</Button>
-        <Button variant="outline" className={plainButton('h-11 px-6 text-sm')} onClick={onBlank}>Start a blank trip</Button>
+        {/* While an order is dragged, the drag's outline takes the place of the area's own dashed line. */}
+        <p className={cn('flex h-11 items-center rounded-[10px] border-[1.5px] border-dashed px-5 text-sm text-muted-foreground', middleLook ? 'border-transparent' : 'border-mute', middleLook)}>{DROP_HERE}</p>
       </div>
       {refused && (
         <p role="alert" className="mt-4 flex max-w-md items-center gap-3 rounded-[10px] bg-bad-tint px-3 py-[7px] text-left text-xs leading-[15px] font-semibold text-bad">

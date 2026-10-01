@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -7,8 +8,10 @@ import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeO
 import { countOf, figure, hhmm, litres, orderAmount, ordersAmount, vehicleSize } from '../words';
 import { DeferForm } from './DeferForm';
 import { DepotRow } from './DepotRow';
+import { movable, useLanding } from './dragging';
 import { DriverMenu } from './DriverMenu';
 import { driverChange } from './drivers';
+import { tripLabel } from './drops';
 import { vehicleIcon } from './icons';
 import { LeaveField } from './LeaveField';
 import type { BoardIndex } from './lookup';
@@ -69,6 +72,10 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
     const chosen = driverChange(draft, key, trip.vehicleId, driverId);
     change(chosen.plan, chosen.undo);
   };
+  // Drag and drop (spec 023): the stops as a sortable list, and its end as a place to land.
+  const canMove = movable(screen);
+  const stopIds = trip.stops.map((stop) => `stop:${key}:${stop.outletId}`);
+  const { setNodeRef: endRef, look: endLook } = useLanding(`stops-end:${key}`, { kind: 'stops', tripKey: key, at: trip.stops.length }, `the end of ${tripLabel(trip)}'s stops`);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -118,44 +125,51 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
 
       <h3 className="px-3.5 pt-3 pb-2 text-xs leading-[15px] font-semibold text-muted-foreground">Stops in order</h3>
       {times && <DepotRow end="start" depot={board.depot} at={times.leaveAt} className="mx-3.5" />}
-      <ol className="mx-3.5">
-        {trip.stops.map((stop, i) => {
-          const shop = index.shop(stop.outletId);
-          if (!shop) return null;
-          const orders = stop.orderIds.flatMap((id) => index.order(id) ?? []);
-          const time = times?.stops[i] ?? null;
-          // The planner's reason for each order it planned here, both parts of a split with their original's.
-          const why = orders.flatMap((order) => {
-            const choice = index.choice(order.id);
-            return choice ? [{ key: order.id, about: orderAmount(shop.brand, order), reason: choice.reason }] : [];
-          });
-          return (
-            <StopRow
-              key={stop.outletId}
-              seq={i + 1}
-              shop={shop}
-              orders={orders}
-              time={time}
-              why={why}
-              longWait={problems.some((problem) => problem.code === 'long_wait' && problem.stopSeq === i + 1)}
-              first={i === 0}
-              last={i === trip.stops.length - 1}
-              onMove={(by) => change(moveStop(draft, key, i, by), { before: draft, line: `Stops ${Math.min(i, i + by) + 1} and ${Math.max(i, i + by) + 1} swapped`, tripKey: key })}
-              onTakeOff={(order) => change(takeOff(draft, [order.id]))}
-              onSplit={(order) => setForm({ kind: 'split', order })}
-              onDefer={(order) => setForm({ kind: 'defer', order })}
-              onJoin={onJoin}
-            >
-              {form && stop.orderIds.includes(form.order.id) && (form.kind === 'split'
-                ? <SplitForm order={form.order} brand={shop.brand} busy={screen.acting} onSplit={(keep) => split(form.order, keep)} onCancel={() => setForm(null)} />
-                : <DeferForm orders={[form.order]} index={index} code={form.order.lastDeferral?.code} reason={form.order.lastDeferral?.reason} onDefer={doDefer} onCancel={() => setForm(null)} />)}
-            </StopRow>
-          );
-        })}
-      </ol>
+      <SortableContext items={stopIds} strategy={verticalListSortingStrategy}>
+        <ol className="mx-3.5">
+          {trip.stops.map((stop, i) => {
+            const shop = index.shop(stop.outletId);
+            if (!shop) return null;
+            const orders = stop.orderIds.flatMap((id) => index.order(id) ?? []);
+            const time = times?.stops[i] ?? null;
+            // The planner's reason for each order it planned here, both parts of a split with their original's.
+            const why = orders.flatMap((order) => {
+              const choice = index.choice(order.id);
+              return choice ? [{ key: order.id, about: orderAmount(shop.brand, order), reason: choice.reason }] : [];
+            });
+            return (
+              <StopRow
+                key={stop.outletId}
+                seq={i + 1}
+                shop={shop}
+                orders={orders}
+                time={time}
+                why={why}
+                longWait={problems.some((problem) => problem.code === 'long_wait' && problem.stopSeq === i + 1)}
+                first={i === 0}
+                last={i === trip.stops.length - 1}
+                drag={{
+                  id: stopIds[i]!, movable: canMove, name: `stop ${i + 1} of ${tripLabel(trip)}`,
+                  dragged: { kind: 'stop', tripKey: key, index: i, label: shop.name, brand: shop.brand }, landing: { kind: 'stops', tripKey: key, at: i },
+                }}
+                onMove={(by) => change(moveStop(draft, key, i, by), { before: draft, line: `Stops ${Math.min(i, i + by) + 1} and ${Math.max(i, i + by) + 1} swapped`, tripKey: key })}
+                onTakeOff={(order) => change(takeOff(draft, [order.id]))}
+                onSplit={(order) => setForm({ kind: 'split', order })}
+                onDefer={(order) => setForm({ kind: 'defer', order })}
+                onJoin={onJoin}
+              >
+                {form && stop.orderIds.includes(form.order.id) && (form.kind === 'split'
+                  ? <SplitForm order={form.order} brand={shop.brand} busy={screen.acting} onSplit={(keep) => split(form.order, keep)} onCancel={() => setForm(null)} />
+                  : <DeferForm orders={[form.order]} index={index} code={form.order.lastDeferral?.code} reason={form.order.lastDeferral?.reason} onDefer={doDefer} onCancel={() => setForm(null)} />)}
+              </StopRow>
+            );
+          })}
+        </ol>
+      </SortableContext>
       {times && <DepotRow end="end" depot={board.depot} at={times.backAt} className="mx-3.5" />}
 
-      <div className="px-3.5 pt-1">
+      {/* The end of the stops: what is dropped here comes last, as "+ Add a stop" adds it. */}
+      <div ref={endRef} className={cn('mx-3.5 mt-1 rounded-md', endLook)}>
         <button type="button" onClick={onAddStop} className="flex h-9 items-center gap-2 rounded-md px-1.5 text-xs font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
           <span aria-hidden="true" className="text-sm font-bold">+</span> Add a stop
         </button>

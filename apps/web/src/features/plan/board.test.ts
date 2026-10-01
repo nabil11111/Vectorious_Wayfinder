@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { meKey } from '@/features/auth/api';
 import { DEPOT_HEADER, nameDepot } from '@/lib/api';
 import { boardKey, dayKey, planWriteOnItsWay, retireBoard, sendPlan, useBoardScreen, writeOutsideBoard } from './board';
+import { landDrop } from './parts/dragging';
 import { driverChange } from './parts/drivers';
 
 // The board's saver across a dispatcher's depot switch (spec 020, AC-6). It keeps the board and its draft outside the
@@ -335,5 +336,33 @@ it('spec 022 AC-5 a driver swap goes out as one save of the draft, and Undo puts
   answer(Response.json({ ...board, plan: { ...board.plan, revision: 3 } }));
   await settled();
   expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: null });
+  saver.stop();
+});
+
+it('spec 023 AC-5 a drop goes out as one save of the draft, checked as a button\'s change is, and its Undo as one more', async () => {
+  signedIn(RUWAN);
+  const [nugegoda, kotahena, wellawatte] = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000002'];
+  const day: DraftPlan = { mixBrands: false, deferrals: [], trips: [{ vehicleId: 'VEH035', tripNo: 1, leaveAt: null, driverId: null, stops: [
+    { outletId: 'OUT001', orderIds: [nugegoda] }, { outletId: 'OUT003', orderIds: [kotahena] }, { outletId: 'OUT002', orderIds: [wellawatte] },
+  ] }] };
+  const saved = boardOf('Peliyagoda', PLAN, 1);
+  const board = PlanBoard.parse({ ...saved, plan: { ...saved.plan, ...day } });
+  const { saver } = useBoardScreen(board);
+  // The stops each save sent, in order.
+  const sent = () => vi.mocked(fetch).mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { plan: DraftPlan }).plan.trips[0]!.stops.map((s) => s.outletId));
+
+  // Fresh Nugegoda dragged from first to last place.
+  landDrop(day, { kind: 'stop', tripKey: 'VEH035-1', index: 0, label: 'Fresh Nugegoda', brand: 'Fresh' }, { kind: 'stops', tripKey: 'VEH035-1', at: 2 }, { change: saver.change, start: () => undefined });
+  await settled();
+  expect(sent()).toEqual([['OUT003', 'OUT002', 'OUT001']]);
+  answer(Response.json({ ...board, plan: { ...board.plan, ...saver.snapshot()!.draft, revision: 2 } }));
+  await settled();
+  expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: { line: 'Stops 1 and 3 moved', tripKey: 'VEH035-1', revision: 2 } });
+
+  saver.change(saver.snapshot()!.undo!.before);
+  await settled();
+  expect(sent()).toEqual([['OUT003', 'OUT002', 'OUT001'], ['OUT001', 'OUT003', 'OUT002']]);
+  answer(Response.json({ ...board, plan: { ...board.plan, revision: 3 } }));
+  await settled();
   saver.stop();
 });
