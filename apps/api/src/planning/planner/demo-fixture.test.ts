@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { parse } from 'csv-parse/sync';
 import { describe, expect, it, vi } from 'vitest';
 import * as checker from '../check';
 import { checkPlan } from '../check';
@@ -139,11 +141,16 @@ describe('the exact seeded planner day without a database', () => {
   it('AC-17 keeps every reason within 200 characters and whole words on varied days made from Peliyagoda\'s and Kandy\'s seeded ones', async () => {
     // A fixed sample of days, Peliyagoda's and Kandy's by turns: some of the day's orders on a few of its working vehicles,
     // about a third of them waiting and larger, and every other pair of days a heavy one, a few waiting orders with lines
-    // near the 999 a line can hold. So splits and refused remainders come up, and on half the days drivers have long
-    // three-part names.
-    const depots = [(await demoFixture()).input, (await kandyFixture()).input];
+    // near the 999 a line can hold. So splits and refused remainders come up. On half the days drivers have long
+    // three-part names, and on half the shops have the names the seed gives them, of up to 26 characters, where the
+    // fixtures' ids leave a reason the shop's district, of up to 12.
+    const seeded = [(await demoFixture()).input, (await kandyFixture()).input];
+    const shopNames: { outlet_id: string; name: string }[] = parse(readFileSync(new URL('../../../../../data/fixtures/outlet-names.csv', import.meta.url)), { columns: true });
+    const nameOf = new Map(shopNames.map((row) => [row.outlet_id, row.name]));
+    // The multiplication is done in whole 32-bit numbers: as a plain product it runs past 2^53 and loses its last
+    // digits, and the numbers then come round again every 10,466 draws or sooner.
     let seed = 7;
-    const next = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const next = () => { seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff; return seed / 2147483648; };
     const some = <T>(rows: T[], n: number) => rows.map((row) => [next(), row] as const).sort(([a], [b]) => a - b).slice(0, n).map(([, row]) => row);
     const waiting = (order: PlannerOrder, nearCap: boolean): PlannerOrder => ({
       ...order, deliveryDate: '2026-06-24', timesDeferred: 1,
@@ -152,14 +159,15 @@ describe('the exact seeded planner day without a database', () => {
     const names = ['Chaminda Kumara Wickramasinghe', 'Dilshan Pradeep Jayawardena', 'Lasantha Bandara Ekanayake', 'Priyantha Gamini Senanayake'];
     const reasons: { depot: string; reason: string }[] = [];
     for (let day = 0; day < 64; day += 1) {
-      const input = depots[day % 2]!;
+      const seededDay = seeded[day % 2]!;
       const heavy = day % 4 >= 2;
+      const input = next() < 0.5 ? { ...seededDay, outlets: seededDay.outlets.map((o) => ({ ...o, name: nameOf.get(o.id) ?? o.name })) } : seededDay;
       const fleet = some(input.vehicles.filter((v) => v.available), 2 + Math.floor(next() * 6));
-      const named = next() < 0.5;
+      const withDrivers = next() < 0.5;
       const orders = heavy
         ? some(input.orders, 3 + Math.floor(next() * 6)).map((order) => waiting(order, true))
         : some(input.orders, 10 + Math.floor(next() * 40)).map((order) => (next() < 0.3 ? waiting(order, next() < 0.3) : order));
-      const result = buildSuggestedPlan({ ...input, orders, vehicles: fleet.map((v, i) => (named ? { ...v, driverName: names[i % names.length]! } : v)) });
+      const result = buildSuggestedPlan({ ...input, orders, vehicles: fleet.map((v, i) => (withDrivers ? { ...v, driverName: names[i % names.length]! } : v)) });
       if (result.status === 'unavailable') continue;
       reasons.push(...[...result.choices, ...result.decisions, ...result.input.plan.deferrals].map((entry) => ({ depot: input.depotId, reason: entry.reason })));
     }
@@ -169,8 +177,9 @@ describe('the exact seeded planner day without a database', () => {
       expect(reason.length, reason).toBeLessThanOrEqual(200);
       expect(reason, reason).not.toContain('…');
     }
-    // The sample reaches every wording: drivers' names where they fit, the tight form where even kind and id do not,
-    // and the tightest, with no deciding rule in brackets, where even the tight form does not.
+    // The sample reaches every wording: shops' and drivers' names where they fit, the tight form where even kind and id
+    // do not, and the tightest, with no deciding rule in brackets, where even the tight form does not.
+    expect(reasons.some(({ reason }) => shopNames.some(({ name }) => reason.includes(name)))).toBe(true);
     expect(reasons.some(({ reason }) => names.some((name) => reason.includes(`${name}'s `)))).toBe(true);
     expect(reasons.some(({ reason }) => / wait: reached at /.test(reason))).toBe(true);
     expect(reasons.some(({ reason }) => /; \d+ (?:cartons|boxes|items) (?:on|joined) (?:dry truck|reefer truck|reefer van|van) VEH\d{3}(?:'s second trip)?(?:;|$)/.test(reason))).toBe(true);
