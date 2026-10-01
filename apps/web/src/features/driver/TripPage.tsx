@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { DriverDay, DriverTrip } from '@wayfinder/contracts';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,11 +8,11 @@ import { truckIcon } from '@/features/loader/parts/icons';
 import { useAppClock } from '@/lib/clock';
 import { TopArea } from './parts/TopArea';
 import { ActionBar, BIG, Card, PLAIN, Problem } from './parts/ui';
-import { retrySync, useSave, useSync } from './sender';
+import { readAgain, retrySync, useSave, useSync } from './sender';
 import type { DriverView } from './view';
 import {
-  aboutTrip, brandOf, leavingLine, loadedLine, noTripLine, NOT_SAVED, notReadyChip, placeLine, startWhenLoaded, stopsCount, stopUnitsLine,
-  tripDayLine, windowLine, type Figures,
+  aboutTrip, brandOf, COULD_NOT_READ, leavingLine, loadedLine, noTripLine, NOT_SAVED, notReadyChip, NOTHING_SENT_UNTIL_READ, placeLine, startWhenLoaded,
+  stopsCount, stopUnitsLine, tripDayLine, windowLine, type Figures,
 } from './words';
 
 // Driver · Today's trip at /driver (spec 013): the trip and its stops in plan order, and "Start trip" once the loader
@@ -101,6 +102,27 @@ export function CouldNotLoad({ view }: { view: DriverView }) {
         <h1 className="font-sans text-[15px] leading-5 font-semibold">Could not load your trip.</h1>
         <p className="mt-1.5 text-[13px] leading-4 text-muted-foreground">{failure ?? 'Could not reach Wayfinder. Check the connection and try again.'}</p>
         <Button variant="outline" className={PLAIN('mt-4')} onClick={retrySync}>Try again</Button>
+      </Card>
+    </div>
+  );
+}
+
+// Could not read (no frame): the phone's database would not give back what it kept for this account. Nothing is sent
+// or saved until it does, so a record kept earlier never goes after a newer one. The loop tries again by itself too.
+export function CouldNotRead() {
+  const [reading, setReading] = useState(false);
+  const again = async () => {
+    setReading(true);
+    await readAgain();
+    setReading(false);
+  };
+  return (
+    <div>
+      <TopArea waitingRecords={0} />
+      <Card role="alert" className="px-5 py-5">
+        <h1 className="font-sans text-[15px] leading-5 font-semibold">{COULD_NOT_READ}</h1>
+        <p className="mt-1.5 text-[13px] leading-4 text-muted-foreground">{NOTHING_SENT_UNTIL_READ}</p>
+        <Button variant="outline" className={PLAIN('mt-4')} disabled={reading} onClick={() => { void again(); }}>{reading ? 'Reading…' : 'Try again'}</Button>
       </Card>
     </div>
   );

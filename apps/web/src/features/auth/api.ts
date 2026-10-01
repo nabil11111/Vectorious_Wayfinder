@@ -25,12 +25,22 @@ function keptAccount(): Me | undefined {
 }
 
 
+// The driver's area keeps its account and screens through a 401, so the trip and the records kept on the phone stay
+// in reach, and its own line asks the driver to sign in again (spec 013, AC-45). It holds this while it is open, and
+// a 401 anywhere else still signs out at once.
+let keptThroughSignOut = 0;
+export function keepAccountThroughSignOut() {
+  keptThroughSignOut += 1;
+  return () => { keptThroughSignOut -= 1; };
+}
+
 // null means signed out; the query never throws for a plain 401.
 export function useMe() {
   const qc = useQueryClient();
   useEffect(() => {
     // Clear both forms of identity so the login page can open immediately. Account-owned waiting writes stay.
     const signedOut = () => {
+      if (keptThroughSignOut > 0) return;
       keepAccount(null);
       void qc.cancelQueries({ queryKey: meKey });
       qc.setQueryData(meKey, null);
@@ -49,7 +59,13 @@ export function useMe() {
         signal.throwIfAborted();
         return keepAccount(me);
       }
-      catch (e) { if (e instanceof ApiRequestError && e.status === 401) return keepAccount(null); throw e; }
+      catch (e) {
+        if (e instanceof ApiRequestError && e.status === 401) {
+          const shown = qc.getQueryData<Me | null>(meKey);
+          return keptThroughSignOut > 0 && shown ? shown : keepAccount(null);
+        }
+        throw e;
+      }
     },
     staleTime: 5 * 60_000,
   });

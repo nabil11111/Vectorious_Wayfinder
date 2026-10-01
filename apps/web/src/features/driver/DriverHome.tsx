@@ -2,12 +2,12 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import { nextStop, type Me } from '@wayfinder/contracts';
 import { AppShell } from '@/components/layout/AppShell';
-import { useMe } from '@/features/auth/api';
+import { keepAccountThroughSignOut, useMe } from '@/features/auth/api';
 import { DayDone, TripDone } from './DonePage';
 import { NextStopPage } from './NextStopPage';
 import { ProofPage } from './ProofPage';
 import { SavedPage } from './SavedPage';
-import { CouldNotLoad, NoTrip, TodaysTrip, TripSkeleton } from './TripPage';
+import { CouldNotLoad, CouldNotRead, NoTrip, TodaysTrip, TripSkeleton } from './TripPage';
 import { UnloadPage } from './UnloadPage';
 import { WrongPage } from './WrongPage';
 import { holdPictures } from './parts/icons';
@@ -15,16 +15,19 @@ import { StatusChip } from './parts/StatusChip';
 import { Card } from './parts/ui';
 import { setAccount, useDriverQuery, useOwner, useSync } from './sender';
 import { useSignal } from './signal';
+import { useKept } from './store';
 import { useDriverView } from './view';
 import { OTHER_TAB } from './words';
 
 // The driver's area (spec 013). The router hands over everything under /driver, so the area's own routes live here:
 // /driver shows the screen the trip is at, and /driver/proof, /driver/wrong and /driver/saved the steps of a stop. The
 // driver frames draw no tabs. One tab owns the driver's app (rule 10); any other says so and does nothing until that
-// one closes. The screens are built at 390 wide and are never wider than 480.
+// one closes. The screens are built at 390 wide and are never wider than 480. While the area is open a 401 keeps the
+// account and the screens, and the top of the screen asks the driver to sign in again (AC-45).
 export function DriverHome() {
   const { data: me } = useMe();
   const owner = useOwner();
+  useEffect(() => keepAccountThroughSignOut(), []);
   return (
     <AppShell place={me?.depotId ?? undefined} status={owner === 'owner' ? <StatusChip /> : undefined}>
       <div className="mx-auto w-full max-w-[480px]">
@@ -44,11 +47,14 @@ function OtherTab() {
 }
 
 function DriverArea({ me }: { me: Me }) {
-  const { id, displayName } = me;
-  useEffect(() => { setAccount({ id, displayName }); }, [id, displayName]);
+  const { id } = me;
+  useEffect(() => { setAccount({ id }); }, [id]);
   useEffect(() => { holdPictures(); }, []);
   // The query ['driver'] brings the live stream's messages and the minute's refetch to the sync loop.
   useDriverQuery();
+  const kept = useKept();
+  // The phone could not read what it kept for this account: every route says so until it can.
+  if (kept.userId === id && kept.failed) return <CouldNotRead />;
   return (
     <Routes>
       <Route index element={<NowPage me={me} />} />

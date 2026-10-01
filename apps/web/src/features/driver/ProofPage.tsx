@@ -39,9 +39,9 @@ function Proof({ me, stopId }: { me: Me; stopId: string }) {
   if (!trip || !stop || !figures) return <Navigate to="/driver" replace />;
   if (!leaving && (trip.status !== 'out' || stop.arrivedAt === null || stop.outcome !== null)) return <Navigate to="/driver" replace />;
 
-  // Every line as loaded, with the photo, at the app clock's time (rule 4).
+  // Every line as loaded, with the photo, at the app clock's time (rule 4). Not while a retaken photo is being read.
   const deliver = async () => {
-    if (!photo || at === null) return;
+    if (!photo || reading || at === null) return;
     setLeaving(true);
     const saved = await save({ kind: 'deliver', writeId: newWriteId(), tripId: trip.tripId, stopId: stop.id, at: new Date(at).toISOString(), revision: stop.revision, photo }, aboutStop(stop));
     if (!saved) {
@@ -66,8 +66,8 @@ function Proof({ me, stopId }: { me: Me; stopId: string }) {
       <ActionBar>
         {photo ? (
           <>
-            <Button className={BIG()} disabled={saving || at === null} focusableWhenDisabled onClick={() => { void deliver(); }}>{saving ? 'Saving…' : 'Save delivery'}</Button>
-            <Button variant="outline" className={PLAIN()} disabled={saving} onClick={take}>Retake photo</Button>
+            <Button className={BIG()} disabled={saving || reading || at === null} focusableWhenDisabled onClick={() => { void deliver(); }}>{saving ? 'Saving…' : 'Save delivery'}</Button>
+            <Button variant="outline" className={PLAIN()} disabled={saving || reading} onClick={take}>{reading ? 'Reading the photo…' : 'Retake photo'}</Button>
           </>
         ) : (
           <Button className={BIG()} disabled={reading} focusableWhenDisabled onClick={take}>{reading ? 'Reading the photo…' : 'Take photo'}</Button>

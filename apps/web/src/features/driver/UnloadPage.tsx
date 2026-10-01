@@ -12,6 +12,8 @@ import { brandOf, entranceOf, lineName, loaderShortLine, stopOfLine, type Figure
 // Driver · Unload at /driver once the driver has arrived (spec 013, rule 4): a card per line, chilled before dry, with
 // the driver's own count against what was loaded, and the loader's shortfall under a line that went short. "Done
 // unloading" works once every line is counted to what was loaded; anything less goes through "Something's wrong".
+// The frame draws "Done unloading" orange whatever the count, so it stays orange while it waits for the counts.
+const ALWAYS_ORANGE = 'data-disabled:bg-primary data-disabled:text-primary-foreground disabled:bg-primary disabled:text-primary-foreground';
 export function UnloadPage({ view, trip, figures, stop }: { view: DriverView; trip: DriverTrip; figures: Figures; stop: DriverStop }) {
   const navigate = useNavigate();
   const tally = useTally(stop.id);
@@ -47,7 +49,7 @@ export function UnloadPage({ view, trip, figures, stop }: { view: DriverView; tr
         })}
       </ul>
       <ActionBar>
-        <Button className={BIG()} disabled={!counted} focusableWhenDisabled onClick={() => navigate(`/driver/proof?stop=${stop.id}`)}>Done unloading</Button>
+        <Button className={BIG(ALWAYS_ORANGE)} disabled={!counted} focusableWhenDisabled onClick={() => navigate(`/driver/proof?stop=${stop.id}`)}>Done unloading</Button>
         <Button variant="outline" className={PLAIN()} onClick={() => navigate(`/driver/wrong?stop=${stop.id}`)}>{"Something's wrong"}</Button>
       </ActionBar>
     </div>

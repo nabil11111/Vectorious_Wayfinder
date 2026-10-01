@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DriverDay, DriverWrite, phoneView } from '@wayfinder/contracts';
 import { api, ApiRequestError } from '@/lib/api';
 import { answered, hasSignal, noAnswer, probeNow, retryDelay, startSignal, whenBack, whenLost, within } from './signal';
-import { addWrite, keepDay, openAccount, readKept, refuseWrite, type Queued } from './store';
+import { addWrite, keepDay, openAccount, readFirst, readKept, refuseWrite, type Queued } from './store';
 
 // The driver's sync loop (spec 013, rule 10, D-45, D-50, plan.md "The phone"). One tab owns the driver's app: the tab
 // that holds the browser's lock `wayfinder-driver`, for as long as it is open. Only that tab runs this loop, which
@@ -16,13 +16,14 @@ export const LOCK = 'wayfinder-driver';
 
 // ── The account the loop works for ───────────────────────────────────────────────────────────────────────────────
 
-interface Account { id: string; name: string }
+// The signed-in account, told apart by its id: two drivers may share a display name.
+interface Account { id: string }
 let account: Account | null = null;
 // Goes up when the account changes, so the answer to a request made for the account before is dropped.
 let generation = 0;
 
 export interface SyncState {
-  // A 401: the session is gone, and the writes wait until the same driver signs in again.
+  // A 401, or a session that belongs to another account: the writes wait until this driver signs in again.
   signedOut: boolean;
   // A day has been fetched for this account since the app opened.
   fetched: boolean;
@@ -30,9 +31,12 @@ export interface SyncState {
   failure: string | null;
   // The places whose records reached the depot once the signal came back, for the green line, until it is closed.
   backOnline: string[] | null;
+  // The phone could not keep a refusal the server gave: the write still waits and goes again on the retry schedule,
+  // and the screens say "Could not save on this phone. Try again." until a refusal is kept.
+  notSaved: boolean;
 }
 
-let sync: SyncState = { signedOut: false, fetched: false, failure: null, backOnline: null };
+let sync: SyncState = { signedOut: false, fetched: false, failure: null, backOnline: null, notSaved: false };
 const listeners = new Set<() => void>();
 function update(change: Partial<SyncState>) {
   sync = { ...sync, ...change };
@@ -188,9 +192,9 @@ async function fetchDay(who: Account, turn: number): Promise<boolean> {
     update({ failure: 'Wayfinder sent something this phone could not read. It tries again by itself.' });
     return false;
   }
-  // The browser's session belongs to someone else now, such as after another account signed in in another tab. That
-  // account's day is not this one's, and this account's writes must not go out under it.
-  if (day.data.driver !== who.name) {
+  // The browser's session belongs to another account now, such as after it signed in in another tab, even one with
+  // the same name. That account's day is not this one's, and this account's writes must not go out under it.
+  if (day.data.driverId !== who.id) {
     update({ signedOut: true });
     return false;
   }
@@ -201,32 +205,43 @@ async function fetchDay(who: Account, turn: number): Promise<boolean> {
   return true;
 }
 
-// Whether the browser's session is still this driver's, asked of the day itself.
-async function stillOwn(who: Account): Promise<'own' | 'other' | 'unknown'> {
+// Whether the browser's session still belongs to the account that owns the write, asked of the day itself: its
+// driverId against the write's owner and the account the phone has open.
+async function stillOwn(owner: string): Promise<'own' | 'other' | 'unknown'> {
   const outcome = await ask('/driver', {});
   if (outcome.kind === 'signed-out') return 'other';
   if (outcome.kind !== 'answer') return 'unknown';
   const day = DriverDay.safeParse(outcome.value);
   if (!day.success) return 'unknown';
-  return day.data.driver === who.name ? 'own' : 'other';
+  return day.data.driverId === owner && readKept().userId === owner ? 'own' : 'other';
 }
 
-async function sendWrite(who: Account, entry: Queued, turn: number) {
+async function sendWrite(entry: Queued, turn: number) {
   const outcome = await ask('/driver/writes', { method: 'POST', json: entry.write });
   if (turn !== generation) return;
   switch (outcome.kind) {
     // The answer is the day, but it is never shown: the loop fetches the day again at once (D-50).
     case 'answer': through(); ring(); return;
     // A refused write is never sent again, and the writes after it carry on. A refusal counts only when the session
-    // is still this driver's: one that changed under the send, such as another account signed in in another tab,
-    // must not cost the write, which waits until this driver is signed in again.
+    // still belongs to the write's owner: one that changed under the send, such as another account signed in in
+    // another tab, must not cost the write, which waits until its driver is signed in again.
     case 'refused': {
-      const session = await stillOwn(who);
+      const session = await stillOwn(entry.userId);
       if (turn !== generation) return;
       if (session === 'other') { update({ signedOut: true }); return; }
       if (session === 'unknown') { later(); return; }
+      try {
+        await refuseWrite(entry, { code: outcome.code, message: outcome.message });
+      } catch (error) {
+        // Still waiting on the phone: it goes again on the retry schedule and is refused again, until the phone can
+        // keep the refusal.
+        console.warn('Could not keep the refusal on this phone.', error);
+        update({ notSaved: true });
+        later();
+        return;
+      }
       through();
-      await refuseWrite(entry, { code: outcome.code, message: outcome.message });
+      update({ notSaved: false });
       ring();
       return;
     }
@@ -239,12 +254,18 @@ async function sendWrite(who: Account, entry: Queued, turn: number) {
 }
 
 // A turn runs even while the driver is asked to sign in again: its fetch is how the phone learns they have, in this
-// tab or another, and nothing is sent until a fetch shows the session is theirs.
+// tab or another, and nothing is sent until a fetch shows the session is theirs. Nothing is fetched or sent before
+// the phone has read what it kept for the account; a read that failed is tried again on the retry schedule.
 async function turn() {
   const who = account;
   const now = generation;
-  const kept = readKept();
-  if (!who || !hasSignal() || !kept.ready || kept.userId !== who.id) return;
+  if (!who) return;
+  if (!(await readFirst(who.id))) {
+    const kept = readKept();
+    if (now === generation && kept.userId === who.id && kept.failed) later();
+    return;
+  }
+  if (now !== generation || !hasSignal()) return;
   if (!(await fetchDay(who, now))) return;
   // The account may have changed while the day was kept; its writes are not this turn's to send.
   if (now !== generation) return;
@@ -254,7 +275,8 @@ async function turn() {
     settle();
     return;
   }
-  await sendWrite(who, next, now);
+  if (next.userId !== who.id) return;
+  await sendWrite(next, now);
 }
 
 // The whole loop, run inside the lock for the tab's life. It never returns, so the lock is never let go.
@@ -317,14 +339,14 @@ export function useOwner(): Owner {
 // ── What the screens call ─────────────────────────────────────────────────────────────────────────────────────
 
 // The signed-in account, from the driver's area. A new account starts over from what the phone kept for it.
-export function setAccount(me: { id: string; displayName: string }) {
+export function setAccount(me: { id: string }) {
   const same = account?.id === me.id;
-  account = { id: me.id, name: me.displayName };
+  account = { id: me.id };
   if (!same) {
     generation += 1;
     fetching?.abort();
     held.clear();
-    update({ signedOut: false, fetched: false, failure: null, backOnline: null });
+    update({ signedOut: false, fetched: false, failure: null, backOnline: null, notSaved: false });
     void openAccount(me.id).then(() => {
       hold();
       ring();
@@ -334,6 +356,18 @@ export function setAccount(me: { id: string; displayName: string }) {
   // The same driver signed in again after a 401: the writes go now.
   update({ signedOut: false });
   ring();
+}
+
+// "Try again" on "Could not read what this phone kept.": read again, and once read carry on as when the app opened.
+// It resolves whether the phone could read.
+export async function readAgain() {
+  const who = account;
+  if (!who) return false;
+  if (!(await readFirst(who.id))) return false;
+  hold();
+  through();
+  ring();
+  return true;
 }
 
 // The live stream's driver message, a clock or demo message and the minute's refetch start the loop's fetch. A new
@@ -351,12 +385,15 @@ export function retrySync() {
 }
 
 // Saves one action on the phone before the screen moves on. It resolves once the write is in the phone's database,
-// and throws when it could not be saved, so nothing is sent.
+// and throws when it could not be saved, so nothing is sent. The phone first reads what it kept for the account if
+// it could not before, so a new action never goes ahead of a write kept earlier.
 export async function saveAction(write: DriverWrite, about: string) {
-  if (!account) throw new Error('No signed-in driver to save for.');
+  const who = account;
+  if (!who) throw new Error('No signed-in driver to save for.');
+  if (!(await readFirst(who.id))) throw new Error('The phone could not read what it kept, so the action was not saved.');
   // Kept as the contracts' shape reads it, the exact request the server will parse, trimmed note and all.
   const request = DriverWrite.parse(write);
-  await addWrite(account.id, request, about, request.at);
+  await addWrite(who.id, request, about, request.at);
   // A stop done on the road ends the green "Back online" line.
   if (write.kind === 'deliver' || write.kind === 'refuse' || write.kind === 'closed') update({ backOnline: null });
   hold();
