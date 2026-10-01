@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardScreen, Undo } from '../board';
 import { addOrders, defer, keyOf, undefer, type Place } from '../draft';
-import { carriedLine, countOf, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, shopLine, whole } from '../words';
+import { carriedLine, countOf, decisionTitle, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, shopLine, TO_DECIDE, whole } from '../words';
 import { DeferForm } from './DeferForm';
 import { BRAND_ICON, ICON } from './icons';
-import { groupKey, type BoardIndex } from './lookup';
+import { decisionShop, groupKey, listed, type BoardIndex } from './lookup';
 import { plainButton } from './look';
 import { Column, ColumnHead, MenuItem, MenuPopup, MenuRoot, MenuTrigger, Pills, Tag } from './ui';
+import { Why } from './Why';
 
 const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 
@@ -44,7 +45,7 @@ const byWanted = (a: BoardOrder, b: BoardOrder) =>
 interface DeferTarget { key: string; orders: BoardOrder[]; code?: DraftDeferral['code']; reason?: string }
 
 // The left column's upper card (Edit plan): the day's unplanned orders by brand and district, or as one list,
-// with the carried-over ones first and the deferred ones last.
+// with the carried-over ones first and the deferred ones last, each deferred one with the planner's "why?".
 export function OrderLists({ screen, index, places, open, outlined, change, onStartTrip, onFindSlot, onJoin }: {
   screen: BoardScreen;
   index: BoardIndex;
@@ -188,20 +189,39 @@ export function OrderLists({ screen, index, places, open, outlined, change, onSt
           <section aria-label="Deferred" className="mt-3">
             <h3 className="px-1 text-xs leading-[15px] font-semibold text-muted-foreground">Deferred · {whole(deferred.length)}</h3>
             <ul className="mt-1">
-              {deferred.map(({ deferral, order }) => (
-                <li key={order.id} className="border-t px-1 py-2">
-                  <Row
-                    title={titleOf(order, index)}
-                    line={deferral.reason}
-                    actions={(
-                      <>
-                        <button type="button" className="text-[11px] font-semibold underline underline-offset-2" onClick={() => change(undefer(draft, order.id))}>Undo</button>
-                        {order.splitFrom !== null && <RowMenu label={titleOf(order, index)} items={[{ label: 'Join back', onClick: () => onJoin(order) }]} />}
-                      </>
-                    )}
-                  />
-                </li>
-              ))}
+              {deferred.map(({ deferral, order }) => {
+                const title = titleOf(order, index);
+                // The planner's reason and its decisions about the order (spec 014): "to decide" while one is open.
+                const choice = index.choice(order.id);
+                const decisions = index.decisions(order.id).filter(listed);
+                return (
+                  <li key={order.id} className="border-t px-1 py-2">
+                    <Row
+                      title={title}
+                      line={deferral.reason}
+                      below={(choice || decisions.length > 0) && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {decisions.some((decision) => decision.open) && <Tag tone="warn">{TO_DECIDE}</Tag>}
+                          {choice && (
+                            <Why
+                              align="start"
+                              title={title}
+                              reasons={[{ key: order.id, reason: choice.reason }]}
+                              decisions={decisions.map((decision) => ({ key: decision.key, title: decisionTitle(decision, decisionShop(index, decision)), acceptedAt: decision.acceptedAt }))}
+                            />
+                          )}
+                        </div>
+                      )}
+                      actions={(
+                        <>
+                          <button type="button" className="text-[11px] font-semibold underline underline-offset-2" onClick={() => change(undefer(draft, order.id))}>Undo</button>
+                          {order.splitFrom !== null && <RowMenu label={title} items={[{ label: 'Join back', onClick: () => onJoin(order) }]} />}
+                        </>
+                      )}
+                    />
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}
@@ -248,13 +268,14 @@ function OrderRow({ order, title, line, add, onDefer, onJoin, extra, children }:
   );
 }
 
-// A row's two lines, with a chip and actions on the right.
-function Row({ title, line, chip, actions }: { title: string; line: string; chip?: ReactNode; actions?: ReactNode }) {
+// A row's two lines and what goes under them, with a chip and actions on the right.
+function Row({ title, line, chip, below, actions }: { title: string; line: string; chip?: ReactNode; below?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="flex items-start gap-2">
       <div className="min-w-0 flex-1">
         <p className="text-xs leading-[15px] font-semibold">{title}</p>
         {line && <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">{line}</p>}
+        {below}
       </div>
       {chip}
       {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}

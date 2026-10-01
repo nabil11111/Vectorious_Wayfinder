@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { splitOrder, type BoardScreen, type Undo } from '../board';
 import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setDriver, setLeaveAt, takeOff, tripOf } from '../draft';
-import { countOf, figure, hhmm, litres, vehicleSize } from '../words';
+import { countOf, figure, hhmm, litres, orderAmount, vehicleSize } from '../words';
 import { DeferForm } from './DeferForm';
 import { DriverMenu } from './DriverMenu';
 import { vehicleIcon } from './icons';
@@ -111,6 +111,11 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
           if (!shop) return null;
           const orders = stop.orderIds.flatMap((id) => index.order(id) ?? []);
           const time = times?.stops[i] ?? null;
+          // The planner's reason for each order it planned here, both parts of a split with their original's.
+          const why = orders.flatMap((order) => {
+            const choice = index.choice(order.id);
+            return choice ? [{ key: order.id, about: orderAmount(shop.brand, order), reason: choice.reason }] : [];
+          });
           return (
             <StopRow
               key={stop.outletId}
@@ -118,6 +123,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
               shop={shop}
               orders={orders}
               time={time}
+              why={why}
               longWait={problems.some((problem) => problem.code === 'long_wait' && problem.stopSeq === i + 1)}
               first={i === 0}
               last={i === trip.stops.length - 1}
