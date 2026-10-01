@@ -299,8 +299,7 @@ describe('a dispatcher on both depots', () => {
   }
 
   // On Kandy, the planning session builds Thursday's suggested plan, gives its first vehicle to D-037 and accepts the
-  // planner's decisions. Answers the board with the draft. The suggestion names a driver for every vehicle (D-97), so
-  // the first vehicle's driver takes D-037's vehicle in exchange, and no driver has two.
+  // planner's decisions. Answers the board with the draft.
   async function kandysDraft(): Promise<PlanBoard> {
     expect((await switchTo(planner.agent, 'Kandy')).status).toBe(200);
     const start = answered(await planner.agent.get('/api/v1/plans'));
