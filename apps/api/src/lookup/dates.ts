@@ -7,7 +7,10 @@ import type { BoardMoment } from '../plans/board';
 export const shiftDate = (date: string, days: number) => new Date(new Date(`${date}T00:00:00Z`).getTime() + days * 86_400_000).toISOString().slice(0, 10);
 export function dateRange(from: string, to: string): string[] {
   const dates: string[] = [];
-  for (let date = from; date <= to; date = shiftDate(date, 1)) dates.push(date);
+  for (let date = from; date <= to; date = shiftDate(date, 1)) {
+    dates.push(date);
+    if (date === to) break;
+  }
   return dates;
 }
 export async function scopeOf(tx: Tx, depotId: string, moment: BoardMoment): Promise<LookupScope> {
@@ -20,7 +23,9 @@ export function publicationOf(plan: typeof plans.$inferSelect): LookupPublicatio
   return { id: plan.id, date: plan.date, revision: plan.revision, publishedAt: plan.publishedAt.toISOString() };
 }
 export function keptTrip(plan: typeof plans.$inferSelect, trip: typeof trips.$inferSelect) {
-  const kept = PlanCheck.parse(plan.sentCheck).trips.find(row => row.vehicleId === trip.vehicleId && row.tripNo === trip.tripNo);
+  const parsed = PlanCheck.safeParse(plan.sentCheck);
+  if (!parsed.success) throw new Error(`Publication ${plan.id} has no valid kept check.`);
+  const kept = parsed.data.trips.find(row => row.vehicleId === trip.vehicleId && row.tripNo === trip.tripNo);
   if (!kept?.times) throw new Error(`Publication ${plan.id} has no kept schedule for trip ${trip.id}.`);
   return { ...kept, times: kept.times };
 }

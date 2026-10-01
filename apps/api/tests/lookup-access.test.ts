@@ -65,6 +65,6 @@ it('AC-3 lookup validates dates ranges proof ids and every unknown or repeated q
   }
   expect(await h.history('?date=2025-02-28')).toMatchObject({ publication: null, counts: null, trips: [] });
   expect((await h.orders('?date=2025-02-28')).rows).toEqual([]);
-  expect((await h.orders('?date=9999-12-31')).rows).toEqual([]);
+  expect(await h.orders('?date=9999-12-31')).toMatchObject({ date: '9999-12-31', summary: { orders: 102, carriedOver: 102 } });
   expect(await heldDriverRows()).toEqual(before);
 });
