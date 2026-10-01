@@ -35,7 +35,13 @@ export async function decideIssue(caller: DepotCaller, issueId: string, body: De
     const told: Announcement[] = [{ topic: 'issues', depotId: caller.depotId }, { topic: issue.kind === 'loading' ? 'loading' : 'driver', depotId: caller.depotId }];
     const before: { status: string; revision: number; lines?: { lineId: string; loaded: number | null; delivered: number | null }[] } = { status: issue.status, revision: issue.revision };
     if (body.decision === 'try_again') {
-      await tx.update(stops).set({ arrivedAt: null, doneAt: null, outcome: null, retriedAt: moment.at, revision: stop.revision + 1 }).where(eq(stops.id, stop.id));
+      // The trip lock keeps retries in answer order even when the app clock pauses or moves backward.
+      const retries = await tx.select({ retriedAt: stops.retriedAt }).from(stops).where(eq(stops.tripId, trip.id));
+      let retryTime = moment.at.getTime();
+      for (const previous of retries) {
+        if (previous.retriedAt) retryTime = Math.max(retryTime, previous.retriedAt.getTime() + 1);
+      }
+      await tx.update(stops).set({ arrivedAt: null, doneAt: null, outcome: null, retriedAt: new Date(retryTime), revision: stop.revision + 1 }).where(eq(stops.id, stop.id));
     } else if (issue.kind === 'closed' && body.decision === 'bring_back') {
       const lines = await tx.select({ lineId: orderLines.id, orderId: orders.id, loaded: orderLines.loadedQty, delivered: orderLines.deliveredQty })
         .from(stopOrders).innerJoin(orders, eq(orders.id, stopOrders.orderId)).innerJoin(orderLines, eq(orderLines.orderId, orders.id)).where(eq(stopOrders.stopId, stop.id));

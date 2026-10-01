@@ -243,6 +243,39 @@ it('AC-33 retries closed shops after untouched stops and then in the order each 
   expect(nextStop(trip)).toBeNull();
 });
 
+it.each([
+  { clock: 'waits', answerMinute: 3 * 60 + 41 },
+  { clock: 'moves backward', answerMinute: 3 * 60 + 40 },
+])('AC-33 keeps the order shops were sent back when the app clock $clock', async ({ answerMinute }) => {
+  let trip = await write(await started(), 'arrive', 3 * 60 + 34, 1);
+  trip = await write(trip, 'closed', 3 * 60 + 35, 1);
+  await answer(1, 'try_again', 3 * 60 + 36);
+  trip = driverTrip(await driver.read());
+  trip = await write(trip, 'arrive', 3 * 60 + 37, 2);
+  trip = await write(trip, 'closed', 3 * 60 + 38, 2);
+  trip = await write(trip, 'arrive', 3 * 60 + 39, 1);
+  trip = await write(trip, 'closed', 3 * 60 + 40, 1);
+  const before = await heldDriverRows();
+  // Wellawatte goes back before Nugegoda, so sequence cannot break a clock tie.
+  const wellawatte = await answer(2, 'try_again', 3 * 60 + 41);
+  const nugegoda = await answer(1, 'try_again', answerMinute);
+  const seen = driverTrip(await driver.read());
+  expect(driverStop(seen, 2)).toEqual({ ...driverStop(trip, 2), revision: driverStop(trip, 2).revision + 1,
+    arrivedAt: null, doneAt: null, outcome: null, retriedAt: at(3 * 60 + 41).toISOString() });
+  expect(driverStop(seen, 1)).toEqual({ ...driverStop(trip, 1), revision: driverStop(trip, 1).revision + 1,
+    arrivedAt: null, doneAt: null, outcome: null, retriedAt: new Date(at(3 * 60 + 41).getTime() + 1).toISOString() });
+  expect(nextStop(seen)?.seq).toBe(2);
+  for (const [decided, minute] of [[wellawatte.decided, 3 * 60 + 41], [nugegoda.decided, answerMinute]] as const) {
+    expect(decided.decidedAt).toBe(at(minute).toISOString());
+    expect(await auditsOf(decided.id)).toEqual([expect.objectContaining({ after: expect.objectContaining({ decidedAt: at(minute).toISOString() }) })]);
+  }
+  const after = await heldDriverRows();
+  for (const key of ['trips', 'orders', 'lines', 'writes', 'photos'] as const) expect(after[key]).toEqual(before[key]);
+  expect(after.trips.find(row => row.id === trip.tripId)!.lastEventAt).toEqual(at(3 * 60 + 40));
+  const arrived = await write(seen, 'arrive', 3 * 60 + 42, 2);
+  expect(driverStop(arrived, 2).arrivedAt).toBe(at(3 * 60 + 42).toISOString());
+});
+
 it('AC-34 brings closed goods back as placed orders, keeps the attempt in the audit and driver day, and carries them to Friday', async () => {
   const closed = await write(await atWellawatte(), 'closed', 3 * 60 + 48, 2);
   const oldStop = driverStop(closed, 2);
