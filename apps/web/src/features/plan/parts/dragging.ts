@@ -86,14 +86,22 @@ export const boardKeyboardCoordinates: KeyboardCoordinateGetter = (event, args) 
   return rect ? { x: rect.left + (rect.width - collisionRect.width) / 2, y: rect.top + (rect.height - collisionRect.height) / 2 } : undefined;
 };
 
-// Each step of a drag in words, for a screen reader.
+// Each step of a drag in words, for a screen reader. dnd-kit finds the place under a row the moment it is picked up and
+// says it right after "Picked up", which a reader then hears in its place: so that first place, where the row already
+// is, goes unsaid, and only a move says where it is over (L-06).
 const placeOf = (over: Over | null) => over?.data.current as DropData | undefined;
+let pickedUp = false;
 export const announcements: Announcements = {
   onDragStart: ({ active }) => {
     const dragged = draggedOf(active);
+    pickedUp = dragged !== undefined;
     return dragged && `Picked up ${dragged.label}. Move it with the arrow keys, drop it with Space or Enter, or press Escape to put it back.`;
   },
   onDragOver: ({ active, over }) => {
+    if (pickedUp) {
+      pickedUp = false;
+      return undefined;
+    }
     const dragged = draggedOf(active);
     const place = placeOf(over);
     if (!dragged) return undefined;
@@ -101,12 +109,14 @@ export const announcements: Announcements = {
     return canLand(dragged, place.landing) ? `${dragged.label} is over ${place.name}.` : `${dragged.label} cannot go on ${place.name}.`;
   },
   onDragEnd: ({ active, over }) => {
+    pickedUp = false;
     const dragged = draggedOf(active);
     const place = placeOf(over);
     if (!dragged) return undefined;
     return place && canLand(dragged, place.landing) ? `${dragged.label} dropped on ${place.name}.` : `${dragged.label} put back.`;
   },
   onDragCancel: ({ active }) => {
+    pickedUp = false;
     const dragged = draggedOf(active);
     return dragged && `${dragged.label} put back.`;
   },

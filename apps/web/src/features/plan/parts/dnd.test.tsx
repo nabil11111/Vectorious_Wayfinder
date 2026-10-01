@@ -111,6 +111,8 @@ const over = (landing: Landing, name: string) => ({ id: name, data: { current: {
 
 it('spec 023 AC-6 says each step of a drag in words', () => {
   expect(announcements.onDragStart({ active: active(dehiwala) })).toBe('Picked up Fresh Dehiwala. Move it with the arrow keys, drop it with Space or Enter, or press Escape to put it back.');
+  // Where it sits as it is picked up is not said, so "Picked up" is heard first (L-06).
+  expect(announcements.onDragOver({ active: active(dehiwala), over: over({ kind: 'unplanned' }, 'Unplanned orders') })).toBeUndefined();
   expect(announcements.onDragOver({ active: active(dehiwala), over: over(stopTwo, 'stop 2 of VEH035') })).toBe('Fresh Dehiwala is over stop 2 of VEH035.');
   expect(announcements.onDragOver({ active: active(dehiwala), over: over({ kind: 'unplanned' }, 'Unplanned orders') })).toBe('Fresh Dehiwala cannot go on Unplanned orders.');
   expect(announcements.onDragOver({ active: active(dehiwala), over: null })).toBe('Fresh Dehiwala is over no place to drop it.');
