@@ -489,6 +489,16 @@ describe('the plan checker in plain words (spec 024)', () => {
     expect(wordsOf(c.input(), code, c.tripNo)).toEqual(c.said);
   });
 
+  it('spec 026 calls a truck whose trip has a blank driver name by its kind and id, as one with no driver', () => {
+    for (const blank of ['', '   ', '\t']) {
+      for (const c of CASES.filter((x) => x.way === '80 rail boxes on a 22 m³ truck' || x.way === 'the spec\'s example' || x.way === 'both trips of a vehicle that is off')) {
+        const vehicles = new Set(c.input().plan.trips.map((trip) => trip.vehicleId));
+        const blankNames = Object.fromEntries([...vehicles].map((id) => [id, blank]));
+        expect(wordsOf({ ...c.input(), plan: { ...c.input().plan, trips: c.input().plan.trips.map((trip) => ({ ...trip, driverName: blankNames[trip.vehicleId] })) } }, c.code, c.tripNo)).toEqual(c.said);
+      }
+    }
+  });
+
   it('AC-1 writes each message and fix as one sentence, and never a trip number', () => {
     for (const { said } of [...CASES, ...DRIVEN]) {
       for (const text of said.flatMap(({ message, fix }) => (fix === undefined ? [message] : [message, fix]))) {

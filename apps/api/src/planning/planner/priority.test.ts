@@ -147,8 +147,6 @@ describe('AC-19: malformed or incomplete snapshots name their input fault', () =
     ['infinite vehicle volume', (x) => { x.vehicles[0]!.volumeCapM3 = Infinity; }, /volumeCapM3|capacity/i],
     ['negative fuel quota', (x) => { x.vehicles[0]!.weeklyFuelQuotaL = -1; }, /weeklyFuelQuotaL|quota/i],
     ['negative fuel history', (x) => { x.vehicles[0]!.litresUsedThisWeek = -1; }, /litresUsedThisWeek|fuel/i],
-    // A vehicle's driver is optional (spec 026), but one that is given has a name to call the truck by.
-    ['empty driver name', (x) => { x.vehicles[0]!.driverName = ' '; }, /driverName/i],
     ['negative travel distance', (x) => { x.travel[0]!.outKm = -1; }, /outKm|travel/i],
     ['fractional travel minute', (x) => { x.travel[0]!.betweenMin = 1.5; }, /betweenMin|travel/i],
     ['negative allowance', (x) => { x.allowances[0]!.minutes = -1; }, /allowance|minutes/i],
@@ -171,6 +169,19 @@ describe('AC-19: malformed or incomplete snapshots name their input fault', () =
     change(input);
     expect(() => prepareInput(input)).toThrow(PlanInputError);
     expect(() => prepareInput(input)).toThrow(fault);
+  });
+
+  it('spec 026 keeps a vehicle whose usual driver is blank as one with no driver, and never refuses for it', () => {
+    const input = plannerInput([plannerOrder('order-1', 'OUT001')]);
+    const [blank, spaced, tab] = input.vehicles;
+    blank!.driverName = '';
+    spaced!.driverName = '  Chaminda ';
+    tab!.driverName = ' \t ';
+    const prepared = prepareInput(input);
+    const named = (id: string) => prepared.vehicles.find((vehicle) => vehicle.id === id)!;
+    expect(named(blank!.id)).not.toHaveProperty('driverName');
+    expect(named(spaced!.id).driverName).toBe('Chaminda');
+    expect(named(tab!.id)).not.toHaveProperty('driverName');
   });
 
   it('accepts empty orders, leap day, 300 originals, existing children, large whole orders, and unusable vehicles', () => {
