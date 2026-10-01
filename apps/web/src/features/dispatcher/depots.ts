@@ -65,9 +65,9 @@ function channelOf(qc: QueryClient) {
 // (D-95), so the server refuses one whose depot the session has left. The session decides it: an account read that
 // finds the session on another depot (useMe's own refetch, say once the network is back), or such a refusal, is a
 // switch made without this tab, and the tab takes it as one, so no tab stays on a depot the session left.
-const committed = new WeakMap<QueryClient, { id: string; depotId: string | null }>();
+const committed = new WeakMap<QueryClient, Me>();
 function commit(qc: QueryClient, me: Me | null | undefined) {
-  if (me) committed.set(qc, { id: me.id, depotId: me.depotId });
+  if (me) committed.set(qc, me);
   else committed.delete(qc);
   nameDepot(me?.role === 'dispatcher' ? me.depotId : null);
 }
@@ -185,6 +185,11 @@ export function useFollowSwitches() {
       // An account set by hand (this tab taking a switch, or a sign-in) is no read of the session.
       if (event.action.manual) return;
       const read = nextRead(qc);
+      // The session this read found is kept apart from the account on screen until the tab takes it as a switch, which
+      // can first wait for a plan change on its way: the account on show goes back before anything draws the one found,
+      // so the page, its reads, the depot every request names and the board's queue stay on it until then (Q-13).
+      const shown = committed.get(qc);
+      if (shown?.id === me.id && shown.depotId !== me.depotId) qc.setQueryData(meKey, shown);
       void takeSession(qc, me, () => reads.get(qc)?.generation === read.generation);
     });
     return () => {

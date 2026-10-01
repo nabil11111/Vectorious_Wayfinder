@@ -1,8 +1,8 @@
-import { MutationObserver, QueryClient, onlineManager } from '@tanstack/react-query';
+import { MutationObserver, QueryClient, QueryObserver, notifyManager, onlineManager } from '@tanstack/react-query';
 import type { Me } from '@wayfinder/contracts';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { meKey } from '@/features/auth/api';
+import { meKey, workingFor } from '@/features/auth/api';
 import { api, DEPOT_CHANGED, DEPOT_HEADER, nameDepot } from '@/lib/api';
 import { clockKey } from '@/lib/clock';
 import { useLive } from '@/lib/live';
@@ -853,6 +853,58 @@ it('Q-13 a plan change on its way that the server refused is said to be dropped,
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
   expect(toast).toHaveBeenCalledWith(PLAN_DROPPED, expect.objectContaining({ id: 'plan-dropped' }));
   expect(toast).toHaveBeenCalledTimes(1);
+});
+
+// Every depot the fetch was asked to name, in turn.
+const allNamed = (fetch: ReturnType<typeof vi.fn>) => fetch.mock.calls.map(([, init]) => ((init as RequestInit | undefined)?.headers as Record<string, string> | undefined)?.[DEPOT_HEADER]);
+
+it('Q-13 an account refresh that finds the session on another depot while a plan change is on its way leaves the tab all on its depot until the change is answered, then takes the new one at once', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  const fetch = vi.fn(async () => Response.json({}));
+  vi.stubGlobal('fetch', fetch);
+  // What the shell draws: the account as a page's query hears of it, a turn after each change, as React does.
+  const account = new QueryObserver<Me | null>(tab.qc, { queryKey: meKey, enabled: false });
+  const drawn: (string | null | undefined)[] = [];
+  const stopDrawing = account.subscribe(notifyManager.batchCalls(() => { drawn.push(account.getCurrentResult().data?.depotId); }));
+  held.planWriting = true;
+  // The account's own refresh (the minute's, or the window's focus) finds the session on Kandy: another tab switched.
+  await tab.qc.fetchQuery({ queryKey: meKey, queryFn: async () => IN_KANDY });
+  // Reads the page sends meanwhile, still on their way when the tab takes Kandy: the board's, and the account's own with
+  // an older answer.
+  const onTheirWay = Promise.all([
+    tab.qc.fetchQuery({ queryKey: ['plans', 'board'], queryFn: () => later(150, { depot: 'Peliyagoda', answered: 'after the switch' }) }),
+    tab.qc.fetchQuery({ queryKey: meKey, queryFn: () => later(150, RUWAN), staleTime: 0 }),
+  ]);
+  await api('/plans');
+  await later(30, null);
+  // While the change is out the tab is still all Peliyagoda: the account it draws, the reads it holds, the depot every
+  // request names, and the account and depot the board's queue works for, so the change's answer is still taken.
+  expect(drawn).not.toContain('Kandy');
+  expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  expect(workingFor(tab.qc)).toBe('u1 Peliyagoda');
+  expect(allNamed(fetch)).toEqual(['Peliyagoda']);
+  expect(held.retired).not.toHaveBeenCalled();
+  // The change is answered and was kept: the tab takes Kandy, every part of it together, and says nothing.
+  held.planWriting = false;
+  held.retired.mockReturnValue(false);
+  await later(100, null);
+  expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(drawn.at(-1)).toBe('Kandy');
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(held.retired).toHaveBeenCalledWith(tab.qc);
+  await api('/plans');
+  expect(allNamed(fetch)).toEqual(['Peliyagoda', 'Kandy']);
+  // Nothing older lands after it: the reads on their way were Peliyagoda's.
+  await onTheirWay;
+  await later(30, null);
+  expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(drawn.at(-1)).toBe('Kandy');
+  expect(toast).not.toHaveBeenCalled();
+  stopDrawing();
 });
 
 it('Q-13 a plan change still unanswered after the wait is never said to be dropped: the tab follows and says it may not be kept', async () => {
