@@ -3,6 +3,8 @@ import { and, desc, eq, gt, inArray, lt, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { orders } from '../db/schema';
 import { depotDate, now } from '../lib/clock';
+import { toConfirmOf } from './card-lines';
+import { deliveriesAt } from './deliveries';
 import { countsFor, readOrders, readShop, snapshot, type Caller } from './store-orders';
 
 // The lists of a shop's orders (spec 009): what is coming today, what is open and what is past. An order
@@ -30,10 +32,15 @@ export function listOrders(caller: Caller, query: StoreOrdersQuery): Promise<Sto
     const today = depotDate(now());
     const shop = await readShop(tx, caller.outletId);
     const openCount = await tx.$count(orders, and(eq(orders.outletId, shop.outlet.id), inArray(orders.status, OPEN)));
-    const answer = (list: StoreOrder[], nextCursor: string | null = null): StoreOrderList => ({ outlet: shop.outlet, today, orders: list, openCount, nextCursor });
+    const answer = (list: StoreOrder[], nextCursor: string | null = null, toConfirm: StoreOrderList['toConfirm'] = null): StoreOrderList =>
+      ({ outlet: shop.outlet, today, orders: list, openCount, nextCursor, toConfirm });
 
-    // An order brought back from a closed shop is not coming today, whatever day it was for (Q-41).
-    if (query.list === 'today') return answer((await readOrders(tx, shop, and(inArray(orders.status, COMING), eq(countsFor, today)))).filter((order) => !order.broughtBack));
+    // An order brought back from a closed shop is not coming today, whatever day it was for (Q-41). Today also lists the
+    // deliveries still to confirm when the shop has more than one (Q-35).
+    if (query.list === 'today') {
+      const list = (await readOrders(tx, shop, and(inArray(orders.status, COMING), eq(countsFor, today)))).filter((order) => !order.broughtBack);
+      return answer(list, null, toConfirmOf(await deliveriesAt(tx, shop.outlet.id), shop.outlet.brand, today));
+    }
     if (query.list === 'open') {
       return answer(await readOrders(tx, shop, inArray(orders.status, OPEN), { orderBy: [countsFor, orders.temp, orders.placedAt, orders.id] }));
     }

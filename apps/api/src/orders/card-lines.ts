@@ -1,4 +1,6 @@
-import type { Brand, IssueDecision, OrderProblem, RefusalReason, ShortReason, Temp } from '@wayfinder/contracts';
+import type { Brand, IssueDecision, OrderProblem, RefusalReason, ShortReason, StoreDelivery, StoreOrderList, Temp } from '@wayfinder/contracts';
+import { depotDate, depotMinutes } from '../lib/clock';
+import { toClock } from '../planning/words';
 import { dayLabel } from '../plans/board-day';
 
 // The line a shop's card gives each problem of its order (spec 015, rule 11, Q-36), worded here so the card only lays it
@@ -65,4 +67,34 @@ export function problemLineOf(facts: ProblemLineFacts): string {
       return `${what}: the depot is reviewing your report`;
     }
   }
+}
+
+// Today's deliveries still to confirm (Q-35), for a shop with more than one delivery among those waiting and those
+// confirmed today: how many wait, and each with its stop and what came, "20 chilled and 3 dry cartons · Delivered 03:38 ·
+// VEH035 · Dilshan", the day before the time when it is not today. null when one delivery or none is the shop's, or none
+// waits, since the one card on Today already says "Delivered".
+export function toConfirmOf(deliveries: StoreDelivery[], brand: Brand, today: string): StoreOrderList['toConfirm'] {
+  const ours = deliveries.filter((delivery) => delivery.receipt === null || depotDate(new Date(delivery.receipt.at)) === today);
+  const waiting = ours.filter((delivery) => delivery.receipt === null);
+  if (ours.length < 2 || waiting.length === 0) return null;
+  const [one, many] = UNIT[brand];
+  const goodsOf = (delivery: StoreDelivery) => {
+    const units = (temp?: Temp) => delivery.lines.filter((line) => !temp || line.temp === temp).reduce((total, line) => total + line.delivered, 0);
+    const all = units();
+    if (brand !== 'Fresh') return `${WHOLE.format(all)} ${all === 1 ? one : many}`;
+    const temps = (['chilled', 'dry'] as const).filter((temp) => units(temp) > 0);
+    return `${temps.map((temp) => `${WHOLE.format(units(temp))} ${temp}`).join(' and ')} ${all === 1 ? one : many}`;
+  };
+  const when = (moment: string) => {
+    const at = new Date(moment);
+    const day = depotDate(at);
+    return day === today ? toClock(depotMinutes(at)) : `${dayLabel(day)} ${toClock(depotMinutes(at))}`;
+  };
+  return {
+    title: `${WHOLE.format(waiting.length)} ${waiting.length === 1 ? 'delivery' : 'deliveries'} to confirm`,
+    deliveries: waiting.map((delivery) => ({
+      stopId: delivery.stopId,
+      line: [goodsOf(delivery), `Delivered ${when(delivery.doneAt)}`, delivery.vehicleId, delivery.driver].filter(Boolean).join(' · '),
+    })),
+  };
 }

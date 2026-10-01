@@ -199,6 +199,10 @@ export const StoreOrderList = z.object({
   openCount: z.number().int(),
   // Only the past list is paged. null when there is nothing more.
   nextCursor: z.string().nullable(),
+  // On Today, for a shop with more than one delivery, the ones still to confirm (Q-35): "2 deliveries to confirm" and
+  // each with its stop and line, "3 dry cartons · Delivered 04:06 · VEH038 · Lahiru", worded by the server, until each
+  // is confirmed. null on the other lists, and when one delivery or none waits alone.
+  toConfirm: z.object({ title: z.string(), deliveries: z.array(z.object({ stopId: z.uuid(), line: z.string() })) }).nullable(),
 });
 export type StoreOrderList = z.infer<typeof StoreOrderList>;
 

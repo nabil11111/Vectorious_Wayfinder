@@ -86,6 +86,7 @@ These are in `docs/decisions.md`.
 |  | Received | Shop · Today, and its desktop frame | The chip "Received 08:31" in green, and "All 8 received" or "11 received · 1 short". |
 |  | Nobody at the shop | No frame | The chip "Loaded" and "Nobody at the shop at 03:45 · VEH035". Once brought back the order leaves Today: it is not coming today (Q-41). |
 |  | The depot's answer | No frame | One line per problem of the delivery that counts the order, under the card's other lines (rule 11). |
+|  | Deliveries to confirm | No frame | For a shop with more than one delivery among those waiting and those confirmed today, while one still waits (Q-35): a card above Coming today, "2 deliveries to confirm", and a row per delivery still waiting as the server words it, "3 dry cartons · Delivered 04:06 · VEH038 · Lahiru", with "Confirm", which opens it; the first Confirm is orange. It counts down as each is confirmed and goes with the last. A shop with one delivery sees only its card's "Delivered". |
 | Orders `/store/orders` | Received | Shop · Orders · Past, Shop · Orders · desktop | The chip "All 8 received" in green or "11 received · 1 short" in yellow, and "Received 08:31", or "Arrived 08:25, after your window". A card whose receipt reported something opens that receipt. |
 |  | Handed over, nobody at the shop, answers | No frame | Today's lines, on the open list's card. A brought-back order reads "Waiting for the delivery plan", its window and entrance with no day, "Nobody at the shop at 03:50 · VEH057" and "39 chilled cartons: brought back to the depot, waiting for the next plan", until a sent plan takes it and its chip says "Planned · Fri 26 Jun" (Q-41). |
 |  | A replacement | No frame | Spec 009's card for its status, and "Replacement for Thu 25 Jun", also on each part when the plan splits it. |
@@ -494,7 +495,7 @@ carton is spec 012's.
   all" (D-37), and the shop sees "1 short from the depot" and can order it again.
 - **Not planned:** a signature (none is drawn), changing a receipt once it is in, writing
   cartons off and "shop credited, claim opened", "Tuesday works for me" and a new date for a deferred order (spec 009),
-  the shop's other screens with no signal, a count of waiting deliveries on the tab, push notifications and sounds, and
+  the shop's other screens with no signal, a count of waiting deliveries on the tab (Today lists them, Q-35), push notifications and sounds, and
   accounts for more shops (D-27): a judge sees Wellawatte's refusal on Live day and the driver's phone only.
 
 ## Departures from the design
