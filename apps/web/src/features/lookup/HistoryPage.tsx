@@ -24,8 +24,8 @@ import {
   currentRead, historyOptions, historySelection, readState, scopeOf, useFollowDefault, useFollowGeneration, useFollowLookupMessages, usePhotoViewer,
 } from './queries';
 import {
-  HISTORY_FAILED, NOT_A_DATE, NO_SENT_PLANS_YET, NO_SENT_PLAN_ON, NO_TRIPS_SENT, NO_TRIP_MATCH, PICK_TRIP, TRIP_NOT_ON_PLAN, historyTitle, shortDay,
-  showingTrips, unrecordedWords, whole,
+  HISTORY_FAILED, NOT_A_DATE, NO_SENT_PLANS_YET, NO_SENT_PLAN_ON, NO_TRIPS_SENT, NO_TRIP_MATCH, PICK_TRIP, TRIP_NOT_ON_PLAN, historyTitle, openDay,
+  sentLater, shortDay, showingTrips, unrecordedWords, whole,
 } from './words';
 
 const FILTERS: { value: TripFilter; label: string }[] = [
@@ -121,8 +121,8 @@ export function HistoryPage() {
   );
   const part = (i: number, className: string) => (
     <HistoryPart depot={depots[i]!} both={both} me={me} params={params} query={queries[i]!} queryKey={options[i]!.queryKey} data={reads[i]}
-      selected={selections[i]!.trip} filters={filters} setFilters={setFilters} onToggle={toggle} clockDay={clockDay} online={online}
-      notice={both ? null : goneLine} className={className} />
+      selected={selections[i]!.trip} filters={filters} setFilters={setFilters} onToggle={toggle} onOpenDate={(date) => setParams({ date, trip: null })}
+      clockDay={clockDay} online={online} notice={both ? null : goneLine} className={className} />
   );
   return (
     <div className="lg:-mt-[7px]">
@@ -178,10 +178,11 @@ export function HistoryPage() {
 
 // One depot's sent plan: its trips on the timeline or what stands in for them, and beside them the selected trip, what
 // was not delivered, the shops' confirmations and the deferrals.
-function HistoryPart({ depot, both, me, params, query, queryKey, data, selected, filters, setFilters, onToggle, clockDay, online, notice, className }: {
+function HistoryPart({ depot, both, me, params, query, queryKey, data, selected, filters, setFilters, onToggle, onOpenDate, clockDay, online, notice, className }: {
   depot: string; both: boolean; me: Me | null | undefined; params: HistoryParams | null; query: UseQueryResult<LookupHistory>; queryKey: readonly unknown[];
   data: LookupHistory | undefined; selected: HistoryTrip | null; filters: TripFilters; setFilters: (change: (held: TripFilters) => TripFilters) => void;
-  onToggle: (tripId: string, anchor: string) => void; clockDay: number | null; online: boolean; notice: ReactNode; className: string;
+  onToggle: (tripId: string, anchor: string) => void; onOpenDate: (date: string) => void; clockDay: number | null; online: boolean; notice: ReactNode;
+  className: string;
 }) {
   // The latest sent date follows the calendar past midnight; a chosen date stays chosen.
   useFollowDefault(queryKey, data?.readAt, params?.date === undefined, 'calendar');
@@ -197,6 +198,9 @@ function HistoryPart({ depot, both, me, params, query, queryKey, data, selected,
   const anchor = both ? `history-detail-${depot}` : 'history-detail';
   const toggle = (tripId: string) => onToggle(tripId, anchor);
   const clear = () => setFilters(() => NO_TRIP_FILTERS);
+  // With no plan sent for today or earlier, every plan the depot sent is for a later day, and the chips list them, so the
+  // page names the soonest it lists and opens it (Q-14).
+  const next = data && data.date === null ? [...data.publishedDates].sort()[0] ?? null : null;
 
   return (
     <div className={`${LAYOUT} ${className}`}>
@@ -204,7 +208,9 @@ function HistoryPart({ depot, both, me, params, query, queryKey, data, selected,
         {notice}
         {params === null ? <Note>{NOT_A_DATE}</Note>
           : !data ? (state === 'failed' ? <LoadFailed title={HISTORY_FAILED} query={read} online={online} /> : <TableSkeleton label="Loading the sent plan" cards={[4, 2]} />)
-            : data.date === null ? <Note>{NO_SENT_PLANS_YET}</Note>
+            : data.date === null ? (next
+              ? <Note action={<Button variant="outline" className={plainButton('h-8 px-4 text-xs')} onClick={() => onOpenDate(next)}>{openDay(next)}</Button>}>{sentLater(next)}</Note>
+              : <Note>{NO_SENT_PLANS_YET}</Note>)
               : data.publication === null ? <Note>{NO_SENT_PLAN_ON}</Note>
                 : filters.attention === 'deferred' ? <ScrollBox label="Deferred orders"><DeferralList deferrals={deferrals} total={data.deferrals.length} /></ScrollBox>
                   : data.trips.length === 0 ? <Note>{NO_TRIPS_SENT}</Note>

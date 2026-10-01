@@ -103,6 +103,10 @@ export const historyHref = (date: string, tripId?: string) => `/dispatcher/histo
 export const historyTitle = (date: string | null) => (date ? `History · ${shortDay(date)}` : 'History');
 export const HISTORY_FAILED = 'Could not load history.';
 export const NO_SENT_PLANS_YET = 'No sent plans yet.';
+// A depot whose sent plans are all for days after today (Q-14): History opens on none, so it says so and names one of
+// them, the soonest the chips list.
+export const sentLater = (date: string) => `No plan is sent for today or earlier yet. The plan for ${shortDay(date)} is sent.`;
+export const openDay = (date: string) => `Open ${shortDay(date)}`;
 export const NO_SENT_PLAN_ON = 'No sent plan for this date.';
 export const NO_TRIPS_SENT = 'No trips recorded on this sent plan.';
 export const NO_TRIP_MATCH = 'No trips match these filters.';
