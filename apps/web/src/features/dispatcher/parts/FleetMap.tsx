@@ -4,7 +4,6 @@ import { CARD } from '@/features/live/parts/ui';
 import { truckName } from '@/features/loader/words';
 import { FLEET_MAP, FLEET_MAP_SIZE } from '@/lib/map/fleet-map-shapes';
 import { cn } from '@/lib/utils';
-import { BothLater } from '../DepotSwitch';
 import { useSwitchDepot } from '../depots';
 import { CARD_SIZE, VIEWS, deliveredList, drawingOf, liveLine, statsOf, type MapDrawing, type MapRead, type MapShapes } from './fleet-map';
 
@@ -95,21 +94,18 @@ export function FleetMap({ read }: { read: MapRead }) {
   );
 }
 
-// "Map view": the depot the card draws chosen, and the other one a button that switches every page to it, as the top
-// bar's switch does (D-93). This is how a dispatcher switches below 1280 wide, where the top bar hides its switch. Both
-// is greyed as the top bar's is. A button centres its words, so the box puts them where the frame does, 7 px from the
-// top.
+// "Map view": the view the card draws chosen, and the others buttons that switch every page to them, as the top bar's
+// switch does (D-93), Both included (spec 021). This is how a dispatcher switches below 1280 wide, where the top bar
+// hides its switch. A button centres its words, so the box puts them where the frame does, 7 px from the top.
 function ViewSwitch({ depot }: { depot: string }) {
   const { chosen, switching, choose } = useSwitchDepot(depot);
   return (
     <div role="group" aria-label="Map view" aria-busy={switching} className="flex shrink-0" style={{ gap: u(3) }}>
       {VIEWS.map((view) => {
         const box: CSSProperties = { ...type(10, 600), display: 'flex', alignItems: 'flex-start', width: u(view.width), height: u(29), borderRadius: u(6), paddingLeft: u(view.inset), paddingTop: u(7) };
-        const focus = 'shrink-0 outline-none focus-visible:ring-3 focus-visible:ring-ring/50';
-        if (view.name === 'Both') return <BothLater key={view.name} className={cn(focus, 'bg-map-option text-map-option-ink/65')} style={box} />;
         return (
           <button key={view.name} type="button" aria-pressed={view.name === chosen} onClick={() => choose(view.name)} style={box}
-            className={cn(focus, view.name === chosen ? 'bg-map-chosen text-white' : 'bg-map-option text-map-option-ink')}>
+            className={cn('shrink-0 outline-none focus-visible:ring-3 focus-visible:ring-ring/50', view.name === chosen ? 'bg-map-chosen text-white' : 'bg-map-option text-map-option-ink')}>
             {view.name}
           </button>
         );

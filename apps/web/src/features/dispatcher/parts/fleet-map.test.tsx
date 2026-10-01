@@ -4,12 +4,12 @@ import { OperationsDay } from '@wayfinder/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { meKey } from '@/features/auth/api';
 import { FLEET_MAP } from '@/lib/map/fleet-map-shapes';
-import { BOTH_LATER, switchDepotMutation } from '../depots';
+import { switchDepotMutation } from '../depots';
 import { FleetMap } from './FleetMap';
 import { LABEL_OFFSETS, arrowSpots, bothMapRead, deliveredList, drawingOf, liveLine, mapReadOf, statsOf, type MapShapes } from './fleet-map';
 
 // Spec 019's card from plain reads: the header and its numbers (AC-3), the arrows and lines (AC-4) and Stores delivered
-// (AC-5), and spec 020's view switch and the chosen depot's map (AC-6). A trip here needs only what the map reads of it:
+// (AC-5), spec 020's view switch and the chosen depot's map (AC-6), and spec 021's Both (AC-5, AC-7). A trip here needs only what the map reads of it:
 // its vehicle, trip number, district and whether it is out. They are written as trips without recorded detail, the
 // shortest the contract takes.
 
@@ -82,7 +82,7 @@ const card = (day: OperationsDay, qc = new QueryClient()) => renderToStaticMarku
 const wide = (markup: string) => markup.slice(0, markup.indexOf('data-layout="narrow"'));
 const narrow = (markup: string) => markup.slice(markup.indexOf('data-layout="narrow"'));
 const count = (markup: string, part: string) => markup.split(part).length - 1;
-// The view switch's buttons by name, and whether each shows pressed; Both has no pressed state.
+// The view switch's buttons by name, and whether each shows pressed.
 const views = (markup: string) => [...markup.matchAll(/<button([^>]*)>(Peliyagoda|Kandy|Both)<\/button>/g)]
   .map(([, attributes, name]) => [name, attributes.includes('aria-pressed="true"') ? 'chosen' : attributes.includes('aria-pressed="false"') ? 'button' : attributes.includes('aria-disabled="true"') ? 'greyed' : 'other']);
 
@@ -226,22 +226,30 @@ describe('Stores delivered', () => {
 describe('the view switch and the chosen depot (spec 020)', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('AC-6 Peliyagoda and Kandy are buttons with the depot on show chosen, at every width, and Both stays greyed with its line', () => {
+  it('AC-7 Peliyagoda, Kandy and Both are buttons with the depot on show chosen, at every width', () => {
     const markup = card(dayWith([]));
     for (const layout of [wide(markup), narrow(markup)]) {
-      expect(views(layout)).toEqual([['Peliyagoda', 'chosen'], ['Kandy', 'button'], ['Both', 'greyed']]);
+      expect(views(layout)).toEqual([['Peliyagoda', 'chosen'], ['Kandy', 'button'], ['Both', 'button']]);
       expect(layout).toMatch(/<button[^>]*aria-pressed="true"[^>]*class="[^"]*bg-map-chosen[^"]*"[^>]*>Peliyagoda<\/button>/);
       expect(layout).toMatch(/<button[^>]*aria-pressed="false"[^>]*class="[^"]*bg-map-option text-map-option-ink(?!\/)[^"]*"[^>]*>Kandy<\/button>/);
-      expect(layout).toMatch(/<button[^>]*aria-disabled="true"[^>]*class="[^"]*text-map-option-ink\/65[^"]*"[^>]*>Both<\/button>/);
+      expect(layout).toMatch(/<button[^>]*aria-pressed="false"[^>]*class="[^"]*bg-map-option text-map-option-ink(?!\/)[^"]*"[^>]*>Both<\/button>/);
     }
-    expect(BOTH_LATER).toBe('Both depots together come later.');
+  });
+
+  it('AC-7 the card on both depots\' read draws the Both view with Both chosen, at every width', () => {
+    const markup = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><FleetMap read={bothMapRead([dayWith([]), dayWith([], {}, 'Kandy')])} /></QueryClientProvider>);
+    for (const layout of [wide(markup), narrow(markup)]) {
+      expect(views(layout)).toEqual([['Peliyagoda', 'button'], ['Kandy', 'button'], ['Both', 'chosen']]);
+      expect(layout).toMatch(/<button[^>]*aria-pressed="true"[^>]*class="[^"]*bg-map-chosen[^"]*"[^>]*>Both<\/button>/);
+    }
+    for (const district of FLEET_MAP.Both.districts.filter((each) => each.d !== '')) expect(wide(markup)).toContain(`d="${district.d}"`);
   });
 
   it('AC-6 the card draws the chosen depot: Kandy\'s frame from the shapes module, its lines and its list, with Kandy chosen', () => {
     const day = dayWith([{ vehicleId: 'VEH041', district: 'Matale' }, { vehicleId: 'VEH045', district: 'Kandy', tripNo: 2 }], { Kandy: 3 }, 'Kandy');
     const markup = card(day);
-    expect(views(wide(markup))).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'greyed']]);
-    expect(views(narrow(markup))).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'greyed']]);
+    expect(views(wide(markup))).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'button']]);
+    expect(views(narrow(markup))).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'button']]);
 
     const drawn = wide(markup);
     const kandy = drawingOf(mapReadOf(day), FLEET_MAP.Kandy);
@@ -269,7 +277,13 @@ describe('the view switch and the chosen depot (spec 020)', () => {
     void new MutationObserver(qc, switchDepotMutation(qc)).mutate('Kandy');
     await new Promise((resolve) => setTimeout(resolve, 0));
     const markup = card(dayWith([]), qc);
-    for (const layout of [wide(markup), narrow(markup)]) expect(views(layout)).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'greyed']]);
+    for (const layout of [wide(markup), narrow(markup)]) expect(views(layout)).toEqual([['Peliyagoda', 'button'], ['Kandy', 'chosen'], ['Both', 'button']]);
+    // Both pressed shows chosen at once too.
+    const toBoth = new QueryClient();
+    toBoth.setQueryData(meKey, { id: 'u1', username: 'ruwan', staffId: 'P-001', displayName: 'Ruwan', role: 'dispatcher', depotId: 'Peliyagoda', outletId: null });
+    void new MutationObserver(toBoth, switchDepotMutation(toBoth)).mutate('Both');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    for (const layout of [wide(card(dayWith([]), toBoth)), narrow(card(dayWith([]), toBoth))]) expect(views(layout)).toEqual([['Peliyagoda', 'button'], ['Kandy', 'button'], ['Both', 'chosen']]);
   });
 });
 

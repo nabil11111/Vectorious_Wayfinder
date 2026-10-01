@@ -644,3 +644,85 @@ it('AC-6 a press switches to the other depot only, and not while a switch is on 
   expect(switchTo('Peliyagoda', 'Peliyagoda', false)).toBeNull();
   expect(switchTo('Peliyagoda', 'Kandy', true)).toBeNull();
 });
+
+// ── Both depots together (spec 021) ─────────────────────────────────────────────────────────────────────────────
+
+const ON_BOTH: Me = { ...RUWAN, depotId: 'Both' };
+
+it('AC-7 Both is a choice like a depot: pressed from either depot, and either depot pressed from it', () => {
+  expect(switchTo('Both', 'Peliyagoda', false)).toBe('Both');
+  expect(switchTo('Both', 'Kandy', false)).toBe('Both');
+  expect(switchTo('Kandy', 'Both', false)).toBe('Kandy');
+  expect(switchTo('Both', 'Both', false)).toBeNull();
+  expect(switchTo('Peliyagoda', 'Both', true)).toBeNull();
+});
+
+it('AC-7 a switch to Both drops every read but the account and the clock, keeps the account on Both, opens the stream again and names Both on every request', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  const [first] = tab.streams;
+  const fetch = vi.fn(async (url: string) => Response.json(String(url).endsWith('/me/depot') || String(url).endsWith('/auth/me') ? ON_BOTH : {}));
+  vi.stubGlobal('fetch', fetch);
+
+  await switching(tab, 'Both');
+
+  expect(fetch).toHaveBeenCalledWith('/api/v1/me/depot', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ depotId: 'Both' }) }));
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(tab.qc.getQueryData(meKey)).toEqual(ON_BOTH);
+  expect(held.retired).toHaveBeenCalledWith(tab.qc);
+  expect([...stored.values()].map((text) => JSON.parse(text))).toContainEqual(ON_BOTH);
+  // Another tab of the session hears of it, and every request this tab makes now names Both (D-95).
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  await api('/operations?depot=Kandy');
+  expect(lastNamed(fetch)).toBe('Both');
+  // The stream opened for Peliyagoda closes and a new one opens, which carries both depots.
+  inTab(tab);
+  useDispatcherPage();
+  expect(first.close).toHaveBeenCalled();
+  expect(tab.streams).toHaveLength(2);
+});
+
+it('AC-7 a switch from Both back to one depot takes that depot, and its requests name it', async () => {
+  const tab = tabOf(ON_BOTH);
+  inTab(tab);
+  useDispatcherPage();
+  const fetch = vi.fn(async (url: string) => Response.json(String(url).endsWith('/me/depot') || String(url).endsWith('/auth/me') ? IN_KANDY : {}));
+  vi.stubGlobal('fetch', fetch);
+  await api('/issues?depot=Peliyagoda');
+  expect(lastNamed(fetch)).toBe('Both');
+
+  await switching(tab, 'Kandy');
+
+  expect(fetch).toHaveBeenCalledWith('/api/v1/me/depot', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ depotId: 'Kandy' }) }));
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  await api('/plans');
+  expect(lastNamed(fetch)).toBe('Kandy');
+});
+
+it('AC-7 a switch to Both that fails changes nothing and says so, as any switch', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'internal', message: 'Something went wrong on our side.' } }, { status: 500 })));
+  await expect(switching(tab, 'Both')).rejects.toBeDefined();
+  expect(toast).toHaveBeenCalledWith(SWITCH_FAILED, expect.objectContaining({ id: 'depot-switch' }));
+  expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(Channel.sent).toEqual([]);
+});
+
+it('AC-7 a tab on one depot follows a switch to Both made in another tab, and the reverse', async () => {
+  const there = tabOf();
+  serverWith({ switched: lost(), session: Response.json(ON_BOTH) });
+  await followSwitch(there.qc, { id: 'u1' });
+  expect(there.qc.getQueryData(meKey)).toEqual(ON_BOTH);
+  expect(cached(there.qc)).toEqual(['["clock"]', '["me"]']);
+
+  const back = tabOf(ON_BOTH);
+  serverWith({ switched: lost(), session: Response.json(RUWAN) });
+  await followSwitch(back.qc, { id: 'u1' });
+  expect(back.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(cached(back.qc)).toEqual(['["clock"]', '["me"]']);
+});

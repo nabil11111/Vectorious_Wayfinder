@@ -1,13 +1,14 @@
+import { BOTH_DEPOTS } from '@wayfinder/contracts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CARD } from '@/features/live/parts/ui';
 import { cn } from '@/lib/utils';
 
 // What stands in place of a dispatcher page while a depot switch is on its way (spec 020, Switching): the page's
 // header and a card in grey blocks, as the pages' own loading states are, with no words and no spinner. The top bar
-// stays real and shows the depot pressed.
+// stays real and shows the depot pressed, or Both (spec 021).
 export function SwitchingSkeleton({ depot }: { depot: string }) {
   return (
-    <div role="status" aria-label={`Switching to ${depot}`}>
+    <div role="status" aria-label={`Switching to ${depot === BOTH_DEPOTS ? 'both depots' : depot}`}>
       <div className="flex flex-wrap items-center gap-3">
         <Skeleton className="h-6 w-44" />
         <Skeleton soft className="h-2.5 w-28 rounded-full" />

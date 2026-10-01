@@ -9,13 +9,9 @@ import { api, ApiRequestError, DEPOT_CHANGED, nameDepot } from '@/lib/api';
 import { clockKey } from '@/lib/clock';
 
 // The dispatcher's depot switch (spec 020, D-93): the top bar's and the dashboard map card's. The server keeps the
-// chosen depot on the session, so every read and write after a switch is for it, and answers Me with it.
+// chosen depot on the session, so every read and write after a switch is for it, and answers Me with it. Both is a
+// choice like a depot (spec 021, D-96): the session then works on both depots together, and Me says 'Both'.
 
-// The booklet's two depots (outlets.csv, vehicles.csv), as the frames' switches list them.
-export const DEPOTS = ['Peliyagoda', 'Kandy'] as const;
-
-// What Both says when pointed at or pressed: a dispatcher works on one depot at a time for now.
-export const BOTH_LATER = 'Both depots together come later.';
 // What a switch that did not go through says. The switch shows the depot before again.
 export const SWITCH_FAILED = 'Could not switch depots. Try again.';
 // What a tab says when a switch made elsewhere retired a plan board that still held changes the server had not saved.
