@@ -74,4 +74,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [018](018-sign-in/spec.md) | Sign-in as designed: staff ID and PIN, the district artwork, English only | Done |
 | [019](019-district-map/spec.md) | The dashboard's district map: districts, trucks on the road and shops delivered | Done |
 | [020](020-depots/spec.md) | Every shop and both depots: accounts, Kandy's day and the depot switch | Done |
-| [024](024-checker-words/spec.md) | The plan checker in plain words | In progress |
+| [024](024-checker-words/spec.md) | The plan checker in plain words | Done |

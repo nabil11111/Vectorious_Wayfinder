@@ -1,6 +1,6 @@
 # 024 · The plan checker in plain words
 
-**Status:** Ready  ·  **Owner:** Claude builder  ·  **Design:** the checks lines in Edit plan (`66:48982`), such as
+**Status:** Done  ·  **Owner:** Claude builder  ·  **Design:** the checks lines in Edit plan (`66:48982`), such as
 "stop 6 Koggala arrives 08:05 · 5 min after close", and View plan's checks (`78:68956`)
 
 ## Why
@@ -40,12 +40,16 @@ depot, too many trips, a vehicle not available, leaving early and the mall's hou
 rules.
 
 ## Acceptance criteria
-- [ ] AC-1 Every message and fix the checker writes shall follow the five rules. A test shall pin the new sentence of
+- [x] AC-1 Every message and fix the checker writes shall follow the five rules. A test shall pin the new sentence of
   each code, including both variants of the codes that have two.
-- [ ] AC-2 Every check shall keep its code, level, figures, flagged stop or order, and suggested leaving time. Every
+- [x] AC-2 Every check shall keep its code, level, figures, flagged stop or order, and suggested leaving time. Every
   existing rule test shall keep its outcome, with only the expected words updated.
-- [ ] AC-3 Every place that quotes a checker sentence (the README walkthrough, the planner's reasons, web tests'
+- [x] AC-3 Every place that quotes a checker sentence (the README walkthrough, the planner's reasons, web tests'
   fixtures that match words) shall read the new words.
+
+## After the build
+Trucks are also named by their drivers ("Chaminda's dry truck") where a trip has one, as spec 026 (D-100) asks,
+and the planner's own short reasons follow the same five rules.
 
 ## Out of scope
 New checks, changed limits, and the planner's own reasons for an order, which already lead with the order.
