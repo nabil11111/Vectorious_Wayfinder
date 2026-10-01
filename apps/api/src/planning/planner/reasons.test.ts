@@ -228,14 +228,14 @@ describe('the planner\'s own sentences in plain words', () => {
     const placed = (existing: boolean, tripNo: number, compact = false) =>
       placementReason(day, order, { ...attempt, slot: { ...attempt.slot, existing, tripNo }, selectionReason: existing ? 'fills an existing run' : 'vehicle ID breaks the tie' }, compact);
     expect(placed(false, 1)).toBe('new run on the dry truck VEH012 to Gampaha, vehicle ID breaks the tie');
-    expect(placed(true, 1)).toBe('joined the dry truck VEH012\'s run to Gampaha, fills an existing run');
+    expect(placed(true, 1)).toBe('joined the dry truck VEH012 on its run to Gampaha, fills an existing run');
     expect(placed(false, 2)).toBe('new second trip on the dry truck VEH012 to Gampaha, vehicle ID breaks the tie');
-    expect(placed(true, 2)).toBe('joined the dry truck VEH012\'s second trip to Gampaha, fills an existing run');
+    expect(placed(true, 2)).toBe('joined the dry truck VEH012 on its second trip to Gampaha, fills an existing run');
     // The short forms the 200-character cap falls back to.
     expect(placed(false, 1, true)).toBe('on the dry truck VEH012 (vehicle ID tie)');
     expect(placed(true, 1, true)).toBe('joined the dry truck VEH012 (fills existing run)');
-    expect(placed(false, 2, true)).toBe('on the dry truck VEH012\'s second trip (vehicle ID tie)');
-    expect(placed(true, 2, true)).toBe('joined the dry truck VEH012\'s second trip (fills existing run)');
+    expect(placed(false, 2, true)).toBe('on the second trip of the dry truck VEH012 (vehicle ID tie)');
+    expect(placed(true, 2, true)).toBe('joined the second trip of the dry truck VEH012 (fills existing run)');
   });
 
   it('says a refused shop first in the short form, then the vehicle by its kind', () => {
