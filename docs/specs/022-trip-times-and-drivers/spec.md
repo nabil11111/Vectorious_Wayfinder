@@ -1,6 +1,6 @@
 # 022 · The trip's depot times, each stop's times on hover, and every trip's driver
 
-**Status:** Ready  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`): the open trip's
+**Status:** Done  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`): the open trip's
 timeline in the middle column, and Done's trip cards on the right ("VEH004 · Ruwan · Fresh · Colombo").
 
 ## Why
@@ -48,17 +48,17 @@ only when the dispatcher picked one, and the suggested plan picks none, so a bui
    "window 05:30 to 08:00", "5 min late" in red, and its cartons.
 
 ## Acceptance criteria
-- [ ] AC-1 When a trip is open on Edit plan, its timeline shall run from its leaving time to its return time, with the
+- [x] AC-1 When a trip is open on Edit plan, its timeline shall run from its leaving time to its return time, with the
   depot's mark and time at each end.
-- [ ] AC-2 When a stop's dot is pointed at, focused or tapped, the system shall show that stop's number, shop, arrival
+- [x] AC-2 When a stop's dot is pointed at, focused or tapped, the system shall show that stop's number, shop, arrival
   and leaving times, any wait, its window, what is unloaded, and whether it is late. Each dot shall be reachable by
   keyboard and named for screen readers.
-- [ ] AC-3 When the suggested plan is built, the system shall give every vehicle on it a driver of its depot, keeping
+- [x] AC-3 When the suggested plan is built, the system shall give every vehicle on it a driver of its depot, keeping
   a vehicle's earlier driver, with no driver on two vehicles and the same driver on a vehicle's two trips.
-- [ ] AC-4 Done's cards and the open trip's header shall name the driver after the vehicle, or say "no driver".
-- [ ] AC-5 Choosing in the driver menu a driver who is on another vehicle shall swap the two vehicles' drivers as one
+- [x] AC-4 Done's cards and the open trip's header shall name the driver after the vehicle, or say "no driver".
+- [x] AC-5 Choosing in the driver menu a driver who is on another vehicle shall swap the two vehicles' drivers as one
   change of the draft.
-- [ ] AC-6 The README walkthrough's numbers and steps that these change shall say what the app now shows.
+- [x] AC-6 The README walkthrough's numbers and steps that these change shall say what the app now shows.
 
 ## Out of scope
 Drivers' hours and rest, a driver's preferences, and moving a driver between depots.
