@@ -140,6 +140,13 @@ are what the demo clock shows.
     Peliyagoda." Press **I'm back at the depot**: "✓ Trip closed · 2 of 2 stops · all records sent". Nadeesha's three
     Thursday orders now read "Delivered".
 
+18. **Watching the day.** Ruwan's **Dashboard** and **Live day** follow every step from 12 on without a reload. Before
+    the trucks leave the Dashboard reads 0 need you, "0 / 2 stops delivered", "0 / 38 trucks out", 99 orders for Friday,
+    37% of the week's fuel and 99 deferred, and Live day lists VEH035 ready with its planned times (leave 04:36,
+    Nugegoda 05:00, Wellawatte 05:24, back 06:10) and the loading events. Once Dilshan delivers, Live day shows "23
+    delivered · photo" in its events, and after the refusal the Dashboard's **Decide** opens the problem's card on Live
+    day, where "Send to driver" turns the truck's row to "Decided".
+
 The shop's receipt comes with the next piece.
 
 **A closed shop.** At step 14 choose "Shop closed" instead and press **Save attempt and move on**: Ruwan's card reads
@@ -236,7 +243,6 @@ Anything we built differently from our Designathon submission, and why.
 - **The dispatcher answers a loader's flag** with "Go short" or "Load it all" and "Send to loader" (D-37); the design
   draws answers only for the driver's problems. There is no Undo yet, and the loader's answer line says what was chosen.
 - **The ready screen names the trip's driver,** where the design names Kasun, who is our loader.
-- **Live day shows only its "Needs you" column** for now; the trucks' timelines come with the dashboard piece.
 - **A truck cannot change after any loading begins.** Frame `150:81067` shows a changed truck while another is
   already loading. The existing loading lock remains: spec 016's Plan changed flow will compare taking back and
   resending before any truck starts loading, not moving already-counted goods (D-70).
@@ -244,6 +250,20 @@ Anything we built differently from our Designathon submission, and why.
   shows under its stop's lines while that stop is still loading.
 - **States the design lacks:** no plan out, nothing to load, every truck loaded, no day left, a truck no longer on the
   list, waiting for the answer, saving, not saved, refused, and nothing needs you.
+
+**The dashboard and Live day**
+- **No district map and no waves:** Needs you and the next run take the full width, Live day has no "Wave 2", and the
+  next run's button is "View plan" with no draft line.
+- **One answer per problem:** "Decide" opens its card, where the design also draws Warn, Skip, Credit and Resend, and an
+  answered row reads "Decided", never "Warned". There is no Undo.
+- **Recorded times only (D-68):** the trucks table shows the planned arrival and the planned return, never an estimate,
+  and the tiles say "stops delivered · partial or closed", "fuel · litres this week" and "deferred on this plan".
+- **Every open problem shows in full** in Needs you, as spec 012 built it, not one focused card with short "Next" rows.
+- **Events say "· photo"** without opening it, and the Trip column shows the trip's number only.
+- **Between 1024 and 1279 wide** the tiles take three columns and the trucks table folds the driver and trip under the
+  truck.
+- **The loader's "Plan changed"** names no docks and has no "Why" line. The plan can change only before loading starts
+  (D-70), where the design also draws a truck changed after loading began.
 
 **The driver**
 - **No calls and no signature.** No "Call the shop", "Called the shop" or "Call Prasanna": the data has no phone numbers
