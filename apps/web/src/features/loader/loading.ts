@@ -61,6 +61,9 @@ export interface LoaderWrites {
   refused: string | null;
   send: (tripId: string, write: WriteOf, done?: () => void) => void;
   retry: () => void;
+  // Whether a write of this kind is on its way or waits for Try again, read at the moment it is asked, so a page that
+  // asks before the loader leaves (Q-22) never holds them back once the write has gone, nor lets them go before.
+  holding: (kind: WriteKind) => boolean;
 }
 
 // A refused write's sentence stays on this tab until the loader dismisses it (spec 016, AC-31): a stale Start opens
@@ -132,5 +135,5 @@ export function useLoaderWrites(): LoaderWrites {
     void run();
   };
 
-  return { ...state, send, retry: () => { void run(); } };
+  return { ...state, send, retry: () => { void run(); }, holding: (kind) => pending.current?.kind === kind };
 }

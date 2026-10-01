@@ -7,8 +7,10 @@ import { clockKey } from '@/lib/clock';
 import { flagCounts, wholeCount } from './count';
 import { Counter, FlagPage } from './FlagPage';
 import { loadingKey } from './loading';
+import { LeaveUnsent, SendingFirst } from './parts/ui';
 import { lastLoaded } from './stops';
 import { TruckPage } from './TruckPage';
+import { asksBeforeLeaving } from './unsent';
 import { answerSentence, countHint, countLine, countWhere, loadFigure, undoFirstWords, undoStopWords } from './words';
 
 // The loader's screens as the live QA run found them (phase 3, Q-16 to Q-23). The pages are drawn as the server would
@@ -238,5 +240,35 @@ describe('Q-21 the load\'s weight never rounds up to look full', () => {
 
   it('shows the figure on the truck\'s card', () => {
     expect(truckPage(veh038([3]))).toContain('336 / 1,200 kg · 1.9 / 9.0 m³');
+  });
+});
+
+describe('Q-22 a flag that was not sent is never left behind without a word', () => {
+  const at = (pathname: string, search = '') => ({ pathname, search });
+  const form = at(`/loader/trucks/${TRIP}/flag`, '?stop=stop-2');
+
+  it('asks before the loader leaves the form while its flag is on its way or not sent, wherever they go', () => {
+    for (const to of [at(`/loader/trucks/${TRIP}`), at('/loader'), at('/loader/changes'), at(`/loader/trucks/${TRIP}/flag`, '?stop=stop-1')]) {
+      expect(asksBeforeLeaving(true, form, to)).toBe(true);
+      expect(asksBeforeLeaving(false, form, to)).toBe(false);
+    }
+    expect(asksBeforeLeaving(true, form, form)).toBe(false);
+  });
+
+  it('says the flag is not sent, and offers to send it again or to leave without it', () => {
+    const html = renderToStaticMarkup(<LeaveUnsent onRetry={() => {}} onLeave={() => {}} />);
+    expect(html).toMatch(/role="alertdialog"/);
+    expect(html).toContain('This flag is not sent. If you leave now, the dispatcher may never see it.');
+    expect([...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(([, words]) => words)).toEqual(['Try again', 'Leave without sending']);
+  });
+
+  it('holds the loader while the flag is still on its way, and says so', () => {
+    expect(renderToStaticMarkup(<SendingFirst />)).toContain('Sending the flag. You can leave once it is sent.');
+  });
+
+  it('shows the flag form as before while nothing is waiting', () => {
+    const html = page(`/loader/trucks/${TRIP}/flag?stop=stop-2`, dayOf(veh038([3])));
+    expect(html).not.toContain('This flag is not sent');
+    expect(html).toContain('Send to dispatcher');
   });
 });
