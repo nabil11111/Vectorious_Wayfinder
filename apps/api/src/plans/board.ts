@@ -112,11 +112,13 @@ export async function readBoard(tx: Tx, depotId: string, date: string | null, mo
     litresUsedThisWeek: sum(fuel.filter((f) => f.vehicleId === v.id).map((f) => Number(f.litres))),
   }));
   const travel = await tx.select().from(districtTravel).where(eq(districtTravel.depotId, depotId));
+  const drivers = await tx.select({ id: users.id, name: users.displayName }).from(users).where(and(eq(users.depotId, depotId), eq(users.role, 'driver'), eq(users.active, true))).orderBy(users.displayName);
   const input: PlanInput = {
     depotId, operatingDay: calendar.isOperating, settings: { ...DEFAULT_SETTINGS, mixBrands: draft.mixBrands }, products: engineProducts,
     orders: boardOrders.map((o) => ({ id: o.id, outletId: o.outletId, lines: o.lines })), outlets: engineShops, vehicles: engineVehicles,
     allowances, travel: travel.map((t) => ({ depotId: t.depotId, district: t.district, outMin: t.depotToDistrictMin, outKm: t.depotToDistrictKm, betweenMin: t.interStopMin, betweenKm: Number(t.interStopKm) })),
-    plan: { trips: draft.trips.map(({ leaveAt, ...t }) => ({ ...t, ...(leaveAt === null ? {} : { leaveAt }) })), deferrals: draft.deferrals },
+    // Each trip's driver by name, so the checker calls the truck "Chaminda's dry truck" (spec 026).
+    plan: { trips: draft.trips.map(({ leaveAt, ...t }) => ({ ...t, ...(leaveAt === null ? {} : { leaveAt }), driverName: drivers.find((d) => d.id === t.driverId)?.name })), deferrals: draft.deferrals },
   };
   const check = saved?.status === 'published' ? saved.sentCheck === null ? null : PlanCheck.parse(saved.sentCheck) : checkPlan(input);
   // Older sent plans have no saved check. Fleet fuel still comes from the checker with no trips to recalculate.
@@ -138,7 +140,6 @@ export async function readBoard(tx: Tx, depotId: string, date: string | null, mo
   });
   const assigned = new Set(draft.trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds)));
   const timings = check?.trips.flatMap((t) => t.times ? [t.times] : []) ?? [];
-  const drivers = await tx.select({ id: users.id, name: users.displayName }).from(users).where(and(eq(users.depotId, depotId), eq(users.role, 'driver'), eq(users.active, true))).orderBy(users.displayName);
   const board: PlanBoard = {
     ...blank, day: { date, cutoffAt: cutoffAt.toISOString(), open: clock.at >= cutoffAt },
     plan: { ...draft, id: saved?.id ?? null, revision: saved?.revision ?? 0, status: saved?.status ?? 'draft', savedAt: saved?.savedAt?.toISOString() ?? null,
