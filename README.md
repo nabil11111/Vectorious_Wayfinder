@@ -207,21 +207,24 @@ Press **Reset the demo day** first if you walked the one above.
 2. **The empty board.** As Ruwan (`P-001`), the Plan board shows "Unplanned · 102" with "Carried over · 4" (Fresh Dickwella,
    deferred twice, first), "0 / 35 trucks", "0 / 102 orders", "37% fuel this week" and "0 / 140.7 m³ fridge space".
    In the middle, "Build the suggested plan" in orange.
-3. **Build it.** Press it: "Building the plan · 102 orders · 35 trucks", then "Unplanned · 0", "Done · 27 trips",
-   "26 / 35 trucks", "96 / 102 orders", "41% fuel this week" and "57.02 / 140.7 m³ fridge space". "Deferred · 6" holds
+3. **Build it.** Press it: "Building the plan · 102 orders · 35 trucks", then "Unplanned · 0", "Done · 27 trips" with
+   each truck's driver on its card, given in staff ID order ("VEH004 · Lasantha · Fresh · Matara"), "26 / 35 trucks",
+   "96 / 102 orders", "41% fuel this week" and "57.02 / 140.7 m³ fridge space". "Deferred · 6" holds
    the chilled orders of four Kurunegala shops (Pannala, Polgahawela, Wariyapola, Mawathagama) and two Puttalam shops
    (Wennappuwa, Puttalam), each with the sentence the shop will read, such as "No fridge truck could reach Fresh
    Pannala before its window closed at 07:45 on Thursday." The middle says "Suggested plan · 16:00 · 6 decisions to
    make".
-4. **Ask why.** Under Done, open VEH004's Fresh · Matara trip and press **why?** on Fresh Dickwella: "Rank 1: waited
-   since Tuesday; chilled; …". Press **why?** on a deferred order: its rank, why no truck could take it, and "to
-   decide".
-5. **An ordinary edit.** Open VEH035's trip, the fridge van with Fresh Nugegoda's carried-over cartons, and choose
-   Dilshan as its driver. It is saved and checked like any other change.
+4. **Ask why.** Under Done, open VEH004's Fresh · Matara trip. Its timeline runs from "Peliyagoda 03:30" to "back
+   09:34", and pointing at Fresh Dickwella's dot shows "Stop 3 · Fresh Dickwella", "arrives 06:37 · leaves 06:52",
+   "window 03:00 to 08:00" and "39 cartons chilled". Press **why?** on Fresh Dickwella: "Rank 1: waited since Tuesday;
+   chilled; …". Press **why?** on a deferred order: its rank, why no truck could take it, and "to decide".
+5. **An ordinary edit.** Open VEH035's trip, the fridge van with Fresh Nugegoda's carried-over cartons, which the
+   planner gave Kelum. Choose Dilshan as its driver: the menu marks him "on VEH001 · swap", so VEH001 takes Kelum and
+   "Drivers of VEH035 and VEH001 swapped" shows with **Undo**. It is one change, saved and checked like any other.
 6. **Decide and send.** Open **View plan**: "Suggested plan · 16:00", "Decisions · 6" and a greyed "Send plan · 6
    decisions open". Press **Accept all 6**: "Decisions · all made", and "Checks · 3" keeps the two long waits and the
    Fresh workload listed with "Ready, with warnings". Press **Send plan to loaders and drivers**: "✓ Sent 16:06 ·
-   loaders and 1 driver".
+   loaders and 26 drivers".
 
 ## Departures from the design
 
