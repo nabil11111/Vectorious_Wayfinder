@@ -12,12 +12,13 @@ import { StatusChip } from './StatusChip';
 
 type Look = 'today' | 'open' | 'past';
 
-// The lines under the chip (spec 009, rule 6). A placed order says its day, window and entrance. A planned
+// The lines under the chip (spec 009, rule 6). A placed order says its day, window and entrance; one brought back from
+// a closed shop has no day until the next plan takes it, so it says only its window and entrance (Q-41). A planned
 // one has its day in the chip already. An order that waited says why.
 function linesOf(order: StoreOrder, outlet: StoreOutlet): string[] {
   const where = `${windowShort(outlet)} · ${ENTRANCE[outlet.dockType].toLowerCase()}`;
   switch (order.status) {
-    case 'placed': return [`${shortDay(order.deliveryDate)} · ${where}`];
+    case 'placed': return [order.broughtBack ? where : `${shortDay(order.deliveryDate)} · ${where}`];
     case 'planned': return [where];
     case 'deferred': return [...(order.deferralReason ? [order.deferralReason] : []), 'New time window is awaiting confirmation.', 'Need another date? Contact your depot.'];
     default: return [];

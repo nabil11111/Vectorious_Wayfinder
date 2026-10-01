@@ -84,10 +84,10 @@ These are in `docs/decisions.md`.
 |  | Not on your list | No frame | "This delivery is not on your list." with "Back to Deliveries", for an address of another shop's stop. |
 | Today `/store` | Handed over | No frame | Spec 009's card with the chip "Delivered" and "Delivered 03:38 · VEH035 · Dilshan", and when less came than was ordered, "3 of 4 delivered · 1 short from the depot" or "46 of 48 delivered · 2 refused, damaged". |
 |  | Received | Shop · Today, and its desktop frame | The chip "Received 08:31" in green, and "All 8 received" or "11 received · 1 short". |
-|  | Nobody at the shop | No frame | The chip "Loaded" and "Nobody at the shop at 03:45 · VEH035". |
+|  | Nobody at the shop | No frame | The chip "Loaded" and "Nobody at the shop at 03:45 · VEH035". Once brought back the order leaves Today: it is not coming today (Q-41). |
 |  | The depot's answer | No frame | One line per problem of the delivery that counts the order, under the card's other lines (rule 11). |
 | Orders `/store/orders` | Received | Shop · Orders · Past, Shop · Orders · desktop | The chip "All 8 received" in green or "11 received · 1 short" in yellow, and "Received 08:31", or "Arrived 08:25, after your window". A card whose receipt reported something opens that receipt. |
-|  | Handed over, nobody at the shop, answers | No frame | Today's lines, on the open list's card. |
+|  | Handed over, nobody at the shop, answers | No frame | Today's lines, on the open list's card. A brought-back order reads "Waiting for the delivery plan", its window and entrance with no day, "Nobody at the shop at 03:50 · VEH057" and "39 chilled cartons: brought back to the depot, waiting for the next plan", until a sent plan takes it and its chip says "Planned · Fri 26 Jun" (Q-41). |
 |  | A replacement | No frame | Spec 009's card for its status, and "Replacement for Thu 25 Jun", also on each part when the plan splits it. |
 |  | Past, from a receipt | Shop · Orders · Past | "View past orders" opens Orders with Past chosen on a phone. |
 | Help `/store/help` |  | Shop · Help | Spec 009's screen. "Open delivery confirmation" now opens the real Deliveries. |
@@ -186,7 +186,9 @@ Thu 08:30. Times are depot time and depend on the judge's pace.
       "All 8 received", green, or "11 received · 1 short", yellow, and "Received 08:31", or "Arrived 08:25, after your
       window" when the truck arrived after the shop's window closed (its mall slot, as spec 007 times it). The short from
       the depot or refused line stays.
-    - Nobody at the shop: "Nobody at the shop at 03:45 · VEH035", also once the order is placed again.
+    - Nobody at the shop: "Nobody at the shop at 03:45 · VEH035", also once the order is placed again. Brought back and
+      placed again, it is off Today's list whatever day it was for, and its card names no day until a sent plan takes it
+      (Q-41).
     - One line per problem of that stop that counts the order, which the server words: the cartons on this order it is
       about, then what happens to them (Q-36), so two answers on one card never read as one taking back the other. A
       refusal "2 damaged chilled cartons: the depot decides what happens to them", "…: they go back to the depot" or

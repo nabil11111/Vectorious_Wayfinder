@@ -50,7 +50,8 @@ export function problemLineOf(facts: ProblemLineFacts): string {
     case 'closed': {
       const what = goods(facts, units, null);
       if (facts.decision === 'try_again') return `${what}: the driver comes back after the other stops`;
-      if (facts.decision === 'bring_back') return `${what}: ${one ? 'it goes' : 'they go'} on the next plan`;
+      // Brought back, it waits for the next plan to give it a day (Q-41).
+      if (facts.decision === 'bring_back') return `${what}: brought back to the depot, waiting for the next plan`;
       return `${what}: the depot decides, today or another day`;
     }
     case 'receipt': {

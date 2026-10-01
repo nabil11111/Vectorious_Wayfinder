@@ -83,7 +83,7 @@ class Server {
     const orders = PRODUCTS.filter((p) => this.quantities[p.id]).map((p): StoreOrder => ({
       id: this.refs[p.temp]!.id, deliveryDate: this.day, scheduledDate: null, temp: p.temp, status: 'placed',
       lines: [{ productId: p.id, name: p.name, unit: p.unit, quantity: this.quantities[p.id]! }], units: this.quantities[p.id]!,
-      placedAt: at, deferralReason: null, delivery: null, receipt: null, problems: [], replacementFor: null,
+      placedAt: at, deferralReason: null, delivery: null, receipt: null, problems: [], replacementFor: null, broughtBack: false,
     }));
     this.placed.push(...orders);
     this.quantities = {};

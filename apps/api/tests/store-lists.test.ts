@@ -195,7 +195,7 @@ describe('the lists of a shop\'s orders', () => {
     expect(today.orders[0]).toEqual({
       id: onTheTruck, deliveryDate: WED, scheduledDate: WED, temp: 'chilled', status: 'planned',
       lines: [{ productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 10 }], units: 10,
-      placedAt: expect.stringMatching(/^2026-04-01T.*Z$/), deferralReason: null, delivery: null, receipt: null, problems: [], replacementFor: null,
+      placedAt: expect.stringMatching(/^2026-04-01T.*Z$/), deferralReason: null, delivery: null, receipt: null, problems: [], replacementFor: null, broughtBack: false,
     });
     expect(today).toMatchObject({ today: WED, nextCursor: null });
 

@@ -46,6 +46,7 @@ describe('Q-36 a card\'s answer lines name their cartons', () => {
     const closed = (decision: ProblemLineFacts['decision']) => problemLineOf(facts({ kind: 'closed', lines: [{ counted: 39, reason: null }], decision }));
     expect(closed(null)).toBe('39 chilled cartons: the depot decides, today or another day');
     expect(closed('try_again')).toBe('39 chilled cartons: the driver comes back after the other stops');
-    expect(closed('bring_back')).toBe('39 chilled cartons: they go on the next plan');
+    // Q-41: brought back, it waits for the next plan, which gives it its new day.
+    expect(closed('bring_back')).toBe('39 chilled cartons: brought back to the depot, waiting for the next plan');
   });
 });

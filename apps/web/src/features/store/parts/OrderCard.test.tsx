@@ -19,7 +19,7 @@ const chilled: StoreOrder = {
     { id: id(3), kind: 'refused', units: 3, decision: 'send_replacements', replacementDay: '2026-06-26', line: '3 expired chilled cartons: replacements come on Fri 26 Jun' },
     { id: id(4), kind: 'receipt', units: 2, decision: 'no_replacement', replacementDay: null, line: '2 missing chilled cartons: no replacement' },
   ],
-  replacementFor: null,
+  replacementFor: null, broughtBack: false,
 };
 
 describe('Q-36 a card\'s answer lines', () => {
@@ -32,5 +32,30 @@ describe('Q-36 a card\'s answer lines', () => {
       expect(text).not.toContain('No replacement is coming.');
       expect(text).not.toContain('3 replacements come on Fri 26 Jun.');
     }
+  });
+});
+
+// Q-41: Fresh Mulgampola's 39 chilled cartons after "Bring them back", as Orders shows them, and once the next plan
+// takes them.
+const mulgampola: StoreOutlet = { id: 'OUT083', name: 'Fresh Mulgampola', brand: 'Fresh', windowOpen: '04:00', windowClose: '07:45', dockType: 'street' };
+const broughtBack: StoreOrder = {
+  ...chilled, id: id(5), scheduledDate: '2026-06-25', status: 'placed', units: 39, receipt: null, broughtBack: true,
+  lines: [{ productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 39 }],
+  delivery: { stopId: id(6), vehicleId: 'VEH057', driver: 'Nuwan', arrivedAt: '2026-06-24T22:20:00.000Z', doneAt: '2026-06-24T22:21:00.000Z', outcome: 'closed', late: false,
+    delivered: null, shortFromDepot: 0, refused: 0, refusalReason: null },
+  problems: [{ id: id(7), kind: 'closed', units: 39, decision: 'bring_back', replacementDay: null, line: '39 chilled cartons: brought back to the depot, waiting for the next plan' }],
+};
+
+describe('Q-41 a brought-back order', () => {
+  it('names no day while it waits for the next plan, only its window, the closed shop and that it was brought back', () => {
+    const text = renderToStaticMarkup(<MemoryRouter><OrderCard order={broughtBack} outlet={mulgampola} look="open" /></MemoryRouter>);
+    expect(text).toContain('Waiting for the delivery plan');
+    expect(text).toContain('>04:00–07:45 · street<');
+    expect(text).not.toContain('Thu 25 Jun');
+    expect(text).toContain('Nobody at the shop at 03:50 · VEH057');
+    expect(text).toContain('39 chilled cartons: brought back to the depot, waiting for the next plan');
+    // An order placed for a day still names its day.
+    expect(renderToStaticMarkup(<MemoryRouter><OrderCard order={{ ...broughtBack, broughtBack: false, delivery: null, problems: [] }} outlet={mulgampola} look="open" /></MemoryRouter>))
+      .toContain('>Thu 25 Jun · 04:00–07:45 · street<');
   });
 });

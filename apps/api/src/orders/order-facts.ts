@@ -30,6 +30,7 @@ export interface OrderFacts {
   receipt: OrderReceipt | null;
   problems: OrderProblem[];
   replacementFor: string | null;
+  broughtBack: boolean;
 }
 
 // The replacements an answer of "Send N replacements" placed (D-59), by the problem they answer: the day they are for
@@ -109,6 +110,8 @@ export async function factsOf(on: Reader, outletId: string, orderIds: string[]):
         return { id: problem.id, kind, units: sum(here.map((each) => each.counted)), decision, replacementDay, line };
       }),
       replacementFor: issueId ? replaced.find((problem) => problem.id === issueId)?.day ?? null : null,
+      // Placed again by "Bring them back" at a closed shop, and on no later sent plan yet (Q-41).
+      broughtBack: row.status === 'placed' && visit?.stop.outcome === 'closed' && atStop.some((problem) => problem.kind === 'closed' && problem.decision === 'bring_back'),
     });
   }
   return facts;

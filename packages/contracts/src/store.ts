@@ -140,6 +140,9 @@ export const StoreOrder = z.object({
   // For a replacement, and for either part of one the plan split, the day of the delivery it replaces (D-59). null
   // for an order the shop placed.
   replacementFor: Day.nullable(),
+  // The driver brought it back from a closed shop and it waits for the next plan (Q-41): it is not coming today, and it
+  // has no day until a sent plan takes it, when it is planned for that plan's day.
+  broughtBack: z.boolean(),
 });
 export type StoreOrder = z.infer<typeof StoreOrder>;
 

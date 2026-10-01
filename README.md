@@ -179,7 +179,8 @@ At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements
 **A closed shop.** At step 14 choose "Shop closed" instead and press **Save attempt and move on**: Ruwan's card reads
 "Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Dilshan's next stop again, and delivering it ends
 at 117 of 118. **Bring them back** ends with "Hand them in; they go on the next run.", and Wellawatte's two orders are
-placed again for Friday's plan.
+placed again for Friday's plan: they leave the shop's Today, and Orders reads "48 chilled cartons: brought back to the
+depot, waiting for the next plan" with no day until Friday's plan takes them.
 
 ### The look-up pages
 
@@ -339,6 +340,8 @@ Anything we built differently from our Designathon submission, and why.
   not accept says so at its foot. No frame draws these.
 - **A shop's report on Live day** uses the issue-open card with "Send N replacements on <day>", "No replacement" and
   "Send to shop"; the design draws only the "Next" line for it.
+- **A brought-back order leaves Today** and names no day until the next plan takes it: Thursday's window beside
+  "Coming today" told the shop to wait for cartons already back at the depot. No frame draws it.
 - **A card's answer lines name their cartons,** "3 expired chilled cartons: replacements come on Fri 26 Jun" beside "2
   missing chilled cartons: no replacement": no frame draws two answers on one order, and plain "No replacement is
   coming" under a refusal's replacements read as taking them back.

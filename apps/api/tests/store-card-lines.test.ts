@@ -120,3 +120,18 @@ it('says warm chilled goods on the chilled cards of a report of the cold alone, 
     ['chilled', ['Chilled cartons that came warm: no replacement']], ['chilled', ['Chilled cartons that came warm: no replacement']], ['dry', []],
   ]);
 });
+
+// Q-41: Fresh Mulgampola's 39 chilled cartons, brought back from a closed shop, stayed under "Coming today" with
+// Thursday's window. Here Wellawatte's two orders do the same.
+it('takes a closed shop\'s brought-back orders off Today, and Orders says they were brought back and wait for the next plan', async () => {
+  await deliveredWalkthrough(walk, { wellawatte: 'closed' });
+  // Before the answer they may still come today, so they stay.
+  expect((await shop.list('today')).orders.map((order) => [order.id, order.broughtBack])).toEqual([[CHILLED, false], [DRY, false]]);
+  await answer('closed', 'OUT002', 'bring_back', 3 * 60 + 52);
+  freeze(THU, 9 * 60 + 38);
+  expect((await shop.list('today')).orders).toEqual([]);
+  const open = (await shop.list('open')).orders;
+  expect(open.map((order) => [order.id, order.status, order.broughtBack])).toEqual([[CHILLED, 'placed', true], [DRY, 'placed', true]]);
+  expect(linesOf(open, CHILLED)).toEqual(['48 chilled cartons: brought back to the depot, waiting for the next plan']);
+  expect(linesOf(open, DRY)).toEqual(['46 dry cartons: brought back to the depot, waiting for the next plan']);
+});

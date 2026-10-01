@@ -178,7 +178,7 @@ it('AC-32 gives a closed shop\'s orders, once brought back and placed again, the
   expect(factsOf(chilled)).toEqual({
     delivery: { stopId: driverStop(trip, 2).id, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at(3 * 60 + 45).toISOString(), doneAt: at(3 * 60 + 48).toISOString(),
       outcome: 'closed', late: false, delivered: null, shortFromDepot: 0, refused: 0, refusalReason: null },
-    receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: 'bring_back', replacementDay: null, line: '48 chilled cartons: they go on the next plan' }], replacementFor: null,
+    receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: 'bring_back', replacementDay: null, line: '48 chilled cartons: brought back to the depot, waiting for the next plan' }], replacementFor: null,
   });
 });
 

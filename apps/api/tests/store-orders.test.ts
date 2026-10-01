@@ -619,7 +619,7 @@ describe('placing', () => {
     expect(res.status).toBe(200);
 
     const order = { deliveryDate: WED, scheduledDate: null, status: 'placed', placedAt: at(TUE, '15:05').toISOString(), deferralReason: null,
-      delivery: null, receipt: null, problems: [], replacementFor: null };
+      delivery: null, receipt: null, problems: [], replacementFor: null, broughtBack: false };
     expect(res.body.placedOrders).toEqual([
       { ...order, id: refs.chilled!.id, temp: 'chilled', lines: [{ ...CHILLED, quantity: 8 }], units: 8 },
       { ...order, id: refs.dry!.id, temp: 'dry', lines: [{ ...DRY, quantity: 4 }], units: 4 },

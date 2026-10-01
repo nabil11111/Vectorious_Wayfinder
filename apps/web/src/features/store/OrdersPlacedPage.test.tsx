@@ -26,7 +26,7 @@ function order(products: StoreProduct[], placedAt: string, quantities: Record<st
   const lines = products.filter((p) => quantities[p.id]).map((p) => ({ productId: p.id, name: p.name, unit: p.unit, quantity: quantities[p.id]! }));
   return {
     id: `00000000-0000-4000-8000-${String(made).padStart(12, '0')}`, deliveryDate: THU, scheduledDate: null, temp, status: 'placed', lines,
-    units: lines.reduce((sum, line) => sum + line.quantity, 0), placedAt, deferralReason: null, delivery: null, receipt: null, problems: [], replacementFor: null,
+    units: lines.reduce((sum, line) => sum + line.quantity, 0), placedAt, deferralReason: null, delivery: null, receipt: null, problems: [], replacementFor: null, broughtBack: false,
   };
 }
 
