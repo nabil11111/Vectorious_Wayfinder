@@ -185,6 +185,59 @@ describe('the exact seeded planner day without a database', () => {
     expect(reasons.some(({ reason }) => /; \d+ (?:cartons|boxes|items) (?:on|joined) (?:dry truck|reefer truck|reefer van|van) VEH\d{3}(?:'s second trip)?(?:;|$)/.test(reason))).toBe(true);
   });
 
+  it('AC-17 keeps the three longest reasons the sweeps found within 200 characters, the limit before the load', async () => {
+    // Kandy days at 201 characters even at the tightest wording, cut down to the orders that shape them: two remainders
+    // refused for weight on a Kegalle split, and the same at rank 103, behind 100 orders of 999 fridges that wait since
+    // Monday, are divided already and so are refused whole. The last wording says the limit first and the load after it,
+    // which keeps every fact in four fewer characters.
+    const { input: kandy } = await kandyFixture();
+    type Line = [productId: string, quantity: number];
+    const day = (vehicles: [id: string, driverName?: string][], orders: [outletId: string, lines: Line[], wantedFor: string, timesDeferred: number][]): PlannerInput => ({
+      ...kandy,
+      vehicles: vehicles.map(([id, driverName]) => ({ ...kandy.vehicles.find((v) => v.id === id)!, ...(driverName ? { driverName } : {}) })),
+      orders: orders.map(([outletId, lines, deliveryDate, timesDeferred]) => ({
+        ...kandy.orders.find((o) => o.outletId === outletId && o.lines[0]!.productId === lines[0]![0])!,
+        deliveryDate, timesDeferred, lines: lines.map(([productId, quantity]) => ({ productId, quantity })),
+      })),
+    });
+    const reasonFor = (input: PlannerInput, outletId: string) => {
+      const result = buildSuggestedPlan(input);
+      if (result.status === 'unavailable') throw new Error('Expected a checked suggestion');
+      const order = input.orders.find((o) => o.outletId === outletId && o.lines[0]!.productId === 'fresh-chilled-carton')!;
+      return result.choices.find((choice) => choice.orderId === order.id)!.reason;
+    };
+    const chilled = (outletId: string, cartons: number, wantedFor: string, timesDeferred: number) =>
+      [outletId, [['fresh-chilled-carton', cartons]], wantedFor, timesDeferred] as [string, Line[], string, number];
+    const dry = (outletId: string, cartons: number, wantedFor: string, timesDeferred: number) =>
+      [outletId, [['fresh-dry-carton', cartons]], wantedFor, timesDeferred] as [string, Line[], string, number];
+
+    const first = reasonFor(day([['VEH041'], ['VEH039']], [
+      dry('OUT080', 384, '2026-06-23', 2), chilled('OUT086', 216, '2026-06-24', 2), chilled('OUT081', 947, '2026-06-24', 2),
+      chilled('OUT101', 977, '2026-06-23', 1), chilled('OUT118', 941, '2026-06-23', 2), chilled('OUT079', 210, '2026-06-24', 2),
+      ['OUT091', [['style-folded', 70], ['style-hanging', 42], ['style-shoes', 25], ['style-bags', 12]], '2026-06-23', 2],
+      chilled('OUT119', 991, '2026-06-24', 2), ['OUT093', [['tech-tv', 912], ['tech-small', 920]], '2026-06-23', 2],
+      chilled('OUT078', 360, '2026-06-24', 1), chilled('OUT076', 976, '2026-06-24', 1), chilled('OUT105', 990, '2026-06-24', 1),
+    ]), 'OUT119');
+    expect(first).toBe('Rank 12: waited since Wed; chilled; Kegalle by 07:59; 390 cartons joined reefer truck VEH041\'s second trip; 601 wait: Reefer truck VEH039 over its 6,180 kg limit with 9,722.1 kg on its second trip.');
+
+    const second = reasonFor(day([['VEH047', 'Chaminda Kumara Wickramasinghe'], ['VEH039', 'Lasantha Bandara Ekanayake'], ['VEH043', 'Chaminda Kumara Wickramasinghe']], [
+      chilled('OUT105', 985, '2026-06-24', 1), dry('OUT086', 92, '2026-06-23', 1), chilled('OUT119', 948, '2026-06-24', 1),
+      chilled('OUT079', 210, '2026-06-24', 1), chilled('OUT085', 933, '2026-06-24', 2), chilled('OUT076', 995, '2026-06-24', 2),
+      chilled('OUT112', 230, '2026-06-24', 1), chilled('OUT108', 343, '2026-06-24', 2), chilled('OUT118', 957, '2026-06-24', 1),
+      dry('OUT112', 177, '2026-06-23', 2),
+    ]), 'OUT119');
+    expect(second).toBe('Rank 10: waited since Wed; chilled; Kegalle by 07:59; 564 cartons joined reefer truck VEH043\'s second trip; 384 wait: Reefer truck VEH039 over its 6,180 kg limit with 8,224.8 kg on its second trip.');
+
+    const tech = ['OUT093', 'OUT094', 'OUT095', 'OUT103', 'OUT115'];
+    const behind = day([['VEH040'], ['VEH058']], [chilled('OUT101', 120, '2026-06-24', 1), chilled('OUT108', 978, '2026-06-24', 1), chilled('OUT083', 996, '2026-06-24', 1)]);
+    behind.orders.unshift(...Array.from({ length: 100 }, (_, i) => ({
+      id: `ahead-${i + 1}`, outletId: tech[i % tech.length]!, deliveryDate: '2026-06-22', timesDeferred: 3, splitFrom: `ahead-parent-${i + 1}`,
+      lines: [{ productId: 'tech-fridge', quantity: 999 }],
+    })));
+    expect(reasonFor(behind, 'OUT108')).toBe('Rank 103: waited since Wed; chilled; Nuwara Eliya by 07:45; 150 cartons on reefer van VEH058\'s second trip; 828 wait: Reefer truck VEH040 over its 5,510 kg limit with 5,713.2 kg on its second trip.');
+    for (const reason of [first, second, reasonFor(behind, 'OUT108')]) expect(reason.length).toBeLessThanOrEqual(200);
+  });
+
   it('AC-17 says fridge truck in every seeded chilled deferral', async () => {
     // Each of these shops also gets its dry cartons from a truck before 08:00 on this plan, so only the
     // fridge vehicles the search tried make the sentence true.
