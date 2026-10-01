@@ -60,6 +60,7 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
     // until it is back and reloaded.
     let readyAt: Minutes | null = null;
     for (const [i, trip] of trips.entries()) {
+      const name = `${vehicleId} trip ${trip.tripNo}`;
       const about = { vehicleId, tripNo: trip.tripNo };
       const onTrip = tripCalled(vehicle, trip.tripNo);
       const shops = trip.stops.map((stop) => outletOf(stop.outletId));
@@ -83,7 +84,7 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
       const timed = day?.trips[i];
       const times = timed?.tripNo === trip.tripNo ? timed.times : null;
       // Everything below reads the times handed in, so a trip that comes without them would pass unchecked.
-      if (!times) throw new PlanInputError(`No times were given for ${vehicleId} trip ${trip.tripNo}`);
+      if (!times) throw new PlanInputError(`No times were given for ${name}`);
 
       if (readyAt !== null && times.leaveAt < readyAt) {
         report('trips_overlap', about, `${capital(onTrip)} leaves at ${toClock(times.leaveAt)}, before it is back and reloaded at ${toClock(readyAt)}.`, `Leave at ${toClock(readyAt)} or later.`, readyAt);

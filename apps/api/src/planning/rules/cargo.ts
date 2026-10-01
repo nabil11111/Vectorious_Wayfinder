@@ -49,8 +49,9 @@ export const cargoProblems: CargoProblems = (input, tripLoads) => {
   const loaded = new Set(tripLoads.map(nameOf));
   for (const trip of input.plan.trips) {
     const vehicle = vehicleOf(trip.vehicleId);
+    const name = nameOf(trip);
     // Weight and volume are checked from the loads handed in, so a trip without one would pass unchecked.
-    if (!loaded.has(nameOf(trip))) throw new PlanInputError(`No load was given for ${nameOf(trip)}`);
+    if (!loaded.has(name)) throw new PlanInputError(`No load was given for ${name}`);
     const about = { vehicleId: vehicle.id, tripNo: trip.tripNo };
     const theVehicle = capital(vehicleCalled(vehicle));
     const onTrip = tripCalled(vehicle, trip.tripNo);
