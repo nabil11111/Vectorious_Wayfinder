@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { z } from 'zod';
-import { CutoffPassedDetails, StoreOrder, type DraftRefs, type Me, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
+import { CutoffPassedDetails, MAX_LINE_UNITS, StoreOrder, type DraftRefs, type Me, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
 import { meKey } from '@/features/auth/api';
 import { ApiRequestError } from '@/lib/api';
 import { fetchNextOrder, nextOrderKey, placeOrders, saveDraft } from './next-order';
@@ -22,12 +22,27 @@ export type PlacedNow = z.infer<typeof PlacedNow>;
 // What the manager has on the form: a quantity per item and the note.
 export interface FormValues { quantities: Record<string, number>; note: string }
 
-// 'saved': the server holds what the form shows. 'saving': a change is waiting or on its way. 'retrying': the
-// last try failed and another follows. 'refused': the server said no and the latest could not be loaded.
-export type Saving = 'saved' | 'saving' | 'retrying' | 'refused';
+// What a quantity box's text stands for: a whole number from 0 to 999 written in digits, with an empty box as 0, or
+// null for anything else, such as a minus, a fraction or more than 999. Nothing is rounded, cut or turned round, so
+// a typed -5 never becomes 5 (Q-01, Q-02).
+export function wholeQuantity(text: string): number | null {
+  const digits = text.trim();
+  if (digits === '') return 0;
+  if (!/^[0-9]+$/.test(digits)) return null;
+  const quantity = Number(digits);
+  return quantity <= MAX_LINE_UNITS ? quantity : null;
+}
 
-interface Screen {
+// 'saved': the server holds what the form shows. 'saving': a change is waiting or on its way. 'retrying': the
+// last try failed and another follows. 'refused': the server said no and the latest could not be loaded. 'held': a
+// quantity box holds something that is not a whole number from 0 to 999, so nothing is saved until it is fixed.
+export type Saving = 'saved' | 'saving' | 'retrying' | 'refused' | 'held';
+
+export interface Screen {
   values: FormValues;
+  // What a quantity box shows while it is not the number the form holds: the text being typed, and anything typed
+  // that is not a whole number from 0 to 999, which stays as it was typed (Q-01).
+  typed: Record<string, string>;
   saving: Saving;
   placing: boolean;
   // The draft was changed somewhere else and the form now shows the latest.
@@ -62,8 +77,9 @@ const worthRetrying = (error: unknown) =>
 // The order form's saving (spec 009, rule 3). One save runs at a time and the newest change waits for it. A
 // request names the drafts by the id and revision of the last answer. Timers and running requests outlive a
 // render, so this lives outside React and tells the screen what to show.
-class DraftForm {
+export class DraftForm {
   private values: FormValues;
+  private typed: Record<string, string> = {};
   private base: Base;
   private products: StoreProduct[];
   // Every change raises seq. A save carries the seq it was sent with, and the form is saved when they meet.
@@ -106,6 +122,11 @@ class DraftForm {
     if (this.onScreen) this.show(patch);
   }
 
+  // A quantity box holds something that is not a whole number from 0 to 999 (Q-01).
+  private invalid() {
+    return Object.values(this.typed).some((text) => wholeQuantity(text) === null);
+  }
+
   private request(): SaveDraftRequest {
     return {
       deliveryDate: this.base.deliveryDate,
@@ -120,12 +141,13 @@ class DraftForm {
     this.base = { deliveryDate: latest.deliveryDate ?? this.base.deliveryDate, refs: latest.draft?.refs ?? {} };
   }
 
-  // Show what the server holds and count the form as saved.
+  // Show what the server holds and count the form as saved. Every box shows its number again.
   private showLatest(latest: StoreNextOrder) {
     this.takeOver(latest);
     this.values = valuesOf(latest);
+    this.typed = {};
     this.savedSeq = this.sentSeq = this.seq;
-    this.tell({ values: this.values, saving: 'saved' });
+    this.tell({ values: this.values, typed: this.typed, saving: 'saved' });
   }
 
   // cutoff_passed names the day that is open now. The form moves to it and says which day closed.
@@ -178,6 +200,8 @@ class DraftForm {
     this.timer = 0;
     if (this.running) return;
     if (this.seq === this.savedSeq) { this.tell({ saving: 'saved' }); return; }
+    // Nothing is saved while a box holds something that is not a whole number from 0 to 999 (Q-01).
+    if (this.invalid()) { this.tell({ saving: 'held' }); return; }
     this.running = true;
     this.sentSeq = this.seq;
     const sent = this.values;
@@ -219,14 +243,39 @@ class DraftForm {
     if (this.placing) return;
     this.values = values;
     this.seq += 1;
-    this.tell({ values, saving: 'saving', changedElsewhere: false, refused: null });
+    // A box that holds something else holds the save until it is fixed, so what is saved is what the form shows.
+    const held = this.invalid();
+    this.tell({ values, typed: this.typed, saving: held ? 'held' : 'saving', changedElsewhere: false, refused: null });
     window.clearTimeout(this.retryTimer);
     window.clearTimeout(this.timer);
-    this.timer = window.setTimeout(this.flush, SAVE_AFTER_MS);
+    this.timer = held ? 0 : window.setTimeout(this.flush, SAVE_AFTER_MS);
   }
 
+  // − and +: a step from the number the form holds. What was typed in the box goes.
   setQuantity = (productId: string, quantity: number) => {
+    if (this.placing) return;
+    const { [productId]: _gone, ...typed } = this.typed;
+    this.typed = typed;
     if ((this.values.quantities[productId] ?? 0) !== quantity) this.change({ ...this.values, quantities: { ...this.values.quantities, [productId]: quantity } });
+    else this.tell({ typed });
+  };
+
+  // What is typed in a box stays as it is typed. A whole number from 0 to 999 is the item's quantity. Anything else
+  // is never turned into another number: the box keeps it, and the form saves nothing until it is fixed (Q-01, Q-02).
+  typeQuantity = (productId: string, text: string) => {
+    if (this.placing) return;
+    this.typed = { ...this.typed, [productId]: text };
+    const quantity = wholeQuantity(text);
+    this.change(quantity === null ? this.values : { ...this.values, quantities: { ...this.values.quantities, [productId]: quantity } });
+  };
+
+  // Leaving a box shows its number as the form holds it, "05" as 5. A box that holds something else keeps it.
+  leaveQuantity = (productId: string) => {
+    const text = this.typed[productId];
+    if (text === undefined || wholeQuantity(text) === null) return;
+    const { [productId]: _left, ...typed } = this.typed;
+    this.typed = typed;
+    this.tell({ typed });
   };
 
   setNote = (note: string) => {
@@ -288,7 +337,7 @@ class DraftForm {
 export function useDraftForm(next: OpenOrder) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [screen, setScreen] = useState<Screen>(() => ({ values: valuesOf(next), saving: 'saved', placing: false, changedElsewhere: false, closedDay: null, refused: null }));
+  const [screen, setScreen] = useState<Screen>(() => ({ values: valuesOf(next), typed: {}, saving: 'saved', placing: false, changedElsewhere: false, closedDay: null, refused: null }));
   const [form] = useState(() => new DraftForm(
     next, qc, (patch) => setScreen((now) => ({ ...now, ...patch })),
     (placedOrders) => navigate('/store/orders/placed', { state: { placedOrders } satisfies PlacedNow }),
@@ -300,5 +349,5 @@ export function useDraftForm(next: OpenOrder) {
     return () => form.closed();
   }, [form]);
 
-  return { ...screen, setQuantity: form.setQuantity, setNote: form.setNote, place: form.place };
+  return { ...screen, setQuantity: form.setQuantity, typeQuantity: form.typeQuantity, leaveQuantity: form.leaveQuantity, setNote: form.setNote, place: form.place };
 }

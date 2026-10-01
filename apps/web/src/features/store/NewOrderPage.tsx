@@ -12,7 +12,7 @@ import { LoadError, StaleNotice } from './parts/LoadError';
 import { NoOpenDay } from './parts/NextOrderCard';
 import { PageHeader } from './parts/PageHeader';
 import { Panel } from './parts/Panel';
-import { QuantityStepper } from './parts/QuantityStepper';
+import { QuantityStepper, type QuantityBox } from './parts/QuantityStepper';
 import { ENTRANCE, TEMP_NAME, brandList, brandUnits, clockTime, cubic, cutoffTime, inListOrder, itemFigures, kilos, lineWords, plural, shortDay, windowWords } from './words';
 
 // New order (Shop · New orders, and its Style, Tech and desktop frames). The shop orders from its brand's
@@ -62,6 +62,13 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
   const closedDay = form.closedDay ?? next.movedFrom;
 
   const checkout = <Checkout next={next} saving={form.saving} placing={form.placing} refused={form.refused} onPlace={() => { void form.place(); }} />;
+  const box = (productId: string): QuantityBox => ({
+    value: form.values.quantities[productId] ?? 0,
+    text: form.typed[productId],
+    onStep: (quantity) => form.setQuantity(productId, quantity),
+    onType: (text) => form.typeQuantity(productId, text),
+    onLeave: () => form.leaveQuantity(productId),
+  });
 
   return (
     <Page>
@@ -82,7 +89,7 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
           {fresh ? (
             <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-3.5">
               {products.map((product) => (
-                <FreshItem key={product.id} product={product} quantity={form.values.quantities[product.id] ?? 0} disabled={form.placing} onChange={(quantity) => form.setQuantity(product.id, quantity)} />
+                <FreshItem key={product.id} product={product} box={box(product.id)} disabled={form.placing} />
               ))}
             </div>
           ) : (
@@ -93,7 +100,7 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
                 <p className="ml-auto text-[11px] leading-[14px] text-muted-foreground/65">{[...new Set(products.map((p) => p.temp))].join(' and ')} · per unit</p>
               </div>
               {products.map((product) => (
-                <ListItem key={product.id} product={product} quantity={form.values.quantities[product.id] ?? 0} disabled={form.placing} onChange={(quantity) => form.setQuantity(product.id, quantity)} />
+                <ListItem key={product.id} product={product} box={box(product.id)} disabled={form.placing} />
               ))}
             </Panel>
           )}
@@ -153,32 +160,33 @@ function OrderForm({ next, stale }: { next: OpenOrder; stale: ReactNode }) {
   );
 }
 
-// The Fresh form: a card for each of its two items, named by temperature.
-function FreshItem({ product, quantity, disabled, onChange }: { product: StoreProduct; quantity: number; disabled: boolean; onChange: (quantity: number) => void }) {
+// The Fresh form: a card for each of its two items, named by temperature. The card wraps, so a box's line takes a
+// row of its own under the stepper (Q-01).
+function FreshItem({ product, box, disabled }: { product: StoreProduct; box: QuantityBox; disabled: boolean }) {
   const name = TEMP_NAME[product.temp];
   return (
-    <Panel className="flex items-center gap-3">
+    <Panel className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
       <img src={goodsIcon('Fresh', product.temp)} alt="" className="size-9" />
       <div className="min-w-0 flex-1">
-        <h2 className={cn('text-lg leading-[25px] font-bold', quantity === 0 && 'text-muted-foreground')}>{name}</h2>
+        <h2 className={cn('text-lg leading-[25px] font-bold', box.value === 0 && 'text-muted-foreground')}>{name}</h2>
         <p className="text-xs leading-[15px] text-muted-foreground">{plural(product.unit)}</p>
       </div>
-      <QuantityStepper size="lg" name={`${name} ${plural(product.unit)}`} value={quantity} disabled={disabled} onChange={onChange} />
+      <QuantityStepper size="lg" name={`${name} ${plural(product.unit)}`} box={box} disabled={disabled} />
     </Panel>
   );
 }
 
 // A row of the Style and Tech lists: the item, its unit with kilos and cubic metres, and the stepper. An item
 // at 0 is greyed.
-function ListItem({ product, quantity, disabled, onChange }: { product: StoreProduct; quantity: number; disabled: boolean; onChange: (quantity: number) => void }) {
+function ListItem({ product, box, disabled }: { product: StoreProduct; box: QuantityBox; disabled: boolean }) {
   return (
-    <div className="flex min-h-14 items-center gap-1.5 border-t py-2">
+    <div className="flex min-h-14 flex-wrap items-center gap-x-1.5 gap-y-1 border-t py-2">
       {/* The longest line of the product list fits a 390 px phone to the pixel, so it may use 4 px of the gap. */}
       <div className="-mr-1 min-w-0 flex-1">
-        <h3 className={cn('font-sans text-sm leading-[17px] font-semibold', quantity === 0 && 'text-muted-foreground')}>{product.name}</h3>
+        <h3 className={cn('font-sans text-sm leading-[17px] font-semibold', box.value === 0 && 'text-muted-foreground')}>{product.name}</h3>
         <p className="mt-1 font-mono text-[11px] leading-[14px] text-muted-foreground/65">{itemFigures(product)}</p>
       </div>
-      <QuantityStepper size="md" name={product.name} value={quantity} disabled={disabled} onChange={onChange} />
+      <QuantityStepper size="md" name={product.name} box={box} disabled={disabled} />
     </div>
   );
 }
@@ -187,6 +195,8 @@ const SAVE_WORDS: Record<Exclude<Saving, 'saved'>, ReactNode> = {
   saving: 'saving…',
   retrying: <span className="text-warn-ink">not saved · trying again</span>,
   refused: <span className="text-warn-ink">not saved</span>,
+  // A box holds something that is not a whole number from 0 to 999, and its line says so (Q-01).
+  held: <span className="text-warn-ink">not saved · check the numbers</span>,
 };
 
 // The foot of the form: what the last save came to, whether it is saved, and the button that places it. The
