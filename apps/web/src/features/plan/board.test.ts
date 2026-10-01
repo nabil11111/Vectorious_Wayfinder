@@ -366,3 +366,31 @@ it('spec 023 AC-5 a drop goes out as one save of the draft, checked as a button\
   await settled();
   saver.stop();
 });
+
+it('spec 023 a write the queue runs hands its answer on once taken, and nothing when refused or loaded again', async () => {
+  signedIn(RUWAN);
+  const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+  const done = vi.fn();
+  // Taken: done gets the board the build answered.
+  const built = saver.act(sendPlan, done);
+  await settled();
+  const answered = boardOf('Peliyagoda', PLAN, 1);
+  answer(Response.json(answered));
+  expect(await built).toBeNull();
+  expect(done).toHaveBeenCalledExactlyOnceWith(answered);
+
+  // Refused with a sentence: nothing handed on.
+  const refused = saver.act(sendPlan, done);
+  await settled();
+  answer(Response.json({ error: { code: 'not_ready', message: 'The plan has blocks.' } }, { status: 409 }));
+  expect(await refused).toBe('The plan has blocks.');
+  // Stale: the board is read again, and nothing is handed on either.
+  const stale = saver.act(sendPlan, done);
+  await settled();
+  answer(Response.json({ error: { code: 'stale', message: 'The plan was changed in another tab, so it was loaded again.' } }, { status: 409 }));
+  await settled();
+  answer(Response.json(boardOf('Peliyagoda', PLAN, 2)));
+  expect(await stale).toBeNull();
+  expect(done).toHaveBeenCalledOnce();
+  saver.stop();
+});

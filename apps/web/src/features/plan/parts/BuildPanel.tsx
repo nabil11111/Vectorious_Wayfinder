@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PlanBoard, PlanRef } from '@wayfinder/contracts';
+import { useNavigate } from 'react-router';
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { suggestPlan, type BoardScreen } from '../board';
+import type { BoardScreen } from '../board';
 import { BUILD, BUILDING, buildingLine, KEEP_DRAFT, REPLACE_TITLE, replaceLine, suggestedAt, toMake } from '../words';
+import { buildPlan, type BuildAct } from './build';
 import { useLanding } from './dragging';
 import { ICON } from './icons';
 import { orangeButton, plainButton } from './look';
-
-// A write the board's queue runs once the draft is saved. It says why it was refused, or null.
-type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>) => Promise<string | null>;
 
 // The empty middle's drop area, in place of "Start a blank trip" (spec 023, with the trucks panel going in spec 026).
 const DROP_HERE = 'or drag an order here to start a trip';
@@ -23,22 +21,24 @@ const DROP_HERE = 'or drag an order here to start a trip';
 // and the board holds still. A refusal shows the server's sentence in red with Try again, and one that loads the board
 // again says so in spec 010's line. After a build, the line says when it was suggested and how many of the planner's
 // decisions are still to make.
-export function BuildPanel({ screen, act, onBuilding }: { screen: BoardScreen; act: Act; onBuilding: () => void }) {
+export function BuildPanel({ screen, act, onBuilding }: { screen: BoardScreen; act: BuildAct; onBuilding: () => void }) {
   const { board, draft } = screen;
   const [asking, setAsking] = useState(false);
   const [building, setBuilding] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
+  const navigate = useNavigate();
   // The whole empty middle takes the drop. Its dashed area says so and shows the drag over it.
   const { setNodeRef: middleRef, look: middleLook } = useLanding('middle', { kind: 'middle' }, 'the middle, to start a trip');
   // The rows View plan lists as open: the screen counts them, nothing else.
   const open = board.suggestion?.decisions.filter((decision) => decision.open).length ?? 0;
 
+  // A build that goes through opens View plan for its day (spec 023). A refused one stays here with its line.
   const build = async () => {
     setAsking(false);
     setRefused(null);
     setBuilding(true);
     onBuilding();
-    const problem = await act((date, ref) => suggestPlan(date, ref));
+    const problem = await buildPlan(act, (date) => navigate(`/dispatcher/plan/${date}`));
     setBuilding(false);
     setRefused(problem);
   };
