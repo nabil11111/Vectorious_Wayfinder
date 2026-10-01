@@ -40,9 +40,11 @@ export const vehicleCalled = (vehicle: Vehicle) => `the ${kindOf(vehicle)} ${veh
 // "the second trip of the reefer truck VEH001", or "its second trip" once the sentence has named the vehicle. Its
 // first or only trip gets no number: it is the vehicle itself, and itsTrip gives null for the sentence to say it
 // in its own words.
-const isSecond = (tripNo: number) => tripNo === 2;
-export const tripCalled = (vehicle: Vehicle, tripNo: number) => (isSecond(tripNo) ? `the second trip of ${vehicleCalled(vehicle)}` : vehicleCalled(vehicle));
-export const itsTrip = (tripNo: number) => (isSecond(tripNo) ? 'its second trip' : null);
+export const isSecondTrip = (tripNo: number) => tripNo === 2;
+export const tripCalled = (vehicle: Vehicle, tripNo: number) => (isSecondTrip(tripNo) ? `the second trip of ${vehicleCalled(vehicle)}` : vehicleCalled(vehicle));
+export const itsTrip = (tripNo: number) => (isSecondTrip(tripNo) ? 'its second trip' : null);
+// " on its second trip" after what a vehicle carries, and nothing for its first or only trip.
+export const onItsTrip = (tripNo: number) => (isSecondTrip(tripNo) ? ' on its second trip' : '');
 
 // A sentence that leads with a vehicle starts "The dry truck VEH044".
 export const capital = (sentence: string) => sentence.charAt(0).toUpperCase() + sentence.slice(1);

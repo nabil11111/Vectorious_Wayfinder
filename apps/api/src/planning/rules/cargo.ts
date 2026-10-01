@@ -3,7 +3,7 @@ import { PlanInputError } from '../errors';
 import { computeLoad } from '../load';
 import { lookup } from '../lookup';
 import type { CargoProblems } from '../types';
-import { capital, itsTrip, kg, m3, orderCalled, tripCalled, vehicleCalled } from '../words';
+import { capital, itsTrip, kg, m3, onItsTrip, orderCalled, tripCalled, vehicleCalled } from '../words';
 
 // What each vehicle carries (spec 007, AC-17 to AC-23): weight, volume, chilled goods, van-only shops, depots,
 // tail-lift items and mixed brands. The sentences follow spec 024: what is wrong first, the vehicle by its kind.
@@ -17,11 +17,6 @@ const over = (load: number, limit: number, perUnit: number) => (Math.round(load 
 // How a trip is told apart from the others in the loads handed in, and in an error about them.
 const nameOf = (trip: { vehicleId: string; tripNo: number }) => `${trip.vehicleId} trip ${trip.tripNo}`;
 const list = new Intl.ListFormat('en-GB');
-// " on its second trip" after a load, and nothing for a first or only trip.
-const onItsTrip = (tripNo: number) => {
-  const second = itsTrip(tripNo);
-  return second === null ? '' : ` on ${second}`;
-};
 
 export const cargoProblems: CargoProblems = (input, tripLoads) => {
   const vehicleOf = lookup(input.vehicles, 'vehicle');

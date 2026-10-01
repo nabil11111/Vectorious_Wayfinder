@@ -2,9 +2,8 @@ import { checkPlan } from '../check';
 import { computeLoad } from '../load';
 import { defaultLeaveAt } from '../timeline';
 import type { BuildSuggestedPlan, PlanInput, PlannerChoice, PlannerDecision, PlannerOrder, PlannerSplit } from '../types';
-import { toClock } from '../words';
 import { compare, prepareInput } from './priority';
-import { deferralDecisions, deferralFor, furthestRejection, placementReason, priorityReason, quantityWord, refusedReason, shopName } from './reasons';
+import { deferralDecisions, deferralFor, earlyLeaveReason, furthestRejection, placementReason, priorityReason, quantityWord, refusedReason } from './reasons';
 import { chooseWhole, type CandidateAttempt } from './candidates';
 import { chooseAllocation, splitLimitDetail } from './split';
 
@@ -80,7 +79,8 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
           detail: splitLimitDetail(input, proposal.remainder, originals.length + splits.length, remainder.slots, code),
         });
         defer(proposal.remainder, deferral);
-        restReason = (compact) => `${remainingUnits} wait: ${refusedReason(source, proposal.remainder, remainder.attempts, code, compact)}`;
+        // The first part's vehicle is named just before, so the refusal's short form may call it "it".
+        restReason = (compact) => `${remainingUnits} wait: ${refusedReason(source, proposal.remainder, remainder.attempts, code, compact, best.slot.vehicleId)}`;
       }
       choices.push({ orderId: order.id, rank, resultOrderIds, reason: choiceReason((compact) => `${priority(compact)}; ${keptUnits} ${quantityWord(source, order)} ${placed(compact)}; ${restReason(compact)}`) });
     } else {
@@ -103,7 +103,7 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
       if (!cause) throw new Error(`No forcing order for ${tripKey(trip)}`);
       decisions.push({
         kind: 'early_leave', vehicleId: trip.vehicleId, tripNo: trip.tripNo, leaveAt: trip.leaveAt,
-        reason: `${trip.vehicleId} trip ${trip.tripNo} leaves at ${toClock(trip.leaveAt)} instead of ${toClock(usual)} after adding the rank ${cause.rank} order for ${shopName(source, cause.order)}.`,
+        reason: earlyLeaveReason(source, { vehicleId: trip.vehicleId, tripNo: trip.tripNo, leaveAt: trip.leaveAt, usual }, cause.rank, cause.order),
       });
     }
     const times = check.trips.find((t) => t.vehicleId === trip.vehicleId && t.tripNo === trip.tripNo)?.times;
