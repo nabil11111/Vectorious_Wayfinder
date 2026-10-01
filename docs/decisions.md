@@ -157,20 +157,27 @@ branches. Spec 016 starts at D-66 so those records can join without renumbering.
 depot-wide, and this piece adds no history date picker.
 
 **D-67 · 1 Oct · The dashboard's counts say what they count** (our pick, until Nabil answers). Stops delivered
-requires some goods accepted and labels partial deliveries; closed stops, complete refusals and zero-load completions
-are finished but not delivered. Trucks out counts distinct
-vehicles, next-run orders counts eligible leaf orders, and deferrals name the plan that deferred them without
+requires some goods accepted and labels partial deliveries; its bar uses the same delivered count. Closed stops,
+complete refusals and zero-load completions are finished but not delivered; trip Progress counts them as finished.
+Brand headers get their own server totals, counting each vehicle once across districts. Trucks out counts distinct
+vehicles. Until the watched plan is published, next-run demand counts only eligible leaf orders wanted after that
+watched date, so the seeded Friday count is 0 while Thursday is being planned. Afterwards eligible carry-over can
+enter. Waiting orders and next-date published membership are deduplicated by id. Deferrals name the plan that deferred them without
 promising a new date. Fuel is the week's recorded and committed `fuel_log` litres against the fleet's quota, not
 measured consumption. [Spec 016's source table](specs/016-live-day/spec.md#rules) defines every numerator and denominator.
 
 **D-68 · 1 Oct · Live day shows the sent schedule and recorded progress, not a location or connection it cannot
 know** (our pick, until Nabil answers). Planned times stay the sent plan's; actual times and Last report come from
-the driver's records. An overdue missing report says that, without claiming the truck is late or offline. GPS,
+the driver's records. The out-truck table heads the frame's ETA as Planned arrival and Back as Planned return;
+open problems sort first by their oldest raised time, then missing-report attention, then other out trips.
+An overdue missing report says that, without claiming the truck is late or offline. GPS,
 revised ETAs, traffic causes and the driver's waiting queue are outside this piece.
 
 **D-69 · 1 Oct · Drops and events reads existing business records at their app-clock times.** Current publication,
 loading, driver and issue records make the feed, scoped to the shown trips, with stable keys and at most 50 latest
-events. A closed attempt keeps its issue counts even when its orders are sent again. Real audit timestamps are never
+events. Every joined problem kind gets its raised event, including 015's receipt report. A photo is only the words
+"· photo" on an event: no A7 proof route or viewer; the existing problem-card photo stays 013's. A closed attempt
+keeps its issue counts even when its orders are sent again. Real audit timestamps are never
 shown and the audit log surviving a reset cannot repopulate this day. Complete history belongs to A8.
 
 **D-70 · 1 Oct · The loader's Plan changed flow covers taking back and resending before loading starts** (our pick,
@@ -180,11 +187,15 @@ goods already counted. Loading flags and the driver's existing closed-shop retry
 
 **D-71 · 1 Oct · The loader compares two publications this tablet tab has seen, and Got it is local** (our pick,
 until Nabil answers). Keep the comparison per account, depot, demo generation and day in session storage. First visit
-establishes a baseline; withdrawal keeps it; resend compares logical vehicle/trip, stop/order and quantity details,
-not regenerated UUIDs. Got it closes the notice, while changed chips and the changed-trip count remain as drawn.
+establishes a baseline; withdrawal keeps it only in storage, with no old list on screen. Resend compares logical
+vehicle/trip, stop/order and quantity details, not regenerated UUIDs. A removed and added trip with the exact same
+orders become one Moved row and bell 1, as in frame 85:71921. Got it closes the notice, while changed chips and the
+comparison-row count remain as drawn.
 It is not a cross-device unread count or permission to start loading, and adds no acknowledgment write.
 
 **D-72 · 1 Oct · Dashboard and Live day use the existing problem cards and decisions.** Decide and Open next only
-open or focus an existing issue; its existing API still checks the role, depot and revision. There is no second
+open or focus an existing issue; its existing API still checks the role, depot and revision. Every open problem
+remains shown in full, preserving 012's departure 10; an answered trip row says Decided, not an unsupported Warned.
+The driver's phone bell count remains deferred despite 013's earlier A7 promise. There is no second
 answer path, Undo, credit, write-off, warning message or replacement command in spec 016. Receipt behavior remains
 spec 015's; a driver-delivered quantity never stands in for a shop's confirmed receipt.

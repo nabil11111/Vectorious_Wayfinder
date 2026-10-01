@@ -4,7 +4,8 @@ One pull request per task, from the lead's integration branch after T0. Tests fi
 criteria in [plan.md](plan.md). This document assigns future implementation; the spec PR changes documents only.
 
 - [ ] **T0 · Shared parts** · lead, after spec 013's server and screens are joined, with 014/015's landed contracts
-  reconciled. Add/export `operations.ts`, widen `LoadingDay` with the publication fields and demo generation, mount
+  reconciled and review item 1's next-run cutoff/stability boundary in spec.md settled. Add/export `operations.ts`,
+  widen `LoadingDay` with the publication fields and demo generation, mount
   an empty dispatcher/depot-protected `routes/operations.ts` in `app.ts`. Keep the existing loading responses valid
   while widening them: T0 owns the minimal `loading/day.ts` and `loading/writes.ts` signature/metadata work and its
   tests **AC-20** before the API builder starts. Add the operations invalidation fan-out to the existing
@@ -24,36 +25,42 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
   `attention.test.ts`; GET `/` in `apps/api/src/routes/operations.ts`;
   `apps/api/tests/operations-plan.ts`, `operations-read.test.ts`. API builder owns this route after T0's handoff.
 
-- [ ] **T2 · Attempts, events and proof** · same API builder, after T1 (**AC-8, AC-9, AC-13, AC-17 to AC-19**).
-  Tests first for closed → bring back → replan, Try again, late/repeated writes, event ordering/reset and scoped
-  JPEG reads. Complete the events fields of the day response and the proof endpoint. No event-table shortcut.
-  **Files:** `apps/api/src/operations/read.ts`, `events.ts`, `photo.ts`, `routes/operations.ts`;
-  `apps/api/tests/operations-plan.ts`, `operations-read.test.ts` (AC-13's read and foreign-proof checks),
+- [ ] **T2 · Attempts and events** · same API builder, after T1 (**AC-8, AC-9, AC-13, AC-17, AC-18**).
+  Tests first for closed → bring back → replan, Try again, late/repeated writes, event ordering/reset and depot
+  scoping. Complete the event fields, including a raised event for each joined problem kind (015's receipt too)
+  and the noninteractive photo marker. No event-table shortcut or proof endpoint.
+  **Files:** `apps/api/src/operations/read.ts`, `events.ts`, `routes/operations.ts`;
+  `apps/api/tests/operations-plan.ts`, `operations-read.test.ts` (AC-13's depot read checks),
   `operations-attempts.test.ts`, `operations-events.test.ts`.
 
 - [ ] **T3 · Dashboard and Live day** · screens builder, alongside T1/T2 after T0 (**AC-26 to AC-29, AC-32 to AC-34**,
   dispatcher part of **AC-35**). Replace the two placeholders, share one operations query, reuse Needs you/cards,
-  add navigation/filter/detail/photograph behavior and all No frame states. Write AC-34's request-ordering test
+  add navigation/filter/detail behavior and all No frame states, including the named Live day loading skeleton.
+  Render brand totals and tile-specific progress from the read, the defined Trucks out columns/order, all full
+  Needs you cards and answered rows marked Decided. Write AC-34's request-ordering test
   first. Use the contract against the API as it lands; fixtures may live in tests only. This task is not done until
   the joined screens meet real records.
   **Files:** `apps/web/src/features/dispatcher/DispatcherHome.tsx`, new `DashboardPage.tsx` and dashboard-only
   `parts/`; `apps/web/src/features/live/LiveDayPage.tsx`, new `operations.ts`, `operations.test.ts`, `words.ts` and
-  `parts/`. Limited changes to `NeedsYou.tsx` for focus ids/Open next, and `issues.ts` to refetch operations after
-  the existing answer. Preserve `IssueCard.tsx`'s answers and `Bell.tsx`'s shared issue query; no ownership of their
-  business changes while 013/015 join.
+  `parts/`. Limited changes to `NeedsYou.tsx` for focus ids/Open next. **No edit to `features/live/issues.ts`**:
+  T0's `issues` fan-out already refetches operations after a committed answer. Preserve `IssueCard.tsx`'s answers
+  and `Bell.tsx`'s shared issue query; no ownership of their business changes while 013/015 join.
 
 - [ ] **T4 · The loader's changed publication** · same screens builder, after T3 (**AC-21 to AC-23, AC-30, AC-31**,
   loader part of **AC-33, AC-35**). Test comparison and session lifecycle before code. Extend the existing loader
   area with the full change page, changed chips and local badge, retaining Start's errors and no automatic form loss.
+  Pair an exact-order whole-trip move into one row/bell 1; keep the old list only in storage during withdrawal.
+  Put this notice/comparison's new words in its own `changes.ts`, not the shared loader `words.ts` owned by 015.
   **Files in `apps/web/src/features/loader/`:** new `changes.ts`, `changes.test.ts`, `PlanChangedPage.tsx`,
-  `parts/PlanChangeBell.tsx`; existing `LoaderHome.tsx`, `TrucksPage.tsx`, `TruckPage.tsx`, `loading.ts`, `words.ts`,
+  `parts/PlanChangeBell.tsx`; existing `LoaderHome.tsx`, `TrucksPage.tsx`, `TruckPage.tsx`, `loading.ts`,
   `parts/NextOutCard.tsx` and `parts/TruckRow.tsx` for both changed chips. It does not own `features/auth/api.ts` or the app router: observe the
   existing account state and keep routes inside `LoaderHome`.
 
 - [ ] **T5 · Join, click through and review** · lead, after T2 and T4 (**AC-26 to AC-33, AC-35**).
   Join API and screens, run typecheck/full tests/build on a freshly migrated/seeded private database, then the named
-  checks in plan.md on the built app. Use 1440 × 900, 1024, 820 and 390 for the dispatcher, 1180 × 820 and 390 for
-  the loader, two browsers for live updates and offline sync. Check the unchanged 012 start/unsend race and 013
+  checks in plan.md in **Nabil's visible Chrome on the built app**, next to the frames. Use 1440 × 900, 1024, 820
+  and 390 for the dispatcher, 1180 × 820 and 390 for the loader, normal/private Chrome sessions for live updates
+  and offline sync. Check the unchanged 012 start/unsend race and 013
   queue/answer tests too. A second tool/person that did not build it reviews every criterion and source.
   **Files:** resolve joins in the already assigned files; add actual evidence to
   `docs/specs/016-live-day/verification.md`, update spec checkboxes/status, README walkthrough/departures,
@@ -63,7 +70,9 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
 **Parallel work:** API T1 → T2 and screens T3 → T4 branch from the pushed T0 and run side by side. T0's contracts,
 loading metadata and stream fan-out belong to the lead alone; any required shared correction returns to that owner
 and is pushed before both builders adopt it. The API builder touches no web files; the screens builder touches no
-API files. T3 and T4 share one screens owner, so they do not race on loader words or routes.
+API files. T3 and T4 share one screens owner, so they do not race on their own files or routes. AC-19 is removed;
+the other 35 criteria retain their ids and task owners. No task assigns a file owned by spec 015: its issue hook,
+IssueCard, loader problem words, driver words and store/receipt files remain outside this piece.
 
 Nobody else changes `packages/contracts`, `apps/api/src/app.ts`, `loading/day.ts`, `loading/writes.ts`,
 `apps/web/src/lib/live.ts` or the T0 tests while T0 is open. Nobody adds a migration or changes the schema, seed,
