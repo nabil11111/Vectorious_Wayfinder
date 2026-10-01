@@ -275,6 +275,13 @@ describe('Q-22 a flag that was not sent is never left behind without a word', ()
     expect([...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(([, words]) => words)).toEqual(['Try again', 'Leave without sending']);
   });
 
+  it('asks the same way before signing out, with Sign out anyway', () => {
+    const html = renderToStaticMarkup(<LeaveUnsent signingOut onRetry={() => {}} onLeave={() => {}} />);
+    expect(html).toMatch(/role="alertdialog"/);
+    expect(html).toContain('This flag is not sent. If you sign out now, the dispatcher may never see it.');
+    expect([...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(([, words]) => words)).toEqual(['Try again', 'Sign out anyway']);
+  });
+
   it('holds the loader while the flag is still on its way, and says so', () => {
     expect(renderToStaticMarkup(<SendingFirst />)).toContain('Sending the flag. You can leave once it is sent.');
   });

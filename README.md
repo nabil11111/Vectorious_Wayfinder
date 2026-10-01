@@ -301,8 +301,9 @@ Anything we built differently from our Designathon submission, and why.
 - **The flag has no photo yet;** proof photos come with the driver's piece.
 - **"Won't fit" is a fourth flag reason,** counting what fits on the truck, with the same two answers said about room.
   A full truck is a real dock problem, and flagging it as "Short" made the dispatcher read it as missing stock.
-- **Leaving the flag form while its flag is not sent asks first,** with "Try again" and "Leave without sending". The
-  loader works online with no outbox, so a flag that did not go would otherwise be lost without a word.
+- **Leaving the flag form or signing out while its flag is not sent asks first,** with "Try again" and "Leave without
+  sending" or "Sign out anyway". The loader works online with no outbox, so a flag that did not go would otherwise be
+  lost without a word.
 - **The load figure is what is on the truck so far.**
 - **A van's load reads in kilos,** "648 / 1,040 kg", and a truck's weight in tonnes rounds down. In tonnes a 1,040 kg
   van read "1.0 / 1.0 t" with 81 kg still free.
