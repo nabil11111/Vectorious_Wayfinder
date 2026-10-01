@@ -21,7 +21,10 @@ function signedIn() {
 
 describe('Q-04 sign-out waits for what must end first', () => {
   beforeEach(() => {
-    vi.stubGlobal('window', new EventTarget());
+    vi.stubGlobal('window', Object.assign(new EventTarget(), {
+      setTimeout: (run: () => void, ms: number) => setTimeout(run, ms),
+      clearTimeout: (timer: number) => clearTimeout(timer),
+    }));
     // With no browser storage here, forgetting the kept account only warns.
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
@@ -52,6 +55,27 @@ describe('Q-04 sign-out waits for what must end first', () => {
     expect(sent).toEqual(['/api/v1/auth/logout']);
     expect(qc.getQueryData(meKey)).toBeNull();
     expect(qc.getQueryData(['orders', 'store', 'next'])).toBeUndefined();
+  });
+
+  it('waits 5 seconds at most for work that has not ended, hands it that deadline, then signs out', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let deadline: AbortSignal | undefined;
+    const stop = finishBeforeSignOut((given) => { deadline = given; return new Promise<void>(() => {}); });
+    try {
+      const { qc, sent, signOut } = signedIn();
+      const signingOut = signOut();
+      await vi.advanceTimersByTimeAsync(4999);
+      expect(sent).toEqual([]);
+      expect(deadline?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await signingOut;
+      expect(deadline?.aborted).toBe(true);
+      expect(sent).toEqual(['/api/v1/auth/logout']);
+      expect(qc.getQueryData(meKey)).toBeNull();
+    } finally {
+      stop();
+      vi.useRealTimers();
+    }
   });
 
   it('no longer waits for work taken back', async () => {

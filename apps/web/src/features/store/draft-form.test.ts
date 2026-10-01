@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { logoutMutation, meKey } from '@/features/auth/api';
 import { DraftForm, wholeQuantity, type OpenOrder, type Screen } from './draft-form';
 import { nextOrderKey } from './next-order';
-import { NOT_KEPT } from './words';
+import { NOT_CONFIRMED, NOT_KEPT, PLACE_NOT_CONFIRMED } from './words';
 
 // The order form's saving (spec 009, rule 3) against a stand-in server: one Fresh shop, its draft and what it placed.
 // The 600 ms before a save and the retries run on fake timers, and the network is a stubbed fetch.
@@ -138,10 +138,13 @@ class Server {
   }
 }
 
-// An answer the test lets go of when it wants.
+// An answer the test lets go of when it wants. One still held when a test ends is let go then, as no signal, so the
+// writes that queue behind it in the next test are not held too.
+const holding: ((answer: Own) => void)[] = [];
 function held() {
   let release!: (answer: Own) => void;
   const answer = new Promise<Own>((resolve) => { release = resolve; });
+  holding.push(release);
   return { answer, release };
 }
 
@@ -183,6 +186,8 @@ afterEach(async () => {
     qc.setQueryData(meKey, null);
     await form.closed();
   }
+  for (const release of holding.splice(0)) release('no signal');
+  await after(0);
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
@@ -292,7 +297,8 @@ describe('Q-04 signing out while a change is still saving', () => {
     form.typeQuantity(CHILLED.id, '10');
     await after(600);
     const signingOut = signOut(qc);
-    await after(5000);
+    // Within the 5 seconds a sign-out waits at most.
+    await after(4000);
     expect(server.log).toEqual(['PUT draft']);
     expect(qc.getQueryData(meKey)).toEqual(NADEESHA);
     save.release('usual');
@@ -508,7 +514,8 @@ describe('Q-04 and Q-08 signing out just after Place', () => {
     const placing = form.place();
     await after(0);
     const signingOut = signOut(qc);
-    await after(5000);
+    // Within the 5 seconds a sign-out waits at most.
+    await after(4000);
     expect(server.log).toEqual(['POST place']);
     answer.release('usual');
     await placing;
@@ -516,5 +523,69 @@ describe('Q-04 and Q-08 signing out just after Place', () => {
     expect(server.log).toEqual(['POST place', 'POST logout']);
     expect(placed).toHaveLength(1);
     expect(toast).not.toHaveBeenCalled();
+  });
+});
+
+describe('Q-04 a sign-out never waits on an answer that does not come', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  it('waits 5 seconds at most for a save that does not answer, says the change could not be confirmed, and signs out', async () => {
+    server = new Server({ [DRY.id]: 2 });
+    const { qc, form } = openForm(server);
+    const save = held();
+    server.saveAnswers.push(save.answer);
+    form.typeQuantity(CHILLED.id, '10');
+    const signingOut = signOut(qc);
+    await after(4999);
+    expect(server.log).toEqual(['PUT draft']);
+    expect(toast).not.toHaveBeenCalled();
+    await after(1);
+    await signingOut;
+    expect(server.log).toEqual(['PUT draft', 'POST logout']);
+    expect(qc.getQueryData(meKey)).toBeNull();
+    expect(toast).toHaveBeenCalledWith(NOT_CONFIRMED, expect.objectContaining({ id: 'draft-not-kept' }));
+    // The answer that comes later starts no retry.
+    save.release('no signal');
+    await after(60_000);
+    expect(server.log).toEqual(['PUT draft', 'POST logout']);
+  });
+
+  it('waits 5 seconds at most for a place that does not answer, and says the order could not be confirmed as placed', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { qc, form } = openForm(server);
+    const answer = held();
+    server.placeAnswers.push(answer.answer);
+    const placing = form.place();
+    await after(0);
+    const signingOut = signOut(qc);
+    await after(5000);
+    await signingOut;
+    expect(server.log).toEqual(['POST place', 'POST logout']);
+    expect(toast).toHaveBeenCalledWith(PLACE_NOT_CONFIRMED, expect.objectContaining({ id: 'draft-not-kept' }));
+    answer.release('no signal');
+    await placing;
+  });
+
+  it('lets go of a form left with a save that never answered, so the next sign-out does not wait for it again', async () => {
+    server = new Server({ [DRY.id]: 2 });
+    const { qc, form } = openForm(server);
+    const save = held();
+    server.saveAnswers.push(save.answer);
+    form.setQuantity(DRY.id, 3);
+    void form.closed();
+    const first = signOut(qc);
+    await after(5000);
+    await first;
+    expect(toast).toHaveBeenCalledWith(NOT_CONFIRMED, expect.objectContaining({ id: 'draft-not-kept' }));
+    // Someone signs in on this browser and out again: nothing is left to wait for.
+    qc.setQueryData(meKey, { ...NADEESHA, id: 'ishara', username: 'ishara' });
+    const second = signOut(qc);
+    await after(0);
+    await second;
+    expect(server.log).toEqual(['PUT draft', 'POST logout', 'POST logout']);
+    save.release('no signal');
+    await after(0);
   });
 });
