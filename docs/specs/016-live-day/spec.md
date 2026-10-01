@@ -1,6 +1,6 @@
 # 016 · Watching the day
 
-**Status:** Spec, with open questions and our picks below · **Owner:** · **Design:** Dispatcher · Dashboard, Live day,
+**Status:** Done, with open questions and our picks below · **Owner:** · **Design:** Dispatcher · Dashboard, Live day,
 Live day · loading, Live day · issue open, both Live day · decision sent states, Loader · Plan changed and Today's trucks · plan changed.
 
 Piece A7 of [the map](../000-map.md). [008](../008-demo-day/spec.md) supplies the clock and live updates,

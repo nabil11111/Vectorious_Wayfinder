@@ -3,7 +3,7 @@
 One pull request per task, from the lead's integration branch after T0. Tests first (D-07); each task names its
 criteria in [plan.md](plan.md). This document assigns future implementation; the spec PR changes documents only.
 
-- [ ] **T0 · Shared parts** · lead, after spec 013's server and screens are joined, with 014/015's landed contracts
+- [x] **T0 · Shared parts** · lead, after spec 013's server and screens are joined, with 014/015's landed contracts
   reconciled. Add/export `operations.ts`,
   widen `LoadingDay` with the publication fields and demo generation, mount
   an empty dispatcher/depot-protected `routes/operations.ts` in `app.ts`. Keep the existing loading responses valid
@@ -18,7 +18,7 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
   `apps/web/src/lib/live.ts`, `lib/live.test.ts`,
   `assets/icons/` if an existing icon is missing; implementation status in `docs/specs/000-map.md`.
 
-- [ ] **T1 · The dispatcher reads the day** · API builder, after T0 (**AC-1 to AC-7, AC-10 to AC-12, AC-14 to AC-16, AC-25, AC-36, AC-37**).
+- [x] **T1 · The dispatcher reads the day** · API builder, after T0 (**AC-1 to AC-7, AC-10 to AC-12, AC-14 to AC-16, AC-25, AC-36, AC-37**).
   Write and run the failing reads/counts/attention tests before implementing the read model. Include the fresh-reset
   legacy plan, depot isolation, absent day and snapshot/reset race. AC-37 asserts Friday demand 0 → 99 → 0 through
   the real Thursday Send/Back to edit; the tile shows the future cutoff without a closed state. Reuse 013's read
@@ -27,7 +27,7 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
   `attention.test.ts`; GET `/` in `apps/api/src/routes/operations.ts`;
   `apps/api/tests/operations-plan.ts`, `operations-read.test.ts`. API builder owns this route after T0's handoff.
 
-- [ ] **T2 · Attempts and events** · same API builder, after T1 (**AC-8, AC-9, AC-13, AC-17, AC-18**).
+- [x] **T2 · Attempts and events** · same API builder, after T1 (**AC-8, AC-9, AC-13, AC-17, AC-18**).
   Tests first for closed → bring back → replan, Try again, late/repeated writes, event ordering/reset and depot
   scoping. Complete the event fields, including a raised event for each joined problem kind (015's receipt too)
   and the noninteractive photo marker. No event-table shortcut or proof endpoint.
@@ -35,7 +35,7 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
   `apps/api/tests/operations-plan.ts`, `operations-read.test.ts` (AC-13's depot read checks),
   `operations-attempts.test.ts`, `operations-events.test.ts`.
 
-- [ ] **T3 · Dashboard and Live day** · screens builder, alongside T1/T2 after T0 (**AC-26 to AC-29, AC-32 to AC-34**,
+- [x] **T3 · Dashboard and Live day** · screens builder, alongside T1/T2 after T0 (**AC-26 to AC-29, AC-32 to AC-34**,
   dispatcher part of **AC-35**). Replace the two placeholders, share one operations query, reuse Needs you/cards,
   add navigation/filter/detail behavior and all No frame states, including the named Live day loading skeleton.
   Render brand totals and tile-specific progress from the read, the defined Trucks out columns/order, all full
@@ -48,7 +48,7 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
   T0's `issues` fan-out already refetches operations after a committed answer. Preserve `IssueCard.tsx`'s answers
   and `Bell.tsx`'s shared issue query; no ownership of their business changes while 013/015 join.
 
-- [ ] **T4 · The loader's changed publication** · same screens builder, after T3 (**AC-21 to AC-23, AC-30, AC-31**,
+- [x] **T4 · The loader's changed publication** · same screens builder, after T3 (**AC-21 to AC-23, AC-30, AC-31**,
   loader part of **AC-33, AC-35**). Test comparison and session lifecycle before code. Extend the existing loader
   area with the full change page, changed chips and local badge, retaining Start's errors and no automatic form loss.
   Pair an exact-order whole-trip move into one row/bell 1; keep the old list only in storage during withdrawal.
@@ -58,7 +58,7 @@ criteria in [plan.md](plan.md). This document assigns future implementation; the
   `parts/NextOutCard.tsx` and `parts/TruckRow.tsx` for both changed chips. It does not own `features/auth/api.ts` or the app router: observe the
   existing account state and keep routes inside `LoaderHome`.
 
-- [ ] **T5 · Join, click through and review** · lead, after T2 and T4 (**AC-26 to AC-33, AC-35**).
+- [x] **T5 · Join, click through and review** · lead, after T2 and T4 (**AC-26 to AC-33, AC-35**).
   Join API and screens, run typecheck/full tests/build on a freshly migrated/seeded private database, then the named
   checks in plan.md in **Nabil's visible Chrome on the built app**, next to the frames. Use 1440 × 900, 1024, 820
   and 390 for the dispatcher, 1180 × 820 and 390 for the loader, normal/private Chrome sessions for live updates
