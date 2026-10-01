@@ -98,6 +98,14 @@ describe('the complete suggested plan', () => {
     expect(result.decisions[0]!.reason).toContain('02:59');
   });
 
+  it('spec 024 words the early departure with the order first and the truck by its kind, and no trip number', () => {
+    const input = plannerInput(['OUT110', 'OUT112', 'OUT111', 'OUT113'].map((s, i) => plannerOrder(`order-${i}`, s)), {
+      depotId: 'Kandy', vehicles: [vehicle('VEH044')],
+    });
+    expect(success(buildSuggestedPlan(input)).decisions.map((d) => d.reason))
+      .toEqual(['The rank 4 order for Badulla makes the dry truck VEH044 leave at 02:59 instead of 03:30.']);
+  });
+
   it('AC-13 carries a waiting remainder whole on the idle van before considering new goods', () => {
     const input = plannerInput([
       plannerOrder('new', 'OUT002', 'fresh-chilled-carton', 30),
