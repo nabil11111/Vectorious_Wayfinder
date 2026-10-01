@@ -277,7 +277,9 @@ function summaryOf(c: HistoryCounts): Figure[] {
 }
 
 // The publication's units at each stage that is recorded, and in one line the stages not recorded yet with how many of
-// their lines are (rule 6): a stage never becomes a zero it did not record.
+// their lines are still missing (rule 6): a stage never becomes a zero it did not record. Loaded and handed over, the
+// day's "how much went out", show what their recorded lines add up to so far until every line is recorded (Q-44).
+const SO_FAR = new Set(['loaded', 'handed over']);
 function stagesOf(counts: HistoryCounts) {
   const s = counts.stages;
   const stages: [string, typeof s.loaded][] = [
@@ -286,7 +288,8 @@ function stagesOf(counts: HistoryCounts) {
   ];
   const figures: Figure[] = [
     { value: whole(s.ordered), label: 'ordered' },
-    ...stages.flatMap(([label, measure]) => (measure.units === null ? [] : [{ value: whole(measure.units), label }])),
+    ...stages.flatMap(([label, measure]) => (measure.units !== null ? [{ value: whole(measure.units), label }]
+      : SO_FAR.has(label) ? [{ value: whole(measure.soFar), label: `${label} so far` }] : [])),
   ];
   return { figures, unrecorded: unrecordedWords(stages) };
 }

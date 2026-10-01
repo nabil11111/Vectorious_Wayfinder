@@ -3,7 +3,8 @@ import type { HistoryLine, HistoryMeasure, HistoryStages } from '@wayfinder/cont
 // Coverage counts lines, not shops or orders. A missing stage must not become a recorded zero.
 function measure(values: (number | null)[]): HistoryMeasure {
   const known = values.filter((value): value is number => value !== null);
-  return { units: known.length === values.length ? known.reduce((sum, value) => sum + value, 0) : null, known: known.length, total: values.length };
+  const soFar = known.reduce((sum, value) => sum + value, 0);
+  return { units: known.length === values.length ? soFar : null, known: known.length, total: values.length, missing: values.length - known.length, soFar };
 }
 export function stagesOf(lines: HistoryLine[]): HistoryStages {
   return { ordered: lines.reduce((sum, line) => sum + line.quantity, 0), loaded: measure(lines.map(line => line.loaded)),

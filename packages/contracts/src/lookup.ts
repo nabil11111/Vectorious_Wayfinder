@@ -54,8 +54,10 @@ export const LookupPhoto = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('issue'), issueId: z.uuid(), takenAt: Moment }),
 ]);
 export type LookupPhoto = z.infer<typeof LookupPhoto>;
-// Coverage is in lines: an incomplete measure is null; a genuinely empty set is zero with 0/0 coverage.
-export const HistoryMeasure = z.object({ units: Count.nullable(), known: Count, total: Count });
+// Coverage is in lines: an incomplete measure is null; a genuinely empty set is zero with 0/0 coverage. missing is the
+// lines not recorded yet and soFar the units of the lines that are (Q-44), so a day with a trip still to run reads
+// "4,031 loaded so far" and "not recorded yet (130 of 163 lines)".
+export const HistoryMeasure = z.object({ units: Count.nullable(), known: Count, total: Count, missing: Count, soFar: Count });
 export type HistoryMeasure = z.infer<typeof HistoryMeasure>;
 export const HistoryStages = z.object({ ordered: Count, loaded: HistoryMeasure, handedOver: HistoryMeasure, received: HistoryMeasure,
   depotShort: HistoryMeasure, refused: HistoryMeasure, receiptShort: HistoryMeasure, notDelivered: HistoryMeasure });

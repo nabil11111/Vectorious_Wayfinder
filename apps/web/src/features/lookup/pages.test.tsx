@@ -63,7 +63,7 @@ const ordersRead = (demoDay: number, depot: Depot = 'Peliyagoda') => {
   });
 };
 
-const known = (units: number) => ({ units, known: 1, total: 1 });
+const known = (units: number) => ({ units, known: 1, total: 1, missing: 0, soFar: units });
 const stages = { ordered: 8, loaded: known(8), handedOver: known(8), received: known(8), depotShort: known(0), refused: known(0), receiptShort: known(0), notDelivered: known(0) };
 const historyRead = (demoDay: number, depot: Depot = 'Peliyagoda') => {
   const { shop, vehicle, driver, base } = OWN[depot];
@@ -238,6 +238,18 @@ it('AC-7 one depot\'s failed read shows only its part failed with Try again, and
 // latest sent dates are listed for the chips.
 const sentLaterRead = (depot: Depot, publishedDates: string[]) => LookupHistory.parse({
   ...scope(1, depot), date: null, publishedDates, publication: null, counts: null, groups: [], trips: [], deferrals: [],
+});
+
+it('Q-44 History\'s header gives loaded and handed over so far, and counts the lines not recorded yet', () => {
+  held.clockDay = 1;
+  const read = historyRead(1);
+  const partial = { units: null, known: 33, total: 163, missing: 130 };
+  read.counts!.stages = { ...read.counts!.stages, loaded: { ...partial, soFar: 4031 }, handedOver: { ...partial, soFar: 3990 },
+    received: { units: null, known: 9, total: 163, missing: 154, soFar: 310 } };
+  const { text } = draw(<HistoryPage />, `/dispatcher/history?date=${THU}`, [[lookupKey('history', held.me, 'Peliyagoda', { date: THU }), read]]);
+  expect(text).toContain('8 ordered 4,031 loaded so far 3,990 handed over so far 0 short from the depot');
+  expect(text).toContain('Not recorded yet: loaded and handed over (130 of 163 lines); received (154 of 163 lines)');
+  expect(text).not.toContain('33 of 163');
 });
 
 it('Q-14 a depot whose sent plans are all still to come says so beside their chip, offers to open the soonest, and never says none was sent', () => {

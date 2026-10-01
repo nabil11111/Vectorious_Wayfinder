@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import type { LookupTripRef } from '@wayfinder/contracts';
 import { matchesTrip, shownVehicles } from './filters';
 import { axisOf, placeOn } from './parts/axis';
-import { fuelLeftWords, fuelTone, measureWords, tripState } from './words';
+import { fuelLeftWords, fuelTone, measureWords, tripState, unrecordedWords } from './words';
 
 // The History and Fleet views drawn in the browser from their reads (spec 017, rules 6, 9 and 10): filters by the
 // returned flags and fields only, the static timeline's span, and the words that keep missing and over-quota figures
@@ -79,9 +79,13 @@ it('Fleet words keep an over quota, a zero quota and an unknown week apart, and 
   expect(tripState(trip('out', { leftAt: '2026-06-24T23:10:00.000Z' }), '2026-06-25')).toBe('out · trip 1 · left 04:40');
   expect(tripState(trip('out'), '2026-06-26')).toBe('out since Thu 25 · trip 1');
   expect(tripState(trip('done', { backAt: '2026-06-25T01:00:00.000Z' }), '2026-06-25')).toBe('returned 06:30 · trip 1');
-  // A stage never recorded is said with its coverage, never as zero.
-  expect(measureWords({ units: null, known: 3, total: 5 })).toBe('not recorded (3 of 5 lines)');
-  expect(measureWords({ units: 0, known: 0, total: 0 })).toBe('0');
+  // A stage never recorded is said with the lines it is still missing, never as zero (Q-44).
+  expect(measureWords({ units: null, known: 3, total: 5, missing: 2, soFar: 22 })).toBe('not recorded on 2 of 5 lines');
+  expect(measureWords({ units: 0, known: 0, total: 0, missing: 0, soFar: 0 })).toBe('0');
+  // The day's stages not recorded yet count the lines not recorded: 130 of 163, not the 33 that are (Q-44).
+  const day = (known: number, soFar: number) => ({ units: null, known, total: 163, missing: 163 - known, soFar });
+  expect(unrecordedWords([['loaded', day(33, 1200)], ['handed over', day(33, 1150)], ['received', day(9, 300)], ['refused', { units: 0, known: 163, total: 163, missing: 0, soFar: 0 }]]))
+    .toBe('Not recorded yet: loaded and handed over (130 of 163 lines); received (154 of 163 lines)');
 });
 
 it('History draws its timeline from even depot hours around every kept and recorded time', () => {

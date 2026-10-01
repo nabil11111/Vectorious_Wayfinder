@@ -78,13 +78,24 @@ it('Q-43 a trip with a closed shop brought back reads the same whole handed over
   trip = await h.road.write(driverTrip(await h.road.driver.read()), 'finish', 235);
   const phone = tripFigures(trip), live = shownTrip(await operations(h.ruwan)).figures, day = await read();
   expect([phone.delivered, live.delivered]).toEqual([23, 23]);
-  expect(day.trips[0]!.stages.handedOver).toEqual({ units: 23, known: 5, total: 5 });
+  expect(day.trips[0]!.stages.handedOver).toEqual({ units: 23, known: 5, total: 5, missing: 0, soFar: 23 });
   expect(day.counts!.stages.handedOver).toEqual(day.trips[0]!.stages.handedOver);
   expect(day.trips[0]!.stages.notDelivered.units).toBe(phone.notDelivered);
   // The closed shop's lines read nothing handed over, never a dash, beside its not-delivered cartons.
   const closed = day.trips[0]!.stops[1]!;
   expect(closed.lines.map(line => [line.loaded, line.delivered, line.notDelivered])).toEqual([[48, 0, 48], [46, 0, 46]]);
   expect(closed.attempts).toMatchObject([{ notDelivered: 94, decision: 'bring_back' }]);
+});
+// Q-44: "Not recorded yet … (33 of 163 lines)" gave the lines that were recorded, and read as the ones missing; and with
+// one trip still to run the day showed no loaded or handed over total at all. Each stage says how many lines it is
+// still missing and what its recorded lines add up to so far.
+it('Q-44 a stage not recorded on every line says the lines it is missing and the units so far', async () => {
+  // Nugegoda's three lines are handed over; the driver has only reached Wellawatte.
+  await h.road.wellawatte();
+  const day = await read();
+  expect(day.counts!.stages).toMatchObject({ ordered: 118, loaded: { units: 117, known: 5, total: 5, missing: 0, soFar: 117 },
+    handedOver: { units: null, known: 3, total: 5, missing: 2, soFar: 23 }, received: { units: null, known: 0, total: 5, missing: 5, soFar: 0 } });
+  expect(day.trips[0]!.stages.handedOver).toEqual(day.counts!.stages.handedOver);
 });
 it('AC-16 three received orders make one confirmation, 22 cartons and separate receipt and depot shortages', async () => {
   const trip = await deliveredWalkthrough(h, { wellawatte: 'refused' });

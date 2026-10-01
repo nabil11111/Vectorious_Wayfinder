@@ -125,16 +125,19 @@ export const showingTrips = (shown: number, total: number) => `Showing ${whole(s
 export const TRIP_STATUS_WORDS: Record<LookupTripRef['status'], string> = { planned: 'Not loaded', loading: 'Loading', ready: 'Ready', out: 'Out', done: 'Back' };
 export const OUTCOME_WORDS = { delivered: 'delivered', refused: 'refused some', closed: 'nobody there' } as const;
 
-// A stage's units, or that it was not recorded with how many lines were: "117", "not recorded (2 of 5 lines)".
+// A stage's units, or that it was not recorded with how many of its lines are still missing (Q-44): "117", "not
+// recorded on 2 of 5 lines".
 export const measureWords = (measure: HistoryMeasure) =>
-  (measure.units === null ? `not recorded (${whole(measure.known)} of ${whole(measure.total)} lines)` : whole(measure.units));
-// The stages not recorded yet, grouped by how many lines each has: "Not recorded yet: loaded, handed over and received
-// (0 of 5 lines)", or null when every stage is recorded.
+  (measure.units === null ? `not recorded on ${missingLines(measure)}` : whole(measure.units));
+// "2 of 5 lines": the lines a stage has not recorded yet, never the ones it has (Q-44).
+export const missingLines = (measure: HistoryMeasure) => `${whole(measure.missing)} of ${whole(measure.total)} lines`;
+// The stages not recorded yet, grouped by how many of their lines are still missing: "Not recorded yet: loaded, handed
+// over and received (130 of 163 lines)", or null when every stage is recorded.
 export function unrecordedWords(stages: [string, HistoryMeasure][]) {
   const groups = new Map<string, string[]>();
   for (const [label, measure] of stages) {
     if (measure.units !== null) continue;
-    const coverage = `${whole(measure.known)} of ${whole(measure.total)} lines`;
+    const coverage = missingLines(measure);
     groups.set(coverage, [...(groups.get(coverage) ?? []), label]);
   }
   if (groups.size === 0) return null;

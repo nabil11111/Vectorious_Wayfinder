@@ -143,7 +143,9 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    Late/Short/Returned select trips with a matching stop; Deferred shows the deferral list instead of inventing trip
    rows. Brand selects actual stop/order brands; matching a mixed trip keeps its whole row, with nonmatching stops
    labelled rather than silently removed. Missing execution detail makes the affected aggregate null, with its
-   recorded/total coverage, instead of silently counting missing detail as zero. No publication means a separate
+   recorded/total coverage, instead of silently counting missing detail as zero. A stage not recorded yet is said by
+   the lines it is still missing, "Not recorded yet: loaded and handed over (130 of 163 lines)", never by the lines it
+   has; and the header shows loaded and handed over from the lines recorded so far, "4,031 loaded so far" (Q-44). No publication means a separate
    empty state; a publication with no trips has zero trip/stop counts and its genuine deferrals.
 7. **A receipt belongs to its stop.** Use `stopId` as the receipt reference: 015 confirms a stop once and adds no
    receipt id. Show confirmed time, time received by the server, cold answer, line counts and report/decision if any.

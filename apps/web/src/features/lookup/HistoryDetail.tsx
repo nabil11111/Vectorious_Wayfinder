@@ -58,7 +58,7 @@ export function HistoryDetail({ trip, brand, viewer, anchor, onClose }: { trip: 
 }
 
 // The stage totals of a set of lines: ordered, then each later stage as recorded, or not recorded with how many of its
-// lines are.
+// lines are still missing (Q-44).
 function Stages({ stages, brand, className }: { stages: HistoryStages; brand: Brand | null; className?: string }) {
   const rows: [string, HistoryMeasure][] = [
     ['Loaded', stages.loaded], ['Handed over', stages.handedOver], ['Received', stages.received], ['Short from the depot', stages.depotShort],
@@ -75,7 +75,7 @@ function Stages({ stages, brand, className }: { stages: HistoryStages; brand: Br
           <dt className="text-muted-foreground">{label}</dt>
           <dd className="text-right">
             {measure.units === null
-              ? <span className="text-muted-foreground">not recorded · {whole(measure.known)} of {whole(measure.total)} lines</span>
+              ? <span className="text-muted-foreground">{measureWords(measure)}</span>
               : <span className="font-mono font-semibold">{whole(measure.units)}</span>}
           </dd>
         </div>

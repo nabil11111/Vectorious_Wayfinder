@@ -19,6 +19,7 @@ export function sumOrders(all: OrdersSummary[]): OrdersSummary {
 const sumMeasure = (all: HistoryMeasure[]): HistoryMeasure => ({
   units: all.some((measure) => measure.units === null) ? null : added(all.map((measure) => measure.units!)),
   known: added(all.map((measure) => measure.known)), total: added(all.map((measure) => measure.total)),
+  missing: added(all.map((measure) => measure.missing)), soFar: added(all.map((measure) => measure.soFar)),
 });
 export function sumHistory(all: HistoryCounts[]): HistoryCounts {
   if (all.length === 1) return all[0]!;
