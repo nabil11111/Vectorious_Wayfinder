@@ -90,15 +90,15 @@ describe('the plan checker', () => {
     }
     // The numbers are in the sentence, and the shop is there by name.
     expect(problems.find((p) => p.code === 'over_weight' && p.vehicleId === 'VEH035')).toMatchObject({
-      tripNo: 1, message: 'VEH035 trip 1 carries 1,242 kg and its limit is 1,040 kg.', fix: 'Take 202 kg off this trip.',
+      tripNo: 1, message: 'The reefer van VEH035 carries 1,242 kg, 202 kg over its 1,040 kg limit.', fix: 'Take 202 kg off this trip.',
     });
     expect(problems.find((p) => p.code === 'van_only')).toMatchObject({
       vehicleId: 'VEH012', tripNo: 1, stopSeq: 2, outletId: 'OUT001',
-      message: 'VEH012 trip 1 stops at Fresh shop 1, which only a van can reach, and VEH012 is a truck.',
+      message: 'Fresh shop 1 only takes vans, and it is on the dry truck VEH012.', fix: 'Move it to a van.',
     });
     expect(problems.find((p) => p.code === 'needs_reefer')).toMatchObject({
       vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT005', orderId: 'order-4',
-      message: 'VEH012 trip 1 carries the 276 kg chilled order for Fresh shop 5, and VEH012 is not a fridge vehicle.',
+      message: 'The 276 kg chilled order for Fresh shop 5 needs a fridge, and it is on the dry truck VEH012.', fix: 'Move it to a reefer truck or van.',
     });
     expect(problems.find((p) => p.code === 'order_not_planned')).toMatchObject({
       orderId: 'order-8', outletId: 'OUT026', message: 'The 331.2 kg dry order for Fresh shop 26 is on no trip and is not deferred.',
@@ -178,7 +178,7 @@ describe('the plan checker', () => {
 
     // Every shop here opens well before the truck arrives, so nothing waits and unloading starts on arrival.
     const stop = (seq: number, outletId: string, arrive: string, leave: string, opens: string): StopTime =>
-      ({ seq, outletId, arriveAt: at(arrive), waitMin: 0, startAt: at(arrive), leaveAt: at(leave), windowOpen: at(opens), windowClose: at('08:00'), late: false });
+      ({ seq, outletId, arriveAt: at(arrive), waitMin: 0, startAt: at(arrive), leaveAt: at(leave), windowOpen: at(opens), windowClose: at('08:00'), late: false, lateMin: 0 });
     const dryLoad = { needsReefer: false, needsTailLift: false, keepUpright: false };
     expect(result.trips).toEqual([
       {

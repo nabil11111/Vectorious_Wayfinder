@@ -86,6 +86,21 @@ const audits = async (entityId: string, action: string) => (await db.select().fr
   .filter((row) => !earlierAudits.has(row.id));
 // OUT001's carried-over order raised from 12 to 180 chilled cartons, which only the fridge van can take (rule 4).
 const raiseNugegoda = () => db.update(orderLines).set({ quantity: 180 }).where(eq(orderLines.orderId, CARRIED.OUT001));
+// Peliyagoda's drivers in staff ID order, D-001 Dilshan first (spec 022, D-97).
+const staffOrder = async () => (await db.select({ id: users.id }).from(users)
+  .where(and(eq(users.depotId, 'Peliyagoda'), eq(users.role, 'driver'), eq(users.active, true))).orderBy(users.staffId)).map((row) => row.id);
+// Each vehicle of a draft, in id order, with its trips' drivers.
+const driversOf = (b = board) => {
+  const drivers = new Map<string, (string | null)[]>();
+  for (const trip of [...b.plan.trips].sort((x, y) => x.vehicleId.localeCompare(y.vehicleId))) drivers.set(trip.vehicleId, [...(drivers.get(trip.vehicleId) ?? []), trip.driverId]);
+  return drivers;
+};
+// Dilshan put on VEH035 as the board's driver menu puts him there once the suggestion gave every truck a driver: the
+// vehicle he drove takes VEH035's driver (spec 022, AC-5).
+const dilshanOnVeh035 = (b = board): DraftPlan => {
+  const was = b.plan.trips.find((t) => t.vehicleId === 'VEH035')?.driverId ?? null;
+  return { ...planOf(b), trips: b.plan.trips.map((t) => (t.vehicleId === 'VEH035' ? { ...t, driverId: dilshanId } : t.driverId === dilshanId ? { ...t, driverId: was } : t)) };
+};
 // Everything a build or an accept may write, so a refusal can be shown to change nothing.
 const held = async () => ({
   orders: await db.select().from(orders).orderBy(orders.id), lines: await db.select().from(orderLines).orderBy(orderLines.id),
@@ -185,7 +200,7 @@ it('AC-3 keeps the suggestion as built on the board, through a save, a split and
   expect(decisions).toHaveLength(6);
   expect(decisions.every((d) => d.kind === 'late_order' && d.acceptedAt === null && d.open)).toBe(true);
   // A save (Dilshan drives VEH035), a split of the big Style order and its join leave the suggestion as built.
-  answered(await save({ ...planOf(), trips: board.plan.trips.map((t) => (t.vehicleId === 'VEH035' ? { ...t, driverId: dilshanId } : t)) }));
+  answered(await save(dilshanOnVeh035()));
   const big = board.orders.find((o) => o.outletId === 'OUT017')!;
   answered(await ruwan.post(`${URL}/split`).send({ ...ref(), orderId: big.id, keep: [{ productId: 'style-folded', quantity: 50 }] }));
   answered(await ruwan.post(`${URL}/join`).send({ ...ref(), orderId: big.id }));
@@ -265,12 +280,52 @@ it('AC-6 replaces every trip and deferral of a hand-made draft, and a vehicle th
   answered(await build());
   expect(board.plan.revision).toBe(2);
   expect(board.plan.trips.filter((t) => t.vehicleId === 'VEH035').map((t) => t.driverId)).toEqual([dilshanId]);
-  expect(board.plan.trips.filter((t) => t.vehicleId === 'VEH004').map((t) => [t.driverId, t.leaveAt])).toEqual([[null, null]]);
-  // VEH008 is not in the suggestion, so its driver drives nothing.
-  expect(board.plan.trips.some((t) => t.vehicleId === 'VEH008' || t.driverId === other)).toBe(false);
+  // VEH004 had no driver, so it takes a free one (spec 022, AC-3), and the planner's own leaving time.
+  expect(board.plan.trips.filter((t) => t.vehicleId === 'VEH004').map((t) => [t.driverId !== null, t.leaveAt])).toEqual([[true, null]]);
+  // VEH008 is not in the suggestion, so its driver is free again: every truck but VEH035 takes the depot's next free
+  // driver in staff ID order, and he is one of them.
+  expect(board.plan.trips.some((t) => t.vehicleId === 'VEH008')).toBe(false);
+  const others = [...driversOf()].filter(([vehicleId]) => vehicleId !== 'VEH035').map(([, drivers]) => drivers[0]);
+  expect(others).toEqual((await staffOrder()).filter((id) => id !== dilshanId).slice(0, others.length));
+  expect(others).toContain(other);
   expect(board.plan.deferrals.some((d) => d.code === 'dispatcher_choice')).toBe(false);
-  expect(board.counts).toMatchObject({ trips: 27, ordersOnTrips: 96, ordersDeferred: 6, ordersUnplanned: 0, drivers: 1 });
+  expect(board.counts).toMatchObject({ trips: 27, ordersOnTrips: 96, ordersDeferred: 6, ordersUnplanned: 0, drivers: 26 });
   expect(tripOf(CARRIED.OUT060)).toEqual(['VEH004', 1]);
+});
+
+it('spec 022 AC-3 gives every truck of the built plan its own driver of the depot, the same on both its trips', async () => {
+  answered(await build());
+  const drivers = driversOf();
+  expect(drivers.size).toBe(26);
+  // One driver per truck, on both its trips.
+  expect([...drivers].filter(([, list]) => new Set(list).size !== 1)).toEqual([]);
+  const chosen = [...drivers.values()].map((list) => list[0]);
+  // Each a driver of Peliyagoda, and none on two trucks.
+  expect(chosen.filter((driverId) => !board.drivers.some((d) => d.id === driverId))).toEqual([]);
+  expect(new Set(chosen).size).toBe(26);
+  // With no driver in the draft before, the trucks in id order take the depot's drivers in staff ID order.
+  expect(chosen).toEqual((await staffOrder()).slice(0, 26));
+  expect(chosen[0]).toBe(dilshanId);
+  expect(board.counts).toMatchObject({ vehiclesUsed: 26, drivers: 26 });
+  // A build again keeps each truck's driver.
+  answered(await build());
+  expect(driversOf()).toEqual(drivers);
+});
+
+it('spec 022 AC-5 saves the driver menu\'s swap as one change: Dilshan on VEH035, and his truck takes VEH035\'s driver', async () => {
+  answered(await build());
+  const before = driversOf();
+  const vehicleId = [...before].find(([, list]) => list[0] === dilshanId)![0];
+  const was = before.get('VEH035')![0]!;
+  expect(vehicleId).not.toBe('VEH035');
+  answered(await save(dilshanOnVeh035()));
+  expect(board.plan.revision).toBe(2);
+  const after = driversOf();
+  expect(after.get('VEH035')!.every((id) => id === dilshanId)).toBe(true);
+  expect(after.get(vehicleId)!.every((id) => id === was)).toBe(true);
+  // Every other truck keeps its driver, and nobody drives two.
+  expect([...after].filter(([id]) => id !== 'VEH035' && id !== vehicleId)).toEqual([...before].filter(([id]) => id !== 'VEH035' && id !== vehicleId));
+  expect(board.counts!.drivers).toBe(26);
 });
 
 // ── Refusals and what a build tells ──────────────────────────────────────────────────────────────────────────────
@@ -435,7 +490,7 @@ it('AC-12 accepts a decision at the app clock\'s time, raises the revision, and 
   expect(audit).toMatchObject({ actorId: ruwanId, entity: 'plan', before: { revision: 1 }, after: { revision: 2, keys: [first] } });
   // Still accepted after a read and an edit elsewhere on the plan.
   expect(PlanBoard.parse((await ruwan.get(URL)).body).suggestion).toEqual(board.suggestion);
-  answered(await save({ ...planOf(), trips: board.plan.trips.map((t) => (t.vehicleId === 'VEH035' ? { ...t, driverId: dilshanId } : t)) }));
+  answered(await save(dilshanOnVeh035()));
   expect(board.suggestion!.decisions.find((d) => d.key === first)).toMatchObject({ acceptedAt: depotInstant(WED, 968).toISOString(), open: false });
 });
 

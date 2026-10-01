@@ -1,15 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import { z } from 'zod';
-import { CutoffPassedDetails, StoreOrder, type DraftRefs, type Me, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
-import { meKey } from '@/features/auth/api';
+import { CutoffPassedDetails, MAX_LINE_UNITS, StoreOrder, type DraftRefs, type Me, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
+import { finishBeforeSignOut, meKey } from '@/features/auth/api';
 import { ApiRequestError } from '@/lib/api';
 import { fetchNextOrder, nextOrderKey, placeOrders, saveDraft } from './next-order';
-import { reasonOf } from './words';
+import { NOT_CONFIRMED, NOT_KEPT, PLACE_NOT_CONFIRMED, reasonOf } from './words';
 
 // A change is saved this long after it was made, so a run of taps is one save.
 const SAVE_AFTER_MS = 600;
+
+// A change that could not be saved is said, also once the form has left the screen or its person has signed out, so
+// it is never lost without a word (Q-04). The line outlasts the move to the sign-in page.
+const notKept = (line = NOT_KEPT) => toast(line, { id: 'draft-not-kept', duration: 10_000, classNames: { title: 'text-pretty' } });
+
+// Resolves once the sign-out's deadline has passed.
+const passedBy = (deadline: AbortSignal) => new Promise<'passed'>((resolve) => {
+  if (deadline.aborted) resolve('passed');
+  else deadline.addEventListener('abort', () => resolve('passed'), { once: true });
+});
 
 // The next order while a delivery day is open. The form only exists then.
 export type OpenOrder = StoreNextOrder & { deliveryDate: string };
@@ -22,16 +33,34 @@ export type PlacedNow = z.infer<typeof PlacedNow>;
 // What the manager has on the form: a quantity per item and the note.
 export interface FormValues { quantities: Record<string, number>; note: string }
 
-// 'saved': the server holds what the form shows. 'saving': a change is waiting or on its way. 'retrying': the
-// last try failed and another follows. 'refused': the server said no and the latest could not be loaded.
-export type Saving = 'saved' | 'saving' | 'retrying' | 'refused';
+// What a quantity box's text stands for: a whole number from 0 to 999 written in digits, with an empty box as 0, or
+// null for anything else, such as a minus, a fraction or more than 999. Nothing is rounded, cut or turned round, so
+// a typed -5 never becomes 5 (Q-01, Q-02).
+export function wholeQuantity(text: string): number | null {
+  const digits = text.trim();
+  if (digits === '') return 0;
+  if (!/^[0-9]+$/.test(digits)) return null;
+  const quantity = Number(digits);
+  return quantity <= MAX_LINE_UNITS ? quantity : null;
+}
 
-interface Screen {
+// 'saved': the server holds what the form shows. 'saving': a change is waiting or on its way. 'retrying': the
+// last try failed and another follows. 'refused': the server said no and the latest could not be loaded. 'held': a
+// quantity box holds something that is not a whole number from 0 to 999, so nothing is saved until it is fixed.
+export type Saving = 'saved' | 'saving' | 'retrying' | 'refused' | 'held';
+
+export interface Screen {
   values: FormValues;
+  // What a quantity box shows while it is not the number the form holds: the text being typed, and anything typed
+  // that is not a whole number from 0 to 999, which stays as it was typed (Q-01).
+  typed: Record<string, string>;
   saving: Saving;
   placing: boolean;
   // The draft was changed somewhere else and the form now shows the latest.
   changedElsewhere: boolean;
+  // The drafts the form showed were placed from another screen, and the form is ready for another order. lost: a
+  // change made here was on its way and is not in what was placed (Q-07).
+  placedElsewhere: { lost: boolean } | null;
   // The day the form was showing when its cut-off passed.
   closedDay: string | null;
   // Why the server refused, shown in red above the button.
@@ -62,8 +91,11 @@ const worthRetrying = (error: unknown) =>
 // The order form's saving (spec 009, rule 3). One save runs at a time and the newest change waits for it. A
 // request names the drafts by the id and revision of the last answer. Timers and running requests outlive a
 // render, so this lives outside React and tells the screen what to show.
-class DraftForm {
+export class DraftForm {
   private values: FormValues;
+  // What the server holds, as the last answer had it: what a sign-out or a place checks it saved (Q-04, Q-08).
+  private saved: FormValues;
+  private typed: Record<string, string> = {};
   private base: Base;
   private products: StoreProduct[];
   // Every change raises seq. A save carries the seq it was sent with, and the form is saved when they meet.
@@ -71,7 +103,21 @@ class DraftForm {
   private sentSeq = 0;
   private savedSeq = 0;
   private running = false;
+  // The save on its way, from its request until its answer is taken in, so a sign-out or a place can wait for it.
+  private current: Promise<void> | null = null;
+  // The last save failed, or found the session gone, and why. Waiting for the form stops there (Q-04, Q-08).
+  private failed = false;
+  private failure: unknown = null;
   private placing = false;
+  // The place on its way, from the press until its answer is taken in, so a sign-out never overtakes it.
+  private placingNow: Promise<void> | null = null;
+  // Aborts the form's saves and places. A sign-out that could wait no longer abandons the form: its request on the
+  // way is aborted, which frees the writes queued behind it, and the form sends nothing more of its own until its
+  // person changes something again (Q-04).
+  private requests = new AbortController();
+  private abandoned = false;
+  // The drafts the last place from this form named, so a place whose answer was lost is known as its own (Q-07).
+  private tried: DraftRefs | null = null;
   private timer = 0;
   private retryTimer = 0;
   private tries = 0;
@@ -79,6 +125,8 @@ class DraftForm {
   private unanswered: FormValues[] = [];
   private retriedWithoutItem = false;
   private onScreen = true;
+  // Takes the form's work back from the sign-out (Q-04).
+  private stopWaiting: (() => void) | null = null;
   // The person who opened the form. Its answers belong to them alone.
   private owner: string | null;
   private qc: QueryClient;
@@ -87,6 +135,7 @@ class DraftForm {
 
   constructor(next: OpenOrder, qc: QueryClient, show: (patch: Partial<Screen>) => void, placed: (orders: StoreOrder[]) => void) {
     this.values = valuesOf(next);
+    this.saved = this.values;
     this.base = { deliveryDate: next.deliveryDate, refs: next.draft?.refs ?? {} };
     this.products = next.products;
     this.qc = qc;
@@ -106,6 +155,11 @@ class DraftForm {
     if (this.onScreen) this.show(patch);
   }
 
+  // A quantity box holds something that is not a whole number from 0 to 999 (Q-01).
+  private invalid() {
+    return Object.values(this.typed).some((text) => wholeQuantity(text) === null);
+  }
+
   private request(): SaveDraftRequest {
     return {
       deliveryDate: this.base.deliveryDate,
@@ -115,17 +169,25 @@ class DraftForm {
     };
   }
 
+  // The orders placed for the day that were the drafts this form shows. A draft keeps its id when it is placed.
+  private placedOf(latest: StoreNextOrder) {
+    const { chilled, dry } = this.base.refs;
+    return latest.placed?.orders.filter((order) => order.id === chilled?.id || order.id === dry?.id) ?? [];
+  }
+
   private takeOver(latest: StoreNextOrder) {
     this.products = latest.products;
     this.base = { deliveryDate: latest.deliveryDate ?? this.base.deliveryDate, refs: latest.draft?.refs ?? {} };
   }
 
-  // Show what the server holds and count the form as saved.
+  // Show what the server holds and count the form as saved. Every box shows its number again.
   private showLatest(latest: StoreNextOrder) {
     this.takeOver(latest);
     this.values = valuesOf(latest);
+    this.saved = this.values;
+    this.typed = {};
     this.savedSeq = this.sentSeq = this.seq;
-    this.tell({ values: this.values, saving: 'saved' });
+    this.tell({ values: this.values, typed: this.typed, saving: 'saved' });
   }
 
   // cutoff_passed names the day that is open now. The form moves to it and says which day closed.
@@ -147,6 +209,10 @@ class DraftForm {
     try {
       latest = await this.qc.fetchQuery({ queryKey: nextOrderKey, queryFn: fetchNextOrder, staleTime: 0 });
     } catch (loadError) {
+      if (!whilePlacing) {
+        this.failed = true;
+        this.failure = loadError;
+      }
       this.tell({ saving: whilePlacing ? 'saved' : 'refused', refused: reasonOf(loadError) });
       return;
     }
@@ -157,27 +223,46 @@ class DraftForm {
       // The "somewhere else" was this form: an earlier save arrived and its answer did not. Carry on from it.
       this.unanswered = [];
       this.takeOver(latest);
+      this.saved = held;
       if (sameValues(held, shown)) this.savedSeq = this.sentSeq = this.seq;
       void this.flush();
     } else if (code === 'unknown_product' && !this.retriedWithoutItem) {
       // An item left the list. Save once more with the items that are still on it.
       this.retriedWithoutItem = true;
       this.takeOver(latest);
+      this.saved = held;
       this.seq += 1;
       this.tell({ refused: reasonOf(error) });
       void this.flush();
     } else {
+      // The drafts this form was saving were placed from another screen, without the change it was saving (Q-07).
+      const placedThere = code === 'stale' && !whilePlacing && this.placedOf(latest).length > 0;
       this.showLatest(latest);
-      this.tell(code === 'stale' ? { changedElsewhere: whilePlacing || !sameValues(held, shown) } : { refused: reasonOf(error) });
+      if (placedThere) this.tell({ placedElsewhere: { lost: true } });
+      else this.tell(code === 'stale' ? { changedElsewhere: whilePlacing || !sameValues(held, shown) } : { refused: reasonOf(error) });
     }
   }
 
+  // Sends the change on the form, unless a save is on its way, nothing is waiting or a box holds something that is
+  // not a whole number. The timer, a change made during a save, a retry, a sign-out and leaving the form come here.
   private flush = async () => {
     window.clearTimeout(this.timer);
     window.clearTimeout(this.retryTimer);
     this.timer = 0;
     if (this.running) return;
+    // Nothing goes out for someone who has signed out, nor from a form the sign-out abandoned (Q-04).
+    if (!this.stillMine() || this.abandoned) return;
     if (this.seq === this.savedSeq) { this.tell({ saving: 'saved' }); return; }
+    // Nothing is saved while a box holds something that is not a whole number from 0 to 999 (Q-01).
+    if (this.invalid()) { this.tell({ saving: 'held' }); return; }
+    const run = this.send();
+    this.current = run;
+    await run;
+    if (this.current === run) this.current = null;
+  };
+
+  // One save, and what its answer means for the form.
+  private async send() {
     this.running = true;
     this.sentSeq = this.seq;
     const sent = this.values;
@@ -185,24 +270,36 @@ class DraftForm {
     try {
       // A read that started before this save would answer with the draft as it was.
       await this.qc.cancelQueries({ queryKey: nextOrderKey });
-      const answer = await saveDraft(this.request());
+      const answer = await saveDraft(this.request(), this.requests.signal);
       this.running = false;
       if (!this.stillMine()) return;
+      this.failed = false;
       this.tries = 0;
       this.unanswered = [];
       this.retriedWithoutItem = false;
       this.savedSeq = this.sentSeq;
+      this.saved = valuesOf(answer);
       this.takeOver(answer);
       this.qc.setQueryData<StoreNextOrder>(nextOrderKey, answer);
       // A change made while this save ran goes next, unless its own timer is still counting.
       if (this.seq !== this.savedSeq) { if (this.timer === 0) void this.flush(); } else this.tell({ saving: 'saved' });
     } catch (error) {
       this.running = false;
-      if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
+      // Aborted by a sign-out that could wait no longer: it has told the person, and nothing is tried again.
+      if (this.abandoned) return;
+      if (error instanceof ApiRequestError && error.status === 401) {
+        // Signed out, here or in another tab. The change cannot be saved, and the person is told on the screen
+        // that comes next (Q-04).
+        this.failed = true;
+        this.failure = error;
+        notKept();
+      } else if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
         void this.flush();
       } else if (worthRetrying(error)) {
+        this.failed = true;
+        this.failure = error;
         this.unanswered.push(sent);
-        // Off the screen there is no reason to keep trying.
+        // Off the screen there is no reason to keep trying. Whoever waits for the form says it was not kept.
         if (!this.onScreen) return;
         this.show({ saving: 'retrying' });
         this.retryTimer = window.setTimeout(this.flush, Math.min(2000 * 2 ** this.tries, 15_000));
@@ -211,35 +308,128 @@ class DraftForm {
         await this.loadLatest(error, false);
       }
     }
+  }
+
+  // Every change saved now: the change waiting for its timer goes at once, a retry goes at once, and a save on its
+  // way is waited for. True when the server then holds what the form showed when this began. False when a save
+  // failed, the session is gone, a box holds something that is not a whole number, an item had left the list, or
+  // the draft was changed somewhere else and the form now shows that instead.
+  private async settle(): Promise<boolean> {
+    const wanted = this.values;
+    this.failed = false;
+    for (;;) {
+      if (this.current) { await this.current; continue; }
+      if (this.invalid() || this.failed || this.abandoned || !this.stillMine()) return false;
+      if (this.seq === this.savedSeq) return sameValues(this.saved, wanted);
+      await this.flush();
+    }
+  }
+
+  // Sign-out waits for this, and so does leaving the form: a place on its way goes first, then every change is
+  // saved. One that cannot be saved is never lost without a word: the person is told, on whatever screen comes
+  // next (Q-04). A sign-out hands over its deadline, and a save or a place that has not answered by then is let go.
+  leave = async (deadline?: AbortSignal) => {
+    const done = (async () => {
+      if (this.placingNow) await this.placingNow;
+      return this.settle();
+    })();
+    const kept = await (deadline ? Promise.race([done, passedBy(deadline)]) : done);
+    if (kept === 'passed') this.letGo();
+    else if (!kept) notKept();
   };
+
+  // The sign-out could not wait any longer for an answer. The request on its way is aborted, so the writes queued
+  // behind it, the next person's too, are not held, and nothing more is tried. The person is told the change, or
+  // the order, could not be confirmed, and a form already left lets go of the sign-out, so none waits for it again.
+  private letGo() {
+    this.abandoned = true;
+    this.requests.abort();
+    window.clearTimeout(this.timer);
+    window.clearTimeout(this.retryTimer);
+    this.timer = 0;
+    notKept(this.placing ? PLACE_NOT_CONFIRMED : NOT_CONFIRMED);
+    if (this.onScreen) return;
+    this.stopWaiting?.();
+    this.stopWaiting = null;
+  }
 
   // From the tap on Place until the place settles, the form holds still. A change made then would be saved
   // behind the place, and once the drafts are placed, as a new draft nobody asked for.
   private change(values: FormValues) {
     if (this.placing) return;
+    // The person is still here after all, as when the sign-out itself failed: their new change goes as usual.
+    if (this.abandoned) {
+      this.abandoned = false;
+      this.requests = new AbortController();
+    }
     this.values = values;
     this.seq += 1;
-    this.tell({ values, saving: 'saving', changedElsewhere: false, refused: null });
+    // A box that holds something else holds the save until it is fixed, so what is saved is what the form shows.
+    const held = this.invalid();
+    this.tell({ values, typed: this.typed, saving: held ? 'held' : 'saving', changedElsewhere: false, placedElsewhere: null, refused: null });
     window.clearTimeout(this.retryTimer);
     window.clearTimeout(this.timer);
-    this.timer = window.setTimeout(this.flush, SAVE_AFTER_MS);
+    this.timer = held ? 0 : window.setTimeout(this.flush, SAVE_AFTER_MS);
   }
 
+  // − and +: a step from the number the form holds. What was typed in the box goes.
   setQuantity = (productId: string, quantity: number) => {
+    if (this.placing) return;
+    const { [productId]: _gone, ...typed } = this.typed;
+    this.typed = typed;
     if ((this.values.quantities[productId] ?? 0) !== quantity) this.change({ ...this.values, quantities: { ...this.values.quantities, [productId]: quantity } });
+    else this.tell({ typed });
+  };
+
+  // What is typed in a box stays as it is typed. A whole number from 0 to 999 is the item's quantity. Anything else
+  // is never turned into another number: the box keeps it, and the form saves nothing until it is fixed (Q-01, Q-02).
+  typeQuantity = (productId: string, text: string) => {
+    if (this.placing) return;
+    this.typed = { ...this.typed, [productId]: text };
+    const quantity = wholeQuantity(text);
+    this.change(quantity === null ? this.values : { ...this.values, quantities: { ...this.values.quantities, [productId]: quantity } });
+  };
+
+  // Leaving a box shows its number as the form holds it, "05" as 5. A box that holds something else keeps it.
+  leaveQuantity = (productId: string) => {
+    const text = this.typed[productId];
+    if (text === undefined || wholeQuantity(text) === null) return;
+    const { [productId]: _left, ...typed } = this.typed;
+    this.typed = typed;
+    this.tell({ typed });
   };
 
   setNote = (note: string) => {
     if (this.values.note !== note) this.change({ ...this.values, note });
   };
 
+  // A press while a change is still saving is taken: the change goes at once, the place waits for its answer and
+  // then places what it saved (Q-08). The form holds still from the press, so what is placed is what the form
+  // showed. A save that fails, a day that closes or a draft changed or placed somewhere else places nothing, and
+  // the form says why. A box that holds something that is not a whole number has its own line, and Place is off.
   place = async () => {
-    if (this.placing || this.running || this.seq !== this.savedSeq) return;
+    if (this.placing || this.invalid()) return;
+    const run = this.placeNow();
+    this.placingNow = run;
+    await run;
+    this.placingNow = null;
+  };
+
+  private async placeNow() {
     this.placing = true;
     this.tell({ placing: true, refused: null });
+    const day = this.base.deliveryDate;
+    const saved = await this.settle();
+    const drafts = Boolean(this.base.refs.chilled || this.base.refs.dry);
+    if (!saved || this.base.deliveryDate !== day || !drafts) {
+      this.placing = false;
+      this.tell(!saved && this.failed ? { placing: false, refused: reasonOf(this.failure) } : { placing: false });
+      return;
+    }
     try {
       await this.qc.cancelQueries({ queryKey: nextOrderKey });
-      const answer = await placeOrders({ deliveryDate: this.base.deliveryDate, refs: this.base.refs });
+      this.tried = this.base.refs;
+      const answer = await placeOrders({ deliveryDate: this.base.deliveryDate, refs: this.base.refs }, this.requests.signal);
       if (!this.stillMine()) return;
       this.takeOver(answer);
       this.qc.setQueryData<StoreNextOrder>(nextOrderKey, answer);
@@ -247,6 +437,12 @@ class DraftForm {
       void this.qc.invalidateQueries({ queryKey: ['orders', 'store'] });
       this.placed(answer.placedOrders);
     } catch (error) {
+      // Aborted by a sign-out that could wait no longer, which has told the person.
+      if (this.abandoned) {
+        this.placing = false;
+        this.tell({ placing: false });
+        return;
+      }
       if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
         // Nothing was placed. The manager sees the new day and decides again.
         void this.qc.invalidateQueries({ queryKey: nextOrderKey });
@@ -258,28 +454,48 @@ class DraftForm {
       this.placing = false;
       this.tell({ placing: false });
     }
-  };
+  }
 
   // The answer of a refetch. When the form has nothing unsaved, a draft that changed somewhere else, or a
-  // day that moved on, is shown at once. With a change waiting, the save's own answer decides.
+  // day that moved on, is shown at once. With a change waiting, the save's own answer decides, and while placing
+  // the place's answer does.
   incoming(next: OpenOrder) {
     this.products = next.products;
     const base: Base = { deliveryDate: next.deliveryDate, refs: next.draft?.refs ?? {} };
-    if (sameBase(base, this.base) || this.running || this.seq !== this.savedSeq) return;
+    if (sameBase(base, this.base) || this.running || this.placing || this.seq !== this.savedSeq) return;
     if (base.deliveryDate > this.base.deliveryDate) this.tell({ closedDay: this.base.deliveryDate });
     else if (base.deliveryDate < this.base.deliveryDate) this.tell({ closedDay: null });
-    if (!sameValues(valuesOf(next), this.values)) this.tell({ changedElsewhere: true });
+    // The drafts this form shows are placed: by this form, when its place's answer was lost, so the confirmation
+    // opens as it would have; or from another screen, which the form says, ready for another order (Q-07).
+    const placed = this.placedOf(next);
+    const tried = this.tried;
+    if (placed.length && tried && placed.every((order) => order.id === tried.chilled?.id || order.id === tried.dry?.id)) {
+      this.showLatest(next);
+      this.placed(placed);
+      return;
+    }
+    if (placed.length) this.tell({ placedElsewhere: { lost: false }, changedElsewhere: false });
+    else if (!sameValues(valuesOf(next), this.values)) this.tell({ changedElsewhere: true });
     this.showLatest(next);
   }
 
   opened() {
     this.onScreen = true;
+    // Sign-out waits for the form while it is open, and for the last save of a form just left (Q-04).
+    this.stopWaiting ??= finishBeforeSignOut(this.leave);
   }
 
-  // Leaving the form must not drop the last change: send it now, without waiting for the timer.
+  // Leaving the form must not drop the last change: it goes now, without waiting for the timer, and the person is
+  // told when it cannot be saved. Signed out, there is nothing to send: the sign-out waited for the form first.
   closed() {
     this.onScreen = false;
-    void this.flush();
+    const done = this.stillMine() ? this.leave() : Promise.resolve();
+    return done.then(() => {
+      // Opened again in the meantime, as React does once more on a first show in development.
+      if (this.onScreen) return;
+      this.stopWaiting?.();
+      this.stopWaiting = null;
+    });
   }
 }
 
@@ -288,7 +504,9 @@ class DraftForm {
 export function useDraftForm(next: OpenOrder) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [screen, setScreen] = useState<Screen>(() => ({ values: valuesOf(next), saving: 'saved', placing: false, changedElsewhere: false, closedDay: null, refused: null }));
+  const [screen, setScreen] = useState<Screen>(() => ({
+    values: valuesOf(next), typed: {}, saving: 'saved', placing: false, changedElsewhere: false, placedElsewhere: null, closedDay: null, refused: null,
+  }));
   const [form] = useState(() => new DraftForm(
     next, qc, (patch) => setScreen((now) => ({ ...now, ...patch })),
     (placedOrders) => navigate('/store/orders/placed', { state: { placedOrders } satisfies PlacedNow }),
@@ -297,8 +515,8 @@ export function useDraftForm(next: OpenOrder) {
   useEffect(() => { form.incoming(next); }, [form, next]);
   useEffect(() => {
     form.opened();
-    return () => form.closed();
+    return () => { void form.closed(); };
   }, [form]);
 
-  return { ...screen, setQuantity: form.setQuantity, setNote: form.setNote, place: form.place };
+  return { ...screen, setQuantity: form.setQuantity, typeQuantity: form.typeQuantity, leaveQuantity: form.leaveQuantity, setNote: form.setNote, place: form.place };
 }

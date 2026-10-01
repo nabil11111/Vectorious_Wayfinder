@@ -7,10 +7,11 @@ import type { BoardIndex } from './lookup';
 import { plainButton } from './look';
 
 // What the truck is picked for: a new trip, from a group (its orders give the line and the order of the list,
-// and the trip starts empty), from Find a slot (the trip starts with that order) or blank; or another vehicle
-// for the open trip.
+// and the trip starts empty), from Find a slot or an order dropped in the empty middle (the trip starts with that
+// order) or blank; or another vehicle for the open trip. dropped names what a drop started the trip with, for the
+// trip's Undo line (spec 023).
 export type Pick =
-  | { kind: 'start'; group: { brand: Brand; district: string } | null; orders: BoardOrder[]; startWith: BoardOrder[] }
+  | { kind: 'start'; group: { brand: Brand; district: string } | null; orders: BoardOrder[]; startWith: BoardOrder[]; dropped?: string }
   | { kind: 'swap'; key: TripKey };
 
 // Pick a truck (Edit plan · blank trip): a row per vehicle that can take another trip, fridge vehicles first when

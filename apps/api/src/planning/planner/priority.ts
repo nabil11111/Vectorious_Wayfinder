@@ -2,6 +2,7 @@ import { PlanInputError } from '../errors';
 import { computeLoad } from '../load';
 import { FRESH_DEADLINE } from '../timeline';
 import type { EngineOutlet, PlannerInput, PlannerOrder } from '../types';
+import { driverNameOf } from '../words';
 
 // Unicode scalar order, independent of locale (including characters outside the BMP).
 export function compare(a: string, b: string): number {
@@ -220,7 +221,11 @@ export function prepareInput(input: PlannerInput): PlannerInput {
     settings: { ...settings, earliestLeave: { ...settings.earliestLeave }, budgetMin: { ...settings.budgetMin } },
     products: input.products.map((row) => ({ ...row })).sort(byId),
     outlets: input.outlets.map((row) => ({ ...row })).sort(byId),
-    vehicles: input.vehicles.map((row) => ({ ...row })).sort(byId),
+    // A usual driver is optional (spec 026): a blank name is no name, and the truck is called by its kind and id.
+    vehicles: input.vehicles.map(({ driverName, ...row }) => {
+      const name = driverNameOf(driverName);
+      return name === undefined ? row : { ...row, driverName: name };
+    }).sort(byId),
     travel: input.travel.map((row) => ({ ...row })).sort((a, b) => compare(a.depotId, b.depotId) || compare(a.district, b.district)),
     allowances: input.allowances.map((row) => ({ ...row })).sort((a, b) => compare(a.brand, b.brand) || compare(a.dockType, b.dockType)),
     orders: input.orders.map((row) => ({ ...row, lines: row.lines.map((line) => ({ ...line })).sort((a, b) => compare(a.productId, b.productId)) })),

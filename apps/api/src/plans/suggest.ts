@@ -1,7 +1,7 @@
 import { AcceptDecisionsRequest, Suggestion, SuggestPlanRequest, type PlanBoard, type Problem } from '@wayfinder/contracts';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db, type Tx } from '../db/client';
-import { auditLog, orders, plans } from '../db/schema';
+import { auditLog, orders, plans, users } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import { announce } from '../lib/live';
 import { buildSuggestedPlan, type PlanInput, type PlannerInput } from '../planning';
@@ -10,7 +10,7 @@ import { boardOf, readBoard } from './board';
 import { dayLabel } from './board-day';
 import { finishPlan, openPlan, replaceDraft, validateDraft } from './draft';
 import { joinableParts, joinParts, makeParts } from './split';
-import { suggestionOf } from './suggestion';
+import { driversFor, suggestionOf } from './suggestion';
 
 // The suggested plan on the board (spec 014): building it in one write (D-51, D-52), and accepting the planner's
 // decisions (D-54). Both are planning writes, so each takes the depot's locks first and answers with the board.
@@ -68,9 +68,9 @@ export async function suggestPlan(caller: Planner, date: string, body: SuggestPl
   const result = await db.transaction(async (tx) => {
     // 1. The depot's locks, the clock instant read under them, the day's checks and the plan reference.
     const opened = await openPlan(tx, caller, date, request);
-    // 2. The draft being replaced: its drivers, which stay with their vehicles (D-31), and its Mix brands.
+    // 2. The draft being replaced: its drivers, which stay with their vehicles (D-31, D-97), and its Mix brands.
     const before = await boardOf(tx, caller.depotId, date, opened.moment);
-    const drivers = new Map(before.plan.trips.filter((t) => t.driverId !== null && before.drivers.some((d) => d.id === t.driverId)).map((t) => [t.vehicleId, t.driverId]));
+    const earlier = new Map(before.plan.trips.flatMap((t) => (t.driverId !== null && before.drivers.some((d) => d.id === t.driverId) ? [[t.vehicleId, t.driverId] as const] : [])));
     // 3. An empty draft, Mix brands kept, so no stop or deferral of this plan names a part any more.
     await replaceDraft(tx, opened.plan.id, { mixBrands: before.plan.mixBrands, trips: [], deferrals: [] });
     // 4. This draft's splits joined back, so the planner plans the shops' orders.
@@ -97,7 +97,11 @@ export async function suggestPlan(caller: Planner, date: string, body: SuggestPl
       parts.set(proposal.remainderOrderId, second.id);
       split.push(original);
     }
-    // 8. The planner's plan as a draft, checked as a save would be against the day with its new parts.
+    // 8. The planner's plan as a draft, with a driver of the depot for every vehicle it uses (D-97), checked as a save
+    // would be against the day with its new parts. The drivers are the board's own list, in staff ID order.
+    const staff = await tx.select({ id: users.id }).from(users)
+      .where(and(eq(users.depotId, caller.depotId), eq(users.role, 'driver'), eq(users.active, true))).orderBy(users.staffId, users.id);
+    const drivers = driversFor(planned.input.plan.trips.map((t) => t.vehicleId), earlier, staff.map((d) => d.id));
     const { draft, suggestion } = suggestionOf(planned, parts, drivers, opened.moment.at.toISOString());
     const withParts = await boardOf(tx, caller.depotId, date, opened.moment);
     try {

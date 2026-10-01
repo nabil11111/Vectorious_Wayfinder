@@ -2,16 +2,12 @@ import { checkPlan } from '../check';
 import { computeLoad } from '../load';
 import { defaultLeaveAt } from '../timeline';
 import type { BuildSuggestedPlan, PlanInput, PlannerChoice, PlannerDecision, PlannerOrder, PlannerSplit } from '../types';
-import { toClock } from '../words';
 import { compare, prepareInput } from './priority';
-import { deferralDecisions, deferralFor, furthestRejection, placementReason, priorityReason, quantityWord, refusedReason, shopName } from './reasons';
+import {
+  deferralDecisions, deferralFor, earlyLeaveReason, fittedReason, furthestRejection, placementReason, priorityReason, quantityWord, refusedReason, type Wording,
+} from './reasons';
 import { chooseWhole, type CandidateAttempt } from './candidates';
 import { chooseAllocation, splitLimitDetail } from './split';
-
-const choiceReason = (render: (compact: boolean) => string): string => {
-  const full = render(false);
-  return full.length <= 200 ? full : render(true);
-};
 
 export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
   const source = prepareInput(raw);
@@ -53,14 +49,14 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
       const deferral = deferralFor(source, order, allocation.code, { detail: allocation.detail, attempts: allocation.attempts });
       input.orders.push(order);
       defer(order, deferral);
-      choices.push({ orderId: order.id, rank, resultOrderIds: [order.id], reason: choiceReason((compact) => `${priorityReason(source, order, rank, compact)}; ${refusedReason(source, order, allocation.attempts, allocation.code!, compact)}`) });
+      choices.push({ orderId: order.id, rank, resultOrderIds: [order.id], reason: fittedReason((wording) => `${priorityReason(source, order, rank, wording)}; ${refusedReason(source, order, allocation.attempts, allocation.code!, wording)}`) });
       continue;
     }
 
     accept(best, order, rank, proposal?.kept.id ?? order.id);
     const resultOrderIds = proposal ? [proposal.kept.id, proposal.remainder.id] : [order.id];
-    const priority = (compact: boolean) => priorityReason(source, order, rank, compact);
-    const placed = (compact: boolean) => placementReason(source, order, best, compact);
+    const priority = (wording: Wording) => priorityReason(source, order, rank, wording);
+    const placed = (wording: Wording) => placementReason(source, order, best, wording);
     if (proposal) {
       input.orders.push(proposal.kept, proposal.remainder);
       splits.push(proposal.split);
@@ -69,10 +65,10 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
       // The waiting parent's two children are handled together, before any younger original can claim
       // remaining room. The second child is searched whole, never passed back through the split search.
       const remainder = chooseWhole(input, proposal.remainder);
-      let restReason: (compact: boolean) => string;
+      let restReason: (wording: Wording) => string;
       if (remainder.best) {
         accept(remainder.best, order, rank, proposal.remainder.id);
-        restReason = (compact) => `${remainingUnits} ${quantityWord(source, order)} ${placementReason(source, order, remainder.best!, compact)}`;
+        restReason = (wording) => `${remainingUnits} ${quantityWord(source, order)} ${placementReason(source, order, remainder.best!, wording)}`;
       } else {
         const code = remainder.refusal ?? furthestRejection(remainder.stages);
         const deferral = deferralFor(source, proposal.remainder, code, {
@@ -80,12 +76,13 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
           detail: splitLimitDetail(input, proposal.remainder, originals.length + splits.length, remainder.slots, code),
         });
         defer(proposal.remainder, deferral);
-        restReason = (compact) => `${remainingUnits} wait: ${refusedReason(source, proposal.remainder, remainder.attempts, code, compact)}`;
+        // The first part's vehicle is named just before, so the refusal's short form may call it "it".
+        restReason = (wording) => `${remainingUnits} wait: ${refusedReason(source, proposal.remainder, remainder.attempts, code, wording, best.slot.vehicleId)}`;
       }
-      choices.push({ orderId: order.id, rank, resultOrderIds, reason: choiceReason((compact) => `${priority(compact)}; ${keptUnits} ${quantityWord(source, order)} ${placed(compact)}; ${restReason(compact)}`) });
+      choices.push({ orderId: order.id, rank, resultOrderIds, reason: fittedReason((wording) => `${priority(wording)}; ${keptUnits} ${quantityWord(source, order)} ${placed(wording)}; ${restReason(wording)}`) });
     } else {
       input.orders.push(order);
-      choices.push({ orderId: order.id, rank, resultOrderIds, reason: choiceReason((compact) => `${priority(compact)}; ${placed(compact)}`) });
+      choices.push({ orderId: order.id, rank, resultOrderIds, reason: fittedReason((wording) => `${priority(wording)}; ${placed(wording)}`) });
     }
   }
 
@@ -101,9 +98,10 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
     if (trip.leaveAt !== undefined && trip.leaveAt < usual) {
       const cause = earlyCauses.get(tripKey(trip));
       if (!cause) throw new Error(`No forcing order for ${tripKey(trip)}`);
+      const leaveAt = trip.leaveAt;
       decisions.push({
-        kind: 'early_leave', vehicleId: trip.vehicleId, tripNo: trip.tripNo, leaveAt: trip.leaveAt,
-        reason: `${trip.vehicleId} trip ${trip.tripNo} leaves at ${toClock(trip.leaveAt)} instead of ${toClock(usual)} after adding the rank ${cause.rank} order for ${shopName(source, cause.order)}.`,
+        kind: 'early_leave', vehicleId: trip.vehicleId, tripNo: trip.tripNo, leaveAt,
+        reason: fittedReason((wording) => earlyLeaveReason(source, { vehicleId: trip.vehicleId, tripNo: trip.tripNo, leaveAt, usual }, cause.rank, cause.order, wording)),
       });
     }
     const times = check.trips.find((t) => t.vehicleId === trip.vehicleId && t.tripNo === trip.tripNo)?.times;

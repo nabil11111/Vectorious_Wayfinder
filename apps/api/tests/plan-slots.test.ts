@@ -86,7 +86,7 @@ it('AC-24 finds OUT030 at stop 3 at 04:56 and refuses OUT060 with the first vehi
     orderId: carried('OUT060').id, revision: saved.plan.revision, slots: [],
     refused: [{ vehicleId: 'VEH004', tripNo: 1, problem: {
       code: 'cross_district', level: 'block', vehicleId: 'VEH004', tripNo: 1,
-      message: 'VEH004 trip 1 has stops in 2 districts, Gampaha and Matara, and a trip stays inside one district.',
+      message: 'The reefer truck VEH004 goes to Gampaha and Matara on one trip, and a trip stays in one district.', fix: 'Move the Matara stops to another trip.',
     } }],
   });
   expect(await held()).toEqual(before);

@@ -1,9 +1,13 @@
-import { useState } from 'react';
-import type { Brand, DraftTrip } from '@wayfinder/contracts';
+import { useContext, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import type { Brand, DraftTrip, TripTimes } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import type { BoardScreen } from '../board';
 import { keyOf, planOf, sameTrip, tripOf, type TripKey } from '../draft';
 import { countOf, figure, hhmm, whole } from '../words';
+import { DepotRow } from './DepotRow';
+import { BoardChange, useLanding } from './dragging';
+import { tripLabel } from './drops';
 import { ICON } from './icons';
 import type { BoardIndex } from './lookup';
 import { toneOf } from './look';
@@ -45,20 +49,26 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
   const vehicle = index.vehicle(trip.vehicleId);
   const driver = index.driver(trip.driverId);
   const shop = trip.stops[0] ? index.shop(trip.stops[0].outletId) : null;
-  // Two lines, as the frame has them: the vehicle and its driver, then the brand and district.
-  const who = [trip.tripNo === 2 ? `${trip.vehicleId} trip 2` : trip.vehicleId, driver?.name].filter(Boolean).join(' · ');
+  // Two lines, as the frame has them: the vehicle and its driver, or "no driver" in the warning colour (spec 022), then
+  // the brand and district.
+  const name = tripLabel(trip);
   const where = [shop?.brand, shop?.district, vehicle?.type === 'van' && 'van'].filter(Boolean).join(' · ');
-  const title = [who, where].filter(Boolean).join(' · ');
+  const title = [name, driver?.name ?? 'no driver', where].filter(Boolean).join(' · ');
+  // An order or a stop dropped on the card joins this trip at the end, and the drop's Undo line shows here (spec 023).
+  const { setNodeRef: landingRef, look: landingLook } = useLanding(`card:${key}`, { kind: 'card', tripKey: key }, `${name}'s card`);
+  const change = useContext(BoardChange);
+  const undo = screen.undo?.tripKey === key ? screen.undo : null;
 
   return (
-    <li className="border-t py-2.5">
+    <li ref={landingRef} className={cn('border-t py-2.5', landingLook)}>
       <div className="flex items-start gap-2">
         <button type="button" onClick={() => onOpen(key)} className="mr-auto min-w-0 rounded-sm text-left text-xs leading-[17px] font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
-          <span className="block">{who}{where && ' ·'}</span>
+          <span className="block">{name} · {driver ? driver.name : <span className="text-warn-ink">no driver</span>}{where && ' ·'}</span>
           {where && <span className="block">{where}</span>}
         </button>
-        <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${title}` : `Show the stops of ${title}`} onClick={() => setOpen(!open)} className="-mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-sm font-bold text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-          {open ? '⌃' : '⌄'}
+        {/* One chevron for both states, turned while the card is open. */}
+        <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${title}` : `Show the stops of ${title}`} onClick={() => setOpen(!open)} className="group -mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+          <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-aria-expanded:rotate-180" />
         </button>
       </div>
       <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">
@@ -71,22 +81,38 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
           <Figure small label="m³" value={`${figure(figures.m3Pct)}%`} tone={toneOf(figures.m3Pct, has('over_volume'))} />
         </div>
       )}
-      {open && (
-        <ol className="mt-2 space-y-1.5">
-          {trip.stops.map((stop, i) => {
-            const at = index.shop(stop.outletId);
-            const time = times?.stops[i];
-            return (
-              <li key={stop.outletId} className="flex items-center gap-2 text-[11px] leading-[14px]">
-                <span className={cn('flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold', time?.late ? 'bg-bad text-white' : 'bg-muted')}>{whole(i + 1)}</span>
-                <span className={cn('w-9 shrink-0 font-mono', time?.late && 'text-bad')}>{time ? hhmm(time.arriveAt) : '--:--'}</span>
-                <span className="min-w-0 flex-1 truncate font-semibold">{at?.name ?? stop.outletId}</span>
-                {at && <span className="shrink-0 text-[10px] text-muted-foreground">{hhmm(time?.windowOpen ?? at.windowOpen)} to {hhmm(time?.windowClose ?? at.windowClose)}</span>}
-              </li>
-            );
-          })}
-        </ol>
+      {undo && change && (
+        <div role="status" className="mt-2 flex items-center gap-2 rounded-[10px] bg-good-tint px-2.5 py-1.5">
+          <p className="flex-1 text-[11px] leading-[14px] font-semibold text-good">{undo.line}</p>
+          <button type="button" className="text-[11px] leading-[14px] font-semibold underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50" onClick={() => change(undo.before)}>Undo</button>
+        </div>
       )}
+      {open && <CardStops trip={trip} times={times} depot={screen.board.depot} index={index} />}
     </li>
+  );
+}
+
+// An opened card's stops, between the depot the trip leaves and the depot it comes back to (spec 022). The depot's
+// rows need the checker's times, so a trip with none shows its stops alone.
+export function CardStops({ trip, times, depot, index }: { trip: DraftTrip; times: TripTimes | null; depot: string; index: BoardIndex }) {
+  return (
+    <div className="mt-2 space-y-1.5">
+      {times && <DepotRow small end="start" depot={depot} at={times.leaveAt} />}
+      <ol className="space-y-1.5">
+        {trip.stops.map((stop, i) => {
+          const at = index.shop(stop.outletId);
+          const time = times?.stops[i];
+          return (
+            <li key={stop.outletId} className="flex items-center gap-2 text-[11px] leading-[14px]">
+              <span className={cn('flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold', time?.late ? 'bg-bad text-white' : 'bg-muted')}>{whole(i + 1)}</span>
+              <span className={cn('w-9 shrink-0 font-mono', time?.late && 'text-bad')}>{time ? hhmm(time.arriveAt) : '--:--'}</span>
+              <span className="min-w-0 flex-1 truncate font-semibold">{at?.name ?? stop.outletId}</span>
+              {at && <span className="shrink-0 text-[10px] text-muted-foreground">{hhmm(time?.windowOpen ?? at.windowOpen)} to {hhmm(time?.windowClose ?? at.windowClose)}</span>}
+            </li>
+          );
+        })}
+      </ol>
+      {times && <DepotRow small end="end" depot={depot} at={times.backAt} />}
+    </div>
   );
 }

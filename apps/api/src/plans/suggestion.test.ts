@@ -3,13 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { buildSuggestedPlan, type PlannerResult } from '../planning';
 import { plannerInput, plannerOrder } from '../planning/planner/testing/input';
 import { vehicle } from '../planning/testing/shared';
-import { boardSuggestion, decisionOpen, suggestionOf } from './suggestion';
+import { boardSuggestion, decisionOpen, driversFor, suggestionOf } from './suggestion';
 
 // Spec 014's plain functions on made-up days: when a decision is open (AC-11), and how the planner's result becomes
-// the draft to save and the suggestion to keep.
+// the draft to save and the suggestion to keep. Spec 022's drivers for the vehicles a suggestion uses (AC-3).
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const [A, B, C, FIRST, SECOND, DILSHAN] = [1, 2, 3, 4, 5, 6].map(id) as [string, string, string, string, string, string];
+// Four of the depot's drivers in staff ID order: D-001, D-003, D-004 and D-005.
+const [D001, D003, D004, D005] = [11, 13, 14, 15].map(id) as [string, string, string, string];
 const BUILT = '2026-06-24T10:30:00.000Z';
 const ACCEPTED = '2026-06-24T10:38:00.000Z';
 
@@ -124,6 +126,16 @@ describe('the planner\'s result as a draft and a suggestion', () => {
     expect(boardSuggestion(suggestion, reworded).decisions.map((d) => d.open)).toEqual([false, false, false]);
   });
 
+  it('spec 022 AC-3 gives a vehicle the same driver on both its trips', () => {
+    const result = planned(buildSuggestedPlan(plannerInput([
+      plannerOrder(C, 'OUT006'),
+      plannerOrder(A, 'OUT001', 'fresh-chilled-carton', 180, { deliveryDate: '2026-06-24', timesDeferred: 1 }),
+    ], { vehicles: [vehicle('VEH035'), vehicle('VEH012')] })));
+    const drivers = driversFor(result.input.plan.trips.map((trip) => trip.vehicleId), new Map(), [D001, D003, D004]);
+    const { draft } = suggestionOf(result, new Map([[`split:${A}:keep`, FIRST], [`split:${A}:rest`, SECOND]]), drivers, BUILT);
+    expect(draft.trips.map((trip) => [trip.vehicleId, trip.tripNo, trip.driverId])).toEqual([['VEH012', 1, D001], ['VEH035', 1, D003], ['VEH035', 2, D003]]);
+  });
+
   it('refuses a split reference with no part made for it, and keeps Mix brands as the planner had it', () => {
     const result = planned(buildSuggestedPlan(plannerInput([
       plannerOrder(A, 'OUT001', 'fresh-chilled-carton', 180, { deliveryDate: '2026-06-24', timesDeferred: 1 }),
@@ -131,5 +143,25 @@ describe('the planner\'s result as a draft and a suggestion', () => {
     expect(() => suggestionOf(result, new Map(), new Map(), BUILT)).toThrow(/split:/);
     const mixed = planned(buildSuggestedPlan(plannerInput([plannerOrder(C, 'OUT006')], { vehicles: [vehicle('VEH012')], settings: { ...plannerInput().settings, mixBrands: true } })));
     expect(suggestionOf(mixed, new Map(), new Map(), BUILT).draft.mixBrands).toBe(true);
+  });
+});
+
+describe('the drivers of the vehicles a suggestion uses (spec 022, D-97)', () => {
+  it('AC-3 keeps a vehicle\'s earlier driver and gives each other vehicle, in id order, the first free driver by staff ID', () => {
+    // VEH035 had D-004 in the draft before. A vehicle named on two trips is one vehicle.
+    expect(driversFor(['VEH035', 'VEH004', 'VEH001', 'VEH035'], new Map([['VEH035', D004]]), [D001, D003, D004, D005]))
+      .toEqual(new Map([['VEH001', D001], ['VEH004', D003], ['VEH035', D004]]));
+  });
+
+  it('AC-3 gives no driver to two vehicles, and frees the driver of a vehicle the suggestion leaves out', () => {
+    // VEH008 had D-001 and is not in the suggestion, so D-001 is free again. VEH010 keeps D-003, which nobody else gets.
+    expect(driversFor(['VEH010', 'VEH002', 'VEH003'], new Map([['VEH008', D001], ['VEH010', D003]]), [D001, D003, D004, D005]))
+      .toEqual(new Map([['VEH002', D001], ['VEH003', D004], ['VEH010', D003]]));
+  });
+
+  it('AC-3 leaves a vehicle without a driver only once every driver of the depot is taken', () => {
+    expect(driversFor(['VEH001', 'VEH002', 'VEH003'], new Map([['VEH003', D001]]), [D001, D003]))
+      .toEqual(new Map([['VEH001', D003], ['VEH002', null], ['VEH003', D001]]));
+    expect(driversFor([], new Map([['VEH003', D001]]), [D001])).toEqual(new Map());
   });
 });

@@ -54,7 +54,7 @@ describe('rules for time', () => {
     expect(times).toEqual([{ vehicleId: 'VEH012', trips: [{ tripNo: 1, times: null }] }]);
     expect(timeProblems(input, times)).toEqual([{
       code: 'cross_district', level: 'block', vehicleId: 'VEH012', tripNo: 1,
-      message: 'VEH012 trip 1 has stops in 2 districts, Gampaha and Colombo, and a trip stays inside one district.',
+      message: 'The dry truck VEH012 goes to Gampaha and Colombo on one trip, and a trip stays in one district.', fix: 'Move the Colombo stops to another trip.',
     }]);
 
     // With no times the rules about leaving and arriving have nothing to check, so an early leaving time adds nothing.
@@ -70,7 +70,7 @@ describe('rules for time', () => {
     expect(times).toEqual([{ vehicleId: 'VEH008', trips: [{ tripNo: 1, times: null }] }]);
     expect(timeProblems(input, times)).toEqual([{
       code: 'no_travel_data', level: 'block', vehicleId: 'VEH008', tripNo: 1,
-      message: 'VEH008 trip 1 goes to Kandy, and there are no travel figures from the Peliyagoda depot to Kandy.',
+      message: 'There are no travel figures from the Peliyagoda depot to Kandy, and the dry truck VEH008 goes there.',
     }]);
 
     // From Kandy's own depot the district is 16 minutes away.
@@ -83,16 +83,16 @@ describe('rules for time', () => {
     const second = trip('VEH012', 2, ['OUT005']);
     expect(check('Peliyagoda', [first, second, trip('VEH012', 3, ['OUT011'])])).toEqual([{
       code: 'too_many_trips', level: 'block', vehicleId: 'VEH012',
-      message: 'VEH012 has 3 trips, and a vehicle runs at most two a day.',
+      message: 'The dry truck VEH012 has 3 trips, and a vehicle runs at most two a day.',
     }]);
     expect(check('Peliyagoda', [first, { ...second, tripNo: 1 }])).toEqual([{
       code: 'too_many_trips', level: 'block', vehicleId: 'VEH012', tripNo: 1,
-      message: 'VEH012 has two trips numbered 1, and a vehicle\'s trips are numbered 1 and 2.',
+      message: 'The dry truck VEH012 has two trips numbered 1, and a vehicle\'s trips are numbered 1 and 2.',
     }]);
     for (const tripNo of [3, 0]) {
       expect(check('Peliyagoda', [{ ...first, tripNo }])).toEqual([{
         code: 'too_many_trips', level: 'block', vehicleId: 'VEH012', tripNo,
-        message: `VEH012 has a trip numbered ${tripNo}, and a vehicle's trips are numbered 1 and 2.`,
+        message: `The dry truck VEH012 has a trip numbered ${tripNo}, and a vehicle's trips are numbered 1 and 2.`,
       }]);
     }
 
@@ -104,7 +104,7 @@ describe('rules for time', () => {
   it('AC-31 reports trips_overlap when a second trip leaves before the first is ready again, and gives the earliest it can leave', () => {
     const overlap = (leaveAt: string) => [{
       code: 'trips_overlap', level: 'block', vehicleId: 'VEH012', tripNo: 2,
-      message: `VEH012 trip 2 leaves at ${leaveAt}, before VEH012 is back from trip 1 and reloaded at 06:18.`, fix: 'Leave at 06:18 or later.', leaveAt: 378,
+      message: `The second trip of the dry truck VEH012 leaves at ${leaveAt}, before it is back and reloaded at 06:18.`, fix: 'Leave at 06:18 or later.', leaveAt: 378,
     }];
     const chained = (leaveAt: string) => check('Peliyagoda', [gampaha, { ...colombo, leaveAt: toMinutes(leaveAt) }]);
     expect(chained('05:30')).toEqual(overlap('05:30'));
@@ -117,14 +117,14 @@ describe('rules for time', () => {
     // On the chained day trip 2 leaves at 06:18 and reaches its fourth stop at 07:54.
     expect(check('Peliyagoda', [gampaha, trip('VEH012', 2, toOut010)])).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 2, stopSeq: 4, outletId: 'OUT010',
-      message: 'VEH012 trip 2 reaches OUT010 at 07:54, 24 minutes after its delivery window closes at 07:30.',
+      message: 'OUT010 is reached at 07:54 by the second trip of the dry truck VEH012, 24 minutes after its window closes at 07:30.',
     }]);
 
     // Arriving exactly at closing time is on time, and a minute later is late.
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT010'], '07:06')])).toEqual([]);
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT010'], '07:07')])).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT010',
-      message: 'VEH012 trip 1 reaches OUT010 at 07:31, 1 minute after its delivery window closes at 07:30.',
+      message: 'OUT010 is reached at 07:31 by the dry truck VEH012, 1 minute after its window closes at 07:30.',
       fix: 'Leave by 07:06 to reach every stop in time.', leaveAt: 426,
     }]);
 
@@ -132,7 +132,7 @@ describe('rules for time', () => {
     // at 08:00. That is inside its window, and late for a Fresh shop.
     expect(only(check('Kandy', [trip('VEH044', 1, badulla, '03:00')]), 'window_missed')).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH044', tripNo: 1, stopSeq: 4, outletId: 'OUT113',
-      message: 'VEH044 trip 1 reaches OUT113 at 08:00, and Fresh shops must be reached before 08:00.',
+      message: 'OUT113 is reached at 08:00 by the dry truck VEH044, and Fresh shops must be reached before 08:00.',
       fix: 'Leave by 02:59 to reach every stop in time.', leaveAt: 179,
     }]);
     // Leaving at 02:59 it is reached at 07:59, and nothing blocks the plan.
@@ -142,7 +142,7 @@ describe('rules for time', () => {
     // OUT017 with a window of 10:00 to 11:30, reached at 11:44.
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '11:20')], { outlets: out017Open('10:00', '11:30') })).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
-      message: 'VEH012 trip 1 reaches OUT017 at 11:44, 14 minutes after its delivery window closes at 11:30.',
+      message: 'OUT017 is reached at 11:44 by the dry truck VEH012, 14 minutes after its window closes at 11:30.',
       fix: 'Leave by 11:06 to reach every stop in time.', leaveAt: 666,
     }]);
   });
@@ -151,7 +151,7 @@ describe('rules for time', () => {
     // The Style trip with OUT017 first leaves at 10:06 and reaches OUT015 at 11:37. Its slot closed at 11:00.
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017', 'OUT015', 'OUT019'])])).toEqual([{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 2, outletId: 'OUT015',
-      message: 'VEH012 trip 1 reaches OUT015 at 11:37, 37 minutes after its mall\'s delivery hours of 09:00 to 11:00 end.',
+      message: 'OUT015 is reached at 11:37 by the dry truck VEH012, 37 minutes after its mall slot of 09:00 to 11:00 ends.',
     }]);
     // Reaching it just as the slot closes is on time: leaving at 10:36 the usual way round, OUT015 is reached at 11:00.
     expect(check('Peliyagoda', [trip('VEH012', 1, styleShops, '10:36')])).toEqual([]);
@@ -160,7 +160,7 @@ describe('rules for time', () => {
     // minutes after its slot, first with a window that is still open and then with one that closed at 11:30.
     const afterSlot = (leaveBy: string) => [{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
-      message: 'VEH012 trip 1 reaches OUT017 at 12:45, 15 minutes after its mall\'s delivery hours of 10:30 to 12:30 end.',
+      message: 'OUT017 is reached at 12:45 by the dry truck VEH012, 15 minutes after its mall slot of 10:30 to 12:30 ends.',
       fix: `Leave by ${leaveBy} to reach every stop in time.`, leaveAt: toMinutes(leaveBy),
     }];
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '12:21')], { outlets: out017Open('09:00', '17:00') })).toEqual(afterSlot('12:06'));
@@ -170,7 +170,7 @@ describe('rules for time', () => {
     // late. Reached at 09:30 the vehicle would wait an hour for nothing, and that is not reported as a wait.
     const never = [{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
-      message: 'VEH012 trip 1 stops at OUT017, which takes deliveries from 09:00 to 10:00 while its mall lets them in only from 10:30 to 12:30, so it can never be reached in time.',
+      message: 'OUT017 takes deliveries from 09:00 to 10:00 and its mall slot is 10:30 to 12:30, so the dry truck VEH012 can never reach it in time.',
     }];
     const apart = { outlets: out017Open('09:00', '10:00') };
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'])], apart)).toEqual(never);
@@ -181,7 +181,7 @@ describe('rules for time', () => {
     const freshInMall = { outlets: changed('OUT017', { brand: 'Fresh', mallOpen: toMinutes('06:00'), mallClose: toMinutes('10:00'), ...hours('06:00', '10:00') }) };
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT017'], '09:46')], freshInMall)).toEqual([{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT017',
-      message: 'VEH012 trip 1 reaches OUT017 at 10:10, 10 minutes after its mall\'s delivery hours of 06:00 to 10:00 end, and Fresh shops must be reached before 08:00.',
+      message: 'OUT017 is reached at 10:10 by the dry truck VEH012, 10 minutes after its mall slot of 06:00 to 10:00 ends, and Fresh shops must be reached before 08:00.',
       fix: 'Leave by 07:35 to reach every stop in time.', leaveAt: 455,
     }]);
   });
@@ -189,9 +189,10 @@ describe('rules for time', () => {
   it('AC-37 warns with over_time_budget when a vehicle\'s Fresh trips pass 270 trip minutes or its Style and Tech trips 480', () => {
     // Badulla's OUT110, OUT112 and OUT111 take 186 + 23 × 2 + 15 × 3 = 277 and are all reached in time.
     const three = [trip('VEH044', 1, ['OUT110', 'OUT112', 'OUT111'])];
+    // Both vehicles here are dry trucks.
     const over = (vehicleId: string, trips: string, took: number, budget: number) => [{
       code: 'over_time_budget', level: 'warn', vehicleId,
-      message: `${vehicleId}'s ${trips} trips take ${took} minutes of driving and unloading, and their budget for the day is ${budget}.`,
+      message: `The dry truck ${vehicleId}'s ${trips} trips take ${took} minutes of driving and unloading, ${took - budget} over the day's ${budget}.`,
     }];
     expect(check('Kandy', three)).toEqual(over('VEH044', 'Fresh', 277, 270));
     // The budgets are settings (D-09), and a day exactly on its budget is inside it.
@@ -212,9 +213,10 @@ describe('rules for time', () => {
   });
 
   it('AC-38 warns with leaves_early for a trip set to leave before 03:30 with a Fresh stop, or before 07:30 without one', () => {
+    // Both vehicles here are dry trucks.
     const early = (vehicleId: string, leaveAt: string, fresh: 'with' | 'without', earliest: string) => [{
       code: 'leaves_early', level: 'warn', vehicleId, tripNo: 1,
-      message: `${vehicleId} trip 1 leaves at ${leaveAt}, and a trip ${fresh} a Fresh shop normally leaves at ${earliest} or later.`,
+      message: `The dry truck ${vehicleId} leaves at ${leaveAt}, and a trip ${fresh} a Fresh shop normally leaves at ${earliest} or later.`,
     }];
     // The four-stop Badulla trip that leaves at 02:59. It also runs past the Fresh budget, and reaches every shop in time.
     const fourStops = check('Kandy', [trip('VEH044', 1, badulla, '02:59')]);
@@ -235,7 +237,7 @@ describe('rules for time', () => {
     // Leaving at 03:30 with OUT008 (opens 05:00) first, a truck arrives at 03:54 and waits 66 minutes.
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT008'], '03:30')])).toEqual([{
       code: 'long_wait', level: 'warn', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT008',
-      message: 'VEH012 trip 1 reaches OUT008 at 03:54 and waits 66 minutes for its delivery window to open at 05:00.',
+      message: 'OUT008 is reached at 03:54 by the dry truck VEH012 and waits 66 minutes for its window to open at 05:00.',
       fix: 'Leave at 04:36 to arrive as it opens.', leaveAt: 276,
     }]);
     // A wait of exactly 30 minutes is not long.
@@ -245,13 +247,13 @@ describe('rules for time', () => {
     // At a later stop no leaving time removes the wait. OUT004 opens at 05:30 and is reached at 04:18.
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT006', 'OUT004'], '03:30')])).toEqual([{
       code: 'long_wait', level: 'warn', vehicleId: 'VEH012', tripNo: 1, stopSeq: 2, outletId: 'OUT004',
-      message: 'VEH012 trip 1 reaches OUT004 at 04:18 and waits 72 minutes for its delivery window to open at 05:30.',
+      message: 'OUT004 is reached at 04:18 by the dry truck VEH012 and waits 72 minutes for its window to open at 05:30.',
     }]);
 
     // The 30 minutes are a setting (D-19). The Style trip waits 23 minutes at OUT017.
     expect(check('Peliyagoda', [trip('VEH012', 1, styleShops)], { settings: { waitWarnMin: 20 } })).toEqual([{
       code: 'long_wait', level: 'warn', vehicleId: 'VEH012', tripNo: 1, stopSeq: 2, outletId: 'OUT017',
-      message: 'VEH012 trip 1 reaches OUT017 at 10:07 and waits 23 minutes for its delivery window to open at 10:30.',
+      message: 'OUT017 is reached at 10:07 by the dry truck VEH012 and waits 23 minutes for its window to open at 10:30.',
     }]);
   });
 
@@ -261,7 +263,7 @@ describe('rules for time', () => {
     // 08:00, still late for a Fresh shop, so the fix says 02:59.
     expect(only(check('Kandy', [trip('VEH044', 1, badulla)]), 'window_missed')).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH044', tripNo: 1, stopSeq: 4, outletId: 'OUT113',
-      message: 'VEH044 trip 1 reaches OUT113 at 08:30, 30 minutes after its delivery window closes at 08:00, and Fresh shops must be reached before 08:00.',
+      message: 'OUT113 is reached at 08:30 by the dry truck VEH044, 30 minutes after its window closes at 08:00, and Fresh shops must be reached before 08:00.',
       fix: fix('02:59'), leaveAt: 179,
     }]);
     // Every late stop of a trip carries the same time. Leaving at 04:30 the last three shops are late.
@@ -272,7 +274,7 @@ describe('rules for time', () => {
     // OUT008, which opens at 05:00, so there is no fix.
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT008', 'OUT012', 'OUT004', 'OUT007', 'OUT014', 'OUT011', 'OUT013', 'OUT010'])])).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 8, outletId: 'OUT010',
-      message: 'VEH012 trip 1 reaches OUT010 at 07:51, 21 minutes after its delivery window closes at 07:30.',
+      message: 'OUT010 is reached at 07:51 by the dry truck VEH012, 21 minutes after its window closes at 07:30.',
     }]);
 
     // Never before the vehicle is ready from its earlier trip. As the vehicle's only trip, this one can leave at
@@ -290,7 +292,7 @@ describe('rules for time', () => {
     // OUT014 at 08:06, and leaving at 06:23 reaches it at 07:59.
     expect(check('Peliyagoda', [gampaha, { ...colombo, leaveAt: toMinutes('06:30') }])).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 2, stopSeq: 4, outletId: 'OUT014',
-      message: 'VEH012 trip 2 reaches OUT014 at 08:06, 6 minutes after its delivery window closes at 08:00, and Fresh shops must be reached before 08:00.',
+      message: 'OUT014 is reached at 08:06 by the second trip of the dry truck VEH012, 6 minutes after its window closes at 08:00, and Fresh shops must be reached before 08:00.',
       fix: fix('06:23'), leaveAt: 383,
     }]);
 
@@ -299,7 +301,7 @@ describe('rules for time', () => {
     const beforeDawn = (close: string) => check('Kandy', [trip('VEH044', 1, ['OUT110'])], { outlets: changed('OUT110', hours('00:00', close)) });
     expect(beforeDawn('03:00')).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH044', tripNo: 1, stopSeq: 1, outletId: 'OUT110',
-      message: 'VEH044 trip 1 reaches OUT110 at 06:36, 216 minutes after its delivery window closes at 03:00.',
+      message: 'OUT110 is reached at 06:36 by the dry truck VEH044, 216 minutes after its window closes at 03:00.',
     }]);
     // Midnight itself is not too early: with the window closing at 03:06 the fix says 00:00.
     expect(beforeDawn('03:06')).toMatchObject([{ code: 'window_missed', outletId: 'OUT110', fix: fix('00:00'), leaveAt: 0 }]);
@@ -307,7 +309,7 @@ describe('rules for time', () => {
     // A missed mall slot carries the fix too: set to 10:40 the Style trip reaches OUT015 at 11:04.
     expect(check('Peliyagoda', [trip('VEH012', 1, styleShops, '10:40')])).toEqual([{
       code: 'mall_slot_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT015',
-      message: 'VEH012 trip 1 reaches OUT015 at 11:04, 4 minutes after its mall\'s delivery hours of 09:00 to 11:00 end.',
+      message: 'OUT015 is reached at 11:04 by the dry truck VEH012, 4 minutes after its mall slot of 09:00 to 11:00 ends.',
       fix: fix('10:36'), leaveAt: 636,
     }]);
   });
@@ -318,7 +320,7 @@ describe('rules for time', () => {
     const problems = check('Peliyagoda', [kurunegala]);
     expect(only(problems, 'window_missed')).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH002', tripNo: 1, stopSeq: 5, outletId: 'OUT067',
-      message: 'VEH002 trip 1 reaches OUT067 at 07:53, 23 minutes after its delivery window closes at 07:30.',
+      message: 'OUT067 is reached at 07:53 by the reefer truck VEH002, 23 minutes after its window closes at 07:30.',
       fix: 'Leave by 03:07 to reach every stop in time.', leaveAt: 187,
     }]);
     expect(only(check('Peliyagoda', [{ ...kurunegala, leaveAt: 187 }]), 'window_missed')).toEqual([]);
@@ -344,7 +346,7 @@ describe('rules for time', () => {
     // No shop in the data is like this. A stop there can never be in time, and the sentence gives the two times.
     expect(check('Peliyagoda', [trip('VEH012', 1, ['OUT019'])], { outlets: changed('OUT019', hours('10:00', '09:00')) })).toEqual([{
       code: 'window_missed', level: 'block', vehicleId: 'VEH012', tripNo: 1, stopSeq: 1, outletId: 'OUT019',
-      message: 'VEH012 trip 1 stops at OUT019, whose delivery window opens at 10:00 and closes at 09:00, so it can never be reached in time.',
+      message: 'OUT019\'s window opens at 10:00 and closes at 09:00, so the dry truck VEH012 can never reach it in time.',
     }]);
   });
 

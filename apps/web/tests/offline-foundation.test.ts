@@ -68,7 +68,7 @@ beforeEach(() => {
   hooks.mutations.length = 0;
   hooks.cleanups.length = 0;
   vi.stubGlobal('localStorage', storage);
-  vi.stubGlobal('window', Object.assign(new EventTarget(), { setInterval: vi.fn(() => 1), clearInterval: vi.fn() }));
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { setInterval: vi.fn(() => 1), clearInterval: vi.fn(), setTimeout: vi.fn(() => 1), clearTimeout: vi.fn() }));
 });
 afterEach(() => {
   for (const cleanup of hooks.cleanups.splice(0).reverse()) cleanup();

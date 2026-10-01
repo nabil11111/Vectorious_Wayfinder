@@ -57,6 +57,10 @@ export const StopTime = z.object({
   windowOpen: z.number().int(),
   windowClose: z.number().int(),
   late: z.boolean(),
+  // The minutes it arrives after its window closes, as the checker's window sentences count them (spec 022). 0 when it
+  // is on time, and when it is late for another reason: a Fresh shop reached at 08:00, or a window that never opens.
+  // A check stored before spec 022 has no lateMin; it reads as on time, as its own `late` says otherwise.
+  lateMin: z.number().int().min(0).default(0),
 });
 export type StopTime = z.infer<typeof StopTime>;
 

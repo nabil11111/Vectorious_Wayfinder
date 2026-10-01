@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { meKey } from '@/features/auth/api';
 import { DEPOT_HEADER, nameDepot } from '@/lib/api';
 import { boardKey, dayKey, planWriteOnItsWay, retireBoard, sendPlan, useBoardScreen, writeOutsideBoard } from './board';
+import { landDrop } from './parts/dragging';
+import { driverChange } from './parts/drivers';
 
 // The board's saver across a dispatcher's depot switch (spec 020, AC-6). It keeps the board and its draft outside the
 // cache, so it belongs to the account and the depot: a switch starts it afresh, and an answer for the depot before
@@ -304,4 +306,91 @@ it('D-95 a write waiting its turn names the depot it was made for, not the one t
   } finally {
     nameDepot(null);
   }
+});
+
+it('spec 022 AC-5 a driver swap goes out as one save of the draft, and Undo puts both drivers back with one more', async () => {
+  signedIn(RUWAN);
+  const [dilshan, sanjeewa] = ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'];
+  const day: DraftPlan = { mixBrands: false, deferrals: [], trips: [
+    { vehicleId: 'VEH001', tripNo: 1, leaveAt: null, driverId: dilshan, stops: [] },
+    { vehicleId: 'VEH035', tripNo: 1, leaveAt: null, driverId: sanjeewa, stops: [] },
+  ] };
+  const saved = boardOf('Peliyagoda', PLAN, 1);
+  const board = PlanBoard.parse({ ...saved, plan: { ...saved.plan, ...day } });
+  const { saver } = useBoardScreen(board);
+  // The trips each save sent, with their drivers.
+  const sent = () => vi.mocked(fetch).mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { plan: DraftPlan }).plan.trips.map((t) => [t.vehicleId, t.driverId]));
+
+  const { plan, undo } = driverChange(day, 'VEH035-1', 'VEH035', dilshan);
+  saver.change(plan, undo);
+  await settled();
+  expect(sent()).toEqual([[['VEH001', sanjeewa], ['VEH035', dilshan]]]);
+  answer(Response.json({ ...board, plan: { ...board.plan, ...plan, revision: 2 } }));
+  await settled();
+  expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: { line: 'Drivers of VEH035 and VEH001 swapped', tripKey: 'VEH035-1', revision: 2 } });
+
+  // Undo, as the trip's green line does it: the draft before, both drivers back, in one more save.
+  saver.change(saver.snapshot()!.undo!.before);
+  await settled();
+  expect(sent()).toEqual([[['VEH001', sanjeewa], ['VEH035', dilshan]], [['VEH001', dilshan], ['VEH035', sanjeewa]]]);
+  answer(Response.json({ ...board, plan: { ...board.plan, revision: 3 } }));
+  await settled();
+  expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: null });
+  saver.stop();
+});
+
+it('spec 023 AC-5 a drop goes out as one save of the draft, checked as a button\'s change is, and its Undo as one more', async () => {
+  signedIn(RUWAN);
+  const [nugegoda, kotahena, wellawatte] = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000002'];
+  const day: DraftPlan = { mixBrands: false, deferrals: [], trips: [{ vehicleId: 'VEH035', tripNo: 1, leaveAt: null, driverId: null, stops: [
+    { outletId: 'OUT001', orderIds: [nugegoda] }, { outletId: 'OUT003', orderIds: [kotahena] }, { outletId: 'OUT002', orderIds: [wellawatte] },
+  ] }] };
+  const saved = boardOf('Peliyagoda', PLAN, 1);
+  const board = PlanBoard.parse({ ...saved, plan: { ...saved.plan, ...day } });
+  const { saver } = useBoardScreen(board);
+  // The stops each save sent, in order.
+  const sent = () => vi.mocked(fetch).mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { plan: DraftPlan }).plan.trips[0]!.stops.map((s) => s.outletId));
+
+  // Fresh Nugegoda dragged from first to last place.
+  landDrop(day, { kind: 'stop', tripKey: 'VEH035-1', index: 0, label: 'Fresh Nugegoda', brand: 'Fresh' }, { kind: 'stops', tripKey: 'VEH035-1', at: 2 }, { change: saver.change, start: () => undefined });
+  await settled();
+  expect(sent()).toEqual([['OUT003', 'OUT002', 'OUT001']]);
+  answer(Response.json({ ...board, plan: { ...board.plan, ...saver.snapshot()!.draft, revision: 2 } }));
+  await settled();
+  expect(saver.snapshot()).toMatchObject({ saving: 'saved', undo: { line: 'Stops 1 and 3 moved', tripKey: 'VEH035-1', revision: 2 } });
+
+  saver.change(saver.snapshot()!.undo!.before);
+  await settled();
+  expect(sent()).toEqual([['OUT003', 'OUT002', 'OUT001'], ['OUT001', 'OUT003', 'OUT002']]);
+  answer(Response.json({ ...board, plan: { ...board.plan, revision: 3 } }));
+  await settled();
+  saver.stop();
+});
+
+it('spec 023 a write the queue runs hands its answer on once taken, and nothing when refused or loaded again', async () => {
+  signedIn(RUWAN);
+  const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+  const done = vi.fn();
+  // Taken: done gets the board the build answered.
+  const built = saver.act(sendPlan, done);
+  await settled();
+  const answered = boardOf('Peliyagoda', PLAN, 1);
+  answer(Response.json(answered));
+  expect(await built).toBeNull();
+  expect(done).toHaveBeenCalledExactlyOnceWith(answered);
+
+  // Refused with a sentence: nothing handed on.
+  const refused = saver.act(sendPlan, done);
+  await settled();
+  answer(Response.json({ error: { code: 'not_ready', message: 'The plan has blocks.' } }, { status: 409 }));
+  expect(await refused).toBe('The plan has blocks.');
+  // Stale: the board is read again, and nothing is handed on either.
+  const stale = saver.act(sendPlan, done);
+  await settled();
+  answer(Response.json({ error: { code: 'stale', message: 'The plan was changed in another tab, so it was loaded again.' } }, { status: 409 }));
+  await settled();
+  answer(Response.json(boardOf('Peliyagoda', PLAN, 2)));
+  expect(await stale).toBeNull();
+  expect(done).toHaveBeenCalledOnce();
+  saver.stop();
 });
