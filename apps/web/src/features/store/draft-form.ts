@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import { z } from 'zod';
 import { CutoffPassedDetails, MAX_LINE_UNITS, StoreOrder, type DraftRefs, type Me, type SaveDraftRequest, type StoreNextOrder, type StoreProduct } from '@wayfinder/contracts';
-import { meKey } from '@/features/auth/api';
+import { finishBeforeSignOut, meKey } from '@/features/auth/api';
 import { ApiRequestError } from '@/lib/api';
 import { fetchNextOrder, nextOrderKey, placeOrders, saveDraft } from './next-order';
-import { reasonOf } from './words';
+import { NOT_KEPT, reasonOf } from './words';
 
 // A change is saved this long after it was made, so a run of taps is one save.
 const SAVE_AFTER_MS = 600;
+
+// A change that could not be saved is said, also once the form has left the screen or its person has signed out, so
+// it is never lost without a word (Q-04). The line outlasts the move to the sign-in page.
+const notKept = () => toast(NOT_KEPT, { id: 'draft-not-kept', duration: 10_000, classNames: { title: 'text-pretty' } });
 
 // The next order while a delivery day is open. The form only exists then.
 export type OpenOrder = StoreNextOrder & { deliveryDate: string };
@@ -87,6 +92,10 @@ export class DraftForm {
   private sentSeq = 0;
   private savedSeq = 0;
   private running = false;
+  // The save on its way, from its request until its answer is taken in, so a sign-out or a place can wait for it.
+  private current: Promise<void> | null = null;
+  // The last save failed, or found the session gone. Waiting for the form stops there (Q-04).
+  private failed = false;
   private placing = false;
   private timer = 0;
   private retryTimer = 0;
@@ -95,6 +104,8 @@ export class DraftForm {
   private unanswered: FormValues[] = [];
   private retriedWithoutItem = false;
   private onScreen = true;
+  // Takes the form's work back from the sign-out (Q-04).
+  private stopWaiting: (() => void) | null = null;
   // The person who opened the form. Its answers belong to them alone.
   private owner: string | null;
   private qc: QueryClient;
@@ -169,6 +180,7 @@ export class DraftForm {
     try {
       latest = await this.qc.fetchQuery({ queryKey: nextOrderKey, queryFn: fetchNextOrder, staleTime: 0 });
     } catch (loadError) {
+      if (!whilePlacing) this.failed = true;
       this.tell({ saving: whilePlacing ? 'saved' : 'refused', refused: reasonOf(loadError) });
       return;
     }
@@ -194,14 +206,26 @@ export class DraftForm {
     }
   }
 
+  // Sends the change on the form, unless a save is on its way, nothing is waiting or a box holds something that is
+  // not a whole number. The timer, a change made during a save, a retry, a sign-out and leaving the form come here.
   private flush = async () => {
     window.clearTimeout(this.timer);
     window.clearTimeout(this.retryTimer);
     this.timer = 0;
     if (this.running) return;
+    // Nothing goes out for someone who has signed out. The sign-out waited for the form first (Q-04).
+    if (!this.stillMine()) return;
     if (this.seq === this.savedSeq) { this.tell({ saving: 'saved' }); return; }
     // Nothing is saved while a box holds something that is not a whole number from 0 to 999 (Q-01).
     if (this.invalid()) { this.tell({ saving: 'held' }); return; }
+    const run = this.send();
+    this.current = run;
+    await run;
+    if (this.current === run) this.current = null;
+  };
+
+  // One save, and what its answer means for the form.
+  private async send() {
     this.running = true;
     this.sentSeq = this.seq;
     const sent = this.values;
@@ -212,6 +236,7 @@ export class DraftForm {
       const answer = await saveDraft(this.request());
       this.running = false;
       if (!this.stillMine()) return;
+      this.failed = false;
       this.tries = 0;
       this.unanswered = [];
       this.retriedWithoutItem = false;
@@ -222,11 +247,17 @@ export class DraftForm {
       if (this.seq !== this.savedSeq) { if (this.timer === 0) void this.flush(); } else this.tell({ saving: 'saved' });
     } catch (error) {
       this.running = false;
-      if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
+      if (error instanceof ApiRequestError && error.status === 401) {
+        // Signed out, here or in another tab. The change cannot be saved, and the person is told on the screen
+        // that comes next (Q-04).
+        this.failed = true;
+        notKept();
+      } else if (codeOf(error) === 'cutoff_passed' && this.moveToOpenDay(error)) {
         void this.flush();
       } else if (worthRetrying(error)) {
+        this.failed = true;
         this.unanswered.push(sent);
-        // Off the screen there is no reason to keep trying.
+        // Off the screen there is no reason to keep trying. Whoever waits for the form says it was not kept.
         if (!this.onScreen) return;
         this.show({ saving: 'retrying' });
         this.retryTimer = window.setTimeout(this.flush, Math.min(2000 * 2 ** this.tries, 15_000));
@@ -235,6 +266,27 @@ export class DraftForm {
         await this.loadLatest(error, false);
       }
     }
+  }
+
+  // Every change saved now: the change waiting for its timer goes at once, a retry goes at once, and a save on its
+  // way is waited for. True when the server then holds what the form showed when this began. False when a save
+  // failed, the session is gone, a box holds something that is not a whole number, or the draft was changed
+  // somewhere else and the form now shows that instead.
+  private async settle(): Promise<boolean> {
+    const wanted = this.values;
+    this.failed = false;
+    for (;;) {
+      if (this.current) { await this.current; continue; }
+      if (this.invalid() || this.failed || !this.stillMine()) return false;
+      if (this.seq === this.savedSeq) return sameValues(this.values, wanted);
+      await this.flush();
+    }
+  }
+
+  // Sign-out waits for this, and so does leaving the form: every change is saved first. One that cannot be saved is
+  // never lost without a word: the person is told, on whatever screen comes next (Q-04).
+  leave = async () => {
+    if (!(await this.settle())) notKept();
   };
 
   // From the tap on Place until the place settles, the form holds still. A change made then would be saved
@@ -323,12 +375,21 @@ export class DraftForm {
 
   opened() {
     this.onScreen = true;
+    // Sign-out waits for the form while it is open, and for the last save of a form just left (Q-04).
+    this.stopWaiting ??= finishBeforeSignOut(this.leave);
   }
 
-  // Leaving the form must not drop the last change: send it now, without waiting for the timer.
+  // Leaving the form must not drop the last change: it goes now, without waiting for the timer, and the person is
+  // told when it cannot be saved. Signed out, there is nothing to send: the sign-out waited for the form first.
   closed() {
     this.onScreen = false;
-    void this.flush();
+    const done = this.stillMine() ? this.leave() : Promise.resolve();
+    return done.then(() => {
+      // Opened again in the meantime, as React does once more on a first show in development.
+      if (this.onScreen) return;
+      this.stopWaiting?.();
+      this.stopWaiting = null;
+    });
   }
 }
 
@@ -346,7 +407,7 @@ export function useDraftForm(next: OpenOrder) {
   useEffect(() => { form.incoming(next); }, [form, next]);
   useEffect(() => {
     form.opened();
-    return () => form.closed();
+    return () => { void form.closed(); };
   }, [form]);
 
   return { ...screen, setQuantity: form.setQuantity, typeQuantity: form.typeQuantity, leaveQuantity: form.leaveQuantity, setNote: form.setNote, place: form.place };

@@ -115,20 +115,35 @@ export async function attemptSignIn(login: { mutateAsync: (body: LoginRequest) =
   }
 }
 
+// Work that must end before its person signs out, such as the shop's draft that is still saving (Q-04). Sign-out
+// waits for all of it. Each piece tells the person itself what it could not finish, so it never throws. A screen
+// hands its work over here and takes it back with the function this returns.
+const beforeSignOut = new Set<() => Promise<void>>();
+export function finishBeforeSignOut(work: () => Promise<void>) {
+  const entry = () => work();
+  beforeSignOut.add(entry);
+  return () => { beforeSignOut.delete(entry); };
+}
+
+export const logoutMutation = (qc: QueryClient): UseMutationOptions<void, Error, void> => ({
+  onMutate: () => qc.cancelQueries({ queryKey: meKey }),
+  mutationFn: async () => {
+    if (beforeSignOut.size) await Promise.all([...beforeSignOut].map((work) => work()));
+    return api<void>('/auth/logout', { method: 'POST', json: {} });
+  },
+  // The screens on show must see the empty account before the rest of the cache goes, or they keep the old one.
+  onSuccess: async () => {
+    await qc.cancelQueries({ queryKey: meKey });
+    keepAccount(null);
+    qc.setQueryData(meKey, null);
+    qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] });
+    qc.getMutationCache().clear();
+  },
+});
+
 export function useLogout() {
   const qc = useQueryClient();
-  return useMutation({
-    onMutate: () => qc.cancelQueries({ queryKey: meKey }),
-    mutationFn: () => api<void>('/auth/logout', { method: 'POST', json: {} }),
-    // The screens on show must see the empty account before the rest of the cache goes, or they keep the old one.
-    onSuccess: async () => {
-      await qc.cancelQueries({ queryKey: meKey });
-      keepAccount(null);
-      qc.setQueryData(meKey, null);
-      qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] });
-      qc.getMutationCache().clear();
-    },
-  });
+  return useMutation(logoutMutation(qc));
 }
 
 export const HOME: Record<Role, string> = {

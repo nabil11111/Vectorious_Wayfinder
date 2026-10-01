@@ -107,6 +107,9 @@ export const itemFigures = (product: StoreProduct) => `${product.unit} · ${kilo
 // Under a quantity box that holds anything but a whole number from 0 to 999: a minus, a fraction or more (Q-01, Q-02).
 export const QUANTITY_LINE = 'Whole numbers from 0 to 999.';
 
+// When a change to the order could not be saved and the form can no longer try: signed out, or the form left (Q-04).
+export const NOT_KEPT = 'Your last change to the order was not saved. Check the draft before you place it.';
+
 export const ENTRANCE: Record<DockType, string> = { street: 'Street', rear_dock: 'Rear dock', mall_bay: 'Mall loading bay' };
 
 // "Fresh · Nugegoda", the way Help writes the shop. A shop's name is its brand and then its place (spec 003).
