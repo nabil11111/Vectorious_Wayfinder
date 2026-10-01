@@ -8,7 +8,7 @@ import type { DepotCaller } from '../middleware/auth';
 import { snapshot } from '../orders/store-orders';
 import { computeLoad } from '../planning';
 import { operatingDays, readMoment, type BoardMoment } from '../plans/board';
-import { goingOf, type LineFlag } from './going';
+import { goingOf, wontFitOf, type LineFlag } from './going';
 import { byLoadOrder, loaderDay, sentTrip } from './loader-day';
 
 // The loader's day (spec 012): the day's sent trucks in leaving order, each with its stops last stop first, what goes
@@ -51,7 +51,7 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: 
   const items = (await tx.select().from(products)).map((p) => ({ ...p, kgPerUnit: Number(p.kgPerUnit), m3PerUnit: Number(p.m3PerUnit) }));
   const problems = (await issuesOf(tx, inArray(trips.id, tripIds))).filter(problem => problem.kind === 'loading').map(problem => LoadingIssue.parse(problem));
   // A line is flagged once while its truck loads, so it has one flag at most.
-  const flags = new Map<string, LineFlag>(problems.flatMap((problem) => problem.lines.map((line) => [`${problem.trip.id}:${line.lineId}`, { counted: line.counted, decision: problem.decision }] as const)));
+  const flags = new Map<string, LineFlag>(problems.flatMap((problem) => problem.lines.map((line) => [`${problem.trip.id}:${line.lineId}`, { counted: line.counted, decision: problem.decision, reason: problem.reason }] as const)));
 
   const trucks = tripRows.map((trip): LoadingTruck => {
     const vehicle = fleet.find((v) => v.id === trip.vehicleId);
@@ -62,11 +62,13 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: 
       const lines = lineRows.filter((line) => line.stopId === stop.id).sort(byLoadOrder).map((line) => {
         const item = items.find((p) => p.id === line.productId);
         if (!item) throw new Error(`No product ${line.productId}.`);
-        const going = goingOf(line.quantity, flags.get(`${trip.id}:${line.lineId}`) ?? null);
-        return { lineId: line.lineId, orderId: line.orderId, temp: line.temp, productId: item.id, name: item.name, unit: item.unit, quantity: line.quantity, going, short: line.quantity - going };
+        const flag = flags.get(`${trip.id}:${line.lineId}`) ?? null;
+        const going = goingOf(line.quantity, flag);
+        return { lineId: line.lineId, orderId: line.orderId, temp: line.temp, productId: item.id, name: item.name, unit: item.unit, quantity: line.quantity, going,
+          short: line.quantity - going, wontFit: wontFitOf(line.quantity, flag) };
       });
       return { id: stop.id, seq: stop.seq, outletId: stop.outletId, shopName, loaded: stop.loadedAt !== null,
-        units: total(lines.map((l) => l.quantity)), going: total(lines.map((l) => l.going)), short: total(lines.map((l) => l.short)), lines };
+        units: total(lines.map((l) => l.quantity)), going: total(lines.map((l) => l.going)), short: total(lines.map((l) => l.short)), wontFit: total(lines.map((l) => l.wontFit)), lines };
     });
     // What is on so far: the loaded stops' lines at their counts, from the one load calculator. A line at 0 adds nothing.
     const on = computeLoad(truckStops.filter((s) => s.loaded).flatMap((s) => s.lines).filter((l) => l.going > 0).map((l) => ({ productId: l.productId, quantity: l.going })), items);
@@ -76,7 +78,7 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: 
       tripId: trip.id, revision: trip.revision, vehicleId: trip.vehicleId, vehicleType: vehicle.type, vehicleTemp: vehicle.temp, tripNo: trip.tripNo,
       brand: brands.length === 1 ? brands[0]! : null, district, status: listed(trip), leavesAt: leavesAt.toISOString(), readyAt: trip.readyAt?.toISOString() ?? null,
       driver: drivers.find((d) => d.id === trip.driverId)?.name ?? null, weightCapKg: vehicle.weightCapKg, volumeCapM3: Number(vehicle.volumeCapM3),
-      units: total(truckStops.map((s) => s.units)), on: { units: on.units, kg: on.kg, m3: on.m3 }, short: total(truckStops.map((s) => s.short)),
+      units: total(truckStops.map((s) => s.units)), on: { units: on.units, kg: on.kg, m3: on.m3 }, short: total(truckStops.map((s) => s.short)), wontFit: total(truckStops.map((s) => s.wontFit)),
       stops: truckStops, issues: problems.filter((problem) => problem.trip.id === trip.id).sort(openThenLatest),
       outOn: away ? { tripNo: away.tripNo, backBy: sentTrip(plan.date, check, away.vehicleId, away.tripNo).backBy.toISOString() } : null,
     };

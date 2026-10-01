@@ -6,7 +6,7 @@ import { districtMap, figuresOf, goodsHandedOver, groupTrips, nextDemand, progre
 const raw = (brand: DriverTrip['brand'] = 'Fresh'): DriverTrip => ({ tripId: randomUUID(), revision: 0, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1,
   brand, district: 'Colombo', status: 'ready', leavesAt: '2026-06-25T00:00:00Z', backBy: '2026-06-25T03:00:00Z', readyAt: null, leftAt: null, backAt: null, problems: [],
   stops: [{ id: randomUUID(), seq: 1, revision: 0, retriedAt: null, outletId: 'OUT001', shopName: 'Fresh Nugegoda', district: 'Colombo', dockType: 'street', windowOpen: '05:00', windowClose: '09:00', note: null,
-    arrivedAt: '2026-06-25T00:00:00Z', doneAt: '2026-06-25T00:01:00Z', outcome: 'refused', lines: [{ lineId: randomUUID(), orderId: randomUUID(), productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', temp: 'dry', quantity: 4, loaded: 0, delivered: 0 }] }] });
+    arrivedAt: '2026-06-25T00:00:00Z', doneAt: '2026-06-25T00:01:00Z', outcome: 'refused', lines: [{ lineId: randomUUID(), orderId: randomUUID(), productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', temp: 'dry', quantity: 4, loaded: 0, wontFit: 0, delivered: 0 }] }] });
 const shown = (driver = raw()): OperationsTrip => ({ detailRecorded: true, tripId: driver.tripId, planId: randomUUID(), date: '2026-06-25', vehicleId: driver.vehicleId, vehicleType: driver.vehicleType, vehicleTemp: driver.vehicleTemp, tripNo: driver.tripNo,
   driver: null, brand: driver.brand, district: driver.district, status: driver.status, openIssueIds: [], stopsTotal: driver.stops.length, action: 'open', outRow: null,
   trip: driver, figures: figuresOf(driver), onSoFar: null, lastReportAt: null, attention: { kind: 'none' }, schedule: { leavesAt: driver.leavesAt, backAt: driver.backBy }, stopDetails: [] });
@@ -32,7 +32,7 @@ it('AC-15 final load is unknown before ready at every level', () => {
 // Spec 019 rule 3: one stop's lines and how it ended, at a given shop.
 type Stop = DriverTrip['stops'][number];
 const line = (loaded: number | null, delivered: number | null) => ({ lineId: randomUUID(), orderId: randomUUID(), productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton',
-  temp: 'dry' as const, quantity: 48, loaded, delivered });
+  temp: 'dry' as const, quantity: 48, loaded, wontFit: 0, delivered });
 const stopAt = (outletId: string, outcome: Stop['outcome'], lines = [line(48, outcome === null ? null : 48)]): Stop => ({ ...raw().stops[0]!, id: randomUUID(), outletId, outcome, lines });
 const tripOf = (stops: Stop[], tripNo = 1) => shown({ ...raw(), tripNo, stops });
 

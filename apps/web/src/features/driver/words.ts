@@ -53,15 +53,21 @@ export const leavingLine = (trip: DriverTrip, at: number | null) => [leaves(trip
 // "Fresh · Colombo · back by 06:10"
 export const placeLine = (trip: DriverTrip) => `${tripPlace(trip)} · back by ${clockTime(trip.backBy)}`;
 
-// "1 dry short for Nugegoda", one for each temperature of each stop the loader went short on.
+// What the loader did not load, by why (L-09): short of stock, or won't fit on the truck. stockShort is the short ones.
+const stockShort = (counts: { short: number; wontFit: number }) => counts.short - counts.wontFit;
+const notLoaded = (counts: { short: number; wontFit: number }, what: string) =>
+  [stockShort(counts) > 0 && `${whole(stockShort(counts))}${what} short`, counts.wontFit > 0 && `${whole(counts.wontFit)}${what} won't fit`].filter(Boolean) as string[];
+
+// "1 dry short for Nugegoda", or "4 chilled won't fit for Nugegoda", for each temperature of each stop the loader went
+// short on.
 function shortsFor(trip: DriverTrip, figures: Figures) {
   return trip.stops.flatMap((stop, i) => {
     const counts = figures.byStop[i]!;
     const place = placeOf(stop.shopName);
     if (brandOf(trip, stop) === 'Fresh') {
-      return (['chilled', 'dry'] as const).filter((temp) => counts.byTemp[temp].short > 0).map((temp) => `${whole(counts.byTemp[temp].short)} ${temp} short for ${place}`);
+      return (['chilled', 'dry'] as const).flatMap((temp) => notLoaded(counts.byTemp[temp], ` ${temp}`).map((words) => `${words} for ${place}`));
     }
-    return counts.short > 0 ? [`${whole(counts.short)} short for ${place}`] : [];
+    return notLoaded(counts, '').map((words) => `${words} for ${place}`);
   });
 }
 
@@ -120,8 +126,10 @@ export const lineName = (line: DriverLine, brand: Brand | null) => {
   return `${line.quantity === 1 ? line.unit : plural(line.unit)} · ${line.name}`;
 };
 
-// "Loader flagged 1 carton short at the depot"
-export const loaderShortLine = (line: DriverLine, counts: LineFigures) => `Loader flagged ${amountOf(counts.short, line.unit)} short at the depot`;
+// "Loader flagged 1 carton short at the depot", or "Loader flagged 4 cartons that won't fit on the truck" (L-09).
+export const loaderShortLine = (line: DriverLine, counts: LineFigures) => (counts.wontFit > 0
+  ? `Loader flagged ${amountOf(counts.wontFit, line.unit)} that won't fit on the truck`
+  : `Loader flagged ${amountOf(counts.short, line.unit)} short at the depot`);
 
 // Under a count box that holds a minus, a fraction or anything but a whole number, and under a refusal's box that holds
 // more than was loaded (Q-25): "Counts are whole numbers from 0 to the 12 loaded."
@@ -158,9 +166,9 @@ export const savedLine = (stop: DriverStop, figures: Figures) => `${stop.shopNam
 // "Stop 1 Fresh Nugegoda delivered 03:38"
 export const deliveredLine = (stop: DriverStop) => `Stop ${stop.seq} ${stop.shopName} delivered ${stop.doneAt ? clockTime(stop.doneAt) : ''}`.trim();
 
-// "Stop 2 · 92 delivered · 2 refused", with "· 1 short" when the loader went short there too.
+// "Stop 2 · 92 delivered · 2 refused", with "· 1 short" or "· 4 won't fit" when the loader went short there too.
 export const refusedLine = (stop: DriverStop, counts: StopFigures) =>
-  [`Stop ${stop.seq}`, `${whole(counts.delivered)} delivered`, `${whole(counts.refused)} refused`, counts.short > 0 && `${whole(counts.short)} short`].filter(Boolean).join(' · ');
+  [`Stop ${stop.seq}`, `${whole(counts.delivered)} delivered`, `${whole(counts.refused)} refused`, ...notLoaded(counts, '')].join(' · ');
 
 export const closedLine = (stop: DriverStop) => `Stop ${stop.seq} · not delivered · nobody there`;
 
@@ -223,12 +231,14 @@ export function tripRows(trip: DriverTrip, figures: Figures): Row[] {
     .map((stop, i) => ({ stop, n: figures.byStop[i]![key] }))
     .filter(({ n }) => n > 0)
     .map(({ stop, n }) => `${whole(n)} · ${placeOf(stop.shopName)}`).join(', ');
-  const short = trip.stops.map((stop, i) => ({ stop, counts: figures.byStop[i]! })).filter(({ counts }) => counts.short > 0)
+  // Short of stock, or won't fit on the truck (L-09), per stop and, for Fresh, per temperature.
+  const left = (of: (counts: { short: number; wontFit: number }) => number) => trip.stops.map((stop, i) => ({ stop, counts: figures.byStop[i]! }))
+    .filter(({ counts }) => of(counts) > 0)
     .map(({ stop, counts }) => {
       const fresh = brandOf(trip, stop) === 'Fresh';
       const amount = fresh
-        ? (['chilled', 'dry'] as const).filter((temp) => counts.byTemp[temp].short > 0).map((temp) => `${whole(counts.byTemp[temp].short)} ${temp}`).join(' and ')
-        : whole(counts.short);
+        ? (['chilled', 'dry'] as const).filter((temp) => of(counts.byTemp[temp]) > 0).map((temp) => `${whole(of(counts.byTemp[temp]))} ${temp}`).join(' and ')
+        : whole(of(counts));
       return `${amount} · ${placeOf(stop.shopName)}`;
     }).join(', ');
   return [
@@ -236,7 +246,8 @@ export function tripRows(trip: DriverTrip, figures: Figures): Row[] {
     { label: deliveredLabel(trip), value: `${whole(figures.delivered)} of ${whole(figures.ordered)}` },
     ...(figures.refused > 0 ? [{ label: 'Refused', value: per('refused') }] : []),
     ...(figures.notDelivered > 0 ? [{ label: 'Not delivered', value: per('notDelivered') }] : []),
-    ...(figures.short > 0 ? [{ label: 'Short from the depot', value: short }] : []),
+    ...(stockShort(figures) > 0 ? [{ label: 'Short from the depot', value: left(stockShort) }] : []),
+    ...(figures.wontFit > 0 ? [{ label: 'Won\'t fit on the truck', value: left((counts) => counts.wontFit) }] : []),
   ];
 }
 
@@ -264,13 +275,18 @@ export function handBack(trip: DriverTrip, figures: Figures) {
     if (counts.short === 0) return;
     const brand = brandOf(trip, stop);
     const place = placeOf(stop.shopName);
+    // Short of stock never left the depot; what would not fit did not fit on the truck (L-09).
+    const said = (n: number, goods: string, why: string) => { if (n > 0) lines.push(`The ${goods} for ${place} ${why}.`); };
     if (brand === 'Fresh') {
       for (const temp of ['chilled', 'dry'] as const) {
-        const n = counts.byTemp[temp].short;
-        if (n > 0) lines.push(`The ${n === 1 ? `${temp} carton` : `${whole(n)} ${temp} cartons`} for ${place} never left the depot.`);
+        const cartons = (n: number) => (n === 1 ? `${temp} carton` : `${whole(n)} ${temp} cartons`);
+        said(counts.byTemp[temp].wontFit, cartons(counts.byTemp[temp].wontFit), 'did not fit on the truck');
+        said(stockShort(counts.byTemp[temp]), cartons(stockShort(counts.byTemp[temp])), 'never left the depot');
       }
     } else {
-      lines.push(`The ${counts.short === 1 ? unitOf(brand, 1) : unitsWords(brand, counts.short)} for ${place} never left the depot.`);
+      const goods = (n: number) => (n === 1 ? unitOf(brand, 1) : unitsWords(brand, n));
+      said(counts.wontFit, goods(counts.wontFit), 'did not fit on the truck');
+      said(stockShort(counts), goods(stockShort(counts)), 'never left the depot');
     }
   });
   return { title: figures.onTruck > 0 ? 'Still on the truck' : 'Nothing to hand back', text: lines.join(' ') };

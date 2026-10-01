@@ -114,20 +114,23 @@ export const countHint = (reason: FlagReason) => (reason === 'wont_fit'
   : 'Tap the line that is not right, then count what is at the dock.');
 
 // A stop on a list, by what the API sent: "94 cartons" to load, "23 of 24" with a flag lowering a count, "✓ 94 on"
-// once loaded, and "23 on · 1 short" when it went on short.
+// once loaded, and "23 on · 1 short" when it went on short, or "8 on · 4 won't fit" when the truck could not take them.
 export const stopUnits = (truck: LoadingTruck, stop: LoadingStop) => unitsWords(brandOfStop(truck, stop), stop.units);
 export const stopGoingOf = (stop: LoadingStop) => `${whole(stop.going)} of ${whole(stop.units)}`;
 export const stopOn = (stop: LoadingStop) => `${whole(stop.going)} on`;
-export const stopOnShort = (stop: LoadingStop) => `${whole(stop.going)} on · ${whole(stop.short)} short`;
+// What does not go out, by why, from the API's counts (L-09): "1 short" of stock, "4 won't fit" on the truck, or both.
+export const notGoing = (counts: { short: number; wontFit: number }, between = ' · ') =>
+  [counts.short > counts.wontFit && `${whole(counts.short - counts.wontFit)} short`, counts.wontFit > 0 && `${whole(counts.wontFit)} won't fit`].filter(Boolean).join(between);
+export const stopOnShort = (stop: LoadingStop) => `${whole(stop.going)} on · ${notGoing(stop)}`;
 
 // A loaded stop's menu (Q-16): "Undo stop 3 loaded", after the button that loaded it, and on a stop loaded before the
 // last one, which stop comes off first: "undo stop 2 first".
 export const undoStopWords = (stop: Pick<LoadingStop, 'seq'>) => `Undo stop ${stop.seq} loaded`;
 export const undoFirstWords = (stop: Pick<LoadingStop, 'seq'>) => `undo stop ${stop.seq} first`;
 
-// "117 of 118 on, 1 short" when every stop is loaded.
+// "117 of 118 on, 1 short" when every stop is loaded, or "109 of 113 on, 4 won't fit".
 export const allOnLine = (truck: LoadingTruck) =>
-  `${whole(truck.on.units)} of ${whole(truck.units)} on${truck.short > 0 ? `, ${whole(truck.short)} short` : ''}`;
+  `${whole(truck.on.units)} of ${whole(truck.units)} on${truck.short > 0 ? `, ${notGoing(truck, ', ')}` : ''}`;
 
 // ── Problems ───────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -274,11 +277,12 @@ export function driverSentLine(issue: Issue, depot: string) {
 
 // ── A ready truck ──────────────────────────────────────────────────────────────────────────────────────────────
 
-// "117 of 118 on · 1 short, dispatcher told 02:35 · leaves 04:36", or "118 of 118 on · leaves 04:36" with nothing
-// short. The answer's time is the latest one's: the answered problems come latest first.
+// "117 of 118 on · 1 short, dispatcher told 02:35 · leaves 04:36", "109 of 113 on · 4 won't fit, dispatcher told 02:36
+// · …", or "118 of 118 on · leaves 04:36" with nothing short. The answer's time is the latest one's: the answered
+// problems come latest first.
 export function readyLine(truck: LoadingTruck) {
   const told = truck.issues.find((issue) => issue.status === 'decided')?.decidedAt;
-  const short = truck.short > 0 ? ` · ${whole(truck.short)} short${told ? `, dispatcher told ${clockTime(told)}` : ''}` : '';
+  const short = truck.short > 0 ? ` · ${notGoing(truck)}${told ? `, dispatcher told ${clockTime(told)}` : ''}` : '';
   return `${whole(truck.on.units)} of ${whole(truck.units)} on${short} · ${leaves(truck)}`;
 }
 
@@ -290,11 +294,15 @@ function stopsWords(seqs: number[]) {
 
 const UNIT_WORD: Record<Brand, [string, string]> = { Fresh: ['carton', 'cartons'], Style: ['box', 'boxes'], Tech: ['item', 'items'] };
 
-// "Dilshan sees the short carton on stop 1 before driving.", or null when nothing is short.
+// "Dilshan sees the short carton on stop 1 before driving.", "… the cartons that won't fit …" (L-09), or null when
+// nothing is short.
 export function readyNote(truck: LoadingTruck) {
   if (truck.short === 0) return null;
   const seqs = truck.stops.filter((stop) => stop.short > 0).map((stop) => stop.seq).sort((a, b) => a - b);
   const [one, many] = truck.brand ? UNIT_WORD[truck.brand] : ['unit', 'units'];
   const where = seqs.length > 0 ? ` on ${stopsWords(seqs)}` : '';
-  return `${truck.driver ?? 'The driver'} sees the short ${truck.short === 1 ? one : many}${where} before driving.`;
+  const goods = truck.wontFit === 0 ? `the short ${truck.short === 1 ? one : many}`
+    : truck.wontFit === truck.short ? `the ${truck.short === 1 ? `${one} that won't` : `${many} that won't`} fit`
+      : `the short ${many} and those that won't fit`;
+  return `${truck.driver ?? 'The driver'} sees ${goods}${where} before driving.`;
 }

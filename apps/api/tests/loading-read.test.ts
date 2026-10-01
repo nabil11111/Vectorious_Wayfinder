@@ -76,17 +76,17 @@ it("AC-3 holds the walkthrough's truck with its last stop first and nothing on y
   expect(truck).toEqual({
     tripId: trip!.id, revision: 0, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1, brand: 'Fresh', district: 'Colombo',
     status: 'planned', leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString(), readyAt: null, driver: 'Dilshan', weightCapKg: 1040, volumeCapM3: 7,
-    units: 118, on: { units: 0, kg: 0, m3: 0 }, short: 0, issues: [], outOn: null,
+    units: 118, on: { units: 0, kg: 0, m3: 0 }, short: 0, wontFit: 0, issues: [], outOn: null,
   });
   expect(stops.map(({ lines: _lines, id: _id, ...stop }) => stop)).toEqual([
-    { seq: 2, outletId: 'OUT002', shopName: 'Fresh Wellawatte', loaded: false, units: 94, going: 94, short: 0 },
-    { seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda', loaded: false, units: 24, going: 24, short: 0 },
+    { seq: 2, outletId: 'OUT002', shopName: 'Fresh Wellawatte', loaded: false, units: 94, going: 94, short: 0, wontFit: 0 },
+    { seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda', loaded: false, units: 24, going: 24, short: 0, wontFit: 0 },
   ]);
   // Chilled before dry, then the order placed first: Nugegoda's 12 carried-over cartons were placed on Tuesday.
   const order = (key: string) => demoId('order', key);
   const line = (key: string, temp: 'chilled' | 'dry', quantity: number) => ({
     lineId: demoId('line', `${key}:fresh-${temp}-carton`), orderId: order(key), temp, productId: `fresh-${temp}-carton`,
-    name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, going: quantity, short: 0,
+    name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, going: quantity, short: 0, wontFit: 0,
   });
   expect(stops.map((s) => s.lines)).toEqual([
     [line(`${THU}:OUT002:chilled`, 'chilled', 48), line(`${THU}:OUT002:dry`, 'dry', 46)],
