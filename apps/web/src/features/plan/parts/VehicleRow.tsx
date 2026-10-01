@@ -25,8 +25,10 @@ export function VehicleRow({ vehicleId, trips, driverName, index }: { vehicleId:
   const kg = fullest('kgPct');
   const m3 = fullest('m3Pct');
   const dots = checked.flatMap((c) => c.trip.stops.map((_, i) => c.check?.times?.stops[i]?.late ?? false));
-  // The truck named by its driver, "Chaminda · dry truck", or by its kind and number with none (spec 026).
-  const label = vehicle ? crewName(vehicle, driverName) : vehicleId;
+  // The truck named by its driver, "Chaminda · dry truck", or by its kind and number with none (spec 026). A row holding
+  // only the truck's second trip says so, "· trip 2", as its card on the board does (L-03).
+  const alone = trips.length === 1 ? trips[0]!.tripNo : 1;
+  const label = vehicle ? crewName(vehicle, driverName, alone) : vehicleId;
 
   return (
     <li>

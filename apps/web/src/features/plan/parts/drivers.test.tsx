@@ -142,3 +142,12 @@ it('L-07 says "trip 1 of 2" only when the truck has a second trip, and no count 
   const both = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
   expect(tripPanel(both, 'VEH004')).toContain('6.8 t · 33.4 m³ · trip 1 of 2');
 });
+
+it('L-03 a View plan row for a truck\'s second trip alone says "· trip 2", as its card does', () => {
+  const split = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
+  const row = (trips: DraftTrip[]) => renderToStaticMarkup(<VehicleRow vehicleId="VEH004" trips={trips} driverName="Chaminda" index={indexOf(split)} />);
+  expect(row([split.plan.trips[1]!])).toMatch(/<p class="[^"]*">Chaminda · reefer truck · trip 2<\/p>/);
+  expect(row([split.plan.trips[0]!])).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
+  // Both trips on one row are the truck's whole day.
+  expect(row(split.plan.trips)).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
+});
