@@ -153,7 +153,9 @@ async function ask(path: string, init: { method?: string; json?: unknown }, canc
   if (error instanceof ApiRequestError) {
     answered();
     if (error.status === 401) return { kind: 'signed-out' };
-    if (error.status >= 500 || error.status === 429) return { kind: 'retry', message: error.message };
+    // An answer with no readable sentence came from something in between, or was cut off while it was read: it is
+    // not the server's word on the write, so the write goes again rather than being refused for it.
+    if (error.status >= 500 || error.status === 429 || error.code === 'network') return { kind: 'retry', message: error.message };
     return { kind: 'refused', code: error.code, message: error.message };
   }
   if (result.cancelled) return { kind: 'cancelled' };
@@ -194,18 +196,40 @@ async function fetchDay(who: Account, turn: number): Promise<boolean> {
   }
   await keepDay(who.id, day.data);
   if (turn !== generation) return false;
-  update({ fetched: true, failure: null });
+  // A day fetched under this driver's own session: whatever asked them to sign in again is behind them.
+  update({ fetched: true, failure: null, signedOut: false });
   return true;
 }
 
-async function sendWrite(entry: Queued, turn: number) {
+// Whether the browser's session is still this driver's, asked of the day itself.
+async function stillOwn(who: Account): Promise<'own' | 'other' | 'unknown'> {
+  const outcome = await ask('/driver', {});
+  if (outcome.kind === 'signed-out') return 'other';
+  if (outcome.kind !== 'answer') return 'unknown';
+  const day = DriverDay.safeParse(outcome.value);
+  if (!day.success) return 'unknown';
+  return day.data.driver === who.name ? 'own' : 'other';
+}
+
+async function sendWrite(who: Account, entry: Queued, turn: number) {
   const outcome = await ask('/driver/writes', { method: 'POST', json: entry.write });
   if (turn !== generation) return;
   switch (outcome.kind) {
     // The answer is the day, but it is never shown: the loop fetches the day again at once (D-50).
     case 'answer': through(); ring(); return;
-    // A refused write is never sent again, and the writes after it carry on.
-    case 'refused': through(); await refuseWrite(entry, { code: outcome.code, message: outcome.message }); ring(); return;
+    // A refused write is never sent again, and the writes after it carry on. A refusal counts only when the session
+    // is still this driver's: one that changed under the send, such as another account signed in in another tab,
+    // must not cost the write, which waits until this driver is signed in again.
+    case 'refused': {
+      const session = await stillOwn(who);
+      if (turn !== generation) return;
+      if (session === 'other') { update({ signedOut: true }); return; }
+      if (session === 'unknown') { later(); return; }
+      through();
+      await refuseWrite(entry, { code: outcome.code, message: outcome.message });
+      ring();
+      return;
+    }
     case 'signed-out': update({ signedOut: true }); return;
     // No answer, a 5xx or a 429: the same write, id and body go again on the retry schedule. With no answer the
     // signal is gone too, and the probe asks for it meanwhile.
@@ -214,11 +238,13 @@ async function sendWrite(entry: Queued, turn: number) {
   }
 }
 
+// A turn runs even while the driver is asked to sign in again: its fetch is how the phone learns they have, in this
+// tab or another, and nothing is sent until a fetch shows the session is theirs.
 async function turn() {
   const who = account;
   const now = generation;
   const kept = readKept();
-  if (!who || sync.signedOut || !hasSignal() || !kept.ready || kept.userId !== who.id) return;
+  if (!who || !hasSignal() || !kept.ready || kept.userId !== who.id) return;
   if (!(await fetchDay(who, now))) return;
   // The account may have changed while the day was kept; its writes are not this turn's to send.
   if (now !== generation) return;
@@ -228,7 +254,7 @@ async function turn() {
     settle();
     return;
   }
-  await sendWrite(next, now);
+  await sendWrite(who, next, now);
 }
 
 // The whole loop, run inside the lock for the tab's life. It never returns, so the lock is never let go.
