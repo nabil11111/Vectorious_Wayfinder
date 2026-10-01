@@ -48,7 +48,7 @@ export function DashboardPage() {
             </Button>
           </div>
         ) : <TilesSkeleton />}
-        <NeedsYouCard issues={issues} day={day} at={clock.at} />
+        <NeedsYouCard issues={issues} day={day} />
         {day ? <TrucksOut day={day} issues={issues.data?.issues} /> : !ops.isError && <TrucksSkeleton />}
       </div>
     </div>
