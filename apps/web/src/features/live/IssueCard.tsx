@@ -1,10 +1,14 @@
-import { useState } from 'react';
-import { LOADING_DECISIONS, type Issue, type LoadingDecision } from '@wayfinder/contracts';
+import { useState, type ReactNode } from 'react';
+import { LOADING_DECISIONS, type Issue, type IssueDecision, type LoadingDecision } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
+import { useMe } from '@/features/auth/api';
 import { orangeButton } from '@/features/plan/parts/look';
 import { brandOfShop, clockTime, countedLine, issuePlace, issueTitle, raisedLine } from '@/features/loader/words';
 import { cn } from '@/lib/utils';
 import type { Answering } from './issues';
+import {
+  answeredLine, atTheDock, driverAnswers, driverIssuePlace, driverIssueTitle, driverQuestion, driverRaised, stillOnLabel, stillOnValue,
+} from './words';
 
 // The two answers to a loader's flag (D-37), as the design's option cards.
 const ANSWER: Record<LoadingDecision, { title: string; line: string }> = {
@@ -18,19 +22,27 @@ export function RaisedAt({ issue }: { issue: Issue }) {
   return <span className="shrink-0 rounded-full bg-muted px-2.5 py-[5px] text-[10px] leading-3 font-semibold tabular-nums">{clockTime(issue.raisedAt)}</span>;
 }
 
-// One open problem in full (Dispatcher · Live day · issue open): what is wrong, where, who flagged it and when, what
-// is at the dock and the note, then the two answers with "Go short" chosen, and "Send to loader".
+// The line of the green card once an answer is sent, which names the depot the cartons go back to.
+export function AnsweredLine({ issue }: { issue: Issue }) {
+  const { data: me } = useMe();
+  return <>{answeredLine(issue, me?.depotId ?? 'the depot')}</>;
+}
+
+// One open problem in full (Dispatcher · Live day · issue open): what is wrong, where, who raised it and when, the
+// facts that bear on it, then the answers and the orange button that sends the chosen one.
 export function IssueCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
+  return issue.kind === 'loading'
+    ? <FlagCard issue={issue} answering={answering} time={time} className={className} />
+    : <DriverCard issue={issue} answering={answering} time={time} className={className} />;
+}
+
+// A loader's flag (spec 012): the count at the dock and the note, then "Go short" or "Load it all", and "Send to loader".
+function FlagCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
   const [choice, setChoice] = useState<LoadingDecision>('go_short');
   const brand = brandOfShop(issue.stop.shopName);
-  const sending = answering.sending === issue.id;
-  const busy = answering.sending !== null;
   return (
     <article aria-label={issueTitle(issue)} className={className}>
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-[15px] leading-5 font-bold">{issueTitle(issue)}</h3>
-        {time && <RaisedAt issue={issue} />}
-      </div>
+      <Heading title={issueTitle(issue)} issue={issue} time={time} />
       <p className="mt-2 text-[11px] leading-[15px] text-muted-foreground">{issuePlace(issue)}</p>
 
       <dl className="mt-[9px] space-y-1 text-[11px] leading-[14px]">
@@ -39,40 +51,102 @@ export function IssueCard({ issue, answering, time, className }: { issue: Issue;
         {issue.note && <Row label="Note" value={issue.note} />}
       </dl>
 
-      <p id={`answer-${issue.id}`} className="mt-[13px] text-xs leading-4 font-semibold">What should the loader do?</p>
-      <div role="radiogroup" aria-labelledby={`answer-${issue.id}`} className="mt-[9px] space-y-2.5">
-        {LOADING_DECISIONS.map((decision) => (
-          <button
-            key={decision}
-            type="button"
-            role="radio"
-            aria-checked={choice === decision}
-            disabled={busy}
-            onClick={() => setChoice(decision)}
-            className={cn(
-              'flex w-full items-center gap-3 rounded-[10px] bg-card px-[11px] py-1.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-              choice === decision ? 'border-2 border-foreground' : 'm-px w-[calc(100%-2px)] border',
-            )}
-          >
-            <span aria-hidden="true" className={cn('size-[14px] shrink-0 rounded-full', choice === decision ? 'bg-foreground' : 'border-[1.5px] border-muted-foreground/60')} />
-            <span className="min-w-0">
-              <span className="block text-xs leading-4 font-semibold">{ANSWER[decision].title}</span>
-              <span className="block text-[10px] leading-[14px] text-muted-foreground">{ANSWER[decision].line}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <Button className={orangeButton('mt-[13px] h-[34px] w-full text-xs')} disabled={busy} focusableWhenDisabled onClick={() => answering.decide(issue, choice)}>
-        {sending ? 'Sending…' : 'Send to loader'}
-      </Button>
-      {answering.failed === issue.id && <p role="alert" className="mt-2 text-xs leading-4 font-semibold text-bad">Could not send. Try again.</p>}
+      <Answers issue={issue} question="What should the loader do?" options={LOADING_DECISIONS.map((decision) => ({ decision, ...ANSWER[decision] }))} choice={choice} onChoose={(decision) => setChoice(decision as LoadingDecision)} busy={answering.sending !== null} />
+      <Send issue={issue} answering={answering} choice={choice} label="Send to loader" />
     </article>
   );
 }
 
+// A driver's problem (spec 013): a shop that refused some, with what it took, the driver, the note, the photo, the
+// dock and what is still on the truck; or a shop that was closed. "Bring them back", and for a closed shop "Try again
+// on this trip" while the trip is out, then "Send to driver".
+function DriverCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
+  const { data: me } = useMe();
+  const options = driverAnswers(issue, me?.depotId ?? 'the depot');
+  const [picked, setPicked] = useState<IssueDecision | null>(null);
+  // The first answer is chosen until the dispatcher picks another; one no longer offered falls back to it.
+  const choice = options.find((option) => option.decision === picked)?.decision ?? options[0]!.decision;
+  const rows: { label: string; value: ReactNode }[] = [
+    ...(issue.kind === 'refused' ? [{ label: 'Driver', value: driverRaised(issue) }] : []),
+    ...(issue.note ? [{ label: 'Note', value: issue.note }] : []),
+    ...(issue.hasPhoto ? [{
+      label: 'Photo',
+      value: <a href={`/api/v1/issues/${encodeURIComponent(issue.id)}/photo`} target="_blank" rel="noreferrer" className="font-semibold text-foreground underline underline-offset-2">Open</a>,
+    }] : []),
+    ...(issue.kind === 'refused' ? [{ label: 'At the dock', value: atTheDock(issue) }] : []),
+    { label: stillOnLabel(issue), value: stillOnValue(issue) },
+  ];
+  return (
+    <article aria-label={driverIssueTitle(issue)} className={className}>
+      <Heading title={driverIssueTitle(issue)} issue={issue} time={time} />
+      <p className="mt-2 text-[11px] leading-[15px] text-muted-foreground">{driverIssuePlace(issue)}</p>
+
+      <dl className="mt-[9px] space-y-1 text-[11px] leading-[14px]">
+        {rows.map((row, i) => <Row key={row.label} label={row.label} value={row.value} first={i === 0} />)}
+      </dl>
+
+      <Answers issue={issue} question={driverQuestion(issue)} options={options} choice={choice} onChoose={setPicked} busy={answering.sending !== null} />
+      <Send issue={issue} answering={answering} choice={choice} label="Send to driver" />
+    </article>
+  );
+}
+
+function Heading({ title, issue, time }: { title: string; issue: Issue; time: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <h3 className="text-[15px] leading-5 font-bold">{title}</h3>
+      {time && <RaisedAt issue={issue} />}
+    </div>
+  );
+}
+
+// The question and the design's option cards, one of them chosen.
+function Answers({ issue, question, options, choice, onChoose, busy }: {
+  issue: Issue; question: string; options: { decision: IssueDecision; title: string; line: string }[]; choice: IssueDecision; onChoose: (decision: IssueDecision) => void; busy: boolean;
+}) {
+  return (
+    <>
+      <p id={`answer-${issue.id}`} className="mt-[13px] text-xs leading-4 font-semibold">{question}</p>
+      <div role="radiogroup" aria-labelledby={`answer-${issue.id}`} className="mt-[9px] space-y-2.5">
+        {options.map((option) => (
+          <button
+            key={option.decision}
+            type="button"
+            role="radio"
+            aria-checked={choice === option.decision}
+            disabled={busy}
+            onClick={() => onChoose(option.decision)}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-[10px] bg-card px-[11px] py-1.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+              choice === option.decision ? 'border-2 border-foreground' : 'm-px w-[calc(100%-2px)] border',
+            )}
+          >
+            <span aria-hidden="true" className={cn('size-[14px] shrink-0 rounded-full', choice === option.decision ? 'bg-foreground' : 'border-[1.5px] border-muted-foreground/60')} />
+            <span className="min-w-0">
+              <span className="block text-xs leading-4 font-semibold">{option.title}</span>
+              <span className="block text-[10px] leading-[14px] text-muted-foreground">{option.line}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function Send({ issue, answering, choice, label }: { issue: Issue; answering: Answering; choice: IssueDecision; label: string }) {
+  const sending = answering.sending === issue.id;
+  return (
+    <>
+      <Button className={orangeButton('mt-[13px] h-[34px] w-full text-xs')} disabled={answering.sending !== null} focusableWhenDisabled onClick={() => answering.decide(issue, choice)}>
+        {sending ? 'Sending…' : label}
+      </Button>
+      {answering.failed === issue.id && <p role="alert" className="mt-2 text-xs leading-4 font-semibold text-bad">Could not send. Try again.</p>}
+    </>
+  );
+}
+
 // A row of the problem's facts: what on the left, the detail on the right, as the design's report rows.
-function Row({ label, value, first = false }: { label: string; value: string; first?: boolean }) {
+function Row({ label, value, first = false }: { label: string; value: ReactNode; first?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <dt className={cn('shrink-0', first && 'font-semibold')}>{label}</dt>

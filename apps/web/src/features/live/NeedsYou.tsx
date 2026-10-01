@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { plainButton } from '@/features/plan/parts/look';
 import { StaleNotice } from '@/features/store/parts/LoadError';
-import { clockTime, sentLine } from '@/features/loader/words';
+import { clockTime } from '@/features/loader/words';
 import { reasonOf } from '@/features/store/words';
 import { cn } from '@/lib/utils';
-import { IssueCard, RaisedAt } from './IssueCard';
+import { AnsweredLine, IssueCard, RaisedAt } from './IssueCard';
 import type { Answering } from './issues';
 
 const CARD = 'rounded-[14px] bg-card shadow-[0_2px_6px_color-mix(in_srgb,var(--foreground)_8%,transparent)]';
@@ -45,7 +45,7 @@ export function NeedsYou({ query, answering, className }: { query: UseQueryResul
             <Check className="size-4 stroke-[2.5]" aria-hidden="true" />
             Sent {answering.sent.decidedAt ? clockTime(answering.sent.decidedAt) : ''}
           </p>
-          <p className="mt-3 text-xs leading-4 font-semibold">{sentLine(answering.sent)}</p>
+          <p className="mt-3 text-xs leading-4 font-semibold"><AnsweredLine issue={answering.sent} /></p>
         </div>
       )}
       {open.length > 0 ? (
