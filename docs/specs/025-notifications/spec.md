@@ -23,10 +23,15 @@ The loader's opens the plan's changes. The shop's and the driver's bells do noth
 - **Live.** When a new update arrives, it also shows at once as a toast with the same line and a link. If the tab is in
   the background and the person allowed it, it also shows as a system notification. The pop-up has "Turn on alerts
   when Wayfinder is in the background", which asks the browser's permission. The app never asks on its own.
-- **What each role is told** (all from records the app already keeps; times are the app clock's):
+- **What each role is told** (all from records the app already keeps; times are the app clock's). Trucks are named as
+  spec 026 names them: by their driver for the dispatcher and the shop ("Wasantha's reefer van"), and by the vehicle
+  number for the loader and the driver ("VEH035"), who must find the actual truck. The updates are those of the day
+  being worked, the loader's day (D-34: today until 16:00, then the next operating day), and of the operating day after
+  it, which the shops order for:
   - **Store manager.**
     - Their order placed.
-    - Their Thursday order on a sent plan: "Thursday's delivery is planned: VEH035, window 05:00 to 07:30".
+    - Their Thursday order on a sent plan: "Thursday's delivery is planned: Wasantha's reefer van, window 05:00 to
+      07:30".
     - An order moved to another day, with its reason.
     - The truck leaving the depot.
     - The driver arriving, delivering, being refused or finding the shop closed.
@@ -36,8 +41,8 @@ The loader's opens the plan's changes. The shop's and the driver's bells do noth
     - A truck loaded and ready, leaving, and back.
   - **Loader.**
     - The plan sent: "Thursday's plan is out: 27 trucks to load".
-    - The plan changed after sending.
-    - The dispatcher's answer to their flag.
+    - The plan changed after sending: sent again, or taken back to edit.
+    - The dispatcher's answer to the dock's flags.
   - **Driver.**
     - Their trip sent and changed.
     - Their truck ready.
@@ -46,15 +51,17 @@ The loader's opens the plan's changes. The shop's and the driver's bells do noth
   that's not a good way to show it"; he chose a glanceable card that is "dismissible ... auto-dismiss ... should just
   pop open and go away").
   - When the dispatcher's answer to a driver's problem arrives, it pops up as a large card over the driver's screen:
-    the design's icon for the answer, three words with the count in large type ("↩ Bring back · 3 chilled", "↻ Try
-    again · Fresh Nugegoda", "✓ Go short"), and under it, small, "Ruwan · 03:38" and the full sentence.
+    the design's icon for the answer, three words with the count in large type ("Bring back · 3 chilled", "Try
+    again · Fresh Nugegoda"), and under it, small, "Ruwan · 03:38" and the full sentence.
   - It closes with a tap or a swipe and goes away by itself after 8 seconds.
   - After it goes, the trip's top line keeps only the short form (icon and three words), not the full sentence. The
     full sentence stays in the bell's pop-up and on the stop's own screen.
   - Each answer kind has its short form, written once beside the answer's words, so the card, the top line and the
-    bell's row agree.
-- **Read state** is kept in the browser per account: the newest time the person has seen. A new device starts with
-  the day's updates unread.
+    bell's row agree. The driver's phone words its own screens with no signal, so both forms are in the contracts
+    (`driverAnswerSentence`, `driverAnswerShort`), from the same figures the phone and the API both read, and the
+    screens give each answer kind one picture. "Send replacements" reads to the driver as bringing the cartons back.
+- **Read state** is kept in the browser per account and demo day: the newest time the person has seen. A new device
+  starts with the day's updates unread, and so does a reset, whose clock starts earlier.
 
 ## Rules, with worked examples
 1. **Derived, never invented.** Every update comes from a record that exists, at that record's time: an order's
@@ -67,13 +74,22 @@ The loader's opens the plan's changes. The shop's and the driver's bells do noth
    stream reconnects. The live stream's topic triggers a fresh read, and only updates newer than the newest the
    tab has seen become toasts.
 4. **Worked example.** Ruwan sends Peliyagoda's plan at 16:06. Nadeesha's bell reads 1, and her pop-up's top row is
-   "Thursday's delivery is planned: VEH035, window 05:00 to 07:30 · 16:06". Pressing it opens Today.
+   "Thursday's delivery is planned: Wasantha's reefer van, window 05:00 to 07:30 · 16:06". Pressing it opens Today.
 
 ## Data in and out
-- `GET /api/v1/notifications` answers `{ items: [{ id, kind, at, line, link, tone }] }` for the person signed in,
-  newest first, at most 30. A dispatcher's read takes `?depot=` as every dispatcher read does (spec 021). `id` is
-  stable (for example `deliver:<stopId>`), so a tab can tell which updates it has shown.
-- Read state is in `localStorage` under the account's id: `{ seenUpTo }`. No new table.
+- `GET /api/v1/notifications` answers `{ demoDay, items: [{ id, kind, at, time, line, link, tone, issueKind, decision,
+  answer }] }` for the person signed in, newest first, at most 30 (`NotificationList` in the contracts). `time` is `at`
+  as the row shows it, "16:06" today and "Tue 23 Jun 17:00" another day. `issueKind` names a new problem's kind and
+  `decision` an answer's, for their pictures; `answer` holds a driver's answer's short form, who answered and the full
+  sentence, for the glanceable card. A dispatcher's read takes `?depot=` as every dispatcher read does (spec 021), and on
+  Both the screen reads each depot and marks each row with its depot. `id` is stable (for example `delivered:<stopId>`),
+  so a tab can tell which updates it has shown. Admin belongs to no shop or depot, and is told nothing.
+- A plan's sends and takings back come from its audit rows, which keep their app-clock time (`sentAt`, and now
+  `unsentAt` too); a plan sent before the audit kept one was sent once, at its publication time.
+- The shop hears its truck leave, its driver arrive and a closed visit on the existing `orders` topic, which the
+  driver's start, arrival and closed writes now also announce to the shop.
+- Read state is in `localStorage` under the account's id and the demo day: `{ seenUpTo }`. What a tab has shown as
+  toasts is in its `sessionStorage`. No new table.
 - The live stream's existing topics (`orders`, `plans`, `loading`, `driver`, `issues`) are what trigger a fresh read.
 
 ## Acceptance criteria
