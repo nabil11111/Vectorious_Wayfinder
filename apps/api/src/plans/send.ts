@@ -8,6 +8,7 @@ import { announce } from '../lib/live';
 import { toClock } from '../planning';
 import type { Planner } from '../routes/plans';
 import { boardOf } from './board';
+import { LOADING_STARTED } from './board-day';
 import { finishPlan, openPlan, replaceDraft } from './draft';
 import { partsAddUp } from './split';
 
@@ -77,7 +78,7 @@ export async function unsendPlan(caller: Planner, date: string, body: UnsendPlan
     const opened = await openPlan(tx, caller, date, body, true);
     const storedTrips = await tx.select().from(trips).where(eq(trips.planId, opened.plan.id)).orderBy(trips.vehicleId, trips.tripNo);
     const loading = storedTrips.find((t) => t.status !== 'planned');
-    if (loading) throw new HttpError(409, 'loading_started', 'Loading has started, so this plan cannot go back to edit.', { vehicleId: loading.vehicleId, tripNo: loading.tripNo });
+    if (loading) throw new HttpError(409, 'loading_started', LOADING_STARTED, { vehicleId: loading.vehicleId, tripNo: loading.tripNo });
     const board = await boardOf(tx, caller.depotId, date, opened.moment);
     const ids = board.orders.map((o) => o.id);
     const earlier = ids.length ? await tx.select({ orderId: deferrals.orderId }).from(deferrals).innerJoin(plans, eq(plans.id, deferrals.planId))

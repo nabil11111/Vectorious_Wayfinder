@@ -9,7 +9,7 @@ import { CUTOFF_MINUTES } from '../orders/orderable-day';
 import { snapshot } from '../orders/store-orders';
 import { checkPlan, computeLoad, DEFAULT_SETTINGS, toMinutes, type PlanInput } from '../planning';
 import type { Planner } from '../routes/plans';
-import { boardDay, percent } from './board-day';
+import { boardDay, dayMovedOn, LOADING_STARTED, percent } from './board-day';
 import { boardSuggestion } from './suggestion';
 
 export interface BoardMoment { at: Date; demoDay: number }
@@ -44,7 +44,7 @@ export async function readBoard(tx: Tx, depotId: string, date: string | null, mo
   const currentDay = boardDay(depotDate(clock.at), depotMinutes(clock.at), days);
   const blank: PlanBoard = {
     depot: depotId, demoDay: clock.demoDay, day: null,
-    plan: { ...emptyDraft(), id: null, revision: 0, status: 'draft', savedAt: null, sentAt: null, canUnsend: false },
+    plan: { ...emptyDraft(), id: null, revision: 0, status: 'draft', savedAt: null, sentAt: null, canUnsend: false, lockedReason: null },
     dropped: [], check: null, orders: [], shops: [], vehicles: [], drivers: [], figures: null, counts: null, suggestion: null,
   };
   if (!date) return { board: blank, input: null };
@@ -143,7 +143,9 @@ export async function readBoard(tx: Tx, depotId: string, date: string | null, mo
   const board: PlanBoard = {
     ...blank, day: { date, cutoffAt: cutoffAt.toISOString(), open: clock.at >= cutoffAt },
     plan: { ...draft, id: saved?.id ?? null, revision: saved?.revision ?? 0, status: saved?.status ?? 'draft', savedAt: saved?.savedAt?.toISOString() ?? null,
-      sentAt: saved?.publishedAt?.toISOString() ?? null, canUnsend: saved?.status === 'published' && currentDay?.date === date && tripRows.every((t) => t.status === 'planned') },
+      sentAt: saved?.publishedAt?.toISOString() ?? null, canUnsend: saved?.status === 'published' && currentDay?.date === date && tripRows.every((t) => t.status === 'planned'),
+      // Why a sent plan cannot go back to edit (Q-19): a truck started loading, or else its day has left the board.
+      lockedReason: saved?.status !== 'published' ? null : tripRows.some((t) => t.status !== 'planned') ? LOADING_STARTED : currentDay?.date === date ? null : dayMovedOn(date, true) },
     dropped: [...named].filter((id) => !eligible.has(id)), check, orders: boardOrders, vehicles: boardVehicles, drivers, figures,
     shops: engineShops.map((s) => {
       const allowance = allowances.find((a) => a.brand === s.brand && a.dockType === s.dockType);

@@ -249,6 +249,9 @@ export const PlanBoard = z.object({
     // The plan is sent, every trip is still planned and its day is still the board's, so it can go back to edit
     // (D-33). The server works it out; the screen shows "Back to edit" only then.
     canUnsend: z.boolean(),
+    // Why a sent plan cannot go back to edit, in the server's words, which View plan shows where Back to edit was
+    // (Q-19): "Loading has started, so this plan cannot go back to edit." null for a draft or while it can.
+    lockedReason: z.string().nullable(),
   }),
   // Orders the draft named that are no longer the day's, taken out of it (rule 2).
   dropped: z.array(z.uuid()),

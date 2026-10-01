@@ -35,7 +35,7 @@ const trip = (vehicleId: string, driverId: string | null, outletId: string, orde
 
 const boardWith = (trips: DraftTrip[]) => PlanBoard.parse({
   depot: 'Peliyagoda', demoDay: 1, day: { date: '2026-06-25', cutoffAt: '2026-06-24T10:30:00.000Z', open: true },
-  plan: { mixBrands: false, trips, deferrals: [], id: uuid(100), revision: 3, status: 'draft', savedAt: '2026-06-24T10:31:00.000Z', sentAt: null, canUnsend: false },
+  plan: { mixBrands: false, trips, deferrals: [], id: uuid(100), revision: 3, status: 'draft', savedAt: '2026-06-24T10:31:00.000Z', sentAt: null, canUnsend: false, lockedReason: null },
   dropped: [], check: null, orders: [order(COLOMBO_ORDER, 'OUT006'), order(GALLE_ORDER, 'OUT051')],
   shops: [shop('OUT006', 'Fresh Colombo Fort', 'Colombo'), shop('OUT051', 'Fresh Galle Fort', 'Galle')],
   vehicles: [vehicle('VEH004'), vehicle('VEH002'), vehicle('VEH035', 'van')],

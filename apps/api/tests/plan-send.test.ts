@@ -112,6 +112,9 @@ it('AC-4 and AC-29 keep the sent board by date and carry its fuel into Friday', 
   expect((await db.select().from(fuelLog).where(eq(fuelLog.date, DATE)))[0]!.litres).toBe('15.9');
   freeze(DATE, 510);
   const historical = PlanBoard.parse((await as.get(URL)).body); expect(historical.check).toEqual(sent.check); expect(historical.plan.canUnsend).toBe(false);
+  // Q-19: it says why, though no truck was loaded: its day has left the board.
+  expect(historical.plan.lockedReason).toBe('Trucks for Thu 25 Jun leave from 03:30, so its plan can no longer go back to edit.');
+  expect(sent.plan.lockedReason).toBeNull();
   const next = PlanBoard.parse((await as.get('/api/v1/plans')).body); expect(next.day!.date).toBe('2026-06-26');
   expect(next.check!.vehicles.find((v) => v.vehicleId === 'VEH004')!.litresBefore).toBe(180.9);
   const seed = PlanBoard.parse((await as.get('/api/v1/plans/2026-06-24')).body); expect([seed.check, seed.figures, seed.counts]).toEqual([null, null, null]);
@@ -160,7 +163,9 @@ it('AC-30 refuses loading and later trips without changing the published plan', 
 it('AC-3 refuses send and unsend once the board day moves', async () => {
   const b = await save(); freeze(DATE, 210); const moved = await send(b); expect(code(moved)).toEqual([409, 'day_moved']);
   expect(moved.body.error.message).toBe('Trucks for Thu 25 Jun leave from 03:30, so its plan can no longer be sent.');
-  freeze(); const sent = PlanBoard.parse((await send(b)).body); freeze(DATE, 210); expect(code(await unsend(sent))).toEqual([409, 'day_moved']);
+  freeze(); const sent = PlanBoard.parse((await send(b)).body); freeze(DATE, 210); const late = await unsend(sent); expect(code(late)).toEqual([409, 'day_moved']);
+  // Q-19: Back to edit is refused in the words the board shows where the button was.
+  expect(late.body.error.message).toBe(PlanBoard.parse((await as.get(URL)).body).plan.lockedReason);
 });
 
 it('AC-10 sends the cleaned draft with dropped orders removed', async () => {

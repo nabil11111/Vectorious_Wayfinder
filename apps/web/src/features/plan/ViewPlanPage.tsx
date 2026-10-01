@@ -27,7 +27,8 @@ const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 // View plan (spec 010, Dispatcher · View plan, · ready to send and · sent) at /dispatcher/plan/:date, so a reload or a
 // clock move keeps the day. The vehicles by brand and district with their trips, the checks, and the send: greyed
 // while a check blocks, orange when none does, and once sent the time it went out. "Back to edit" returns a draft
-// to the board, and a sent plan too while the board says it can go back (D-33). A suggested plan (spec 014) says when
+// to the board, and a sent plan too while the board says it can go back (D-33); where it cannot, the server's sentence
+// says why in its place, "Loading has started, so this plan cannot go back to edit." (Q-19). A suggested plan (spec 014) says when
 // it was suggested beside the title and lists the planner's decisions above the checks, and the send stays greyed
 // until each is accepted or ended by an edit (D-54). On both depots together a plan belongs to one depot (spec 021,
 // D-96): the page reads no plan and asks which depot's to show.
@@ -106,7 +107,7 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
   };
 
   const back = sent
-    ? !board.plan.canUnsend ? current.data?.day?.date === date && <p className="flex min-h-9 items-center text-[13px] leading-4 text-muted-foreground">Loading has started, so this plan cannot go back to edit.</p> : (
+    ? !board.plan.canUnsend ? board.plan.lockedReason && <p className="flex min-h-9 items-center text-[13px] leading-4 text-muted-foreground">{board.plan.lockedReason}</p> : (
       <Button variant="outline" className={plainButton('h-9 px-5 text-[13px]')} disabled={busy !== null} onClick={() => { void run('unsend', unsendPlan); }}>
         {busy === 'unsend' ? 'Taking back…' : '← Back to edit'}
       </Button>

@@ -7,8 +7,8 @@ import { boardKey, dayKey } from './board';
 import { ViewPlanPage } from './ViewPlanPage';
 
 // Q-19: once a truck starts loading, a sent plan can no longer go back to edit (spec 012, rule 3), and View plan says
-// so where "Back to edit" was. View plan is drawn from the day's board and the board on show, as the server would draw
-// it. These fixtures live in the test only.
+// so where "Back to edit" was, in the server's own sentence, whatever day the board is on by then. View plan is drawn
+// from the day's board and the board on show, as the server would draw it. These fixtures live in the test only.
 
 vi.mock('react', async (original) => {
   const react = await original<typeof import('react')>();
@@ -19,11 +19,14 @@ const THU = '2026-06-25';
 const FRI = '2026-06-26';
 const LOCKED = 'Loading has started, so this plan cannot go back to edit.';
 
-// Thursday's plan, sent at Wed 16:36, as the board answers for a date.
-function sentThursday(canUnsend: boolean): PlanBoard {
+const MOVED = 'Trucks for Thu 25 Jun leave from 03:30, so its plan can no longer go back to edit.';
+
+// Thursday's plan, sent at Wed 16:36, as the board answers for a date: it can go back to edit, or the server says why
+// it cannot.
+function sentThursday(canUnsend: boolean, lockedReason: string | null = canUnsend ? null : LOCKED): PlanBoard {
   return {
     depot: 'Peliyagoda', demoDay: 1, day: { date: THU, cutoffAt: '2026-06-24T10:30:00.000Z', open: true },
-    plan: { mixBrands: false, trips: [], deferrals: [], id: '0c000000-0000-4000-8000-000000000001', revision: 3, status: 'published', savedAt: '2026-06-24T11:05:00.000Z', sentAt: '2026-06-24T11:06:00.000Z', canUnsend },
+    plan: { mixBrands: false, trips: [], deferrals: [], id: '0c000000-0000-4000-8000-000000000001', revision: 3, status: 'published', savedAt: '2026-06-24T11:05:00.000Z', sentAt: '2026-06-24T11:06:00.000Z', canUnsend, lockedReason },
     dropped: [], check: null, orders: [], shops: [], vehicles: [], drivers: [], figures: null, counts: null, suggestion: null,
   };
 }
@@ -51,8 +54,15 @@ it('Q-19 keeps "Back to edit" while no truck has started', () => {
   expect(html).not.toContain(LOCKED);
 });
 
-it('Q-19 says nothing of loading on a sent plan whose day the board has moved past', () => {
+it('Q-19 still says loading has started once the board has moved past the plan\'s day, as Thursday\'s look back did not', () => {
   const html = viewPlan(sentThursday(false), onShow(FRI));
+  expect(html).toContain(LOCKED);
+  expect(html).not.toContain('Back to edit');
+});
+
+it('Q-19 says why a sent plan no truck loaded cannot go back to edit once its day has left the board', () => {
+  const html = viewPlan(sentThursday(false, MOVED), onShow(FRI));
+  expect(html).toContain(MOVED);
   expect(html).not.toContain(LOCKED);
   expect(html).not.toContain('Back to edit');
 });

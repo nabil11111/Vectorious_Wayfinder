@@ -27,7 +27,7 @@ const trip = (vehicleId: string, driverId: string | null, outletId: string, orde
   ({ vehicleId, tripNo, leaveAt: null, driverId, stops: [{ outletId, orderIds: [orderId] }] });
 const BOARD = PlanBoard.parse({
   depot: 'Peliyagoda', demoDay: 1, day: { date: '2026-06-25', cutoffAt: '2026-06-24T10:30:00.000Z', open: true },
-  plan: { mixBrands: false, trips: [trip('VEH011', CHAMINDA, 'OUT051', GALLE), trip('VEH001', DILSHAN, 'OUT006', FORT)], deferrals: [], id: uuid(100), revision: 3, status: 'draft', savedAt: '2026-06-24T10:31:00.000Z', sentAt: null, canUnsend: false },
+  plan: { mixBrands: false, trips: [trip('VEH011', CHAMINDA, 'OUT051', GALLE), trip('VEH001', DILSHAN, 'OUT006', FORT)], deferrals: [], id: uuid(100), revision: 3, status: 'draft', savedAt: '2026-06-24T10:31:00.000Z', sentAt: null, canUnsend: false, lockedReason: null },
   dropped: [], check: null, orders: [order(GALLE, 'OUT051'), order(FORT, 'OUT006'), order(DEHIWALA, 'OUT005')],
   shops: [shop('OUT051', 'Fresh Galle Fort', 'Galle'), shop('OUT006', 'Fresh Colombo Fort', 'Colombo'), shop('OUT005', 'Fresh Dehiwala', 'Colombo', 'van_only')],
   vehicles: [vehicle('VEH011', 'truck', 'ambient', 7200, 38), vehicle('VEH001', 'truck', 'reefer', 5510, 26.4), vehicle('VEH035', 'van', 'reefer', 1040, 7), vehicle('VEH005', 'truck', 'reefer', 6840, 33.4, false)],
