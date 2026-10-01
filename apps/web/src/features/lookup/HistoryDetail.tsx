@@ -12,7 +12,7 @@ import { CloseButton, DetailHeading, Facts } from './parts/ui';
 import type { PhotoViewer as Viewer } from './queries';
 import {
   NOT_CONFIRMED, NO_PHOTO, OUTCOME_WORDS, RETURN_INSTRUCTED, TRIP_STATUS_WORDS, answerWords, clockTime, coldWords, countWords, issueWords, kilos, kmWords,
-  lineWords, measureWords, reasonWords, sentWords, shortDay, tripName, tripPlace, unitsWords, whole, cubic,
+  lineWords, measureWords, reasonWords, reportWords, sentWords, shortDay, tripName, tripPlace, unitsWords, whole, cubic,
 } from './words';
 
 // The selected trip (Dispatcher · History's rail, rules 5 to 8): its kept schedule and recorded times, the stage totals
@@ -183,7 +183,8 @@ function Receipt({ receipt, stop, viewer }: { receipt: HistoryReceipt; stop: His
       {coldWords(receipt.cold) && <p className="text-muted-foreground">{coldWords(receipt.cold)}</p>}
       {report && (
         <div className="mt-1.5 border-t pt-1.5">
-          <p className="font-semibold">Report · {reasonWords(report.reason)}</p>
+          <p className="font-semibold">Report · {reportWords(report, stop.lines, brand)}</p>
+          {report.note && <p className="text-muted-foreground">Note · {report.note}</p>}
           <p className="text-muted-foreground">
             {answerWords(report.decision, answeredBy, report.decidedAt)}
             {report.replacement && ` · ${unitsWords(brand, report.replacement.units)} on ${shortDay(report.replacement.day)}`}

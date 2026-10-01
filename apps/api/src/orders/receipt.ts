@@ -1,4 +1,4 @@
-import { deliveryFigures, type ReceiptWrite, type StoreDeliveries } from '@wayfinder/contracts';
+import { deliveryFigures, writtenReason, type ReceiptWrite, type StoreDeliveries } from '@wayfinder/contracts';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { auditLog, issueLines, issues, orders, photos, plans, stops, trips } from '../db/schema';
@@ -56,19 +56,24 @@ export async function confirmDelivery(caller: Caller, write: ReceiptWrite): Prom
     }
     if (write.lines.length !== delivery.lines.length) throw invalid('Count every line of the delivery once.');
     const counted = delivery.lines.map((line) => {
-      const received = write.lines.find((named) => named.lineId === line.lineId)!.received;
-      if (received > line.delivered) throw invalid('Count no more than was handed over on each line.');
-      return { ...line, received, short: line.delivered - received };
+      const named = write.lines.find((each) => each.lineId === line.lineId)!;
+      if (named.received > line.delivered) throw invalid('Count no more than was handed over on each line.');
+      return { ...line, received: named.received, short: line.delivered - named.received, said: named.reason ?? null, reason: writtenReason(write, named) };
     });
     const { chilled } = deliveryFigures(delivery);
     if (chilled && write.cold === null) throw invalid('Say whether the chilled goods were still cold.');
     if (!chilled && write.cold !== null) throw invalid('Answer the cold check only when chilled goods came.');
+    // Each short line says what is wrong with it, by its own reason or, from a phone that saved it before lines had
+    // reasons, the receipt's one reason (Q-40); a full line says nothing.
     const short = counted.some((line) => line.short > 0);
-    if (short && write.reason === null) throw invalid('Say what is wrong with the cartons that are short.');
-    if (!short && write.reason !== null) throw invalid('Say what is wrong only when a line is short.');
+    if (counted.some((line) => line.short > 0 && line.reason === null)) throw invalid('Say what is wrong with the cartons that are short.');
+    if (counted.some((line) => line.short === 0 && line.said !== null) || (!short && write.reason !== null)) throw invalid('Say what is wrong only when a line is short.');
     const notCold = write.cold === false;
     const reported = short || notCold;
     if (write.photo !== undefined && !reported) throw invalid('Add a photo only to a report.');
+    // A note goes with a report, as the photo does; one of only spaces is no note.
+    const note = write.note ? write.note : null;
+    if (note !== null && !reported) throw invalid('Add a note only to a report.');
     const jpeg = write.photo === undefined ? undefined : jpegOf(write.photo);
 
     // 10. The time kept lies between the handover and the server's clock (rule 8). The trip's last event time is the
@@ -86,15 +91,19 @@ export async function confirmDelivery(caller: Caller, write: ReceiptWrite): Prom
     if (reported) {
       // Rule 5: each short line at the units short, and when the chilled goods were not cold each chilled line that
       // came too, at 0 when nothing is short on it.
-      await tx.insert(issues).values({ id: write.writeId, kind: 'receipt', stopId: stop.id, reason: short ? write.reason! : 'not_cold', raisedBy: caller.userId, raisedAt: at });
+      // The problem's own reason is its first short line's, or not_cold; each short line keeps its own (Q-40).
+      const first = counted.find((line) => line.short > 0);
+      await tx.insert(issues).values({ id: write.writeId, kind: 'receipt', stopId: stop.id, reason: first ? first.reason! : 'not_cold', raisedBy: caller.userId, raisedAt: at, note });
       await tx.insert(issueLines).values(counted.filter((line) => line.short > 0 || (notCold && line.temp === 'chilled' && line.delivered > 0))
-        .map((line) => ({ issueId: write.writeId, orderLineId: line.lineId, counted: line.short })));
+        .map((line) => ({ issueId: write.writeId, orderLineId: line.lineId, counted: line.short, reason: line.short > 0 ? line.reason : null })));
       if (jpeg) await tx.insert(photos).values({ id: write.writeId, stopId: stop.id, issueId: write.writeId, jpeg, takenBy: caller.userId, takenAt: at });
     }
     await tx.insert(auditLog).values({ actorId: caller.userId, action: 'stop.received', entity: 'stop', entityId: stop.id,
       before: { revision: stop.revision },
       after: { writeId: write.writeId, tripId: held.id, revision: stop.revision + 1, counts: counted.map((line) => ({ lineId: line.lineId, received: line.received })),
-        cold: write.cold, reason: write.reason, claimedAt: write.at, keptAt: at.toISOString() } });
+        cold: write.cold, reason: write.reason, claimedAt: write.at, keptAt: at.toISOString(),
+        ...(short && write.reason === null ? { reasons: counted.filter((line) => line.short > 0).map((line) => ({ lineId: line.lineId, reason: line.reason })) } : {}),
+        ...(note !== null ? { note } : {}) } });
 
     // 12. The answer, and what to announce once the change has committed.
     const told: Announcement[] = [{ topic: 'orders', outletId: caller.outletId, depotId: shop.depotId }];

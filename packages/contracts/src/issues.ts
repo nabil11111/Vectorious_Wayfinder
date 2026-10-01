@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IssueDecision, IssueKind, IssueReason, IssueStatus, Temp } from './basics';
+import { IssueDecision, IssueKind, IssueReason, IssueStatus, ShortReason, Temp } from './basics';
 import { TripStatus } from './plans';
 
 // A problem, whoever raises it (spec 012, D-36): a loader's flag, a driver's refused delivery or closed shop (A4) and a
@@ -23,6 +23,9 @@ export const IssueLine = z.object({
   delivered: z.number().int().min(0).nullable(),
   // What the shop counted on its receipt (spec 015), null until the shop confirms.
   received: z.number().int().min(0).nullable(),
+  // On a shop's report, what the shop said is wrong with this line (Q-40): lineReason reads it, also for a report kept
+  // before lines had reasons. null or left out on every other kind.
+  reason: ShortReason.nullable().optional(),
 });
 export type IssueLine = z.infer<typeof IssueLine>;
 

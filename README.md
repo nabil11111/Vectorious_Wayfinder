@@ -165,16 +165,16 @@ are what the demo clock shows.
 19. **The shop confirms.** Move the demo clock on to "Delivered by 08:30". As Nadeesha (`S-001`) on a phone, Today shows her three
     Thursday orders "Delivered", the dry one "3 of 4 delivered · 1 short from the depot". Open **Deliveries**: "Confirm
     delivery", each line against what the driver handed over (12 and 8 chilled, 3 dry with "1 short from the depot"), and
-    "Still cold on arrival?" with Yes. On the first card press − once: "1 carton missing", and "What's wrong?" with
-    Missing.
+    "Still cold on arrival?" with Yes. On the first card press − once: "1 carton missing", and beside it "What's wrong?"
+    with Missing; each short line has its own. "Note for the depot (optional)" takes a note of up to 200 characters.
 20. **A receipt with no signal.** Turn the network off and press **Confirm delivery**: "Receipt saved on this phone",
     "Received 11 cartons · Missing 1 carton", "Saved at 08:30 · waiting to sync". Reload with the network still off: the
     same screen opens. Turn it back on: "Receipt sent to the depot" and "Sent at 08:31 · shortage unresolved".
 21. **The depot replaces it.** As Ruwan (`P-001`), the bell shows 1. Live day: "1 chilled carton missing", "Shop · Nadeesha",
-    "Received · 11 of 12 chilled cartons", "Cold on arrival · yes", with **Send 1 replacement on Fri 26 Jun** chosen.
+    "Received · 11 of 12 chilled cartons, 1 missing", "Cold on arrival · yes", with **Send 1 replacement on Fri 26 Jun** chosen.
     Press **Send to shop**: "✓ Sent · Fresh Nugegoda · 1 replacement on Fri 26 Jun, Nadeesha told".
 22. **The shop sees it.** On Nadeesha's phone, without a reload, the receipt says "replacement on Fri 26 Jun". Orders,
-    Past: "12 chilled cartons · 11 received · 1 short" with "1 replacement comes on Fri 26 Jun.", "8 chilled cartons ·
+    Past: "12 chilled cartons · 11 received · 1 short" with "1 missing chilled carton: a replacement comes on Fri 26 Jun", "8 chilled cartons ·
     All 8 received" and "4 dry cartons · 3 received · 1 short". Open: "1 chilled carton · Waiting for the delivery plan ·
     Replacement for Thu 25 Jun".
 
@@ -184,7 +184,8 @@ At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements
 **A closed shop.** At step 14 choose "Shop closed" instead and press **Save attempt and move on**: Ruwan's card reads
 "Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Wasantha's next stop again, and delivering it ends
 at 117 of 118. **Bring them back** ends with "Hand them in; they go on the next run.", and Wellawatte's two orders are
-placed again for Friday's plan.
+placed again for Friday's plan: they leave the shop's Today, and Orders reads "48 chilled cartons: brought back to the
+depot, waiting for the next plan" with no day until Friday's plan takes them.
 
 **A second trip.** A truck the plan sends out twice, such as VEH057 at Kandy, gives its driver both trips. **I'm back at the
 depot** on trip 1 opens trip 2's Today's trip under "✓ Trip 1 closed · 4 of 4 stops · all records sent · checked in
@@ -348,8 +349,12 @@ Anything we built differently from our Designathon submission, and why.
 - **Confirm delivery lists every line of the drop,** so Nugegoda's three orders are three cards, as the driver's Unload
   does; the frame shows one order. A line expects what the driver handed over, and says when the depot sent it short or
   the shop refused some at the door, with the design's damaged picture.
-- **"What's wrong?" shows once a count is lower,** with "Missing" and "Damaged", and "Add a photo (optional)" only on a
-  receipt that reports something.
+- **A typed count stays as typed.** A minus or a fraction says "Whole numbers from 0 to 50." and a count above what was
+  handed over "More than the 50 handed over.", in red, and Confirm waits; the frame draws no wrong count, and changing
+  what was typed sent a report the shop never meant.
+- **"What's wrong?" shows on each line once its count is lower,** with "Missing" and "Damaged", and "Add a photo
+  (optional)" and "Note for the depot (optional)" only on a receipt that reports something. One answer for the whole
+  receipt could not say a crate came damaged while a pallet never came, and the frame draws no note.
 - **The saved screen** says "There is no signal right now." when the phone knew it had none, and "The connection dropped
   while sending." after a send that got no answer.
 - **No "and signed":** there is no signature; the shop's receipt is the confirmation.
@@ -357,6 +362,18 @@ Anything we built differently from our Designathon submission, and why.
   not accept says so at its foot. No frame draws these.
 - **A shop's report on Live day** uses the issue-open card with "Send N replacements on <day>", "No replacement" and
   "Send to shop"; the design draws only the "Next" line for it.
+- **A receipt refused because another device confirmed first keeps its report on screen,** under "Confirmed on another
+  device at 08:42" and what that confirmation said, with a line that the report did not reach the depot and to contact
+  the depot for anything more: two staff checking one delivery is a normal morning, and the report used to go without a
+  word. No frame draws it.
+- **Today lists the deliveries still to confirm** when a shop had more than one, "2 deliveries to confirm" with a row
+  and Confirm for each, until the last is confirmed: a shop that confirmed its chilled drop never heard its dry one
+  waited. No frame draws it.
+- **A brought-back order leaves Today** and names no day until the next plan takes it: Thursday's window beside
+  "Coming today" told the shop to wait for cartons already back at the depot. No frame draws it.
+- **A card's answer lines name their cartons,** "3 expired chilled cartons: replacements come on Fri 26 Jun" beside "2
+  missing chilled cartons: no replacement": no frame draws two answers on one order, and plain "No replacement is
+  coming" under a refusal's replacements read as taking them back.
 - **States the design lacks:** something wrong, a photo, sending, sent and all received, sent and answered, nothing to
   confirm, not accepted, sign in again, could not save, could not load, another tab, not on your list, and the shop's
   cards for a delivery not yet confirmed, nobody at the shop, the depot's answers and a replacement.

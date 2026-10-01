@@ -7,11 +7,13 @@ import { LoadError, StaleNotice } from './parts/LoadError';
 import { NextOrderCard, PlacedCard } from './parts/NextOrderCard';
 import { OrderCard } from './parts/OrderCard';
 import { Panel } from './parts/Panel';
+import { ToConfirmCard } from './parts/ToConfirmCard';
 import { clockTime, cutoffDay, shortDay, weekday } from './words';
 
 const heading = 'mb-[9px] text-[17px] leading-[23px] font-bold lg:mb-3 lg:text-lg lg:leading-[25px]';
 
-// Today (Shop · Today and Shop · Today · orders submitted): what is due today and the next order. On a phone
+// Today (Shop · Today and Shop · Today · orders submitted): what is due today, the deliveries still to confirm when the
+// shop had more than one (Q-35), and the next order. On a phone
 // it is one column, and from 1024 px the next order moves to a column of its own on the right.
 export function TodayPage() {
   const next = useNextOrder();
@@ -43,6 +45,8 @@ export function TodayPage() {
 
       <div className="mt-2.5 grid grid-cols-1 gap-y-3 lg:mt-6 lg:grid-cols-[minmax(0,728fr)_minmax(0,440fr)] lg:gap-x-8">
         <section>
+          {/* Deliveries still to confirm when the shop had more than one (Q-35), above what is coming today. */}
+          {today.data?.toConfirm && <div className="mb-3 lg:mb-3.5"><ToConfirmCard toConfirm={today.data.toConfirm} /></div>}
           <h2 className={cn(heading, placedOnTop ? 'pt-[7px] lg:pt-0' : 'hidden lg:block')}>Coming today</h2>
           {today.data ? (
             today.data.orders.length > 0 ? (

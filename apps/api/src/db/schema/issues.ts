@@ -35,6 +35,9 @@ export const issueLines = pgTable('issue_lines', {
   issueId: uuid('issue_id').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   orderLineId: uuid('order_line_id').notNull().references(() => orderLines.id, { onDelete: 'cascade' }),
   counted: integer('counted').notNull(),
+  // A shop's report's own word for a short line, missing or damaged (Q-40), checked against the contracts' list as
+  // issues.reason is. null on every other kind, and on a chilled line a report counts only because the goods came warm.
+  reason: text('reason'),
 }, (t) => [
   primaryKey({ columns: [t.issueId, t.orderLineId] }),
   check('issue_lines_counted', sql`${t.counted} >= 0`),

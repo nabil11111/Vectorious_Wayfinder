@@ -1,4 +1,4 @@
-import { byDeliveryOrder, ReceiptDecision, ReceiptReason, RefusalReason, type StoreDeliveries, type StoreDelivery } from '@wayfinder/contracts';
+import { byDeliveryOrder, lineReason, ReceiptDecision, ReceiptReason, RefusalReason, ShortReason, type StoreDeliveries, type StoreDelivery } from '@wayfinder/contracts';
 import { and, eq, inArray, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Db, Tx } from '../db/client';
@@ -66,8 +66,11 @@ export async function deliveriesAt(on: Reader, outletId: string, where?: SQL): P
         cold: own.find((line) => line.temp === 'chilled')?.cold ?? null,
         report: report ? {
           id: report.id, reason: ReceiptReason.parse(report.reason),
+          // Each line with its own reason; a report kept before lines had reasons gives its short lines its own (Q-40).
           lines: counted.filter((line) => line.issueId === report.id).sort((a, b) => order.indexOf(a.orderLineId) - order.indexOf(b.orderLineId))
-            .map((line) => ({ lineId: line.orderLineId, counted: line.counted })),
+            .map((line) => ({ lineId: line.orderLineId, counted: line.counted,
+              reason: lineReason({ reason: ReceiptReason.parse(report.reason) }, { counted: line.counted, reason: line.reason === null ? null : ShortReason.parse(line.reason) }) })),
+          note: report.note,
           decision: report.decision === null ? null : ReceiptDecision.parse(report.decision), decidedAt: report.decidedAt?.toISOString() ?? null,
           replacement: replacements.get(report.id) ?? null,
         } : null,

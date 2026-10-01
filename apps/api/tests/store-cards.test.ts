@@ -110,7 +110,7 @@ it('AC-31 gives Nadeesha\'s orders, after her receipt and Ruwan\'s answer, 11, 8
     doneAt: at(HANDED_OVER).toISOString(), outcome: 'delivered', late: false, delivered, shortFromDepot, refused: 0, refusalReason: null });
   const received = (units: number, short: number) => ({ at: at(8 * 60 + 31).toISOString(), sentAt: at(8 * 60 + 33).toISOString(), units, short });
   const expected = [
-    { delivery: handedOver(12, 0), receipt: received(11, 1), problems: [{ id: write.writeId, kind: 'receipt', units: 1, decision: 'send_replacements', replacementDay: FRI }], replacementFor: null },
+    { delivery: handedOver(12, 0), receipt: received(11, 1), problems: [{ id: write.writeId, kind: 'receipt', units: 1, decision: 'send_replacements', replacementDay: FRI, line: '1 missing chilled carton: a replacement comes on Fri 26 Jun' }], replacementFor: null },
     { delivery: handedOver(8, 0), receipt: received(8, 0), problems: [], replacementFor: null },
     { delivery: handedOver(3, 1), receipt: received(3, 1), problems: [], replacementFor: null },
   ];
@@ -143,11 +143,11 @@ it('AC-32 gives Wellawatte\'s chilled order 46 delivered, 2 refused and damaged,
   };
   let list = (await wellawatteShop.list('today')).orders;
   expect(factsOf(byId(list, WELLAWATTE.chilled))).toEqual({ delivery: { ...refused, delivered: 46, refused: 2 }, receipt: null,
-    problems: [{ id: refusal.id, kind: 'refused', units: 2, decision: null, replacementDay: null }], replacementFor: null });
+    problems: [{ id: refusal.id, kind: 'refused', units: 2, decision: null, replacementDay: null, line: '2 damaged chilled cartons: the depot decides what happens to them' }], replacementFor: null });
   expect(factsOf(byId(list, WELLAWATTE.dry))).toEqual({ delivery: { ...refused, delivered: 46, refused: 0 }, receipt: null, problems: [], replacementFor: null });
   await answer(2, 'bring_back', 3 * 60 + 52);
   list = (await wellawatteShop.list('open')).orders;
-  expect(byId(list, WELLAWATTE.chilled).problems).toEqual([{ id: refusal.id, kind: 'refused', units: 2, decision: 'bring_back', replacementDay: null }]);
+  expect(byId(list, WELLAWATTE.chilled).problems).toEqual([{ id: refusal.id, kind: 'refused', units: 2, decision: 'bring_back', replacementDay: null, line: '2 damaged chilled cartons: they go back to the depot' }]);
 });
 
 it('AC-32 gives a closed shop\'s orders the attempt and an open problem, then after Try again no delivery and the answer', async () => {
@@ -157,14 +157,14 @@ it('AC-32 gives a closed shop\'s orders the attempt and an open problem, then af
     outcome: 'closed', late: false, delivered: null, shortFromDepot: 0, refused: 0, refusalReason: null };
   let list = (await wellawatteShop.list('open')).orders;
   expect([WELLAWATTE.chilled, WELLAWATTE.dry].map((id) => factsOf(byId(list, id)))).toEqual([
-    { delivery: attempt, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: null, replacementDay: null }], replacementFor: null },
-    { delivery: attempt, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 46, decision: null, replacementDay: null }], replacementFor: null },
+    { delivery: attempt, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: null, replacementDay: null, line: '48 chilled cartons: the depot decides, today or another day' }], replacementFor: null },
+    { delivery: attempt, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 46, decision: null, replacementDay: null, line: '46 dry cartons: the depot decides, today or another day' }], replacementFor: null },
   ]);
   await answer(2, 'try_again', 3 * 60 + 52);
   list = (await wellawatteShop.list('open')).orders;
   expect([WELLAWATTE.chilled, WELLAWATTE.dry].map((id) => factsOf(byId(list, id)))).toEqual([
-    { delivery: null, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: 'try_again', replacementDay: null }], replacementFor: null },
-    { delivery: null, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 46, decision: 'try_again', replacementDay: null }], replacementFor: null },
+    { delivery: null, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: 'try_again', replacementDay: null, line: '48 chilled cartons: the driver comes back after the other stops' }], replacementFor: null },
+    { delivery: null, receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 46, decision: 'try_again', replacementDay: null, line: '46 dry cartons: the driver comes back after the other stops' }], replacementFor: null },
   ]);
 });
 
@@ -178,7 +178,7 @@ it('AC-32 gives a closed shop\'s orders, once brought back and placed again, the
   expect(factsOf(chilled)).toEqual({
     delivery: { stopId: driverStop(trip, 2).id, vehicleId: 'VEH035', driver: 'Dilshan', arrivedAt: at(3 * 60 + 45).toISOString(), doneAt: at(3 * 60 + 48).toISOString(),
       outcome: 'closed', late: false, delivered: null, shortFromDepot: 0, refused: 0, refusalReason: null },
-    receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: 'bring_back', replacementDay: null }], replacementFor: null,
+    receipt: null, problems: [{ id: closed.id, kind: 'closed', units: 48, decision: 'bring_back', replacementDay: null, line: '48 chilled cartons: brought back to the depot, waiting for the next plan' }], replacementFor: null,
   });
 });
 
@@ -204,7 +204,7 @@ it('reads a replacement and each part of a split one as replacing the delivery\'
   let list = (await wellawatteShop.list('open')).orders;
   expect(byId(list, replacement!.id).replacementFor).toBe(THU);
   expect(byId(list, own!.id).replacementFor).toBeNull();
-  expect(byId(list, WELLAWATTE.chilled).problems).toEqual([{ id: refusal.id, kind: 'refused', units: 2, decision: null, replacementDay: FRI }]);
+  expect(byId(list, WELLAWATTE.chilled).problems).toEqual([{ id: refusal.id, kind: 'refused', units: 2, decision: null, replacementDay: FRI, line: '2 damaged chilled cartons: the depot decides what happens to them' }]);
   const next = async () => StoreNextOrder.parse((await wellawatte.get('/api/v1/store/next-order')).body);
   expect((await next()).placed?.orders.map((order) => order.id)).toEqual([own!.id]);
 

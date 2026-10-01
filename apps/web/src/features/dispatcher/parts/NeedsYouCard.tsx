@@ -87,6 +87,8 @@ function ProblemRow({ issue, depot, first }: { issue: Issue; depot: string | nul
         <div className="min-w-0">
           <p className="text-[15px] leading-5 font-semibold">{title}</p>
           <p className="mt-1 text-xs leading-4 text-muted-foreground"><Depot depot={depot} />{issue.raisedBy} · {clockTime(issue.raisedAt)} · stop {issue.stop.seq} · {truckName(issue.trip)}</p>
+          {/* A shop's report carries its note (Q-40). */}
+          {issue.kind === 'receipt' && issue.note && <p className="mt-1 text-xs leading-4 text-muted-foreground">Note · {issue.note}</p>}
         </div>
       </div>
       <Link to={`/dispatcher/live?issue=${encodeURIComponent(issue.id)}`} className={first ? orangeButton(BUTTON) : inkButton(BUTTON)}>Decide</Link>

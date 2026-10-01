@@ -1,5 +1,5 @@
 import {
-  DEPOT_TIME_ZONE, type Brand, type DeliveryFigures, type DockType, type OrderDelivery, type OrderLine, type OrderProblem, type OrderReceipt,
+  DEPOT_TIME_ZONE, reportReasons, type Brand, type DeliveryFigures, type DockType, type OrderDelivery, type OrderLine, type OrderReceipt,
   type RefusalReason, type ShortReason, type StoreDelivery, type StoreDeliveryLine, type StoreOrder, type StoreOutlet, type StoreProduct,
   type StoreReceipt, type Temp,
 } from '@wayfinder/contracts';
@@ -203,8 +203,13 @@ export const shortChip = (short: number, unit: string, reason: ShortReason) => `
 // Under a line the depot sent short, and one the shop refused some of at the door.
 export const shortFromDepotLine = (units: number) => `${WHOLE.format(units)} short from the depot`;
 export const refusedAtDoorLine = (units: number) => `${WHOLE.format(units)} refused at the door`;
+// Under a receipt's count box that holds more than was handed over (Q-38): it stays as typed, and this says why it
+// cannot go. A minus or a fraction gets the loader's "Whole numbers from 0 to 50." instead.
+export const overLine = (handedOver: number) => `More than the ${WHOLE.format(handedOver)} handed over.`;
 
 export const SHORT_REASON_WORDS: Record<ShortReason, string> = { missing: 'Missing', damaged: 'Damaged' };
+// The note that goes with a report (Q-40), for the depot to read with it.
+export const RECEIPT_NOTE_LABEL = 'Note for the depot (optional)';
 
 export const RECEIPT_TITLE = 'Confirm delivery';
 export const NOT_SAVED_ON_PHONE = 'Could not save on this phone. Try again.';
@@ -231,6 +236,12 @@ export const keptSentences = (reports: boolean) => (reports
   : ['Your receipt is kept on this phone.', 'It will retry when the connection returns.', 'You do not need to confirm this delivery again.']);
 export const savedFoot = (savedAt: string, today: string) => `Saved at ${whenOf(savedAt, today)} · waiting to sync`;
 export const NOT_ACCEPTED = 'The depot did not accept this receipt.';
+// A refused receipt keeps the phone's report on screen and says where it stands (Q-37): the delivery confirmed on
+// another device, with what that confirmation said, and how to raise anything more.
+export const confirmedElsewhere = (receipt: Pick<StoreReceipt, 'at'>, today: string) => `Confirmed on another device at ${whenOf(receipt.at, today)}`;
+export const PHONE_RECORDED = 'What this phone recorded';
+export const notReached = (reports: boolean) =>
+  `This phone’s ${reports ? 'report' : 'receipt'} did not reach the depot. To report anything more, contact your depot using your store’s usual contact number.`;
 export const notAcceptedFoot = (savedAt: string, today: string) => `Saved at ${whenOf(savedAt, today)} · not accepted`;
 
 // Sent (Shop · Receipt sent): "Confirmed at 08:31 · Fresh · Nugegoda", with the day for a receipt of another day.
@@ -254,7 +265,9 @@ export function sentStatus(receipt: StoreReceipt, brand: Brand, short: number, t
   const { report } = receipt;
   if (!report) return { chip: { label: 'All received', tone: 'good' }, sentences: ['The depot has your receipt.'], foot: foot() };
   const one = short === 1;
-  const goods = report.reason === 'not_cold' ? 'the chilled goods' : `the ${one ? '' : `${WHOLE.format(short)} `}${report.reason} ${unitOf(brand, short)}`;
+  // The report's reasons, each once (Q-40): "the 2 damaged and missing items" when its lines differ.
+  const reasons = reportReasons(report);
+  const goods = report.reason === 'not_cold' ? 'the chilled goods' : `the ${one ? '' : `${WHOLE.format(short)} `}${reasons.join(' and ')} ${unitOf(brand, short)}`;
   if (report.decision === 'send_replacements' && report.replacement) {
     const day = shortDay(report.replacement.day);
     return {
@@ -277,16 +290,16 @@ export function sentStatus(receipt: StoreReceipt, brand: Brand, short: number, t
       foot: foot('report unresolved'),
     };
   }
-  const which = report.reason === 'missing' ? 'shortage' : 'damage';
+  const which = reasons.length > 1 ? null : report.reason === 'missing' ? 'shortage' : 'damage';
   const Goods = goods.charAt(0).toUpperCase() + goods.slice(1);
   return {
     chip: { label: 'Awaiting depot review', tone: 'good' },
     sentences: [
-      `The depot has your receipt and ${which} report.`,
+      `The depot has your receipt and ${which ? `${which} ` : ''}report.`,
       `${Goods} still ${one ? 'needs' : 'need'} a resolution.`,
       `Reporting ${one ? 'it does not mark it' : 'them does not mark them'} as replaced.`,
     ],
-    foot: foot(`${which} unresolved`),
+    foot: foot(`${which ?? 'report'} unresolved`),
   };
 }
 
@@ -331,26 +344,3 @@ export const receivedAtLine = (receipt: OrderReceipt) => `Received ${clockTime(r
 export const lateLine = (delivery: OrderDelivery) => `Arrived ${clockTime(delivery.arrivedAt)}, after your window`;
 export const nobodyLine = (delivery: OrderDelivery) => `Nobody at the shop at ${clockTime(delivery.arrivedAt)} · ${delivery.vehicleId}`;
 export const replacementForLine = (day: string) => `Replacement for ${shortDay(day)}`;
-
-// One line per problem of the order's stop that counts it.
-export function problemLine(problem: OrderProblem, brand: Brand) {
-  const n = problem.units;
-  const day = problem.replacementDay ? shortDay(problem.replacementDay) : null;
-  const replacements = (count: number) => (count > 0 ? `${WHOLE.format(count)} ${count === 1 ? 'replacement comes' : 'replacements come'}` : 'Replacements come');
-  switch (problem.kind) {
-    case 'refused': {
-      const them = n === 1 ? `refused ${unitOf(brand, 1)}` : `${WHOLE.format(n)} refused ${unitOf(brand, n)}`;
-      if (problem.decision === 'send_replacements' && day) return `${replacements(n)} on ${day}.`;
-      if (problem.decision === 'bring_back') return `The ${them} ${n === 1 ? 'goes' : 'go'} back to the depot.`;
-      return `The depot decides what happens to the ${them}.`;
-    }
-    case 'closed':
-      if (problem.decision === 'try_again') return 'The driver comes back after the other stops.';
-      if (problem.decision === 'bring_back') return 'It goes on the next plan.';
-      return 'The depot decides: today or another day.';
-    case 'receipt':
-      if (problem.decision === 'send_replacements' && day) return `${replacements(n)} on ${day}.`;
-      if (problem.decision === 'no_replacement') return 'No replacement is coming.';
-      return 'The depot is reviewing your report.';
-  }
-}

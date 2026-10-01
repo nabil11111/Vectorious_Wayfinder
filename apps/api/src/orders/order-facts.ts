@@ -1,10 +1,11 @@
-import { IssueDecision, RefusalReason, type OrderDelivery, type OrderProblem, type OrderReceipt } from '@wayfinder/contracts';
+import { Brand as BrandOf, IssueDecision, lineReason, ReceiptReason, RefusalReason, ShortReason, type OrderDelivery, type OrderProblem, type OrderReceipt } from '@wayfinder/contracts';
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Db, Tx } from '../db/client';
 import { issueLines, issues, orderLines, orders, outlets, plans, stopOrders, stops, trips, users } from '../db/schema';
 import { depotInstant } from '../lib/clock';
 import { toMinutes } from '../planning';
+import { problemLineOf } from './card-lines';
 
 // What a shop's card says about each of its orders (spec 015, rule 11): what happened at the order's latest stop on a
 // sent plan, its receipt, the problems of that stop that count it, and, for a replacement or either part of one, the
@@ -29,6 +30,7 @@ export interface OrderFacts {
   receipt: OrderReceipt | null;
   problems: OrderProblem[];
   replacementFor: string | null;
+  broughtBack: boolean;
 }
 
 // The replacements an answer of "Send N replacements" placed (D-59), by the problem they answer: the day they are for
@@ -57,7 +59,7 @@ export async function factsOf(on: Reader, outletId: string, orderIds: string[]):
   if (!orderIds.length) return facts;
   const [shop] = await on.select().from(outlets).where(eq(outlets.id, outletId));
   if (!shop) throw new Error(`No outlet ${outletId}.`);
-  const rows = await on.select({ id: orders.id, status: orders.status, receivedAt: orders.receivedAt, sentAt: orders.receiptSentAt,
+  const rows = await on.select({ id: orders.id, status: orders.status, temp: orders.temp, cold: orders.arrivedCold, receivedAt: orders.receivedAt, sentAt: orders.receiptSentAt,
     replacesIssueId: orders.replacesIssueId, originalReplaces: original.replacesIssueId })
     .from(orders).leftJoin(original, eq(original.id, orders.splitFrom)).where(inArray(orders.id, orderIds));
   const lines = await on.select({ orderId: orderLines.orderId, lineId: orderLines.id, quantity: orderLines.quantity, loaded: orderLines.loadedQty,
@@ -95,11 +97,21 @@ export async function factsOf(on: Reader, outletId: string, orderIds: string[]):
         at: row.receivedAt.toISOString(), sentAt: row.sentAt?.toISOString() ?? null,
         units: sum(own.map((line) => line.received!)), short: sum(own.map((line) => line.quantity - line.received!)),
       } : null,
-      problems: atStop.filter((problem) => countedHere(problem.id).length > 0).map((problem) => ({
-        id: problem.id, kind: problem.kind as OrderProblem['kind'], units: sum(countedHere(problem.id).map((line) => line.counted)),
-        decision: problem.decision === null ? null : IssueDecision.parse(problem.decision), replacementDay: replacements.get(problem.id)?.day ?? null,
-      })),
+      problems: atStop.filter((problem) => countedHere(problem.id).length > 0).map((problem) => {
+        const kind = problem.kind as OrderProblem['kind'];
+        const decision = problem.decision === null ? null : IssueDecision.parse(problem.decision);
+        const replacementDay = replacements.get(problem.id)?.day ?? null;
+        const here = countedHere(problem.id);
+        // A report's lines with the shop's own reason, and one kept before lines had reasons its one (Q-40).
+        const lines = here.map((line) => ({ counted: line.counted, reason: kind === 'receipt'
+          ? lineReason({ reason: ReceiptReason.parse(problem.reason) }, { counted: line.counted, reason: line.reason === null ? null : ShortReason.parse(line.reason) }) : null }));
+        const line = problemLineOf({ kind, brand: BrandOf.parse(shop.brand), temp: row.temp, lines, refusalReason: kind === 'refused' ? RefusalReason.parse(problem.reason) : null,
+          warm: kind === 'receipt' && row.temp === 'chilled' && row.cold === false, decision, replacementDay });
+        return { id: problem.id, kind, units: sum(here.map((each) => each.counted)), decision, replacementDay, line };
+      }),
       replacementFor: issueId ? replaced.find((problem) => problem.id === issueId)?.day ?? null : null,
+      // Placed again by "Bring them back" at a closed shop, and on no later sent plan yet (Q-41).
+      broughtBack: row.status === 'placed' && visit?.stop.outcome === 'closed' && atStop.some((problem) => problem.kind === 'closed' && problem.decision === 'bring_back'),
     });
   }
   return facts;

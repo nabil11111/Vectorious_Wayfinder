@@ -67,16 +67,16 @@ These are in `docs/decisions.md`.
 | Screen | State | Frame | What shows |
 | --- | --- | --- | --- |
 | Deliveries `/store/deliveries` and `/store/deliveries/:stopId` | Loading | Loading · skeleton | Grey blocks for the title, two line cards and the button, on the first load with nothing kept on the phone. |
-|  | To confirm | Shop · Confirm delivery | "Confirm delivery" and "Arrived 03:34 · VEH035 · Dilshan" (the day is added when it is not today). A card per line in spec 012's order: the goods picture (chilled or dry for Fresh, the brand's for Style and Tech), "Chilled cartons" or "Dry cartons" (the item's name for Style and Tech), "12 expected" on the right, then "Received" with −, the count and +. The count starts at what was handed over and can be typed. Under a line below it, the yellow chip "1 carton missing", or "damaged" as chosen. Under a line short from the depot, the design's shortfall picture and "1 short from the depot"; under a line refused at the door, "2 refused at the door". When a chilled line came, the card "Still cold on arrival?" with "Yes", chosen, and "No". The orange "Confirm delivery", at the foot of a phone screen. |
-|  | Something is wrong | No frame | Once a count is lower: "What's wrong?" with "Missing", chosen, and "Damaged", as the loader's flag form draws its reasons. Once a count is lower or the answer is "No": the plain "Add a photo (optional)", which opens the camera, or the file picker on a laptop. |
+|  | To confirm | Shop · Confirm delivery | "Confirm delivery" and "Arrived 03:34 · VEH035 · Dilshan" (the day is added when it is not today). A card per line in spec 012's order: the goods picture (chilled or dry for Fresh, the brand's for Style and Tech), "Chilled cartons" or "Dry cartons" (the item's name for Style and Tech), "12 expected" on the right, then "Received" with −, the count and +. The count starts at what was handed over and can be typed. A typed count stays as typed: a minus or a fraction is marked red with "Whole numbers from 0 to 50.", one above what was handed over with "More than the 50 handed over.", and − and + and "Confirm delivery" wait until every box is right (Q-38). Under a line below it, the yellow chip "1 carton missing", or "damaged" as chosen. Under a line short from the depot, the design's shortfall picture and "1 short from the depot"; under a line refused at the door, "2 refused at the door". When a chilled line came, the card "Still cold on arrival?" with "Yes", chosen, and "No". The orange "Confirm delivery", at the foot of a phone screen. |
+|  | Something is wrong | No frame | Once a line's count is lower: on that line's card, beside its chip, "What's wrong?" with "Missing", chosen, and "Damaged", as the loader's flag form draws its reasons, each line its own (Q-40). Once a count is lower or the answer is "No": the plain "Add a photo (optional)", which opens the camera, or the file picker on a laptop, and "Note for the depot (optional)", which takes 200 characters and counts down the last 40, as the note for the driver does. |
 |  | A photo | No frame, spec 013's photo tile | The photo in the tile with "Retake photo", or "That picture could not be used. Take it again." in red. |
 |  | Sending | No frame | The button says "Sending…" and waits, while the phone has a signal and the receipt is on its way. |
-|  | Saved on this phone | Shop · Short delivery · receipt pending sync | Drawn from the phone's own copy of the receipt, whether or not its delivery is still in the list. The design's tray picture, "Receipt saved on this phone", and "The connection dropped while sending." after a send that got no answer, or "There is no signal right now." A card per line: "12 chilled cartons expected", "Received 11 cartons" and, when short, "Missing 1 carton" in yellow ("Damaged" as chosen). The card "Not sent to the depot yet", yellow, with "Your receipt and report are kept together. They will retry when the connection returns. You do not need to confirm this delivery again." ("Your receipt is kept on this phone. …" when it reports nothing). The orange "Retry sending", and "Saved at 08:31 · waiting to sync". |
+|  | Saved on this phone | Shop · Short delivery · receipt pending sync | Drawn from the phone's own copy of the receipt, whether or not its delivery is still in the list. The design's tray picture, "Receipt saved on this phone", and "The connection dropped while sending." after a send that got no answer, or "There is no signal right now." A card per line: "12 chilled cartons expected", "Received 11 cartons" and, when short, "Missing 1 carton" in yellow ("Damaged" as chosen for that line), and "Your note" with the note when there is one. The card "Not sent to the depot yet", yellow, with "Your receipt and report are kept together. They will retry when the connection returns. You do not need to confirm this delivery again." ("Your receipt is kept on this phone. …" when it reports nothing). The orange "Retry sending", and "Saved at 08:31 · waiting to sync". |
 |  | Sent, waiting for the depot | Shop · Receipt sent | The design's receipt picture, "Receipt sent to the depot", "Confirmed at 08:31 · Fresh · Nugegoda", the line cards, the green chip "Awaiting depot review" with "The depot has your receipt and shortage report. The missing carton still needs a resolution. Reporting it does not mark it as replaced." ("damage report", "The damaged carton…", or "your report that the chilled goods were not cold" as reported), the orange "View past orders", and "Sent at 08:33 · shortage unresolved". |
 |  | Sent, all received | No frame | As above, with the green chip "All received", "The depot has your receipt.", and "Sent at 08:33". |
 |  | Sent, answered | No frame | The green chip "Replacement on Fri 26 Jun" with "The depot is sending 1 chilled carton on Fri 26 Jun. It shows in your open orders.", or the grey chip "No replacement" with "The depot will not replace the missing carton. Place another order if you need it." The foot: "Sent at 08:33 · replacement on Fri 26 Jun" or "· no replacement". |
 |  | Nothing to confirm | No frame | "Deliveries", "No delivery is waiting for you to confirm." and the plain "View past orders". |
-|  | Not accepted | No frame | On the saved screen, in red: "The depot did not accept this receipt." and the server's sentence, such as "This delivery was already confirmed." or "That delivery is not on your list.", with "Clear", which takes it off the phone and shows the delivery as the depot has it, or "No delivery is waiting for you to confirm." when the depot no longer has it. It shows from the phone's copy, also after a reset or a reload, until it is cleared. |
+|  | Not accepted | No frame | On the saved screen, in red: "The depot did not accept this receipt." and the server's sentence, such as "This delivery was already confirmed." or "That delivery is not on your list.", with "Clear", which takes it off the phone and shows the delivery as the depot has it, or "No delivery is waiting for you to confirm." when the depot no longer has it. It shows from the phone's copy, also after a reset or a reload, until it is cleared. Nothing goes without a word (Q-37): when another device confirmed the delivery first, "Confirmed on another device at 08:42" with that confirmation's line cards and status card as the depot has them, then "What this phone recorded" with the phone's own cards and note. Every refused receipt ends with "This phone's report did not reach the depot. To report anything more, contact your depot using your store's usual contact number." ("receipt" when it reported nothing). |
 |  | Sign in again | No frame, spec 013's line | A yellow line: "Sign in again to send this receipt." with "Sign in". |
 |  | Could not save | No frame | "Could not save on this phone. Try again." in red on top of the form, which keeps its counts. Nothing is sent. |
 |  | Could not load | No frame | "Could not load your deliveries." and "Try again", only when nothing is kept on the phone. |
@@ -84,14 +84,15 @@ These are in `docs/decisions.md`.
 |  | Not on your list | No frame | "This delivery is not on your list." with "Back to Deliveries", for an address of another shop's stop. |
 | Today `/store` | Handed over | No frame | Spec 009's card with the chip "Delivered" and "Delivered 03:38 · VEH035 · Dilshan", and when less came than was ordered, "3 of 4 delivered · 1 short from the depot" or "46 of 48 delivered · 2 refused, damaged". |
 |  | Received | Shop · Today, and its desktop frame | The chip "Received 08:31" in green, and "All 8 received" or "11 received · 1 short". |
-|  | Nobody at the shop | No frame | The chip "Loaded" and "Nobody at the shop at 03:45 · VEH035". |
+|  | Nobody at the shop | No frame | The chip "Loaded" and "Nobody at the shop at 03:45 · VEH035". Once brought back the order leaves Today: it is not coming today (Q-41). |
 |  | The depot's answer | No frame | One line per problem of the delivery that counts the order, under the card's other lines (rule 11). |
+|  | Deliveries to confirm | No frame | For a shop with more than one delivery among those waiting and those confirmed today, while one still waits (Q-35): a card above Coming today, "2 deliveries to confirm", and a row per delivery still waiting as the server words it, "3 dry cartons · Delivered 04:06 · VEH038 · Lahiru", with "Confirm", which opens it; the first Confirm is orange. It counts down as each is confirmed and goes with the last. A shop with one delivery sees only its card's "Delivered". |
 | Orders `/store/orders` | Received | Shop · Orders · Past, Shop · Orders · desktop | The chip "All 8 received" in green or "11 received · 1 short" in yellow, and "Received 08:31", or "Arrived 08:25, after your window". A card whose receipt reported something opens that receipt. |
-|  | Handed over, nobody at the shop, answers | No frame | Today's lines, on the open list's card. |
+|  | Handed over, nobody at the shop, answers | No frame | Today's lines, on the open list's card. A brought-back order reads "Waiting for the delivery plan", its window and entrance with no day, "Nobody at the shop at 03:50 · VEH057" and "39 chilled cartons: brought back to the depot, waiting for the next plan", until a sent plan takes it and its chip says "Planned · Fri 26 Jun" (Q-41). |
 |  | A replacement | No frame | Spec 009's card for its status, and "Replacement for Thu 25 Jun", also on each part when the plan splits it. |
 |  | Past, from a receipt | Shop · Orders · Past | "View past orders" opens Orders with Past chosen on a phone. |
 | Help `/store/help` |  | Shop · Help | Spec 009's screen. "Open delivery confirmation" now opens the real Deliveries. |
-| Live day `/dispatcher/live` | A shop's report open | No frame, the card of Dispatcher · Live day · issue open | Spec 012's card: "08:31", "1 chilled carton missing", "Fresh Nugegoda · stop 1 · VEH035 · Dilshan · delivered 03:38", the rows "Shop · Nadeesha · 08:31", "Received · 11 of 12 chilled cartons", "Cold on arrival · yes" and "Photo" when there is one, which opens it. "What should the depot do?", the option cards "Send 1 replacement on Fri 26 Jun" ("The shop gets it on the next run."), chosen, and "No replacement" ("Nothing more is sent. The shop is told."), and the orange "Send to shop". |
+| Live day `/dispatcher/live` | A shop's report open | No frame, the card of Dispatcher · Live day · issue open | Spec 012's card: "08:31", "1 chilled carton missing", "Fresh Nugegoda · stop 1 · VEH035 · Dilshan · delivered 03:38", the rows "Shop · Nadeesha · 08:31", "Received · 11 of 12 chilled cartons, 1 missing" (each counted line with its own reason, "; " between lines), "Cold on arrival · yes", "Note" with the shop's note and "Photo" when there are, which opens it. A report whose lines differ is titled by each, "1 crate of 2 damaged, 1 pallet missing", here, in the Dashboard's Needs you ("Tech Kandy City Centre · 1 crate of 2 damaged, 1 pallet missing", with "Note · …" under it) and on the truck's row ("Damaged, missing"); History says "Report · 1 crate of 2 · Refrigerators damaged, 1 pallet · Small appliances missing" and "Note · …". "What should the depot do?", the option cards "Send 1 replacement on Fri 26 Jun" ("The shop gets it on the next run."), chosen, and "No replacement" ("Nothing more is sent. The shop is told."), and the orange "Send to shop". |
 |  | A refusal open | Dispatcher · Live day · issue open | Spec 013's card with a second option, "Send 2 replacements on Fri 26 Jun" ("The driver brings them back, and the shop gets 2 on the next run."), and the orange "Send to driver and shop", as the design draws it. A closed shop's card keeps its two answers and its button says the same, since the shop now sees the answer too. |
 |  | Answer sent | Dispatcher · Live day · issue open · decision sent, its green card | "✓ Sent 08:35" and "Fresh Nugegoda · 1 replacement on Fri 26 Jun, Nadeesha told", or "Fresh Nugegoda · no replacement, Nadeesha told". Spec 013's lines for a driver's problem end "Dilshan and the shop told", and a refusal answered with replacements reads "VEH035 · 2 cartons back, 2 replacements on Fri 26 Jun, Dilshan and the shop told". |
 
@@ -112,10 +113,12 @@ Thu 08:30. Times are depot time and depend on the judge's pace.
    what the shop refused at the door were reported where they were found (specs 012 and 013), so the line says so and
    the shop is not asked about them again. *Nugegoda's lines expect 12 and 8 chilled cartons and 3 dry ones, with "1 short
    from the depot" under the dry line. At Wellawatte the chilled line would expect 46, with "2 refused at the door".*
-3. **Confirming.** Each line's count starts at what was handed over, and goes from 0 to it. Under a line below it the
-   form shows the units missing. Once a count is lower, the shop says what is wrong, "Missing" or "Damaged", once for the
-   receipt. When a chilled line came, the shop answers "Still cold on arrival?", which starts at Yes. A photo may be added
-   once the receipt reports something: a count is lower, or the answer is No. "Confirm delivery" sends every line of the
+3. **Confirming.** Each line's count starts at what was handed over, and goes from 0 to it. A box holding anything
+   else keeps it as typed and holds the receipt back until it is fixed, so nothing typed wrong is ever sent (Q-38). Under a line below it the
+   form shows the units missing. Once a line's count is lower, the shop says what is wrong with that line, "Missing" or
+   "Damaged", each line its own (Q-40). When a chilled line came, the shop answers "Still cold on arrival?", which starts at Yes. A photo may be added
+   once the receipt reports something: a count is lower, or the answer is No, and so may a note for the depot of up to
+   200 characters (Q-40). "Confirm delivery" sends every line of the
    delivery once, a line handed over at 0 at 0. A receipt can name every line a stop can hold: up to 300 orders of up to
    20 lines each, 6,000 lines. *Nadeesha lowers the 12 to 11: "1 carton missing", Missing, Yes.*
 4. **What a receipt records (D-61).** Each line's received count. On each order of the delivery: `received`, when the shop
@@ -123,9 +126,11 @@ Thu 08:30. Times are depot time and depend on the judge's pace.
    cold. The stop's revision goes up by one. *Her three orders are received at 08:31 and sent at 08:33, with 11, 8 and 3,
    the two chilled ones cold.*
 5. **The report (D-58, D-60).** A receipt with a line below what was handed over, or No to the cold check, is also a
-   problem of kind `receipt`. Its id is the receipt's. Its reason is the shop's, `missing` or `damaged`, or `not_cold` when
-   nothing is short. It counts each short line at the units short, and when the chilled goods were not cold, each chilled
-   line too, at 0 when nothing is short on it. The photo goes with it. *Nadeesha's report: missing, the 12-carton line
+   problem of kind `receipt`. Its id is the receipt's. It counts each short line at the units short, with the shop's own
+   reason for that line, `missing` or `damaged`, and when the chilled goods were not cold, each chilled line too, at 0 and
+   with no reason when nothing is short on it (Q-40). Its own reason is its first short line's, or `not_cold` when nothing
+   is short. The photo and the note go with it. A report kept before lines had reasons reads its one reason on each of its
+   short lines, and a phone that saved a receipt with one reason for all its lines sends it as that reason on each. *Nadeesha's report: missing, the 12-carton line
    counted at 1. Had she answered No with every count full: not cold, the 12 and 8 chilled lines counted at 0.*
 6. **Saved on the phone first (D-57).** Spec 013's rule 10, with the shop's own parts. "Confirm delivery" saves the
    receipt in the phone's database as the exact request it will send, photo and all, under the signed-in account, before
@@ -182,18 +187,24 @@ Thu 08:30. Times are depot time and depend on the judge's pace.
       "All 8 received", green, or "11 received · 1 short", yellow, and "Received 08:31", or "Arrived 08:25, after your
       window" when the truck arrived after the shop's window closed (its mall slot, as spec 007 times it). The short from
       the depot or refused line stays.
-    - Nobody at the shop: "Nobody at the shop at 03:45 · VEH035", also once the order is placed again.
-    - One line per problem of that stop that counts the order: a refusal "The depot decides what happens to the 2
-      refused cartons.", "The 2 refused cartons go back to the depot." or "2 replacements come on Fri 26 Jun."; nobody
-      at the shop "The depot decides: today or another day.", "The driver comes back after the other stops." or "It
-      goes on the next plan."; a report "The depot is reviewing your report.", "1 replacement comes on Fri 26 Jun." or
-      "No replacement is coming."
+    - Nobody at the shop: "Nobody at the shop at 03:45 · VEH035", also once the order is placed again. Brought back and
+      placed again, it is off Today's list whatever day it was for, and its card names no day until a sent plan takes it
+      (Q-41).
+    - One line per problem of that stop that counts the order, which the server words: the cartons on this order it is
+      about, then what happens to them (Q-36), so two answers on one card never read as one taking back the other. A
+      refusal "2 damaged chilled cartons: the depot decides what happens to them", "…: they go back to the depot" or
+      "…: replacements come on Fri 26 Jun" ("3 expired chilled cartons", "2 chilled cartons you did not order"); nobody
+      at the shop "48 chilled cartons: the depot decides, today or another day", "…: the driver comes back after the
+      other stops" or "…: they go on the next plan"; a report by the shop's reasons on the order, "1 missing chilled
+      carton: the depot is reviewing your report", "…: a replacement comes on Fri 26 Jun" or "…: no replacement", "1
+      damaged item and 1 missing item: …" when they differ, and "Chilled cartons that came warm: no replacement" for
+      warm goods, which a replacement never covers.
     - A replacement: "Replacement for Thu 25 Jun", the day of the delivery it replaces, also on each part when the plan
       splits it.
     - A card whose receipt reported something opens that receipt, as the design's "View shortage report" does.
 
-    *Nadeesha's 12-carton card after the answer: "11 received · 1 short", "Received 08:31", "1 replacement comes on Fri 26
-    Jun."*
+    *Nadeesha's 12-carton card after the answer: "11 received · 1 short", "Received 08:31", "1 missing chilled carton: a
+    replacement comes on Fri 26 Jun".*
 12. **What the dispatcher sees.** A shop's report is a card in "Needs you", oldest first with the others (spec 012): the
     title by reason, "1 chilled carton missing", "1 chilled carton damaged" or "Chilled goods not cold"; the place line
     with the stop, truck, driver and handover time; the rows "Shop", "Received" (each counted line as received of handed
@@ -226,8 +237,9 @@ shows as it is:
 | Every line of the stop is named once | 400 `invalid_input` | "Count every line of the delivery once." |
 | Each count is from 0 to what was handed over | 400 `invalid_input` | "Count no more than was handed over on each line." |
 | The cold check is answered exactly when a chilled line came with something on it | 400 `invalid_input` | "Say whether the chilled goods were still cold." or "Answer the cold check only when chilled goods came." |
-| What is wrong is said exactly when a line is short | 400 `invalid_input` | "Say what is wrong with the cartons that are short." or "Say what is wrong only when a line is short." |
+| What is wrong is said for each short line, its own or the receipt's one reason, and on no full line | 400 `invalid_input` | "Say what is wrong with the cartons that are short." or "Say what is wrong only when a line is short." |
 | A photo goes only with a report, as a whole JPEG of at most 500 KB and 2000 px a side | 400 `invalid_input` | "Add a photo only to a report." or "The photo must be a whole JPEG of at most 500 KB." |
+| A note goes only with a report, at most 200 characters once trimmed (Q-40) | 400 `invalid_input` | "Add a note only to a report." (a longer one fails the shape: "Some fields are missing or wrong.") |
 | An answered problem is the caller's depot's | 400 `unknown_record` | "That problem is not on this depot's list." |
 | The answer names the open problem's revision | 409 `stale` | "This problem was already answered." |
 | The answer fits the problem's kind | 400 `invalid_input` | "That answer does not fit this problem." |
@@ -242,8 +254,10 @@ shows as it is:
 - **Two tabs.** Only the tab that owns the shop's queue fetches, keeps and sends. Deliveries in another tab says
   "Wayfinder is open in another tab." and the rest of the shop's area works there.
 - **Two phones, one delivery.** The later receipt is refused `stale`, "This delivery was already confirmed.", whatever
-  revision it names, also when both arrive at once. It shows under "Not accepted" until cleared, and the delivery shows
-  as the depot has it.
+  revision it names, also when both arrive at once. It shows under "Not accepted" until cleared, with the delivery as the
+  depot has it above it, "Confirmed on another device at 08:42", and the line that the phone's report did not reach the
+  depot and how to raise anything more (Q-37); the phone reads the delivery on its own when its deliveries no longer list
+  it.
 - **Waiting behind the driver.** A receipt that waits for the trip's lock behind a driver's write on the same trip is
   judged on the stop and its orders as that write left them.
 - **An id reused.** `write_reused`, "This record was already sent with other details."
@@ -459,7 +473,8 @@ closed the trip at 03:55. The times below are examples.
    1 replacement on Fri 26 Jun, Nadeesha told". The bell clears.
 8. On the phone, without a reload: "Replacement on Fri 26 Jun", "The depot is sending 1 chilled carton on Fri 26 Jun." and
    "Sent at 08:33 · replacement on Fri 26 Jun". Tap "View past orders": under "Thu 25 Jun", "12 chilled cartons · 11
-   received · 1 short", "Received 08:31" and "1 replacement comes on Fri 26 Jun."; "8 chilled cartons · All 8 received";
+   received · 1 short", "Received 08:31" and "1 missing chilled carton: a replacement comes on Fri 26 Jun"; "8 chilled
+   cartons · All 8 received";
    "4 dry cartons · 3 received · 1 short" with "1 short from the depot". The first card opens its receipt. Open holds "1
    chilled carton · Waiting for the delivery plan", "Fri 26 Jun · 05:00–07:30 · street" and "Replacement for Thu 25 Jun".
 9. Today shows the three cards "Received 08:31", with "11 received · 1 short", "All 8 received" and "3 received · 1 short".
@@ -480,9 +495,9 @@ carton is spec 012's.
 - **A8:** the dispatcher's look-up of receipts in History and Orders.
 - **Open question 4:** a replacement for cartons short from the depot. The loader's answers stay "Go short" and "Load it
   all" (D-37), and the shop sees "1 short from the depot" and can order it again.
-- **Not planned:** a note on the receipt and a signature (neither is drawn), changing a receipt once it is in, writing
+- **Not planned:** a signature (none is drawn), changing a receipt once it is in, writing
   cartons off and "shop credited, claim opened", "Tuesday works for me" and a new date for a deferred order (spec 009),
-  the shop's other screens with no signal, a count of waiting deliveries on the tab, push notifications and sounds, and
+  the shop's other screens with no signal, a count of waiting deliveries on the tab (Today lists them, Q-35), push notifications and sounds, and
   accounts for more shops (D-27): a judge sees Wellawatte's refusal on Live day and the driver's phone only.
 
 ## Departures from the design
@@ -490,7 +505,9 @@ carton is spec 012's.
    (spec 013). The frame shows one order.
 2. A line expects what the driver handed over, and says when the depot sent it short or the shop refused some at the door
    (D-56).
-3. "What's wrong?" with "Missing" and "Damaged" shows once a count is lower. The frame's chip only says "missing".
+3. "What's wrong?" with "Missing" and "Damaged" shows on each line once its count is lower, each line its own, and "Note
+   for the depot (optional)" once the receipt reports something (Q-40). The frame's chip only says "missing" and draws no
+   note.
 4. "Add a photo (optional)" shows once the receipt reports something, as in the frame, and not on a receipt with nothing
    wrong.
 5. The saved screen says "There is no signal right now." when the phone knew it had none, and the frame's "The connection

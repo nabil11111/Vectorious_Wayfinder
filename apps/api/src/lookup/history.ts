@@ -64,7 +64,7 @@ export function getLookupHistory(caller: DepotCaller, query: LookupHistoryQuery)
           const report = ownProblems.find(row => row.kind === 'receipt');
           receipt = { stopId: stop.id, confirmedAt: first.receivedAt.toISOString(), sentAt: first.receiptSentAt?.toISOString() ?? null, cold,
             orderCount: ownOrders.length, lines: stop.lines.map(line => ({ lineId: line.lineId, orderId: line.orderId, received: received.find(row => row.lineId === line.lineId)!.received! })), received: 0, short: 0,
-            report: report ? { ...ReceiptReport.parse({ ...report, lines: report.lines.map(line => ({ lineId: line.lineId, counted: line.counted })) }), photo: photoOf(pictures.find(row => row.issueId === report.id)) } : null };
+            report: report ? { ...ReceiptReport.parse({ ...report, lines: report.lines.map(line => ({ lineId: line.lineId, counted: line.counted, reason: line.reason ?? null })) }), photo: photoOf(pictures.find(row => row.issueId === report.id)) } : null };
         }
         const delivery = handed ? deliveryFigures({ stopId: stop.id, revision: stop.revision, day: plan.date, vehicleId: trip.vehicleId, driver: driver?.name ?? null,
           arrivedAt: stop.arrivedAt!, doneAt: stop.doneAt!, outcome: stop.outcome as 'delivered' | 'refused', late: late!,

@@ -31,6 +31,13 @@ function departureOf(trip: DriverTrip, dock: DockProgress | null): TripAttention
   return { kind: 'departure_unreported', plannedAt: trip.leavesAt, sentence: `Departure not reported · ${planned}`, word: 'watching' };
 }
 
+// A shop's report says each of its lines' reasons once, "Damaged, missing" (Q-40); every other problem its own reason.
+function summaryOf(problem: Issue) {
+  const reasons = problem.kind === 'receipt' ? [...new Set(problem.lines.flatMap((line) => line.reason ?? []))] : [];
+  if (reasons.length === 0) return REASON_SUMMARY[problem.reason];
+  return reasons.map((reason, i) => (i === 0 ? REASON_SUMMARY[reason] : REASON_SUMMARY[reason].toLowerCase())).join(', ');
+}
+
 export function attentionOf(trip: DriverTrip, arrivals: Map<string, string>, at: string, dock: DockProgress | null = null): TripAttention {
   if (['planned', 'loading', 'ready'].includes(trip.status) && at > trip.leavesAt) return departureOf(trip, dock);
   const next = nextStop(trip);
@@ -45,7 +52,7 @@ export function outRowOf(trip: DriverTrip, arrivals: Map<string, string>, issues
   const next = nextStop(trip);
   const problem = issues.filter(issue => issue.status === 'open').sort((a, b) => a.raisedAt.localeCompare(b.raisedAt) || a.id.localeCompare(b.id))[0];
   const attention = attentionOf(trip, arrivals, at);
-  const status: OperationsStatus = problem ? { kind: 'open_problem', issueId: problem.id, issueKind: problem.kind, summary: REASON_SUMMARY[problem.reason], raisedAt: problem.raisedAt }
+  const status: OperationsStatus = problem ? { kind: 'open_problem', issueId: problem.id, issueKind: problem.kind, summary: summaryOf(problem), raisedAt: problem.raisedAt }
     : trip.status === 'done' && trip.backAt ? { kind: 'back', backAt: trip.backAt }
     : next?.arrivedAt ? { kind: 'at_stop', stopId: next.id, shopName: next.shopName, arrivedAt: next.arrivedAt }
     : attention.kind !== 'none' ? attention : !next && trip.status === 'out' ? { kind: 'returning' }

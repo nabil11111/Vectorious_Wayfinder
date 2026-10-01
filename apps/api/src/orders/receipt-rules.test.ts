@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { applyReceipt, deliveryFigures, receiptView, ReceiptWrite, type StoreDeliveries, type StoreDelivery, type StoreDeliveryLine } from '@wayfinder/contracts';
+import { applyReceipt, deliveryFigures, lineReason, receiptView, ReceiptWrite, reportReasons, type StoreDeliveries, type StoreDelivery, type StoreDeliveryLine } from '@wayfinder/contracts';
 
 // AC-5 on made-up deliveries: the receipt's rules on plain values, which the phone shows and the server is held to.
 
@@ -19,7 +19,7 @@ function deliveries(...list: StoreDelivery[]): StoreDeliveries {
   return { outlet: { id: 'OUT001', name: 'Fresh Nugegoda', brand: 'Fresh', windowOpen: '05:00', windowClose: '07:30', dockType: 'street' },
     userId: randomUUID(), today: '2026-06-25', appliedWriteIds: [], deliveries: list };
 }
-function receipt(of: StoreDelivery, counts: number[], more: Partial<Pick<ReceiptWrite, 'cold' | 'reason' | 'photo' | 'at' | 'writeId'>> = {}): ReceiptWrite {
+function receipt(of: StoreDelivery, counts: number[], more: Partial<Pick<ReceiptWrite, 'cold' | 'reason' | 'photo' | 'note' | 'at' | 'writeId'>> = {}): ReceiptWrite {
   return ReceiptWrite.parse({ kind: 'receipt', writeId: randomUUID(), stopId: of.stopId, at: at('08:31'), revision: of.revision,
     lines: of.lines.map((l, i) => ({ lineId: l.lineId, received: counts[i] })), cold: of.lines.some((l) => l.temp === 'chilled' && l.delivered > 0) ? true : null, reason: null, ...more });
 }
@@ -52,7 +52,7 @@ describe('applyReceipt', () => {
     const write = receipt(stop, [11, 8, 3], { reason: 'missing' });
     const after = applyReceipt(deliveries(stop), write).deliveries[0]!;
     expect(after.receipt).toEqual({ at: at('08:31'), sentAt: null, cold: true, report: {
-      id: write.writeId, reason: 'missing', lines: [{ lineId: stop.lines[0]!.lineId, counted: 1 }], decision: null, decidedAt: null, replacement: null,
+      id: write.writeId, reason: 'missing', lines: [{ lineId: stop.lines[0]!.lineId, counted: 1, reason: 'missing' }], note: null, decision: null, decidedAt: null, replacement: null,
     } });
   });
 
@@ -60,8 +60,8 @@ describe('applyReceipt', () => {
     const stop = nugegoda();
     const write = receipt(stop, [12, 8, 3], { cold: false });
     const report = applyReceipt(deliveries(stop), write).deliveries[0]!.receipt!.report;
-    expect(report).toEqual({ id: write.writeId, reason: 'not_cold', lines: [{ lineId: stop.lines[0]!.lineId, counted: 0 }, { lineId: stop.lines[1]!.lineId, counted: 0 }],
-      decision: null, decidedAt: null, replacement: null });
+    expect(report).toEqual({ id: write.writeId, reason: 'not_cold', lines: [{ lineId: stop.lines[0]!.lineId, counted: 0, reason: null }, { lineId: stop.lines[1]!.lineId, counted: 0, reason: null }],
+      note: null, decision: null, decidedAt: null, replacement: null });
   });
 
   it('AC-5 keeps the shop\'s reason when lines are short and the chilled goods were not cold too, counting every line in the delivery\'s order', () => {
@@ -69,13 +69,35 @@ describe('applyReceipt', () => {
     const write = receipt(stop, [12, 6, 2], { cold: false, reason: 'damaged' });
     const report = applyReceipt(deliveries(stop), write).deliveries[0]!.receipt!.report!;
     expect(report.reason).toBe('damaged');
-    expect(report.lines).toEqual([{ lineId: stop.lines[0]!.lineId, counted: 0 }, { lineId: stop.lines[1]!.lineId, counted: 2 }, { lineId: stop.lines[2]!.lineId, counted: 1 }]);
+    expect(report.lines).toEqual([{ lineId: stop.lines[0]!.lineId, counted: 0, reason: null }, { lineId: stop.lines[1]!.lineId, counted: 2, reason: 'damaged' },
+      { lineId: stop.lines[2]!.lineId, counted: 1, reason: 'damaged' }]);
+  });
+
+  it('Q-40 gives each short line its own reason, takes the first one\'s for the report and keeps the note', () => {
+    const stop = nugegoda();
+    const base = receipt(stop, [11, 8, 2], { note: 'One crushed, one never came' });
+    const write = { ...base, lines: base.lines.map((each, i) => ({ ...each, reason: ['damaged', null, 'missing'][i] as 'damaged' | 'missing' | null })) };
+    const report = applyReceipt(deliveries(stop), write).deliveries[0]!.receipt!.report!;
+    expect(report).toMatchObject({ reason: 'damaged', note: 'One crushed, one never came',
+      lines: [{ lineId: stop.lines[0]!.lineId, counted: 1, reason: 'damaged' }, { lineId: stop.lines[2]!.lineId, counted: 1, reason: 'missing' }] });
+    expect(reportReasons(report)).toEqual(['damaged', 'missing']);
+    // A line's own reason wins over a receipt's one reason; a short line with neither changes nothing.
+    expect(applyReceipt(deliveries(stop), { ...write, reason: 'missing' }).deliveries[0]!.receipt!.report!.lines[0]!.reason).toBe('damaged');
+    const list = deliveries(stop);
+    expect(applyReceipt(list, { ...write, lines: write.lines.map((each) => ({ ...each, reason: null })) })).toBe(list);
+  });
+
+  it('Q-40 reads a report kept before lines had reasons as its one reason on each short line, and none on a line counted for the cold', () => {
+    const report = { reason: 'missing' as const, lines: [{ lineId: 'a', counted: 1 }, { lineId: 'b', counted: 0 }] };
+    expect(report.lines.map((each) => lineReason(report, each))).toEqual(['missing', null]);
+    expect(lineReason({ reason: 'not_cold' }, { counted: 0 })).toBeNull();
+    expect(reportReasons(report)).toEqual(['missing']);
   });
 
   it('AC-5 leaves out of a not-cold report a chilled line handed over at 0, since nothing came on it', () => {
     const stop = delivery('03:48', [line('chilled', 48, 48, 0), line('chilled', 10, 10, 10), line('dry', 46, 46, 46)], 'refused');
     const write = receipt(stop, [0, 10, 46], { cold: false });
-    expect(applyReceipt(deliveries(stop), write).deliveries[0]!.receipt!.report!.lines).toEqual([{ lineId: stop.lines[1]!.lineId, counted: 0 }]);
+    expect(applyReceipt(deliveries(stop), write).deliveries[0]!.receipt!.report!.lines).toEqual([{ lineId: stop.lines[1]!.lineId, counted: 0, reason: null }]);
   });
 
   it('AC-5 changes nothing for a receipt whose id the deliveries list, or whose delivery is not in the list', () => {

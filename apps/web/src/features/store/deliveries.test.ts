@@ -100,3 +100,22 @@ describe('which screen Deliveries shows', () => {
     expect(screenOf(input({ stopId: OTHER_STOP, view: view(day([])), one: { data: undefined, error: null, isError: false, isSuccess: true } })).show).toBe('not-on-list');
   });
 });
+
+// Q-37: two devices at Kotahena. The phone saved 55 and 2 damaged with no signal; the desktop confirmed all 57; the
+// phone's receipt came back refused as already confirmed. The screen keeps the phone's report and shows what the depot has.
+describe('Q-37 a receipt refused because another device confirmed the delivery', () => {
+  const stale = (): ReceiptRecord => ({ ...record('refused'), refusal: { code: 'stale', message: 'This delivery was already confirmed.' } });
+
+  it('keeps the phone\'s own copy and gives the delivery as the depot has it, with its receipt', () => {
+    const screen = screenOf(input({ view: view(day([received]), [stale()]) }));
+    expect(screen).toMatchObject({ show: 'refused', listed: true, depot: received });
+    if (screen.show !== 'refused') return;
+    expect(screen.drawn?.lines.map((each) => each.received)).toEqual([11, 8, 3]);
+  });
+
+  it('reads the depot\'s copy from the one-delivery read when the phone\'s deliveries no longer list it', () => {
+    expect(screenOf(input({ view: view(day([]), [stale()]), one: { data: received, error: null, isError: false, isSuccess: true } })))
+      .toMatchObject({ show: 'refused', listed: false, depot: received });
+    expect(screenOf(input({ view: view(day([]), [stale()]) }))).toMatchObject({ show: 'refused', depot: null });
+  });
+});

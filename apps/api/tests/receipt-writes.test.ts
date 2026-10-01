@@ -129,10 +129,10 @@ it('AC-7 confirms 11, 8 and 3, Missing and Yes with a photo: the report with the
   expect(res.status).toBe(200);
   const [twelve] = delivery.lines;
   expect(StoreDeliveries.parse(res.body).deliveries[0]!.receipt).toEqual({ at: at(8 * 60 + 31).toISOString(), sentAt: at(SENT).toISOString(), cold: true,
-    report: { id: write.writeId, reason: 'missing', lines: [{ lineId: twelve!.lineId, counted: 1 }], decision: null, decidedAt: null, replacement: null } });
+    report: { id: write.writeId, reason: 'missing', lines: [{ lineId: twelve!.lineId, counted: 1, reason: 'missing' }], note: null, decision: null, decidedAt: null, replacement: null } });
   expect(await db.select().from(issues).where(eq(issues.id, write.writeId))).toEqual([expect.objectContaining({
     kind: 'receipt', reason: 'missing', status: 'open', revision: 0, stopId: delivery.stopId, raisedBy: nadeeshaId, raisedAt: at(8 * 60 + 31), note: null, decision: null })]);
-  expect(await db.select().from(issueLines).where(eq(issueLines.issueId, write.writeId))).toEqual([{ issueId: write.writeId, orderLineId: twelve!.lineId, counted: 1 }]);
+  expect(await db.select().from(issueLines).where(eq(issueLines.issueId, write.writeId))).toEqual([{ issueId: write.writeId, orderLineId: twelve!.lineId, counted: 1, reason: 'missing' }]);
   expect(await db.select().from(photos).where(eq(photos.id, write.writeId))).toEqual([{ id: write.writeId, stopId: delivery.stopId, issueId: write.writeId, jpeg, takenBy: nadeeshaId, takenAt: at(8 * 60 + 31) }]);
   expect((await ordersAt(delivery.stopId)).rows.every((order) => order.status === 'received')).toBe(true);
   expect(told()).toEqual([{ topic: 'orders', outletId: 'OUT001', depotId: 'Peliyagoda' }, { topic: 'issues', depotId: 'Peliyagoda' }]);

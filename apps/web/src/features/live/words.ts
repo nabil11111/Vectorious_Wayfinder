@@ -203,6 +203,8 @@ export function problemTitle(issue: Issue) {
 // A problem in a row, the dashboard's Needs you and a truck's row on Live day: its shop and its card's title, "Fresh
 // Peradeniya · 1 chilled carton damaged", or the title alone where it names the shop, "Nobody at Fresh Mulgampola".
 export const problemLine = (issue: Issue) => (issue.kind === 'closed' ? problemTitle(issue) : `${issue.stop.shopName} · ${problemTitle(issue)}`);
+// The Dashboard's Needs you row is the same line (Q-39, Q-40).
+export const needsYouTitle = problemLine;
 
 // The dispatcher's answers, as Drops and events names them.
 export const DECISION_WORDS: Record<IssueDecision, string> = {

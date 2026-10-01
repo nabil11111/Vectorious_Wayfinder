@@ -2,19 +2,24 @@ import { useId, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { noteFits, noteLine } from '../words';
 
-// The note for the driver, with its label above and its line below, as the style guide's inputs are (Q-06). The
+// The note for the driver, with its label above and its line below, as the style guide's inputs are (Q-06).
+export function DriverNote({ note, disabled, onChange }: { note: string; disabled: boolean; onChange: (note: string) => void }) {
+  return <NoteBox id="driver-note" label="Note for the driver" note={note} disabled={disabled} onChange={onChange} />;
+}
+
+// A note of up to 200 characters: the driver's on the order form, and the depot's on a receipt's report (Q-40). The
 // box takes any length, so the browser never cuts a paste on its own. A change that would make the note longer than
 // 200 characters is refused whole and the line says so in red. Near the end the line counts what is left, and at 200
 // it says the note is full.
-export function DriverNote({ note, disabled, onChange }: { note: string; disabled: boolean; onChange: (note: string) => void }) {
+export function NoteBox({ id, label, note, disabled, onChange }: { id: string; label: string; note: string; disabled: boolean; onChange: (note: string) => void }) {
   const [refused, setRefused] = useState(false);
   const line = noteLine(note.length, refused);
   const lineId = useId();
   return (
     <>
-      <label htmlFor="driver-note" className="block pt-0.5 text-xs leading-[15px] font-semibold text-muted-foreground">Note for the driver</label>
+      <label htmlFor={id} className="block pt-0.5 text-xs leading-[15px] font-semibold text-muted-foreground">{label}</label>
       <textarea
-        id="driver-note"
+        id={id}
         rows={1}
         value={note}
         disabled={disabled}

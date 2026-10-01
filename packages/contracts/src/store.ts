@@ -105,13 +105,16 @@ export const OrderReceipt = z.object({ at: Moment, sentAt: Moment.nullable(), un
 export type OrderReceipt = z.infer<typeof OrderReceipt>;
 
 // A problem at the order's latest stop that counts it: a refusal, a closed shop or the shop's own report, the units it
-// counts on this order, the answer (null while open) and the day of the replacements an answer placed.
+// counts on this order, the answer (null while open), the day of the replacements an answer placed, and the card's line
+// for it, which the server words: the cartons it is about and what happens to them, "3 expired chilled cartons:
+// replacements come on Fri 26 Jun" (Q-36).
 export const OrderProblem = z.object({
   id: z.uuid(),
   kind: z.enum(['refused', 'closed', 'receipt']),
   units: Count,
   decision: IssueDecision.nullable(),
   replacementDay: Day.nullable(),
+  line: z.string(),
 });
 export type OrderProblem = z.infer<typeof OrderProblem>;
 
@@ -137,6 +140,9 @@ export const StoreOrder = z.object({
   // For a replacement, and for either part of one the plan split, the day of the delivery it replaces (D-59). null
   // for an order the shop placed.
   replacementFor: Day.nullable(),
+  // The driver brought it back from a closed shop and it waits for the next plan (Q-41): it is not coming today, and it
+  // has no day until a sent plan takes it, when it is planned for that plan's day.
+  broughtBack: z.boolean(),
 });
 export type StoreOrder = z.infer<typeof StoreOrder>;
 
@@ -193,6 +199,10 @@ export const StoreOrderList = z.object({
   openCount: z.number().int(),
   // Only the past list is paged. null when there is nothing more.
   nextCursor: z.string().nullable(),
+  // On Today, for a shop with more than one delivery, the ones still to confirm (Q-35): "2 deliveries to confirm" and
+  // each with its stop and line, "3 dry cartons · Delivered 04:06 · VEH038 · Lahiru", worded by the server, until each
+  // is confirmed. null on the other lists, and when one delivery or none waits alone.
+  toConfirm: z.object({ title: z.string(), deliveries: z.array(z.object({ stopId: z.uuid(), line: z.string() })) }).nullable(),
 });
 export type StoreOrderList = z.infer<typeof StoreOrderList>;
 
