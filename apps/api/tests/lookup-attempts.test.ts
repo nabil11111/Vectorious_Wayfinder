@@ -4,7 +4,7 @@ import { db } from '../src/db/client';
 import { auditLog, users } from '../src/db/schema';
 import { depotInstant } from '../src/lib/clock';
 import { driverStop, driverTrip } from './driver-plan';
-import { answeredTruck, answerFlag, loaderScreen, THU, truckOf } from './loading-plan';
+import { answeredTruck, answerFlag, loaderScreen, sendWalkthroughPlan, THU, truckOf } from './loading-plan';
 import { lookupHarness } from './lookup-plan';
 import { decide, FRI, photo } from './operations-plan';
 import { jpeg, receiptOf, shopScreen } from './receipt-plan';
@@ -14,6 +14,59 @@ vi.mock('../src/lib/clock', async original => {
   return { ...actual, demoClockAt: (...args: Parameters<typeof actual.demoClockAt>) => ({ ...actual.demoClockAt(...args), now: clock.at || actual.demoClockAt(...args).now }) };
 });
 const h = await lookupHarness(clock), read = () => h.history('?date=' + THU);
+
+it('AC-14 a Thursdays loading problem keeps its own counts after Fridays reload delivery and receipt', async () => {
+  await sendWalkthroughPlan(h);
+  const loader = loaderScreen(h.kasun), day = await loader.read();
+  let truck = answeredTruck(await loader.start(truckOf(day, 'VEH035'), day.plan!), 'VEH035');
+  const chilled = truck.stops.find(stop => stop.seq === 2)!.lines.find(line => line.temp === 'chilled')!;
+  expect(chilled.quantity).toBe(48);
+  truck = answeredTruck(await loader.flag(truck, 2, [{ lineId: chilled.lineId, counted: 47 }]), 'VEH035');
+  const loadingProblemId = truck.issues[0]!.id;
+  await answerFlag(h.ruwan, loadingProblemId, 'go_short');
+  truck = truckOf(await loader.read(), 'VEH035');
+  truck = answeredTruck(await loader.stopLoaded(truck, 2), 'VEH035');
+  truck = answeredTruck(await loader.stopLoaded(truck, 1), 'VEH035');
+  answeredTruck(await loader.ready(truck), 'VEH035');
+  let trip = driverTrip(await h.road.driver.read());
+  trip = await h.road.write(trip, 'start', 211);
+  trip = await h.road.write(trip, 'arrive', 214, 1);
+  trip = await h.road.write(trip, 'deliver', 218, 1, { photo });
+  trip = await h.road.write(trip, 'arrive', 225, 2);
+  trip = await h.road.write(trip, 'closed', 228, 2, { photo });
+  await decide(h.ruwan, trip.problems.find(row => row.kind === 'closed')!.id, 'bring_back');
+  await h.road.write(driverTrip(await h.road.driver.read()), 'finish', 235);
+  const old = (await read()).trips[0]!.stops[1]!;
+  expect(old.lines.find(row => row.lineId === chilled.lineId)).toMatchObject({ loaded: 47, delivered: null, received: null });
+
+  h.freeze(THU, 960);
+  await h.publish(FRI, ['OUT002']);
+  h.freeze(FRI, 150);
+  const friday = await loader.read();
+  truck = answeredTruck(await loader.start(truckOf(friday, 'VEH035'), friday.plan!), 'VEH035');
+  truck = answeredTruck(await loader.stopLoaded(truck, 1), 'VEH035');
+  answeredTruck(await loader.ready(truck), 'VEH035');
+  trip = driverTrip(await h.road.driver.read());
+  trip = await h.road.write(trip, 'start', 211, undefined, {}, FRI);
+  trip = await h.road.write(trip, 'arrive', 214, 1, {}, FRI);
+  trip = await h.road.write(trip, 'deliver', 218, 1, { photo }, FRI);
+  const [manager] = await db.select().from(users).where(eq(users.username, 'nadeesha'));
+  try {
+    await db.update(users).set({ outletId: 'OUT002' }).where(eq(users.id, manager!.id));
+    h.freeze(FRI, 513);
+    const shop = shopScreen(h.nadeesha), delivery = await shop.one(driverStop(trip, 1).id);
+    const result = await shop.send(receiptOf(delivery, [40, 46], { reason: 'missing', at: depotInstant(FRI, 511).toISOString() }));
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+  } finally { await db.update(users).set({ outletId: manager!.outletId }).where(eq(users.id, manager!.id)); }
+  const current = (await h.history('?date=' + FRI)).trips[0]!.stops[0]!;
+  expect(current.lines.find(row => row.lineId === chilled.lineId)).toMatchObject({ loaded: 48, delivered: 48, received: 40 });
+  const historical = (await read()).trips[0]!.stops[1]!;
+  expect(historical.problems.find(row => row.id === loadingProblemId)!.lines).toMatchObject([
+    { lineId: chilled.lineId, counted: 47, loaded: 47, delivered: null, received: null },
+  ]);
+  expect(historical).toEqual(old);
+});
+
 
 it('AC-14 and AC-8 Fridays reload and receipt cannot rewrite Thursdays 94 closed cartons or membership', async () => {
   let trip = await h.road.write(await h.road.wellawatte(), 'closed', 228, 2, { photo });
@@ -84,6 +137,9 @@ it('AC-15 retry keeps each issues own time counts photo and answer without audit
   expect(day.counts).toMatchObject({ stops: 2, delivered: 2, returned: 0 });
   for (const attempt of stop.attempts) {
     expect(attempt.lines.map(line => line.counted)).toEqual([48, 46]);
+    expect(stop.problems.find(problem => problem.id === attempt.issueId)!.lines.map(line => ({
+      counted: line.counted, loaded: line.loaded, delivered: line.delivered, received: line.received,
+    }))).toEqual([48, 46].map(counted => ({ counted, loaded: counted, delivered: null, received: null })));
     expect(attempt).not.toHaveProperty('arrivedAt');
     expect(attempt).not.toHaveProperty('receipt');
   }

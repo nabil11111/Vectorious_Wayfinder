@@ -16,6 +16,22 @@ vi.mock('../src/lib/clock', async original => {
   return { ...actual, demoClockAt: (...args: Parameters<typeof actual.demoClockAt>) => ({ ...actual.demoClockAt(...args), now: clock.at || actual.demoClockAt(...args).now }) };
 });
 const h = await lookupHarness(clock), admin = request.agent(h.server);
+
+it.each(['orders?date=0000-01-01', 'history?date=0000-06-01',
+  'orders?date=0001-01-10&range=four_weeks', 'orders?date=0001-01-10'])(
+  'AC-3 refuses dates outside the database calendar including the skipped-shop window: %s', async path => {
+    const before = await heldDriverRows();
+    expect(code(await h.ruwan.get('/api/v1/lookup/' + path))).toEqual([400, 'invalid_input']);
+    expect(await heldDriverRows()).toEqual(before);
+  });
+it('AC-3 accepts the first supported history day and complete 28-day order window', async () => {
+  expect(await h.history('?date=0001-01-01')).toMatchObject({ date: '0001-01-01', publication: null, counts: null, trips: [] });
+  for (const range of ['day', 'four_weeks']) {
+    expect(await h.orders('?date=0001-01-28&range=' + range)).toMatchObject({ date: '0001-01-28',
+      from: range === 'day' ? '0001-01-28' : '0001-01-01', rows: [], skippedLately: { from: '0001-01-01', to: '0001-01-28', rows: [] } });
+  }
+});
+
 beforeAll(async () => { await signIn(admin, 'admin'); });
 
 it('AC-1 lookup requires dispatcher and depot checks on every GET without writes', async () => {
