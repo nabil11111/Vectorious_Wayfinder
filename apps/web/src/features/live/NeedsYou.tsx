@@ -3,13 +3,14 @@ import type { IssueList } from '@wayfinder/contracts';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { plainButton } from '@/features/plan/parts/look';
+import { orangeButton, plainButton } from '@/features/plan/parts/look';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { clockTime } from '@/features/loader/words';
 import { reasonOf } from '@/features/store/words';
 import { cn } from '@/lib/utils';
 import { AnsweredLine, IssueCard, RaisedAt } from './IssueCard';
 import type { Answering } from './issues';
+import { focusIssue, issueAnchor } from './parts/focus';
 
 const CARD = 'rounded-[14px] bg-card shadow-[0_2px_6px_color-mix(in_srgb,var(--foreground)_8%,transparent)]';
 
@@ -46,13 +47,18 @@ export function NeedsYou({ query, answering, className }: { query: UseQueryResul
             Sent {answering.sent.decidedAt ? clockTime(answering.sent.decidedAt) : ''}
           </p>
           <p className="mt-3 text-xs leading-4 font-semibold"><AnsweredLine issue={answering.sent} /></p>
+          {/* Open next brings the oldest problem still open into view, in full (spec 016, rule 5). There is no Undo. */}
+          {open.length > 0 && (
+            <Button className={orangeButton('mt-4 h-[34px] w-full text-xs')} onClick={() => focusIssue(open[0]!.id)}>Open next</Button>
+          )}
         </div>
       )}
       {open.length > 0 ? (
         // A card per open problem, oldest first. The column's heading sits in the first one with its time, as the
         // frame draws it, and every later card has its time beside its title.
         open.map((issue, i) => (
-          <div key={issue.id} className="rounded-[14px] border-2 border-foreground bg-card px-3.5 pt-3 pb-3.5">
+          // Each card is where Decide and Open next move the focus (spec 016).
+          <div key={issue.id} id={issueAnchor(issue.id)} tabIndex={-1} className="scroll-mt-28 rounded-[14px] border-2 border-foreground bg-card px-3.5 pt-3 pb-3.5 outline-none focus:ring-3 focus:ring-ring/50">
             {i === 0 && (
               <div className="mb-2.5 flex items-center justify-between gap-3">
                 <h2 className="font-sans text-[11px] leading-[14px] font-semibold text-muted-foreground">Needs you · {open.length}</h2>

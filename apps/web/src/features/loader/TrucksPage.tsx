@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { useEffect, type ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router';
 import type { LoadingDay, LoadingTruck } from '@wayfinder/contracts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { useAppClock } from '@/lib/clock';
+import { NOT_KEPT, SEE_CHANGES, WITHDRAWN, chipsOf, markChangesOpened, noticeOf, planChangedLine, truckKey, usePlanChanges } from './changes';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { LoadFailed } from './parts/LoadFailed';
 import { DayNote, NextOutCard } from './parts/NextOutCard';
@@ -42,8 +43,19 @@ function Trucks({ day, writes, stale }: { day: LoadingDay; writes: LoaderWrites;
   // Next out is the first truck that is not ready, and the others follow it from 2 in leaving order (rule 2).
   const next = day.trucks.find((truck) => truck.status !== 'ready') ?? null;
   const others = day.trucks.filter((truck) => truck !== next);
-  const note = emptyNote(day);
   const busy = writes.phase !== 'idle';
+  // The plan sent again (spec 016, rule 9): while it is back in edit only the wait sentence shows, and a newer
+  // publication opens its notice once, never over a write on its way. The changed chips stay after Got it.
+  const changes = usePlanChanges();
+  const notice = noticeOf(changes, day);
+  const changed = chipsOf(changes, day);
+  const unopened = (notice === 'changed' || notice === 'unchanged') && !changes.kept?.opened;
+  useEffect(() => {
+    if (!unopened || busy) return;
+    markChangesOpened();
+    navigate('/loader/changes');
+  }, [unopened, busy, navigate]);
+  const note = notice === 'withdrawn' ? WITHDRAWN : emptyNote(day);
 
   const start = (truck: LoadingTruck) => {
     if (!day.plan) return;
@@ -55,6 +67,14 @@ function Trucks({ day, writes, stale }: { day: LoadingDay; writes: LoaderWrites;
       {stale && <div className="mb-3">{stale}</div>}
       {writes.refused && <Refused>{writes.refused}</Refused>}
       {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
+      {changes.failed && <p role="status" className="mb-3 rounded-[10px] bg-warn-tint px-3 py-2.5 text-[13px] leading-4 font-semibold text-warn-ink">{NOT_KEPT}</p>}
+      {/* A notice seen but not closed with Got it stays on top of the list, and opens again from here or the bell. */}
+      {changes.kept && (notice === 'changed' || notice === 'unchanged') && changes.kept.opened && (
+        <p role="status" className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-[12px] bg-warn-tint px-4 py-2.5 text-[15px] leading-5 font-semibold text-warn-ink">
+          <span><span aria-hidden="true" className="mr-2 font-bold">!</span>{planChangedLine(changes.kept.latest)}</span>
+          <Link to="/loader/changes" className="text-[13px] underline underline-offset-2">{SEE_CHANGES}</Link>
+        </p>
+      )}
 
       {day.day && (
         <header className="flex items-baseline justify-between gap-3">
@@ -68,12 +88,12 @@ function Trucks({ day, writes, stale }: { day: LoadingDay; writes: LoaderWrites;
           {note !== null ? (
             <DayNote>{note}</DayNote>
           ) : next ? (
-            <NextOutCard truck={next} at={at} busy={busy} starting={writes.out === 'start' && writes.phase === 'saving'} onStart={() => start(next)} />
+            <NextOutCard truck={next} at={at} busy={busy} starting={writes.out === 'start' && writes.phase === 'saving'} onStart={() => start(next)} changed={changed.has(truckKey(next))} />
           ) : (
             <DayNote>Every truck is loaded.</DayNote>
           )}
         </div>
-        <NextList trucks={others} from={next ? 2 : 1} className="lg:mt-0.5" />
+        <NextList trucks={others} from={next ? 2 : 1} changed={changed} className="lg:mt-0.5" />
       </div>
     </div>
   );

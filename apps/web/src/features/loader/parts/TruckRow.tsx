@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import type { LoadingTruck } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
+import { CHANGED, truckKey } from '../changes';
 import { clockTime, leaves, truckName, tripPlace, unitsWords, whole } from '../words';
 import { truckIcon } from './icons';
 import { Tag } from './ui';
@@ -14,8 +15,8 @@ function standing(truck: LoadingTruck) {
 }
 
 // A truck in the Next list: its place in the day, its picture, "VEH035 · Fresh · Colombo", how it stands and a chip
-// once it is loading or ready. The row opens its truck.
-export function TruckRow({ truck, place }: { truck: LoadingTruck; place: number }) {
+// once it is loading or ready, and "changed" when the last publication changed it (spec 016). The row opens its truck.
+export function TruckRow({ truck, place, changed = false }: { truck: LoadingTruck; place: number; changed?: boolean }) {
   return (
     <li>
       <Link
@@ -31,20 +32,22 @@ export function TruckRow({ truck, place }: { truck: LoadingTruck; place: number 
           <span className="block text-[15px] leading-[18px] font-semibold">{truckName(truck)} · {tripPlace(truck)}</span>
           <span className="mt-[5px] block text-[13px] leading-4 text-muted-foreground">{standing(truck)}</span>
         </span>
+        {changed && <Tag tone="warn" className="-ml-1 px-2 lg:ml-0 lg:px-2.5">{CHANGED}</Tag>}
         {truck.status !== 'planned' && <Tag tone={truck.status === 'ready' ? 'good' : 'warn'} className="-ml-1 px-2 lg:ml-0 lg:px-2.5">{truck.status}</Tag>}
       </Link>
     </li>
   );
 }
 
-// The rest of the day's trucks in leaving order, numbered on from the one above them.
-export function NextList({ trucks, from, className }: { trucks: LoadingTruck[]; from: number; className?: string }) {
+// The rest of the day's trucks in leaving order, numbered on from the one above them. changed holds the trucks the
+// last publication changed.
+export function NextList({ trucks, from, changed, className }: { trucks: LoadingTruck[]; from: number; changed?: Set<string>; className?: string }) {
   if (trucks.length === 0) return null;
   return (
     <section aria-labelledby="next-trucks" className={className}>
       <h2 id="next-trucks" className="text-lg leading-6 font-bold">Next</h2>
       <ol className="mt-[17px] space-y-[18px] lg:mt-3.5 lg:space-y-3">
-        {trucks.map((truck, i) => <TruckRow key={truck.tripId} truck={truck} place={from + i} />)}
+        {trucks.map((truck, i) => <TruckRow key={truck.tripId} truck={truck} place={from + i} changed={changed?.has(truckKey(truck))} />)}
       </ol>
     </section>
   );
