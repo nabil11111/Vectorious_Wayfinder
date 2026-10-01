@@ -18,6 +18,7 @@ const dayAt = (day: string, readAt: string, dayChangesAt: string): OperationsDay
     stopsTotal: 0, stopsDelivered: 0, stopsDone: 0, partialStops: 0, noGoodsStops: 0, closedStops: 0, tripsTotal: 0, vehiclesOut: 0, vehiclesTotal: 38,
     deferredOrders: 0, deliveryProgress: { numerator: 0, denominator: 0, percent: 0 }, truckProgress: { numerator: 0, denominator: 38, percent: 0 },
   },
+  map: { shops: 0, districts: [] },
   nextRun: null, fuel: null, brandTotals: [], groups: [], timeline: null, earlierOut: [], outTripIds: [], events: [], eventsTruncated: false,
 });
 const thursday = (readAt: string) => dayAt('2026-06-25', readAt, THU_1600);

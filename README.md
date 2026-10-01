@@ -287,8 +287,12 @@ Anything we built differently from our Designathon submission, and why.
   cards for a delivery not yet confirmed, nobody at the shop, the depot's answers and a replacement.
 
 **The dashboard and Live day**
-- **No district map and no waves:** Needs you and the next run take the full width, Live day has no "Wave 2", and the
-  next run's button is "View plan" with no draft line.
+- **No waves:** Live day has no "Wave 2", and the next run's button is "View plan" with no draft line.
+- **The district map** says "Live · 07:30" where the frame says "Replay · 07:30": it shows the day as it is, where the
+  design drew a replay, so every number on it comes from the live read (D-92). Its Map view switch shows only the
+  dispatcher's own depot and greys Kandy and Both (D-32), districts and trucks have no hover details, the active chip
+  carries the design's lorry picture, and the card credits OpenStreetMap for the district outlines. Below 1280 wide it
+  sits under Needs you, and below 640 its Stores delivered list goes under the map.
 - **One answer per problem:** "Decide" opens its card, where the design also draws Warn, Skip, Credit and Resend, and an
   answered row reads "Decided", never "Warned". There is no Undo.
 - **Recorded times only (D-68):** the trucks table shows the planned arrival and the planned return, never an estimate,

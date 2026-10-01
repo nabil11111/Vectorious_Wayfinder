@@ -1,5 +1,5 @@
 import { OperationsDay, PlanCheck, type OperationsTrip } from '@wayfinder/contracts';
-import { and, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Tx } from '../db/client';
 import { auditLog, calendarDays, deferrals, depots, fuelLog, orders, outlets, plans, stops, stopOrders, trips, users, vehicles } from '../db/schema';
 import { driverTripsOf } from '../driver/day';
@@ -15,7 +15,7 @@ import { operatingDays, readMoment } from '../plans/board';
 import { percent } from '../plans/board-day';
 import { attentionOf, compareOut, outRowOf, timelineOf } from './attention';
 import { eventsOf } from './events';
-import { figuresOf, groupTrips, nextDemand, progress, stopCounts } from './figures';
+import { districtMap, figuresOf, groupTrips, nextDemand, progress, stopCounts } from './figures';
 
 // Every source, including the clock and reset generation, belongs to this one read-only snapshot.
 export function getOperationsDay(caller: DepotCaller): Promise<OperationsDay> {
@@ -108,9 +108,11 @@ async function operationsDayOf(tx: Tx, caller: DepotCaller): Promise<OperationsD
     fuel = { isoYear: calendar.isoYear, isoWeek: calendar.isoWeek, litres, quotaLitres, percent: quotaLitres === 0 ? null : percent(litres, quotaLitres) };
   }
   const counts = stopCounts(current), vehiclesOut = new Set(out.map(row => row.vehicleId)).size;
+  // The map's shops are the depot's active ones; their stops are the watched day's, as the delivered tile counts them.
+  const shops = await tx.select({ id: outlets.id, district: outlets.district }).from(outlets).where(and(eq(outlets.depotId, caller.depotId), isNull(outlets.archivedAt)));
   return OperationsDay.parse({ depot: { id: depot.id, name: depot.name }, demoDay: moment.demoDay, day, dayChangesAt: day ? depotInstant(day, CUTOFF_MINUTES).toISOString() : null, readAt,
     plan: plan ? { id: plan.id, revision: plan.revision, publishedAt: plan.publishedAt!.toISOString(), detailRecorded: plan.sentCheck !== null } : null,
     counts: { ...counts, tripsTotal: current.length, vehiclesOut, vehiclesTotal: fleet.length, deferredOrders: new Set(deferred.map(row => row.id)).size,
-      deliveryProgress: progress(counts.stopsDelivered, counts.stopsTotal), truckProgress: progress(vehiclesOut, fleet.length) }, nextRun, fuel,
+      deliveryProgress: progress(counts.stopsDelivered, counts.stopsTotal), truckProgress: progress(vehiclesOut, fleet.length) }, map: districtMap(shops, current), nextRun, fuel,
     ...groupTrips(current), timeline: day ? timeline(day, current) : null, earlierOut, outTripIds: [...out].sort(compareOut).map(row => row.tripId), ...await eventsOf(tx, { currentPlan: plan, plans: shownPlans, trips: shown, issues: problems }) });
 }

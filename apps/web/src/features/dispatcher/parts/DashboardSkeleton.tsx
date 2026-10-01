@@ -19,6 +19,16 @@ export function TilesSkeleton() {
   );
 }
 
+// The district map's first load: one grey block the card's size. From 640 wide that is the frame's 520 by 407 at the
+// column's width, at most one and a half times; below, the stacked card is 450 px of words and key plus its map.
+export function MapSkeleton() {
+  return (
+    <div role="status" aria-label="Loading the district map" className="@container">
+      <Skeleton className="h-[calc(450px+100cqw*280/340)] w-full rounded-[14px] sm:h-[min(100cqw*407/520,610.5px)]" />
+    </div>
+  );
+}
+
 export function TrucksSkeleton() {
   return (
     <div role="status" aria-label="Loading the trucks out" className={cn(CARD, 'px-4 pt-5 pb-4 lg:px-6')}>

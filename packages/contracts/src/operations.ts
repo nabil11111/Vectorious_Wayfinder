@@ -74,6 +74,12 @@ export const OperationsCounts = z.object({
   tripsTotal: Count, vehiclesOut: Count, vehiclesTotal: Count, deferredOrders: Count, deliveryProgress: OperationsProgress, truckProgress: OperationsProgress,
 });
 export type OperationsCounts = z.infer<typeof OperationsCounts>;
+// Spec 019: the dashboard's district map. Each of the depot's districts by name, its active shops and how many had
+// every stop of the day delivered; null when the plan's stop details were not recorded, as stopsDelivered is.
+export const OperationsMapDistrict = z.object({ district: z.string(), shops: Count, shopsDelivered: Count.nullable() });
+export type OperationsMapDistrict = z.infer<typeof OperationsMapDistrict>;
+export const OperationsMap = z.object({ shops: Count, districts: z.array(OperationsMapDistrict) });
+export type OperationsMap = z.infer<typeof OperationsMap>;
 export const OperationsTimeline = z.object({ start: Moment, end: Moment, ticks: z.array(Moment), now: Moment.nullable() });
 export type OperationsTimeline = z.infer<typeof OperationsTimeline>;
 export const NextRun = z.object({ date: Day, cutoffAt: Moment, orders: Count });
@@ -92,7 +98,7 @@ const Section = z.object({ date: Day, brandTotals: z.array(OperationsBrandTotal)
 export const OperationsDay = z.object({
   depot: z.object({ id: z.string(), name: z.string() }), demoDay: z.number().int().min(1), day: Day.nullable(), dayChangesAt: Moment.nullable(), readAt: Moment,
   plan: z.object({ id: z.uuid(), revision: Count, publishedAt: Moment, detailRecorded: z.boolean() }).nullable(), counts: OperationsCounts,
-  nextRun: NextRun.nullable(), fuel: OperationsFuel.nullable(), brandTotals: z.array(OperationsBrandTotal), groups: z.array(OperationsGroup),
+  map: OperationsMap, nextRun: NextRun.nullable(), fuel: OperationsFuel.nullable(), brandTotals: z.array(OperationsBrandTotal), groups: z.array(OperationsGroup),
   timeline: OperationsTimeline.nullable(), earlierOut: z.array(Section), outTripIds: z.array(z.uuid()), events: z.array(OperationsEvent), eventsTruncated: z.boolean(),
 });
 export type OperationsDay = z.infer<typeof OperationsDay>;

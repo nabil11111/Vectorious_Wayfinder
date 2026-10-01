@@ -15,8 +15,8 @@ import { cn } from '@/lib/utils';
 
 // The dashboard's Needs you (Dispatcher · Dashboard 53:11540): every open problem of the depot, oldest first, each a
 // summary whose Decide opens its full card on Live day (D-72). Below them the trucks whose report is missing, as the
-// frame's Watching row, which are not problems and not counted. The map's place goes to these cards, and the next
-// run sits at the foot.
+// frame's Watching row, which are not problems and not counted. The next run sits at the foot, and the district map
+// beside the card from 1280 wide (spec 019).
 export function NeedsYouCard({ issues, day }: { issues: UseQueryResult<IssueList>; day: OperationsDay | undefined }) {
   const open = issues.data?.issues ?? [];
   const watching = day ? allTrips(day).filter(isRecorded).filter((trip) => trip.openIssueIds.length === 0 && (trip.attention.kind === 'departure_unreported' || trip.attention.kind === 'arrival_unreported'))

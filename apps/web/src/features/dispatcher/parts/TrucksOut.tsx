@@ -1,22 +1,20 @@
 import { Link } from 'react-router';
-import type { Issue, OperationsDay, OperationsStatus, OperationsTrip } from '@wayfinder/contracts';
+import type { Issue, OperationsDay, OperationsStatus } from '@wayfinder/contracts';
 import { ICON, truckIcon } from '@/features/live/parts/icons';
-import { allTrips, isRecorded } from '@/features/live/parts/rows';
+import { isRecorded } from '@/features/live/parts/rows';
 import { CARD, Chip, StopDots, type Tone } from '@/features/live/parts/ui';
 import { NO_TRUCK_OUT, noPlanOut, placeLine, statusSentence } from '@/features/live/words';
 import { clockTime, shortDay, whole } from '@/features/loader/words';
 import { plainButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
-
-type OutTrip = OperationsTrip & { outRow: NonNullable<OperationsTrip['outRow']> };
+import { tripsOut, type OutTrip } from './trips-out';
 
 // Trucks out now (Dispatcher · Dashboard 53:11540, rule 4): one row per trip that is out, in the read's order, problems
 // first. Progress is the trip's own finished stops, the next stop its kept planned arrival (labelled original after a
 // retry) and Back its planned return: the sent schedule, never an estimate. Status is the oldest open problem, or what
 // was recorded or is missing. Open and Decide lead to the trip or the problem on Live day.
 export function TrucksOut({ day, issues }: { day: OperationsDay; issues: Issue[] | undefined }) {
-  const byId = new Map(allTrips(day).map((trip) => [trip.tripId, trip]));
-  const rows = day.outTripIds.map((id) => byId.get(id)).filter((trip): trip is OutTrip => Boolean(trip?.outRow));
+  const rows = tripsOut(day);
   return (
     <section aria-labelledby="trucks-out" className={cn(CARD, 'px-4 pt-[18px] pb-4 lg:px-6 lg:pt-5')}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

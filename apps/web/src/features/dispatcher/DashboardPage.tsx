@@ -9,21 +9,24 @@ import { plainButton } from '@/features/plan/parts/look';
 import { reasonOf } from '@/features/store/words';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
-import { TilesSkeleton, TrucksSkeleton } from './parts/DashboardSkeleton';
+import { MapSkeleton, TilesSkeleton, TrucksSkeleton } from './parts/DashboardSkeleton';
+import { FleetMap } from './parts/FleetMap';
 import { NeedsYouCard } from './parts/NeedsYouCard';
 import { Tiles } from './parts/Tiles';
 import { TrucksOut } from './parts/TrucksOut';
 
 // The dispatcher's dashboard at /dispatcher (spec 016, Dispatcher · Dashboard 53:11540): the watched day and the app's
-// time, six tiles from the read, Needs you with the next run below it, and the trucks out now, problems first. The
-// district map is left out (map cut order), so the cards take its room. Below 1024 the tiles go two to a row, then
-// Needs you, the next run and the truck cards.
+// time, six tiles from the read, Needs you with the next run below it and the district map beside it (spec 019), and
+// the trucks out now, problems first. From 1280 wide the map sits right of Needs you, 520 wide as in the frame; below
+// that it goes under Needs you. Below 1024 the tiles go two to a row, then Needs you, the map and the truck cards.
 export function DashboardPage() {
   const ops = useOperations();
   const issues = useIssues();
   const clock = useAppClock();
   const online = useOnline();
   const day = ops.data;
+  // A failed refresh keeps the last read, so the card keeps drawing it; a first read that failed shows the error above.
+  const map = day ? <FleetMap day={day} /> : ops.isError ? null : <MapSkeleton />;
 
   return (
     <div className="lg:-mt-[7px]">
@@ -48,7 +51,10 @@ export function DashboardPage() {
             </Button>
           </div>
         ) : <TilesSkeleton />}
-        <NeedsYouCard issues={issues} day={day} />
+        <div className={cn('grid gap-4', map && 'xl:grid-cols-[minmax(0,1fr)_520px] xl:gap-x-3.5')}>
+          <NeedsYouCard issues={issues} day={day} />
+          {map}
+        </div>
         {day ? <TrucksOut day={day} issues={issues.data?.issues} /> : !ops.isError && <TrucksSkeleton />}
       </div>
     </div>

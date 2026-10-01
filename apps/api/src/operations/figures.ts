@@ -1,4 +1,4 @@
-import { tripFigures, type DriverTrip, type OperationsFigures, type OperationsProgress, type OperationsTrip } from '@wayfinder/contracts';
+import { tripFigures, type DriverTrip, type OperationsFigures, type OperationsMap, type OperationsProgress, type OperationsTrip } from '@wayfinder/contracts';
 import { percent } from '../plans/board-day';
 
 export const progress = (numerator: number | null, denominator: number): OperationsProgress => ({ numerator, denominator, percent: numerator === null ? null : percent(numerator, denominator) });
@@ -12,17 +12,46 @@ export function figuresOf(trip: DriverTrip): OperationsFigures {
   return { ...unfinished(figures), byTemp: temperatures(figures.byTemp), byStop: figures.byStop.map(stop => ({ ...unfinished(stop), byTemp: temperatures(stop.byTemp), byLine: stop.byLine.map(unfinished) })) };
 }
 
+type Stop = DriverTrip['stops'][number];
+const deliveredUnits = (stop: Stop) => stop.lines.reduce((n, line) => n + (line.delivered ?? 0), 0);
+const endedWithGoods = (stop: Stop) => stop.outcome === 'delivered' || stop.outcome === 'refused';
+
+// Goods were handed over at a stop: it ended delivered, or refused with something delivered. The "stops delivered"
+// tile and the map's shops delivered (spec 019 rule 3) both count with this one test, so they can never disagree.
+export const goodsHandedOver = (stop: Stop) => endedWithGoods(stop) && deliveredUnits(stop) > 0;
+
+// The stops of the given trips with what happened at them, or null when one of the trips kept no detail (a plan sent
+// before the driver's piece): then nothing about the day's deliveries is known.
+function knownStops(rows: OperationsTrip[]): Stop[] | null {
+  const unknown = rows.some(row => row.stopsTotal > 0) && rows.some(row => !row.detailRecorded);
+  return unknown ? null : rows.flatMap(row => row.detailRecorded ? row.trip.stops : []);
+}
+
 export function stopCounts(rows: OperationsTrip[]) {
   const stopsTotal = rows.reduce((n, row) => n + row.stopsTotal, 0);
-  const unknown = stopsTotal > 0 && rows.some(row => !row.detailRecorded);
-  const stops = rows.flatMap(row => row.detailRecorded ? row.trip.stops : []);
-  const delivered = (stop: DriverTrip['stops'][number]) => stop.lines.reduce((n, line) => n + (line.delivered ?? 0), 0);
-  const goods = stops.filter(stop => stop.outcome === 'delivered' || stop.outcome === 'refused');
-  return { stopsTotal, stopsDelivered: unknown ? null : goods.filter(stop => delivered(stop) > 0).length,
-    stopsDone: unknown ? null : stops.filter(stop => stop.outcome !== null).length,
-    partialStops: unknown ? null : goods.filter(stop => delivered(stop) > 0 && stop.outcome === 'refused' && stop.lines.some(line => (line.loaded ?? 0) > (line.delivered ?? 0))).length,
-    noGoodsStops: unknown ? null : goods.filter(stop => delivered(stop) === 0).length,
-    closedStops: unknown ? null : stops.filter(stop => stop.outcome === 'closed').length };
+  const stops = knownStops(rows);
+  if (stops === null) return { stopsTotal, stopsDelivered: null, stopsDone: null, partialStops: null, noGoodsStops: null, closedStops: null };
+  return { stopsTotal, stopsDelivered: stops.filter(goodsHandedOver).length,
+    stopsDone: stops.filter(stop => stop.outcome !== null).length,
+    partialStops: stops.filter(stop => goodsHandedOver(stop) && stop.outcome === 'refused' && stop.lines.some(line => (line.loaded ?? 0) > (line.delivered ?? 0))).length,
+    noGoodsStops: stops.filter(stop => endedWithGoods(stop) && deliveredUnits(stop) === 0).length,
+    closedStops: stops.filter(stop => stop.outcome === 'closed').length };
+}
+
+// The dashboard's district map (spec 019): each of the depot's districts by name with its active shops, and how many
+// of them had at least one stop on the day's plan and goods handed over at every one (rule 3). Shops with no stop
+// today stay in the total. Unknown in every district while the day's stops are, as the tile's count is.
+export function districtMap(shops: { id: string; district: string }[], rows: OperationsTrip[]): OperationsMap {
+  const stops = knownStops(rows);
+  const delivered = (shopId: string) => {
+    const own = (stops ?? []).filter(stop => stop.outletId === shopId);
+    return own.length > 0 && own.every(goodsHandedOver);
+  };
+  const districts = [...new Set(shops.map(shop => shop.district))].sort().map(district => {
+    const own = shops.filter(shop => shop.district === district);
+    return { district, shops: own.length, shopsDelivered: stops === null ? null : own.filter(shop => delivered(shop.id)).length };
+  });
+  return { shops: shops.length, districts };
 }
 
 export const compareTrips = (a: OperationsTrip, b: OperationsTrip) =>

@@ -301,3 +301,9 @@ remains shown in full, preserving 012's departure 10; an answered trip row says 
 The driver's phone bell count remains deferred despite 013's earlier A7 promise. There is no second
 answer path, Undo, credit, write-off, warning message or replacement command in spec 016. Receipt behavior remains
 spec 015's; a driver-delivered quantity never stands in for a shop's confirmed receipt.
+
+**D-92 · 1 Oct · The dashboard's map draws the live day, not the design's replay.** The frame drew February's
+training records at 07:30; that data never enters the repo, and a dispatcher needs today. The card keeps the
+frame's shapes, lines, arrows, labels and list, and takes its numbers from the operations read. Its view switch
+follows D-32: the dispatcher's own depot only. The district shapes are derived from geoBoundaries (OpenStreetMap,
+ODbL), so the card credits OpenStreetMap and `docs/map-data.md` names the source (Nabil, 1 Oct, spec 019).

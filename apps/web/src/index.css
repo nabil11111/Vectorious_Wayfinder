@@ -92,3 +92,64 @@
   body { @apply bg-background text-foreground font-sans antialiased; }
   h1, h2, h3 { @apply font-heading; }
 }
+
+/* The dashboard's district map (spec 019), in the colours the design's map-fleet-overview.js paints it with. */
+@theme inline {
+  --color-map-title: var(--map-title);
+  --color-map-muted: var(--map-muted);
+  --color-map-stores: var(--map-stores);
+  --color-map-chosen: var(--map-chosen);
+  --color-map-option: var(--map-option);
+  --color-map-option-ink: var(--map-option-ink);
+  --color-map-active-tint: var(--map-active-tint);
+  --color-map-active-ink: var(--map-active-ink);
+  --color-map-sea: var(--map-sea);
+  --color-map-served: var(--map-served);
+  --color-map-unserved: var(--map-unserved);
+  --color-map-line: var(--map-line);
+  --color-map-line-muted: var(--map-line-muted);
+  --color-map-arrow: var(--map-arrow);
+  --color-map-badge-ink: var(--map-badge-ink);
+  --color-map-badge-tint: var(--map-badge-tint);
+  --color-map-label: var(--map-label);
+  --color-map-end: var(--map-end);
+  --color-map-depot: var(--map-depot);
+  --color-map-heading: var(--map-heading);
+  --color-map-ocean: var(--map-ocean);
+  --color-map-divider: var(--map-divider);
+  --color-map-note: var(--map-note);
+  --color-map-district: var(--map-district);
+  --color-map-count: var(--map-count);
+  --color-map-track: var(--map-track);
+  --color-map-bar: var(--map-bar);
+}
+
+:root {
+  --map-title: #263744;         /* the card's "Live · 07:30" */
+  --map-muted: #647480;         /* "Map view", vehicles and routes, the key's words and the source line */
+  --map-stores: #354957;        /* "75 stores" */
+  --map-chosen: #263B46;        /* the view switch's chosen depot */
+  --map-option: #F2F5F6;        /* a view the dispatcher cannot choose */
+  --map-option-ink: #63727C;    /* that view's name, greyed further on the card */
+  --map-active-tint: #FFF0E2;   /* the "12 active" chip */
+  --map-active-ink: #BD550E;    /* the chip's words */
+  --map-sea: #EDF3F6;           /* the sea, and the map's frame */
+  --map-served: #E8EDE7;        /* a district the depot has shops in */
+  --map-unserved: #F5F7F4;      /* every other district */
+  --map-line: #E8792D;          /* a line with a truck on the road to it, and the key's shared route */
+  --map-line-muted: #ADBCB9;    /* a line with no truck on it */
+  --map-arrow: #DF721E;         /* a truck on the road, and the key's vehicle */
+  --map-badge-ink: #B44D09;     /* a second trip's "2" */
+  --map-badge-tint: #FFF2E8;    /* behind the key's "2" */
+  --map-label: #526C67;         /* a district's name on the map */
+  --map-end: #849992;           /* the dot where a district's line ends */
+  --map-depot: #263F4A;         /* the depot's diamond */
+  --map-heading: #304653;       /* the depot's name and "Stores delivered" */
+  --map-ocean: #A4B6BF;         /* "INDIAN OCEAN" */
+  --map-divider: #E8EEEE;       /* between the map and Stores delivered */
+  --map-note: #6C827A;          /* "29 of 75 stores" */
+  --map-district: #5A6D75;      /* a district's name in Stores delivered */
+  --map-count: #397D67;         /* "7/24" */
+  --map-track: #EDF1EF;         /* a district's bar */
+  --map-bar: #63A28B;           /* the bar's delivered part */
+}
