@@ -1,12 +1,11 @@
-import { randomUUID } from 'node:crypto';
-import { PlanCheck, type OperationsDay } from '@wayfinder/contracts';
+import { PlanCheck } from '@wayfinder/contracts';
 import { and, eq, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
-import { auditLog, demoDay, orders, plans, stops, trips, vehicles } from '../src/db/schema';
+import { demoDay, orders, plans, stops, trips, vehicles } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import * as board from '../src/plans/board';
@@ -181,6 +180,7 @@ it('AC-16 kept minutes after midnight stay on their actual date and recorded lat
   check.trips[0]!.times!.stops[1]!.arriveAt = 1445;
   check.trips[0]!.times!.stops[1]!.leaveAt = 1460;
   await db.update(plans).set({ sentCheck: check }).where(eq(plans.id, plan!.id));
+  await db.update(stops).set({ plannedArrival: '00:05:00', plannedDepart: '00:20:00' }).where(eq(stops.seq, 2));
   const first = shownTrip(await read()).stopDetails[0]!;
   await db.update(stops).set({ arrivedAt: new Date(new Date(first.windowClose).getTime() + 1) }).where(eq(stops.id, first.id));
   const day = await read();
@@ -194,4 +194,11 @@ it('AC-3 zero fleet quota has no invented fuel percentage', async () => {
     await db.update(vehicles).set({ weeklyFuelQuotaL: 0 }).where(eq(vehicles.depotId, 'Peliyagoda'));
     expect((await read()).fuel!.percent).toBeNull();
   } finally { for (const row of fleet) await db.update(vehicles).set({ weeklyFuelQuotaL: row.weeklyFuelQuotaL }).where(eq(vehicles.id, row.id)); }
+});
+
+it('AC-5 planned stop clocks come from the sent stops', async () => {
+  await sendWalkthroughPlan(walk);
+  const first = shownTrip(await read()).stopDetails[0]!;
+  await db.update(stops).set({ plannedArrival: '05:01:00', plannedDepart: '05:16:00' }).where(eq(stops.id, first.id));
+  expect(shownTrip(await read()).stopDetails[0]).toMatchObject({ plannedArrival: depotInstant(THU, 301).toISOString(), plannedDeparture: depotInstant(THU, 316).toISOString() });
 });

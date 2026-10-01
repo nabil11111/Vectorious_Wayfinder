@@ -22,7 +22,7 @@ it('AC-16 attention names missing reports and retries without predictions', () =
   const done = { ...out, stops: [{ ...out.stops[0]!, outcome: 'closed' as const, doneAt: at(400) }] };
   expect(outRowOf(done, arrivals, [], at(500))).toMatchObject({ nextStop: null, plannedArrival: null, status: { kind: 'returning' }, progress: { percent: 100 } });
   const issue = { id: randomUUID(), kind: 'closed', reason: 'nobody_there', status: 'open', raisedAt: at(400) } as Issue;
-  expect(outRowOf(done, arrivals, [issue], at(500)).status).toMatchObject({ kind: 'open_problem', issueId: issue.id });
+  expect(outRowOf(done, arrivals, [issue], at(500)).status).toMatchObject({ kind: 'open_problem', issueId: issue.id, summary: 'Nobody there' });
 });
 
 it('AC-16 out trucks sort open problems then watching then scheduled leave', () => {
