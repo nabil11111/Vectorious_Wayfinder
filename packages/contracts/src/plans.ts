@@ -275,6 +275,56 @@ export const SlotSearch = z.object({
 });
 export type SlotSearch = z.infer<typeof SlotSearch>;
 
+// ── Crews (spec 026) ────────────────────────────────────────────────────────────────────────────────────────────────
+
+// The crew picker's read names the orders a trip is started or moved with, by id with commas between, and "" for none:
+// at most the 300 orders a day can have.
+export const CrewQuery = z.object({
+  orders: z.string().max(300 * 37).transform((list) => (list === '' ? [] : list.split(','))).pipe(z.array(z.uuid()).max(300)),
+});
+export type CrewQuery = z.infer<typeof CrewQuery>;
+
+// Why a truck may not take the orders, by the checker's cargo rules (spec 007): more weight or volume than it takes, a
+// chilled order and no fridge, or a shop that takes vans only. The order or shop it is about, as the checker's problem
+// names it, or null.
+export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only'] as const;
+export const CrewMisfit = z.object({ code: z.enum(CREW_MISFITS), orderId: z.uuid().nullable(), outletId: z.string().nullable() });
+export type CrewMisfit = z.infer<typeof CrewMisfit>;
+
+// A truck of the depot with its driver (D-100): the one the draft gives it, or else its usual driver, who drove it on the
+// depot's latest sent plan or, with none there, the one a fixed pairing of the drivers in staff ID order with the
+// trucks in id order gives it. null when it has none.
+export const Crew = z.object({
+  vehicleId: z.string(),
+  driverId: z.uuid().nullable(),
+  type: z.enum(['truck', 'van']),
+  temp: z.enum(['reefer', 'ambient']),
+  weightCapKg: z.number(),
+  volumeCapM3: z.number(),
+  fuelLeftPct: z.number(),
+  // The districts it ran on the depot's latest sent plan, and whether one of them is a district of the orders.
+  lastDistricts: z.array(z.string()),
+  ranHere: z.boolean(),
+  // It takes the orders by weight and volume, has a fridge for a chilled one, and can reach every shop. A crew that does
+  // not fit can still be picked: the checker judges the trip (spec 007).
+  fits: z.boolean(),
+  misfits: z.array(CrewMisfit),
+  // Why it cannot be picked: in the workshop on the day, for the workshop's reason, or on two trips already. null when it can.
+  unavailable: z.discriminatedUnion('kind', [z.object({ kind: z.literal('workshop'), reason: z.string() }), z.object({ kind: z.literal('two_trips') })]).nullable(),
+});
+export type Crew = z.infer<typeof Crew>;
+
+// Every crew of the depot for the orders, in the picker's order: those that fit first, then those that ran the orders'
+// district on the latest sent plan, then the most fuel left, and the ones that cannot be picked last. load is what the
+// orders weigh and take up, by the checker's load maths, and revision the draft's the crews were read from.
+export const CrewList = z.object({
+  orderIds: z.array(z.uuid()),
+  revision: z.number().int().min(0),
+  load: z.object({ kg: z.number(), m3: z.number() }),
+  crews: z.array(Crew),
+});
+export type CrewList = z.infer<typeof CrewList>;
+
 // ── Refusals ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export const PLAN_ERROR_CODES = [

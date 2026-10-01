@@ -2,7 +2,9 @@ import { Router, type Request, type RequestHandler } from 'express';
 import { depotCallerOf, requireDepot, requireRole, type DepotCaller } from '../middleware/auth';
 import { AcceptDecisionsRequest, BOTH_DEPOTS, JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, SuggestPlanRequest, UnsendPlanRequest } from '@wayfinder/contracts';
 import { HttpError } from '../lib/errors';
+import { CrewQuery } from '@wayfinder/contracts';
 import { getBoard } from '../plans/board';
+import { findCrews } from '../plans/crews';
 import { saveDraft } from '../plans/draft';
 import { joinOrder, splitOrder } from '../plans/split';
 import { sendPlan, unsendPlan } from '../plans/send';
@@ -37,5 +39,6 @@ plansRouter.post('/:date/join', async (req, res) => { res.json(await joinOrder(p
 plansRouter.post('/:date/send', async (req, res) => { res.json(await sendPlan(plannerOf(req), dateOf(req), SendPlanRequest.parse(req.body))); });
 plansRouter.post('/:date/unsend', async (req, res) => { res.json(await unsendPlan(plannerOf(req), dateOf(req), UnsendPlanRequest.parse(req.body))); });
 plansRouter.get('/:date/slots', async (req, res) => { res.json(await findSlots(plannerOf(req), dateOf(req), SlotQuery.parse(req.query))); });
+plansRouter.get('/:date/crews', async (req, res) => { res.json(await findCrews(plannerOf(req), dateOf(req), CrewQuery.parse(req.query))); });
 plansRouter.post('/:date/suggest', async (req, res) => { res.json(await suggestPlan(plannerOf(req), dateOf(req), SuggestPlanRequest.parse(req.body))); });
 plansRouter.post('/:date/decisions', async (req, res) => { res.json(await acceptDecisions(plannerOf(req), dateOf(req), AcceptDecisionsRequest.parse(req.body))); });
