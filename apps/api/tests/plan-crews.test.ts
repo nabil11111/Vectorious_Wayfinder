@@ -100,7 +100,7 @@ it('AC-1 lists the crews for Fresh Nugegoda\'s chilled order: the fridge van tha
   expect(list).toMatchObject({ orderIds: [NUGEGODA], revision: 0, load: { kg: order.load.kg, m3: order.load.m3 } });
   expect(list.crews[0]).toEqual({
     vehicleId: 'VEH035', driverId: list.crews[0]!.driverId, type: 'van', temp: 'reefer', weightCapKg: 1040, volumeCapM3: 7,
-    fuelLeftPct: board.vehicles.find((v) => v.id === 'VEH035')!.fuelLeftPct, lastDistricts: [], ranHere: false, fits: true, misfits: [], unavailable: null,
+    fuelLeftPct: board.vehicles.find((v) => v.id === 'VEH035')!.fuelLeftPct, readyAt: null, lastDistricts: [], ranHere: false, fits: true, misfits: [], unavailable: null,
   });
   expect(staffOf(list.crews[0]!)).toBe('D-036');
   // Nugegoda takes vans only, and the order needs a fridge: of the trucks that can be picked, only the fridge van fits.
@@ -161,6 +161,35 @@ it('AC-4 takes the usual drivers and districts from the latest sent plan, and pu
   const fitting = list.crews.filter((crew) => crew.fits && crew.unavailable === null);
   expect(fitting[0]!.vehicleId).toBe('VEH035');
   expect(fitting.some((crew) => crew.fuelLeftPct > fitting[0]!.fuelLeftPct)).toBe(true);
+  expect(inPickerOrder(list)).toBe(true);
+});
+
+it('L-04 does not call a crew fitting whose truck is ready again only after every window of the orders closes', async () => {
+  // The suggested plan: many trucks run a first trip, and a crew for another Fresh trip's orders would start its second.
+  const built = await ruwan.post(`/api/v1/plans/${THU}/suggest`).send({ planId: null, demoDay: board.demoDay });
+  expect(built.status, JSON.stringify(built.body.error)).toBe(200);
+  const day = PlanBoard.parse(built.body);
+  const shop = (outletId: string) => day.shops.find((s) => s.id === outletId)!;
+  const fresh = day.plan.trips.find((t) => t.tripNo === 1 && t.stops.length > 1 && shop(t.stops[0]!.outletId).brand === 'Fresh')!;
+  const orderIds = fresh.stops.flatMap((s) => s.orderIds);
+  const list = await crews(THU, orderIds);
+  // The latest the orders' windows close, as the planner reads a window: its mall slot, and 07:59 for a Fresh shop.
+  const closes = Math.max(...fresh.stops.map((s) => {
+    const at = shop(s.outletId);
+    return Math.min(at.windowClose, at.mallClose ?? at.windowClose, at.brand === 'Fresh' ? 479 : Infinity);
+  }));
+  const readyOf = (vehicleId: string) => day.check!.trips.find((t) => t.vehicleId === vehicleId && t.tripNo === 1)?.times?.readyAgainAt ?? null;
+  const second = list.crews.filter((crew) => crew.unavailable === null && day.plan.trips.some((t) => t.vehicleId === crew.vehicleId));
+  expect(second.length).toBeGreaterThan(0);
+  for (const crew of second) {
+    expect(crew.readyAt).toBe(readyOf(crew.vehicleId));
+    const late = crew.readyAt !== null && crew.readyAt > closes;
+    expect(crew.misfits.some((m) => m.code === 'ready_late'), crew.vehicleId).toBe(late);
+    if (late) expect(crew.fits).toBe(false);
+  }
+  expect(second.some((crew) => crew.misfits.some((m) => m.code === 'ready_late'))).toBe(true);
+  // A truck with no trip yet is ready at the usual time, and says nothing of it.
+  expect(list.crews.filter((crew) => !day.plan.trips.some((t) => t.vehicleId === crew.vehicleId)).every((crew) => crew.readyAt === null)).toBe(true);
   expect(inPickerOrder(list)).toBe(true);
 });
 

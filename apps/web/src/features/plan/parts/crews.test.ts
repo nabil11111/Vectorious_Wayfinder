@@ -38,7 +38,7 @@ const INDEX = indexOf(BOARD);
 const DRAFT = planOf(BOARD);
 const crew = (vehicleId: string, driverId: string | null, change: Partial<Crew> = {}): Crew => {
   const v = BOARD.vehicles.find((x) => x.id === vehicleId)!;
-  return { vehicleId, driverId, type: v.type, temp: v.temp, weightCapKg: v.weightCapKg, volumeCapM3: v.volumeCapM3, fuelLeftPct: v.fuelLeftPct,
+  return { vehicleId, driverId, type: v.type, temp: v.temp, weightCapKg: v.weightCapKg, volumeCapM3: v.volumeCapM3, fuelLeftPct: v.fuelLeftPct, readyAt: null,
     lastDistricts: [], ranHere: false, fits: true, misfits: [], unavailable: null, ...change };
 };
 // Fresh Dehiwala's order dropped in the empty middle: a chilled order for a van-only shop.
@@ -131,4 +131,15 @@ it('offers a crews read only while it is for the saved draft on screen, and keys
   expect(crewsFor({ ...LIST, revision: 2 }, BOARD, DRAFT)).toBeNull();
   expect(crewsFor(LIST, BOARD, { ...DRAFT, trips: DRAFT.trips.slice(1) })).toBeNull();
   expect(crewsFor(undefined, BOARD, DRAFT)).toBeNull();
+});
+
+it('L-04 says when a second trip is ready, and that it is after every window closes when the read says so', () => {
+  const ready = { ...LIST, crews: [
+    crew('VEH001', DILSHAN, { readyAt: 418 }),
+    crew('VEH011', CHAMINDA, { readyAt: 498, fits: false, misfits: [{ code: 'ready_late', orderId: null, outletId: null }] }),
+  ] };
+  expect(crewRows(ready, DROPPED, DRAFT, INDEX).map((row) => row.line)).toEqual([
+    'fits · trip 2 · ready 06:58 · fuel 62% left',
+    'ready 08:18, after every window closes · trip 2 · fuel 62% left',
+  ]);
 });

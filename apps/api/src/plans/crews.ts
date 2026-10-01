@@ -5,6 +5,7 @@ import { outlets, plans, stops, trips, users, vehicles } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import { snapshot } from '../orders/store-orders';
 import { checkPlan, computeLoad, type PlanInput } from '../planning';
+import { effectiveWindow } from '../planning/planner/priority';
 import type { Planner } from '../routes/plans';
 import { readBoard } from './board';
 import { usualPairing } from './suggestion';
@@ -79,6 +80,10 @@ export function findCrews(caller: Planner, date: string, { orders: asked }: Crew
     const { usual, districts } = await crewsOf(tx, caller.depotId, date);
     const here = new Set(orders.map((order) => shopOf(board, order.outletId).district));
     const misfitsOf = trialOf(input, orders);
+    // The latest any of the orders' windows closes, as the planner reads a window: within its mall slot, and before 08:00
+    // for a Fresh shop. A truck ready again only after it cannot take them on a second trip (L-04).
+    const closes = Math.max(...orders.map((order) => effectiveWindow(input.outlets.find((o) => o.id === order.outletId)!).close));
+    const readyOf = (vehicleId: string) => board.check?.trips.find((t) => t.vehicleId === vehicleId && t.tripNo === 1)?.times?.readyAgainAt ?? null;
     // A driver is on one row only, the truck he drives on the draft (L-05). A truck the draft has no trip on takes its
     // usual driver while he drives none there, and a truck in the workshop names nobody.
     const driving = new Set(board.plan.trips.flatMap((t) => (t.driverId === null ? [] : [t.driverId])));
@@ -91,10 +96,11 @@ export function findCrews(caller: Planner, date: string, { orders: asked }: Crew
     const crews = board.vehicles.filter((vehicle) => usual.has(vehicle.id)).map((vehicle): Crew => {
       const own = board.plan.trips.filter((t) => t.vehicleId === vehicle.id);
       const ran = districts.get(vehicle.id) ?? [];
-      const misfits = misfitsOf(vehicle.id);
+      const readyAt = own.length > 0 ? readyOf(vehicle.id) : null;
+      const misfits = [...misfitsOf(vehicle.id), ...(readyAt !== null && readyAt > closes ? [{ code: 'ready_late' as const, orderId: null, outletId: null }] : [])];
       return {
         vehicleId: vehicle.id, driverId: driverOf(vehicle, own),
-        type: vehicle.type, temp: vehicle.temp, weightCapKg: vehicle.weightCapKg, volumeCapM3: vehicle.volumeCapM3, fuelLeftPct: vehicle.fuelLeftPct,
+        type: vehicle.type, temp: vehicle.temp, weightCapKg: vehicle.weightCapKg, volumeCapM3: vehicle.volumeCapM3, fuelLeftPct: vehicle.fuelLeftPct, readyAt,
         lastDistricts: ran, ranHere: ran.some((district) => here.has(district)), fits: misfits.length === 0, misfits,
         unavailable: vehicle.working ? (own.length >= 2 ? { kind: 'two_trips' } : null) : { kind: 'workshop', reason: offReasonOf(vehicle) },
       };

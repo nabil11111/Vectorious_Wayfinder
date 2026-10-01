@@ -53,6 +53,8 @@ const list = new Intl.ListFormat('en-GB');
 // Why a truck may not take the orders, in a few words, from the crews read's misfits.
 function misfitWords(crew: Crew, load: CrewList['load'], index: BoardIndex): string[] {
   const words: string[] = [];
+  // Ready again only after every window closes, as the read decides (L-04).
+  if (crew.misfits.some((m) => m.code === 'ready_late') && crew.readyAt !== null) words.push(`ready ${hhmm(crew.readyAt)}, after every window closes`);
   if (crew.misfits.some((m) => m.code === 'over_weight')) words.push(`too heavy: ${tonnes(load.kg)} of ${tonnes(crew.weightCapKg)}`);
   if (crew.misfits.some((m) => m.code === 'over_volume')) words.push(`too big: ${cubic(load.m3)} of ${cubic(crew.volumeCapM3)}`);
   for (const outletId of new Set(crew.misfits.filter((m) => m.code === 'van_only').map((m) => m.outletId))) {
@@ -75,7 +77,8 @@ export function crewRows(read: CrewList, pick: Pick, plan: DraftPlan, index: Boa
       const why = crew.unavailable?.kind === 'workshop' ? `in the workshop: ${crew.unavailable.reason.toLowerCase()}` : 'on two trips already';
       return { vehicleId: crew.vehicleId, driverId: crew.driverId, title, line: why, warning: null, disabled: true };
     }
-    const ready = tripNo === 2 ? index.trip(crew.vehicleId, 1)?.times?.readyAgainAt : undefined;
+    // When a second trip is ready, from the read, unless its misfit has said so already.
+    const ready = tripNo === 2 && !crew.misfits.some((m) => m.code === 'ready_late') ? crew.readyAt ?? undefined : undefined;
     const line = [
       ...(read.orderIds.length > 0 ? (crew.fits ? ['fits'] : misfitWords(crew, read.load, index)) : []),
       ...(tripNo === 2 ? [`trip 2${ready !== undefined ? ` · ready ${hhmm(ready)}` : ''}`] : []),

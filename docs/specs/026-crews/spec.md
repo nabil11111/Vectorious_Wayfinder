@@ -29,7 +29,9 @@ Nabil, 1 Oct:
   It is a dropdown of crews, each row reading "Chaminda · dry truck · 7.2 t · 38 m³", with what matters for these
   orders under it, such as "fits", "ran Galle last time", "fuel 62% left" or "cannot reach Tech Kadugannawa: van only".
   The order:
-  1. crews whose truck fits the trip's orders (weight, volume, fridge, every shop reachable);
+  1. crews whose truck fits the trip's orders (weight, volume, fridge, every shop reachable) and, on a second trip, is
+     ready before the last of their windows closes; one ready after says so: "ready 08:18, after every window closes"
+     (L-04);
   2. then those that ran this district on the latest sent plan;
   3. then the most fuel left.
 

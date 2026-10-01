@@ -285,9 +285,10 @@ export const CrewQuery = z.object({
 export type CrewQuery = z.infer<typeof CrewQuery>;
 
 // Why a truck may not take the orders, by the checker's cargo rules (spec 007): more weight or volume than it takes, a
-// chilled order and no fridge, or a shop that takes vans only. The order or shop it is about, as the checker's problem
-// names it, or null.
-export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only'] as const;
+// chilled order and no fridge, or a shop that takes vans only; or, for a truck on its first trip already, that it is
+// ready again only after every window of the orders closes (L-04). The order or shop it is about, as the checker's
+// problem names it, or null.
+export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only', 'ready_late'] as const;
 export const CrewMisfit = z.object({ code: z.enum(CREW_MISFITS), orderId: z.uuid().nullable(), outletId: z.string().nullable() });
 export type CrewMisfit = z.infer<typeof CrewMisfit>;
 
@@ -303,6 +304,9 @@ export const Crew = z.object({
   weightCapKg: z.number(),
   volumeCapM3: z.number(),
   fuelLeftPct: z.number(),
+  // When a truck on its first trip already is ready again for a second, by the checker's times; null for a truck with no
+  // trip yet, which leaves at the usual time.
+  readyAt: Minutes.nullable(),
   // The districts it ran on the depot's latest sent plan, and whether one of them is a district of the orders.
   lastDistricts: z.array(z.string()),
   ranHere: z.boolean(),
