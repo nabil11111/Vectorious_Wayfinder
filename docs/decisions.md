@@ -140,6 +140,14 @@ truck needs the dispatcher to see the flag and answer it, and the rest of Live d
 **D-40 · 1 Oct · The loader's screens show what the data holds: one list in leaving order, with no waves, dock numbers
 or call buttons.** Every trip has its own leaving time (D-19), and the data has no docks and no phone numbers.
 
+**D-41 · 1 Oct · The planner serves chilled orders before dry ones of the same waiting age, even when a dry one
+closes earlier** (the lead's pick, until Nabil answers). Fridge trips are what the seeded day is short of, and a
+window stays a hard check, so a dry order that misses its window is still deferred with its reason.
+
+**D-42 · 1 Oct · A shop's new order keeps its own place in the queue and does not take its older order's
+priority** (the lead's pick, until Nabil answers). The waiting goods are protected first, and a new bulk order
+cannot push another shop's waiting order back.
+
 **D-43 · 1 Oct · The driver's no-signal screens come with A4, and A6 keeps only the receipt that waits on the shop's
 phone, built with A5.** The design draws the driver's no-signal states beside the driver's own screens and they share one
 save-first queue, and the waiting receipt belongs with the shop confirming what arrived.
@@ -179,3 +187,24 @@ cannot load would strand the driver.
 in the contracts that a test holds the server to, and never shows a write's answer: after each write it fetches the day
 again.** With no signal the phone must show what the server will say, one function cannot drift from itself, and an
 answer that arrives late must not bring back an older day.
+
+**D-51 · 1 Oct · One write builds the suggested plan and saves it in one transaction.** The draft and the orders the
+planner splits land together or not at all, so a refused build leaves the board as it was. It saves with the same
+`replaceDraft` and checks as a hand save (D-29).
+
+**D-52 · 1 Oct · A build replaces the whole draft, and the screen asks first.** The planner plans the day from the
+shops' orders (spec 011), so splits made on the draft are joined back before it plans, and a mix of hand trips and
+suggested ones would be neither plan. Each vehicle keeps its driver, since a driver is not part of the allocation
+(D-31).
+
+**D-53 · 1 Oct · The plan keeps its suggestion.** When it was built, the draft it saved, the planner's reason for every
+order and its decisions stay with the plan, so the reasons and the decisions survive a reload, and a decision is judged
+against the planner's own choice. Hand edits leave it as built, and the next build replaces it.
+
+**D-54 · 1 Oct · The planner's decisions are accepted before the plan is sent.** Leaving early, an order that waited
+waiting again and a late order waiting are the dispatcher's calls (D-10, D-11, D-19), and a checker warning is not
+consent (spec 011). An edit that changes the planner's choice ends its decision.
+
+**D-55 · 1 Oct · "why?" shows the planner's reason for an order** (our pick, until Nabil answers). A judge and a
+dispatcher must be able to ask why an order went where it did. The design's chips that ask why the dispatcher changed
+the suggestion are not built, because a deferral already carries its reason (spec 010, rule 7).

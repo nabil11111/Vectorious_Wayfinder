@@ -7,13 +7,15 @@ import deliveryWindow from '@/assets/icons/icon-delivery-window.png';
 import orderDelivered from '@/assets/icons/icon-order-delivered.png';
 import orderWaiting from '@/assets/icons/icon-order-waiting.png';
 import route from '@/assets/icons/icon-route.png';
+import secondTrip from '@/assets/icons/icon-second-trip.png';
 import lorry from '@/assets/icons/icon-truck-lorry.png';
 import reefer from '@/assets/icons/icon-truck-reefer.png';
 import van from '@/assets/icons/icon-van.png';
 import warning from '@/assets/icons/icon-warning.png';
 
-// The design's own pictures, named by what they stand for on the plan board.
-export const ICON = { unplanned: orderWaiting, trucks: lorry, done: orderDelivered, route, checks: warning, cutoff, day: deliveryWindow };
+// The design's own pictures, named by what they stand for on the plan board. The planner's decisions take the
+// picture of the design's Suggestions card, whose place they have on View plan (spec 014).
+export const ICON = { unplanned: orderWaiting, trucks: lorry, done: orderDelivered, route, checks: warning, cutoff, day: deliveryWindow, decisions: secondTrip };
 
 export const BRAND_ICON: Record<Brand, string> = { Fresh: brandFresh, Style: brandStyle, Tech: brandTech };
 

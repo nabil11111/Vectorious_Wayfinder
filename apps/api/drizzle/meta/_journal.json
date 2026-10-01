@@ -47,8 +47,15 @@
     {
       "idx": 6,
       "version": "7",
-      "when": 1790810655152,
-      "tag": "0006_driver",
+      "when": 1790812818036,
+      "tag": "0006_suggested-plan",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790817218553,
+      "tag": "0007_driver",
       "breakpoints": true
     }
   ]

@@ -85,6 +85,72 @@ export type UnsendPlanRequest = z.infer<typeof UnsendPlanRequest>;
 export const SlotQuery = z.object({ orderId: z.uuid() });
 export type SlotQuery = z.infer<typeof SlotQuery>;
 
+// Building the suggested plan (spec 014) names the plan on screen as the send does. The first build of a day, with
+// no plan yet, names the demo day.
+export const SuggestPlanRequest = PlanRef;
+export type SuggestPlanRequest = z.infer<typeof SuggestPlanRequest>;
+
+// A decision's key: early_leave:VEH002:1, waited_again:<order id> or late_order:<order id>.
+const DecisionKey = z.string().min(1).max(64);
+
+// Accepting the planner's decisions, each named once. 700 is above what a day of 300 orders and 76 trips can give.
+export const AcceptDecisionsRequest = withRef({
+  keys: z.array(DecisionKey).min(1).max(700).refine((keys) => new Set(keys).size === keys.length, 'Name each decision once.'),
+});
+export type AcceptDecisionsRequest = z.infer<typeof AcceptDecisionsRequest>;
+
+// ── The suggested plan (spec 014) ────────────────────────────────────────────────────────────────────────────────
+
+// The choices the planner leaves to the dispatcher (spec 011's PlannerDecision kinds): a trip set to leave before its
+// usual time to meet a window (D-19), an order that waited before waiting again (D-10), and an order deferred because
+// no truck can reach the shop in its window or mall slot (D-11).
+export const DECISION_KINDS = ['early_leave', 'waited_again', 'late_order'] as const;
+export const DecisionKind = z.enum(DECISION_KINDS);
+export type DecisionKind = z.infer<typeof DecisionKind>;
+
+// One order as the planner got it: its rank from 1, the orders it became (itself, or its two parts with the first
+// part first) and the planner's reason in its own words.
+export const SuggestionChoice = z.object({
+  orderId: z.uuid(),
+  rank: z.number().int().min(1),
+  resultOrderIds: z.array(z.uuid()).min(1).max(2),
+  reason: z.string().min(1).max(1000),
+});
+export type SuggestionChoice = z.infer<typeof SuggestionChoice>;
+
+// One of the planner's decisions, with the planner's reason. orderId is set for waited_again and late_order, and
+// vehicleId, tripNo and leaveAt for early_leave; the others are null. acceptedAt is when the dispatcher accepted it.
+export const SuggestionDecision = z.object({
+  key: DecisionKey,
+  kind: DecisionKind,
+  reason: z.string().min(1).max(1000),
+  orderId: z.uuid().nullable(),
+  vehicleId: z.string().min(1).max(16).nullable(),
+  tripNo: z.union([z.literal(1), z.literal(2)]).nullable(),
+  leaveAt: Minutes.nullable(),
+  acceptedAt: Moment.nullable(),
+});
+export type SuggestionDecision = z.infer<typeof SuggestionDecision>;
+
+// What a plan keeps of its last build (D-53): when it was built, the draft the build saved as the board reads it
+// back, which decisions are judged against, the choices in rank order and the decisions in the planner's order.
+export const Suggestion = z.object({
+  builtAt: Moment,
+  plan: DraftPlan,
+  choices: z.array(SuggestionChoice).max(300),
+  decisions: z.array(SuggestionDecision).max(700),
+});
+export type Suggestion = z.infer<typeof Suggestion>;
+
+// The suggestion as the board answers it. A decision is open while it is not accepted and the saved draft still holds
+// the planner's own choice (spec 014, rule 6). The saved draft stays on the server.
+export const BoardSuggestion = z.object({
+  builtAt: Moment,
+  choices: z.array(SuggestionChoice).max(300),
+  decisions: z.array(SuggestionDecision.extend({ open: z.boolean() })).max(700),
+});
+export type BoardSuggestion = z.infer<typeof BoardSuggestion>;
+
 // ── The board, which every read and every write answers with ──────────────────────────────────────────────────
 
 export const BoardOrder = z.object({
@@ -194,6 +260,8 @@ export const PlanBoard = z.object({
   drivers: z.array(BoardDriver),
   figures: z.array(TripFigures).nullable(),
   counts: BoardCounts.nullable(),
+  // The plan's suggested plan, or null when it was never built (spec 014).
+  suggestion: BoardSuggestion.nullable(),
 });
 export type PlanBoard = z.infer<typeof PlanBoard>;
 
@@ -212,6 +280,7 @@ export type SlotSearch = z.infer<typeof SlotSearch>;
 export const PLAN_ERROR_CODES = [
   'no_depot', 'orders_open', 'no_plan_day', 'day_moved', 'plan_sent', 'stale', 'invalid_input', 'unknown_record',
   'driver_taken', 'cannot_split', 'cannot_join', 'not_ready', 'split_mismatch', 'departed_already', 'loading_started',
+  'planner_unavailable', 'decisions_open',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 
@@ -228,3 +297,9 @@ export type SplitMismatchDetails = z.infer<typeof SplitMismatchDetails>;
 // departed_already and loading_started name the trip.
 export const TripDetails = z.object({ vehicleId: z.string(), tripNo: z.number().int() });
 export type TripDetails = z.infer<typeof TripDetails>;
+// planner_unavailable: the planner's blocks, empty when the day has more orders than the planner plans (spec 014).
+export const PlannerUnavailableDetails = z.object({ blocks: z.array(Problem) });
+export type PlannerUnavailableDetails = z.infer<typeof PlannerUnavailableDetails>;
+// decisions_open: the keys of the planner's decisions still open.
+export const DecisionsOpenDetails = z.object({ keys: z.array(DecisionKey) });
+export type DecisionsOpenDetails = z.infer<typeof DecisionsOpenDetails>;

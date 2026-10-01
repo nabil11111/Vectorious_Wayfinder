@@ -3,17 +3,21 @@ import type { BoardOrder, BoardShop, StopTime } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import { deferredOn, entranceAndWindow, hhmm, orderAmount, partLine } from '../words';
 import { MenuGroup, MenuItem, MenuLabel, MenuPopup, MenuRoot, MenuSeparator, MenuTrigger, Tag } from './ui';
+import { Why, type WhyReason } from './Why';
 
 // One stop of the open trip (Edit plan, "Stops in order"): its number, when the checker says it arrives, the
-// shop, its entrance and window, the wait, the unloading and when it leaves, and "⋮" with what can be done: move
-// it, and for each of its orders take it off, split it, defer it or join a split order back.
-export function StopRow({ seq, shop, orders, time, longWait, first, last, onMove, onTakeOff, onSplit, onDefer, onJoin, children }: {
+// shop, its entrance and window, the wait, the unloading and when it leaves, "why?" with the planner's reason for
+// its orders (spec 014), and "⋮" with what can be done: move it, and for each of its orders take it off, split it,
+// defer it or join a split order back.
+export function StopRow({ seq, shop, orders, time, longWait, why, first, last, onMove, onTakeOff, onSplit, onDefer, onJoin, children }: {
   seq: number;
   shop: BoardShop;
   orders: BoardOrder[];
   // The checker's times, or null while the trip on screen is not the one it timed.
   time: StopTime | null;
   longWait: boolean;
+  // The planner's reason for each of the stop's orders it planned. Empty when it planned none of them.
+  why: WhyReason[];
   first: boolean;
   last: boolean;
   onMove: (by: -1 | 1) => void;
@@ -40,6 +44,7 @@ export function StopRow({ seq, shop, orders, time, longWait, first, last, onMove
           <span className={cn('font-mono text-[11px] leading-[14px]', longWait ? 'text-warn-ink' : 'text-muted-foreground')}>{doing}</span>
         </div>
         {late && <Tag tone="bad" className="text-[10px]">late</Tag>}
+        {why.length > 0 && <Why title={shop.name} reasons={why} />}
         <MenuRoot>
           <MenuTrigger aria-label={`More for stop ${seq}, ${shop.name}`} className="flex h-[22px] w-6 shrink-0 items-center justify-center rounded-md text-sm font-bold text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 data-popup-open:bg-muted">⋮</MenuTrigger>
           <MenuPopup>

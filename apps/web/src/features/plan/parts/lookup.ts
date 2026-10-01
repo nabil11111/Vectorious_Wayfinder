@@ -1,5 +1,14 @@
-import type { BoardDriver, BoardOrder, BoardShop, BoardVehicle, Brand, PlanBoard, Problem, TripCheck, TripFigures, VehicleDay } from '@wayfinder/contracts';
+import type {
+  BoardDriver, BoardOrder, BoardShop, BoardSuggestion, BoardVehicle, Brand, PlanBoard, Problem, SuggestionChoice, TripCheck, TripFigures, VehicleDay,
+} from '@wayfinder/contracts';
 import { countOf } from '../words';
+
+// One of the planner's decisions as the board answers it (spec 014).
+export type BoardDecision = BoardSuggestion['decisions'][number];
+
+// The decisions the screens list: open ones and accepted ones. A decision an edit has ended is not listed (rule 6).
+export const listed = (decision: BoardDecision) => decision.open || decision.acceptedAt !== null;
+export const decisionsOf = (board: PlanBoard): BoardDecision[] => board.suggestion?.decisions.filter(listed) ?? [];
 
 // A group of the unplanned list: a brand and a district.
 export const groupKey = (brand: Brand, district: string) => `${brand}-${district}`;
@@ -43,6 +52,17 @@ export interface BoardIndex {
   vehicleDay: (vehicleId: string) => VehicleDay | null;
   // A trip's problems: those about it, its stops and its orders, and those about its whole vehicle.
   problems: (vehicleId: string, tripNo: number) => Problem[];
+  // The planner's choice for this order, so both parts of a split find their original's (spec 014). null for an order
+  // the planner never saw, such as a part split by hand after the build.
+  choice: (orderId: string) => SuggestionChoice | null;
+  // The planner's decisions about this order, listed or not, in the planner's order.
+  decisions: (orderId: string) => BoardDecision[];
+}
+
+// The name of the shop a decision's order goes to, or null for an early departure or an order the board no longer has.
+export function decisionShop(index: BoardIndex, decision: BoardDecision): string | null {
+  const order = decision.orderId === null ? null : index.order(decision.orderId);
+  return order ? index.shop(order.outletId)?.name ?? null : null;
 }
 
 const byId = <T extends { id: string }>(rows: T[]) => {
@@ -59,6 +79,12 @@ export function indexOf(board: PlanBoard): BoardIndex {
   const order = byId(board.orders);
   const vehicle = byId(board.vehicles);
   const driver = byId(board.drivers);
+  // By the orders each choice became, and by the order the planner got, which an original joined back by hand is again.
+  const choices = new Map((board.suggestion?.choices ?? []).flatMap((choice) => [choice.orderId, ...choice.resultOrderIds].map((id) => [id, choice] as const)));
+  const decided = new Map<string, BoardDecision[]>();
+  for (const decision of board.suggestion?.decisions ?? []) {
+    if (decision.orderId !== null) decided.set(decision.orderId, [...(decided.get(decision.orderId) ?? []), decision]);
+  }
   return {
     shop: (id) => shop(id),
     order: (id) => order(id),
@@ -68,5 +94,7 @@ export function indexOf(board: PlanBoard): BoardIndex {
     figures: (vehicleId, tripNo) => figures.get(`${vehicleId}-${tripNo}`) ?? null,
     vehicleDay: (vehicleId) => days.get(vehicleId) ?? null,
     problems: (vehicleId, tripNo) => problems.filter((p) => p.vehicleId === vehicleId && (p.tripNo === undefined || p.tripNo === tripNo)),
+    choice: (orderId) => choices.get(orderId) ?? null,
+    decisions: (orderId) => decided.get(orderId) ?? [],
   };
 }

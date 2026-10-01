@@ -1,5 +1,5 @@
 {
-  "id": "0fb35fa0-e8d3-4bef-8c1e-216e6afdcbaf",
+  "id": "485a33c1-e7ab-4c48-a7da-766e3aeb570f",
   "prevId": "7c9d1132-8173-425a-83a9-89fc986f7f80",
   "version": "7",
   "dialect": "postgresql",
@@ -686,12 +686,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
-        },
-        "delivered_qty": {
-          "name": "delivered_qty",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -739,10 +733,6 @@
         "order_lines_quantity_positive": {
           "name": "order_lines_quantity_positive",
           "value": "\"order_lines\".\"quantity\" > 0"
-        },
-        "order_lines_delivered_qty": {
-          "name": "order_lines_delivered_qty",
-          "value": "\"order_lines\".\"delivered_qty\" between 0 and \"order_lines\".\"loaded_qty\""
         },
         "order_lines_loaded_qty": {
           "name": "order_lines_loaded_qty",
@@ -1110,6 +1100,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "suggestion": {
+          "name": "suggestion",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "uuid",
@@ -1274,38 +1270,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "retried_at": {
-          "name": "retried_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "arrived_at": {
-          "name": "arrived_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "done_at": {
-          "name": "done_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "outcome": {
-          "name": "outcome",
-          "type": "stop_outcome",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -1349,12 +1313,7 @@
         }
       },
       "policies": {},
-      "checkConstraints": {
-        "stops_done": {
-          "name": "stops_done",
-          "value": "(\"stops\".\"outcome\" is null and \"stops\".\"done_at\" is null) or (\"stops\".\"outcome\" is not null and \"stops\".\"done_at\" is not null and \"stops\".\"arrived_at\" is not null)"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.trips": {
@@ -1421,24 +1380,6 @@
         },
         "ready_at": {
           "name": "ready_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "left_at": {
-          "name": "left_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "back_at": {
-          "name": "back_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_event_at": {
-          "name": "last_event_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -2036,226 +1977,6 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.driver_writes": {
-      "name": "driver_writes",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "driver_id": {
-          "name": "driver_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "trip_id": {
-          "name": "trip_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "body_hash": {
-          "name": "body_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "answered_at": {
-          "name": "answered_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "driver_writes_driver": {
-          "name": "driver_writes_driver",
-          "columns": [
-            {
-              "expression": "driver_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "answered_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "driver_writes_driver_id_users_id_fk": {
-          "name": "driver_writes_driver_id_users_id_fk",
-          "tableFrom": "driver_writes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "driver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "driver_writes_trip_id_trips_id_fk": {
-          "name": "driver_writes_trip_id_trips_id_fk",
-          "tableFrom": "driver_writes",
-          "tableTo": "trips",
-          "columnsFrom": [
-            "trip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.photos": {
-      "name": "photos",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "stop_id": {
-          "name": "stop_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "issue_id": {
-          "name": "issue_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "jpeg": {
-          "name": "jpeg",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "taken_by": {
-          "name": "taken_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "taken_at": {
-          "name": "taken_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "photos_issue": {
-          "name": "photos_issue",
-          "columns": [
-            {
-              "expression": "issue_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "photos_proof": {
-          "name": "photos_proof",
-          "columns": [
-            {
-              "expression": "stop_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"photos\".\"issue_id\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "photos_stop_id_stops_id_fk": {
-          "name": "photos_stop_id_stops_id_fk",
-          "tableFrom": "photos",
-          "tableTo": "stops",
-          "columnsFrom": [
-            "stop_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "photos_issue_id_issues_id_fk": {
-          "name": "photos_issue_id_issues_id_fk",
-          "tableFrom": "photos",
-          "tableTo": "issues",
-          "columnsFrom": [
-            "issue_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "photos_taken_by_users_id_fk": {
-          "name": "photos_taken_by_users_id_fk",
-          "tableFrom": "photos",
-          "tableTo": "users",
-          "columnsFrom": [
-            "taken_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -2281,9 +2002,7 @@
       "name": "issue_kind",
       "schema": "public",
       "values": [
-        "loading",
-        "refused",
-        "closed"
+        "loading"
       ]
     },
     "public.issue_status": {
@@ -2335,15 +2054,6 @@
         "loader",
         "driver",
         "admin"
-      ]
-    },
-    "public.stop_outcome": {
-      "name": "stop_outcome",
-      "schema": "public",
-      "values": [
-        "delivered",
-        "refused",
-        "closed"
       ]
     },
     "public.temp": {

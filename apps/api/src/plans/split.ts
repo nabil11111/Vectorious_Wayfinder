@@ -8,6 +8,7 @@ import type { Planner } from '../routes/plans';
 import { boardOf } from './board';
 import { finishPlan, openPlan, replaceDraft, unknownRecord } from './draft';
 
+type Order = typeof orders.$inferSelect;
 const cannotSplit = () => new HttpError(409, 'cannot_split', 'A part or an order deferred in this draft cannot be split.');
 const cannotJoin = () => new HttpError(409, 'cannot_join', 'Both parts must still be placed and belong to no other plan.');
 const invalidSplit = () => new HttpError(400, 'invalid_input', 'Choose each product once, within its quantity, and leave at least one unit in each part.');
@@ -40,6 +41,66 @@ async function originalOf(tx: Tx, caller: Planner, date: string, id: string) {
   return row.order;
 }
 
+// The order work of a split (rule 8), for a hand split and the planner's alike. The original becomes `split` with its
+// revision up, and two parts start `placed` with its shop, temperature, wanted day, note, placed time and placer: the
+// first with keep's lines and the second with the rest. The parts must add up, and order.split is written. Refuses a
+// keep that names a product twice or one the original lacks, asks for more than it has, or leaves a part empty.
+export async function makeParts(tx: Tx, caller: Planner, original: Order, keep: { productId: string; quantity: number }[]): Promise<[Order, Order]> {
+  const originalLines = await tx.select().from(orderLines).where(eq(orderLines.orderId, original.id));
+  const kept = new Map<string, number>();
+  for (const line of keep) {
+    const source = originalLines.find((l) => l.productId === line.productId);
+    if (!source || kept.has(line.productId) || line.quantity > source.quantity) throw invalidSplit();
+    kept.set(line.productId, line.quantity);
+  }
+  const firstLines = originalLines.map((line) => ({ productId: line.productId, quantity: kept.get(line.productId) ?? 0 })).filter((line) => line.quantity > 0);
+  const secondLines = originalLines.map((line) => ({ productId: line.productId, quantity: line.quantity - (kept.get(line.productId) ?? 0) })).filter((line) => line.quantity > 0);
+  if (!firstLines.length || !secondLines.length) throw invalidSplit();
+
+  await tx.update(orders).set({ status: 'split', revision: sql`${orders.revision} + 1` }).where(eq(orders.id, original.id));
+  const child = { outletId: original.outletId, temp: original.temp, deliveryDate: original.deliveryDate,
+    status: 'placed' as const, driverNote: original.driverNote, placedAt: original.placedAt, placedBy: original.placedBy,
+    createdBy: original.createdBy, savedAt: original.savedAt, splitFrom: original.id };
+  const [first] = await tx.insert(orders).values(child).returning();
+  const [second] = await tx.insert(orders).values(child).returning();
+  await tx.insert(orderLines).values([
+    ...firstLines.map((line) => ({ ...line, orderId: first!.id })),
+    ...secondLines.map((line) => ({ ...line, orderId: second!.id })),
+  ]);
+  if (!await partsAddUp(tx, original.id)) throw new HttpError(409, 'split_mismatch', 'The parts do not add up to their original.', { orderId: original.id });
+  await tx.insert(auditLog).values({ actorId: caller.userId, action: 'order.split', entity: 'order', entityId: original.id,
+    before: { ...original, lines: originalLines }, after: { status: 'split', revision: original.revision + 1, parts: [{ ...first, lines: firstLines }, { ...second, lines: secondLines }] } });
+  return [first!, second!];
+}
+
+// The parts of a split original that can be joined back on this plan (rule 8): exactly two, both still placed, and on
+// no stop or deferral of another plan. null when they cannot be.
+export async function joinableParts(tx: Tx, planId: string, original: Order): Promise<Order[] | null> {
+  if (original.status !== 'split' || original.splitFrom) return null;
+  const children = await tx.select().from(orders).where(eq(orders.splitFrom, original.id));
+  if (children.length !== 2 || children.some((c) => c.status !== 'placed')) return null;
+  const ids = children.map((c) => c.id);
+  const otherStops = await tx.select({ id: stopOrders.orderId }).from(stopOrders)
+    .innerJoin(stops, eq(stops.id, stopOrders.stopId)).innerJoin(trips, eq(trips.id, stops.tripId))
+    .where(and(inArray(stopOrders.orderId, ids), ne(trips.planId, planId))).limit(1);
+  const otherDeferrals = await tx.select({ id: deferrals.orderId }).from(deferrals)
+    .where(and(inArray(deferrals.orderId, ids), ne(deferrals.planId, planId))).limit(1);
+  return otherStops.length || otherDeferrals.length ? null : children;
+}
+
+// The order work of a join (rule 8), for a hand join and a build alike, once the parts are off every stop and deferral:
+// the parts go with their lines, and the original is placed again, or deferred when a sent plan deferred it, with its
+// revision up and order.joined.
+export async function joinParts(tx: Tx, caller: Planner, original: Order, parts: Order[]): Promise<void> {
+  await tx.delete(orders).where(inArray(orders.id, parts.map((p) => p.id)));
+  const oldDeferrals = await tx.select({ id: deferrals.id }).from(deferrals).innerJoin(plans, eq(plans.id, deferrals.planId))
+    .where(and(eq(deferrals.orderId, original.id), eq(plans.status, 'published'))).limit(1);
+  const status = oldDeferrals.length ? 'deferred' : 'placed';
+  await tx.update(orders).set({ status, revision: sql`${orders.revision} + 1` }).where(eq(orders.id, original.id));
+  await tx.insert(auditLog).values({ actorId: caller.userId, action: 'order.joined', entity: 'order', entityId: original.id,
+    before: { ...original, parts }, after: { status, revision: original.revision + 1 } });
+}
+
 export async function splitOrder(caller: Planner, date: string, body: SplitOrderRequest): Promise<PlanBoard> {
   const request = SplitOrderRequest.parse(body);
   const result = await db.transaction(async (tx) => {
@@ -50,33 +111,10 @@ export async function splitOrder(caller: Planner, date: string, body: SplitOrder
     if (original.splitFrom || board.plan.deferrals.some((d) => d.orderId === original.id)) throw cannotSplit();
     const occurrences = board.plan.trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds)).filter((id) => id === original.id);
     if (occurrences.length > 1) throw new HttpError(400, 'invalid_input', 'An order on two stops cannot be split.');
-    const originalLines = await tx.select().from(orderLines).where(eq(orderLines.orderId, original.id));
-    const kept = new Map<string, number>();
-    for (const line of request.keep) {
-      const source = originalLines.find((l) => l.productId === line.productId);
-      if (!source || kept.has(line.productId) || line.quantity > source.quantity) throw invalidSplit();
-      kept.set(line.productId, line.quantity);
-    }
-    const firstLines = originalLines.map((line) => ({ productId: line.productId, quantity: kept.get(line.productId) ?? 0 })).filter((line) => line.quantity > 0);
-    const secondLines = originalLines.map((line) => ({ productId: line.productId, quantity: line.quantity - (kept.get(line.productId) ?? 0) })).filter((line) => line.quantity > 0);
-    if (!firstLines.length || !secondLines.length) throw invalidSplit();
-
-    await tx.update(orders).set({ status: 'split', revision: sql`${orders.revision} + 1` }).where(eq(orders.id, original.id));
-    const child = { outletId: original.outletId, temp: original.temp, deliveryDate: original.deliveryDate,
-      status: 'placed' as const, driverNote: original.driverNote, placedAt: original.placedAt, placedBy: original.placedBy,
-      createdBy: original.createdBy, savedAt: original.savedAt, splitFrom: original.id };
-    const [first] = await tx.insert(orders).values(child).returning();
-    const [second] = await tx.insert(orders).values(child).returning();
-    await tx.insert(orderLines).values([
-      ...firstLines.map((line) => ({ ...line, orderId: first!.id })),
-      ...secondLines.map((line) => ({ ...line, orderId: second!.id })),
-    ]);
+    const [first] = await makeParts(tx, caller, original, request.keep);
     await replaceDraft(tx, opened.plan.id, { ...board.plan, trips: board.plan.trips.map((trip) => ({ ...trip,
-      stops: trip.stops.map((stop) => ({ ...stop, orderIds: stop.orderIds.map((id) => id === original.id ? first!.id : id) })),
+      stops: trip.stops.map((stop) => ({ ...stop, orderIds: stop.orderIds.map((id) => id === original.id ? first.id : id) })),
     })) });
-    if (!await partsAddUp(tx, original.id)) throw new HttpError(409, 'split_mismatch', 'The parts do not add up to their original.', { orderId: original.id });
-    await tx.insert(auditLog).values({ actorId: caller.userId, action: 'order.split', entity: 'order', entityId: original.id,
-      before: { ...original, lines: originalLines }, after: { status: 'split', revision: original.revision + 1, parts: [{ ...first, lines: firstLines }, { ...second, lines: secondLines }] } });
     return { board: await finishPlan(tx, opened), outletId: original.outletId };
   });
   announce({ topic: 'plans', depotId: caller.depotId });
@@ -89,16 +127,9 @@ export async function joinOrder(caller: Planner, date: string, body: JoinOrderRe
   const result = await db.transaction(async (tx) => {
     const opened = await openPlan(tx, caller, date, request);
     const original = await originalOf(tx, caller, date, request.orderId);
-    if (original.status !== 'split' || original.splitFrom) throw cannotJoin();
-    const children = await tx.select().from(orders).where(eq(orders.splitFrom, original.id));
-    if (children.length !== 2 || children.some((c) => c.status !== 'placed')) throw cannotJoin();
-    const ids = children.map((c) => c.id);
-    const otherStops = await tx.select({ id: stopOrders.orderId }).from(stopOrders)
-      .innerJoin(stops, eq(stops.id, stopOrders.stopId)).innerJoin(trips, eq(trips.id, stops.tripId))
-      .where(and(inArray(stopOrders.orderId, ids), ne(trips.planId, opened.plan.id))).limit(1);
-    const otherDeferrals = await tx.select({ id: deferrals.orderId }).from(deferrals)
-      .where(and(inArray(deferrals.orderId, ids), ne(deferrals.planId, opened.plan.id))).limit(1);
-    if (otherStops.length || otherDeferrals.length) throw cannotJoin();
+    const parts = await joinableParts(tx, opened.plan.id, original);
+    if (!parts) throw cannotJoin();
+    const ids = parts.map((c) => c.id);
     const board = await boardOf(tx, caller.depotId, date, opened.moment);
     await replaceDraft(tx, opened.plan.id, { ...board.plan,
       trips: board.plan.trips.map((trip) => ({ ...trip, stops: trip.stops.map((stop) => ({ ...stop,
@@ -106,13 +137,7 @@ export async function joinOrder(caller: Planner, date: string, body: JoinOrderRe
       })).filter((stop) => stop.orderIds.length > 0) })),
       deferrals: board.plan.deferrals.filter((d) => !ids.includes(d.orderId)),
     });
-    await tx.delete(orders).where(inArray(orders.id, ids));
-    const oldDeferrals = await tx.select({ id: deferrals.id }).from(deferrals).innerJoin(plans, eq(plans.id, deferrals.planId))
-      .where(and(eq(deferrals.orderId, original.id), eq(plans.status, 'published'))).limit(1);
-    const status = oldDeferrals.length ? 'deferred' : 'placed';
-    await tx.update(orders).set({ status, revision: sql`${orders.revision} + 1` }).where(eq(orders.id, original.id));
-    await tx.insert(auditLog).values({ actorId: caller.userId, action: 'order.joined', entity: 'order', entityId: original.id,
-      before: { ...original, parts: children }, after: { status, revision: original.revision + 1 } });
+    await joinParts(tx, caller, original, parts);
     return { board: await finishPlan(tx, opened), outletId: original.outletId };
   });
   announce({ topic: 'plans', depotId: caller.depotId });

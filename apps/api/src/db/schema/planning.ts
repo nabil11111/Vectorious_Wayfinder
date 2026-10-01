@@ -24,6 +24,10 @@ export const plans = pgTable('plans', {
   // The checker's result when the plan was sent, which the sent plan shows. Empty for a draft, and for plans sent
   // before this column existed, such as the seed's earlier days (spec 010).
   sentCheck: jsonb('sent_check'),
+  // The planner's suggestion (spec 014, D-53), read and written whole: when it was built, the draft the build saved,
+  // the planner's reason for every order and its decisions. Empty until the plan's first build, and the next build
+  // replaces it. Hand edits leave it as built.
+  suggestion: jsonb('suggestion'),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique('plans_depot_date').on(t.depotId, t.date)]);
