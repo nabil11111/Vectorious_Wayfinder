@@ -193,6 +193,7 @@ export function placementReason(input: PlannerInput, order: PlannerOrder, attemp
       'shares a stop to free a run': 'shares a stop',
       'moved to free a run': 'moved to free a run',
       'takes a run freed for it': 'freed run',
+      'parts rebalanced so both go': 'rebalanced',
     };
     const why = attempt.selectionReason ? shorter[attempt.selectionReason] ?? attempt.selectionReason : 'fits delivery limits';
     // The tightest wordings leave out the deciding rule, and only that.

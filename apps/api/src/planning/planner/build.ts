@@ -9,7 +9,7 @@ import {
 } from './reasons';
 import { chooseWhole, type CandidateAttempt } from './candidates';
 import { freeRunFor, type Relocations } from './repair';
-import { chooseAllocation, splitLimitDetail } from './split';
+import { chooseAllocation, rebalance, splitLimitDetail } from './split';
 
 // A choice's reason is worded once the plan is final, because freeing a run for a later order can move an earlier
 // order's goods onto another run, and its reason must say where they went.
@@ -112,10 +112,12 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
       continue;
     }
 
+    // Before the first part is accepted, so AC-13's rebalance can try the two parts again from the same plan.
+    const before: PlanInput = { ...input, orders: [...input.orders], plan: { ...input.plan, trips: [...input.plan.trips] } };
+    const causesBefore = new Map(earlyCauses);
     accept(best, order, rank, proposal?.kept.id ?? order.id);
     if (proposal) {
       input.orders.push(proposal.kept, proposal.remainder);
-      splits.push(proposal.split);
       const keptUnits = computeLoad(proposal.kept.lines, source.products).units;
       const remainingUnits = computeLoad(proposal.remainder.lines, source.products).units;
       const { kept, remainder: rest } = proposal;
@@ -125,9 +127,21 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
       // remaining room. The second child is searched whole, never passed back through the split search.
       const remainder = chooseWhole(input, rest);
       const code = remainder.refusal ?? furthestRejection(remainder.stages);
+      const balanced = remainder.best ? null : rebalance(before, input, order, proposal, best.slot, remainder.slots);
       if (remainder.best) {
+        splits.push(proposal.split);
         accept(remainder.best, order, rank, rest.id);
+      } else if (balanced) {
+        // AC-13: the two parts shared out again so both go, from the plan as it was before the first part.
+        input.plan.trips = before.plan.trips;
+        earlyCauses.clear();
+        for (const [key, cause] of causesBefore) earlyCauses.set(key, cause);
+        input.orders = [...before.orders, balanced.proposal.kept, balanced.proposal.remainder];
+        splits.push(balanced.proposal.split);
+        accept({ ...balanced.kept, ...(best.selectionReason ? { selectionReason: best.selectionReason } : {}) }, order, rank, kept.id);
+        accept({ ...balanced.rest, selectionReason: 'parts rebalanced so both go' }, order, rank, rest.id);
       } else {
+        splits.push(proposal.split);
         defer(rest, order, rank, deferralFor(source, rest, code, {
           attempts: remainder.attempts, split: { keptUnits, remainingUnits },
           detail: splitLimitDetail(input, rest, originals.length + splits.length, remainder.slots, code),

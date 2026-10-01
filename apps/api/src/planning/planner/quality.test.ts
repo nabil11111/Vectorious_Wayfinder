@@ -157,4 +157,34 @@ describe('F8 the planner\'s quality on the seeded days', () => {
     expect(run.served).toEqual(run.all);
     expect(run.blocks).toBe(0);
   });
+  it('F3 rebalances a split\'s two parts when the first remainder fits no truck, before a later order takes the room', () => {
+    // The same two trucks and order, and a later order of one C item, 50 kg, for the same shop. Without a rebalance the
+    // C item takes the smaller truck while the B items wait, and no run can then be freed: the A items no longer fit
+    // beside it. The parts are rebalanced when the split is made, the A items on the smaller truck and the B items on
+    // the larger, and the C item joins the B items.
+    const products: EngineProduct[] = [
+      { id: 'a', kgPerUnit: 500, m3PerUnit: 1, temp: 'dry', needsTailLift: false, keepUpright: false },
+      { id: 'b', kgPerUnit: 100, m3PerUnit: 4, temp: 'dry', needsTailLift: false, keepUpright: false },
+      { id: 'c', kgPerUnit: 50, m3PerUnit: 0.5, temp: 'dry', needsTailLift: false, keepUpright: false },
+    ];
+    const order = plannerOrder('mixed', 'OUT019', 'a', 2, { lines: [{ productId: 'a', quantity: 2 }, { productId: 'b', quantity: 2 }] });
+    const later = plannerOrder('other', 'OUT019', 'c', 1);
+    const input = plannerInput([order, later], {
+      products,
+      vehicles: [
+        { ...vehicle('VEH012'), id: 'BIG', weightCapKg: 1000, volumeCapM3: 10 },
+        { ...vehicle('VEH012'), id: 'SMALL', weightCapKg: 1000, volumeCapM3: 5 },
+      ],
+    });
+    Object.assign(input.outlets.find((s) => s.id === 'OUT019')!, { windowOpen: 600, windowClose: 620 });
+    const run = measured(input);
+    expect(run.deferrals).toBe(0);
+    expect(run.result.splits).toEqual([{
+      orderId: 'mixed', keep: [{ productId: 'a', quantity: 0 }, { productId: 'b', quantity: 2 }], keptOrderId: 'split:mixed:keep', remainderOrderId: 'split:mixed:rest',
+    }]);
+    const where = Object.fromEntries(run.result.input.plan.trips.map((t) => [t.vehicleId, t.stops.flatMap((s) => s.orderIds)]));
+    expect(where).toEqual({ BIG: ['split:mixed:keep', 'other'], SMALL: ['split:mixed:rest'] });
+    expect(run.served).toEqual(run.all);
+    expect(run.blocks).toBe(0);
+  });
 });

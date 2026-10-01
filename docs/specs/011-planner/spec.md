@@ -108,7 +108,13 @@ requires a stated override. The numbered priority above and the rules below are 
 - [ ] **AC-13** When no whole candidate fits, the system shall try a nonempty proper part on each candidate using
   AC-14, then pick the candidate by AC-6. It shall split only an original (`splitFrom: null`), once, into exactly
   two children. The first goes on the chosen trip; then try the remainder whole on the updated plan before
-  considering the next original order. Defer it only if no whole candidate passes, using AC-17's exhausted stage.
+  considering the next original order. If no whole candidate passes, share the two parts out once more before the
+  split is made: for each run the remainder could take, in its AC-6 order, that run takes the most of the original
+  it can carry by AC-14 and the chosen trip the rest, and the first pair that both pass is the split, with the same
+  two temporary IDs, whole quantities that add up exactly and no third part. *Two 1,000 kg trucks of 10 and 5 m³, one
+  run each, and two 500 kg, 1 m³ A items with two 100 kg, 4 m³ B items: both A items on the larger truck leave 8 m³ of
+  B items for the smaller one, so the A items go on the smaller truck and the B items on the larger.* Defer the
+  remainder only if that finds no pair either, using AC-17's exhausted stage.
   It is never split again: D-17 sends what fits and 010 forbids splitting a child again. A part already in the input
   must fit whole or wait whole. Both parts retain their parent's priority, so new goods cannot displace waiting goods.
   Automatic splits require at most 10 product lines, each with 1 to 999 units, to fit the split-write contract;

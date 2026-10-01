@@ -87,8 +87,8 @@ are depot time.
    part and is planned whole, because a part cannot be split again (spec 011, AC-13). Each split the planner proposes
    is made as spec 010's split makes one (rule 8): the original becomes `split`, and two parts start `placed` with its
    shop, temperature, wanted day, note, placed time and placer. Each part goes exactly where the planner's plan puts
-   it: the first on the trip it chose, and the second on another trip when the planner found one for it whole (spec
-   011, AC-13), or deferred with the planner's reason. The shop sees both parts at once, as for a hand split (spec
+   it: the first on the trip it chose, and the second on another trip when the planner found one for it whole or once
+   it shared the two parts out again (spec 011, AC-13), or deferred with the planner's reason. The shop sees both parts at once, as for a hand split (spec
    010, open point 2). *A test raises OUT001's carried-over order from 12 to 180 chilled cartons. Only VEH035 can take
    it, and 1,242 kg is over its 1,040, so the planner splits it: 150 cartons (1,035 kg, 5.55 m³) go on VEH035 trip 1
    and the other 30 on VEH035 trip 2, which reaches Fresh Nugegoda at 06:34. All its goods go, so there is no

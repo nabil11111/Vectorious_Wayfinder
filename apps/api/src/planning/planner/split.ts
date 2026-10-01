@@ -55,6 +55,42 @@ export function proposePart(input: PlanInput, order: PlannerOrder, slot: Candida
   return { split: { orderId: order.id, keep, keptOrderId, remainderOrderId }, kept, remainder };
 }
 
+// AC-13: when the second part fits no run whole, the two parts are shared out once more before the split is made. For
+// each run the second part could have taken, in its own AC-6 order, that run takes the most of the order it can carry
+// by AC-14, and the first part's run the rest; the first that passes both, the first part's run first, is the split.
+// Both parts keep their temporary IDs and the parent's priority, quantities stay whole and add up exactly, and there is
+// never a third part. before is the plan as it was before the first part; after has the first part on its run.
+export function rebalance(
+  before: PlanInput, after: PlanInput, order: PlannerOrder, proposal: SplitProposal, slot: CandidateSlot, restSlots: readonly CandidateSlot[],
+): { proposal: SplitProposal; kept: CandidateAttempt; rest: CandidateAttempt } | null {
+  const lines = [...order.lines].sort((a, b) => compare(a.productId, b.productId));
+  const same = (a: readonly { productId: string; quantity: number }[], b: readonly { productId: string; quantity: number }[]) =>
+    a.length === b.length && a.every((line, i) => line.productId === b[i]!.productId && line.quantity === b[i]!.quantity);
+  for (const other of restSlots) {
+    if (other.vehicleId === slot.vehicleId && other.tripNo === slot.tripNo) continue;
+    const part = proposePart(after, order, other);
+    if (!part) continue;
+    const taken = new Map(part.kept.lines.map((line) => [line.productId, line.quantity]));
+    const keep = lines.map((line) => ({ productId: line.productId, quantity: line.quantity - (taken.get(line.productId) ?? 0) }));
+    const kept = { ...order, id: proposal.kept.id, splitFrom: order.id, lines: keep.filter((line) => line.quantity > 0) };
+    const rest = { ...order, id: proposal.remainder.id, splitFrom: order.id, lines: part.kept.lines };
+    if (!kept.lines.length || same(kept.lines, proposal.kept.lines)) continue;
+    const keptAttempt = tryCandidate(before, kept, slot);
+    if (keptAttempt.stage !== 'accepted') continue;
+    const withKept: PlanInput = {
+      ...before, orders: [...before.orders, kept],
+      plan: { ...before.plan, trips: [...before.plan.trips.filter((t) => t.vehicleId !== slot.vehicleId), ...keptAttempt.input.plan.trips] },
+    };
+    const restAttempt = tryCandidate(withKept, rest, other);
+    if (restAttempt.stage !== 'accepted') continue;
+    return {
+      proposal: { split: { orderId: order.id, keep, keptOrderId: kept.id, remainderOrderId: rest.id }, kept, remainder: rest },
+      kept: keptAttempt, rest: restAttempt,
+    };
+  }
+  return null;
+}
+
 export function splitLimitDetail(
   input: PlanInput, order: PlannerOrder, effectiveCount: number, slots: readonly CandidateSlot[], code: PlannerDeferralCode,
 ): string | undefined {
