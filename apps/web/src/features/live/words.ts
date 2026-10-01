@@ -2,6 +2,7 @@ import { DEPOT_TIME_ZONE, type Brand, type Issue, type IssueDecision, type Issue
 import { brandOfShop, clockTime, issueTitle, reportTitle, sentLine as loaderSentLine, shortDay, truckName, unitsWords, whole } from '@/features/loader/words';
 import { countOf } from '@/features/plan/words';
 import { inDepot } from '@/lib/clock';
+import { weekday } from '@/features/store/words';
 
 // The words of a driver's problem on Live day (spec 013, the screen states' Live day rows): a shop that refused some
 // and a shop that was closed. Every number is the API's, as spec 012's problem words take them; this only writes them
@@ -97,11 +98,13 @@ export function deliveredExtras(counts: OperationsCounts) {
     counts.closedStops ? `${whole(counts.closedStops)} closed` : null,
   ].filter((part): part is string => part !== null);
 }
-// Under the dashboard's delivered tile: "stops delivered · 1 partial", and "· no plan out" when no plan is out.
+// Under the dashboard's delivered tile: "stops delivered · 1 partial", and "· no plan out" when no plan is out. A day of
+// one stop says "stop delivered" under "0 / 1" (Q-33).
 export function deliveredNote(counts: OperationsCounts, planOut: boolean) {
-  if (!planOut) return 'stops delivered · no plan out';
-  if (counts.stopsDelivered === null) return 'stops delivered · not recorded';
-  return ['stops delivered', ...deliveredExtras(counts)].join(' · ');
+  const stops = `${counts.stopsTotal === 1 ? 'stop' : 'stops'} delivered`;
+  if (!planOut) return `${stops} · no plan out`;
+  if (counts.stopsDelivered === null) return `${stops} · not recorded`;
+  return [stops, ...deliveredExtras(counts)].join(' · ');
 }
 
 export type Fuel = NonNullable<OperationsDay['fuel']>;
@@ -113,6 +116,13 @@ export const fuelLitres = (fuel: Fuel) => `${LITRES.format(fuel.litres)} / ${LIT
 
 // The next run: "Next run · Fri 26 Jun" and "Orders close Thu 16:00".
 export const nextRunTitle = (date: string) => `Next run · ${shortDay(date)}`;
+
+// Under the dashboard's figures, one and many (Q-33): "1 needs you now", "2 need you now", and "1 order for Friday ·
+// closes Thu 16:00".
+export const needYouNow = (open: number | null) => (open === 1 ? 'needs you now' : 'need you now');
+export const trucksOutNow = (fleet: number) => (fleet === 1 ? 'truck out now' : 'trucks out now');
+export const nextRunOrders = (next: { orders: number; date: string; cutoffAt: string }) =>
+  `${next.orders === 1 ? 'order' : 'orders'} for ${weekday(next.date)} · closes ${inDepot(Date.parse(next.cutoffAt)).weekday} ${clockTime(next.cutoffAt)}`;
 export const ordersClose = (cutoffAt: string) => `Orders close ${inDepot(Date.parse(cutoffAt)).weekday} ${clockTime(cutoffAt)}`;
 export const NO_NEXT_DAY = 'No next delivery day.';
 
