@@ -12,10 +12,10 @@ const keyOf = (decision: PlannerDecision) =>
 
 // Each vehicle's usual driver (spec 026): the driver who drove it on the depot's latest sent plan (history), else a
 // fixed pairing of the depot's drivers in staff ID order with its vehicles in id order, skipping the drivers history
-// already pairs. vehicleIds are the depot's vehicles in id order and staff its drivers in staff ID order. A vehicle
-// past the last driver has none.
+// already pairs. vehicleIds are the depot's vehicles in id order and staff its drivers in staff ID order. History of a
+// vehicle that is not one of them, such as one archived since, reserves nobody. A vehicle past the last driver has none.
 export function usualPairing(vehicleIds: readonly string[], history: ReadonlyMap<string, string>, staff: readonly string[]): Map<string, string | null> {
-  const paired = new Set(history.values());
+  const paired = new Set(vehicleIds.flatMap((vehicleId) => history.get(vehicleId) ?? []));
   const free = staff.filter((driverId) => !paired.has(driverId));
   return new Map(vehicleIds.map((vehicleId) => [vehicleId, history.get(vehicleId) ?? free.shift() ?? null]));
 }
