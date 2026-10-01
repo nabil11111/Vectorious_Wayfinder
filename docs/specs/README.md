@@ -70,3 +70,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [014](014-suggested-plan/spec.md) | The suggested plan on the board: build it, explain it, decide and send | Done |
 | [015](015-shop-receipt/spec.md) | The shop's receipt: confirm what arrived, report what is short, and the receipt that waits on the phone | Done |
 | [016](016-live-day/spec.md) | Watching the day: dashboard, Live day and the loader's changed plan | Done |
+| [017](017-look-up-pages/spec.md) | The dispatcher's look-up pages: Orders, History and Fleet Today | Spec |
