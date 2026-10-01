@@ -1,29 +1,32 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
-import type { BoardCounts, Brand, DraftTrip, PlanBoard } from '@wayfinder/contracts';
+import type { BoardCounts, Brand, DraftTrip, PlanBoard, PlanRef } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { reasonOf } from '@/features/store/words';
 import { ApiRequestError } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { boardKey, dayKey, refOf, sendPlan, unsendPlan, useDayBoard, useOrdersFollow, usePlanSaver } from './board';
+import { acceptDecisions, boardKey, dayKey, refOf, sendPlan, unsendPlan, useBoard, useDayBoard, useOrdersFollow, usePlanSaver } from './board';
 import { ChecksPanel } from './parts/ChecksPanel';
+import { Decisions } from './parts/Decisions';
 import { BRAND_ICON } from './parts/icons';
 import type { BoardIndex } from './parts/lookup';
-import { checkItems, indexOf } from './parts/lookup';
+import { checkItems, decisionsOf, indexOf } from './parts/lookup';
 import { inkButton, orangeButton, plainButton } from './parts/look';
 import { Column } from './parts/ui';
 import { VehicleRow } from './parts/VehicleRow';
-import { clockTime, countOf, figure, hhmm, space, viewPlanOf, whole } from './words';
+import { clockTime, countOf, figure, hhmm, sendDecisionsOpen, space, suggestedAt, viewPlanOf, whole } from './words';
 
 const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 
 // View plan (spec 010, Dispatcher · View plan, · ready to send and · sent) at /dispatcher/plan/:date, so a reload or a
 // clock move keeps the day. The vehicles by brand and district with their trips, the checks, and the send: greyed
 // while a check blocks, orange when none does, and once sent the time it went out. "Back to edit" returns a draft
-// to the board, and a sent plan too while the board says it can go back (D-33).
+// to the board, and a sent plan too while the board says it can go back (D-33). A suggested plan (spec 014) says when
+// it was suggested beside the title and lists the planner's decisions above the checks, and the send stays greyed
+// until each is accepted or ended by an edit (D-54).
 export function ViewPlanPage() {
   const { date = '' } = useParams();
   const query = useDayBoard(date);
@@ -43,27 +46,34 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
   const qc = useQueryClient();
   const saver = usePlanSaver();
   const navigate = useNavigate();
-  const [busy, setBusy] = useState<'send' | 'unsend' | null>(null);
+  // The board's own day (rule 1), so another day's plan offers no Accept (spec 014).
+  const current = useBoard();
+  const [busy, setBusy] = useState<'send' | 'unsend' | 'accept' | null>(null);
+  // Which accept is on its way: one decision's key, or 'all'.
+  const [accepting, setAccepting] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
   const index = indexOf(board);
   const sent = board.plan.status === 'published';
   const items = checkItems(board.check?.problems ?? []);
   const blocked = board.check?.ok !== true;
+  // The planner's decisions still open: View plan lists them, and the screen counts the rows (rule 9).
+  const open = decisionsOf(board).filter((decision) => decision.open).length;
+  const canAccept = !sent && current.data?.day?.date === date;
   // The board's queue keeps up with the plan this page shows, so a send names the revision on screen.
   useEffect(() => {
     if (fresh) saver.sync(board);
   }, [saver, board, fresh]);
 
-  // A send and a back to edit wait for the board's save on its way and answer with the board. The board's queue
-  // runs them when this is its day; any other day's plan goes on its own.
-  const run = async (kind: 'send' | 'unsend') => {
+  // A send, a back to edit and an accept wait for the board's save on its way and answer with the board. The board's
+  // queue runs them when this is its day; any other day's plan, or this one after a reload, goes on its own, naming the
+  // plan on screen.
+  const run = async (kind: 'send' | 'unsend' | 'accept', call: (day: string, ref: PlanRef) => Promise<PlanBoard>) => {
     setBusy(kind);
     setRefused(null);
-    const call = kind === 'send' ? sendPlan : unsendPlan;
     let problem: string | null = null;
     if (saver.date === date) {
       if (fresh) saver.sync(board);
-      problem = await saver.act((day, ref) => call(day, ref));
+      problem = await saver.act(call);
     } else {
       try {
         // A read of this day already on its way would land after the answer and bring back the plan before it.
@@ -76,14 +86,19 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
       }
     }
     setBusy(null);
+    setAccepting(null);
     setRefused(problem);
     void qc.invalidateQueries({ queryKey: boardKey });
     if (problem === null && kind === 'unsend') navigate('/dispatcher/plan');
   };
+  const accept = (keys: string[], which: string) => {
+    setAccepting(which);
+    void run('accept', (day, ref) => acceptDecisions(day, { ...ref, keys }));
+  };
 
   const back = sent
     ? board.plan.canUnsend && (
-      <Button variant="outline" className={plainButton('h-9 px-5 text-[13px]')} disabled={busy !== null} onClick={() => { void run('unsend'); }}>
+      <Button variant="outline" className={plainButton('h-9 px-5 text-[13px]')} disabled={busy !== null} onClick={() => { void run('unsend', unsendPlan); }}>
         {busy === 'unsend' ? 'Taking back…' : '← Back to edit'}
       </Button>
     )
@@ -98,12 +113,17 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
     )
     : blocked
       ? <Button variant="secondary" className={inkButton('h-9 px-5 text-[13px]')} disabled focusableWhenDisabled>Send plan · {countOf(items.length, 'check')} open</Button>
-      : <Button className={orangeButton('h-9 px-5 text-[13px]')} disabled={busy !== null} focusableWhenDisabled onClick={() => { void run('send'); }}>{busy === 'send' ? 'Sending…' : 'Send plan to loaders and drivers'}</Button>;
+      : open > 0
+        ? <Button variant="secondary" className={inkButton('h-9 px-5 text-[13px]')} disabled focusableWhenDisabled>{sendDecisionsOpen(open)}</Button>
+        : <Button className={orangeButton('h-9 px-5 text-[13px]')} disabled={busy !== null} focusableWhenDisabled onClick={() => { void run('send', sendPlan); }}>{busy === 'send' ? 'Sending…' : 'Send plan to loaders and drivers'}</Button>;
 
   return (
     <div className="lg:-mt-2.5">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="text-xl leading-6 font-bold">{viewPlanOf(date)}</h1>
+        {board.suggestion && (
+          <span className="inline-flex h-7 items-center rounded-full border bg-card px-3 text-xs leading-[15px] font-semibold whitespace-nowrap">{suggestedAt(board.suggestion.builtAt)}</span>
+        )}
         <div className="flex flex-wrap items-center gap-2.5 sm:ml-auto">
           {back}
           {send}
@@ -116,7 +136,10 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
         <div className="order-2 space-y-3.5 lg:order-1">
           <Vehicles board={board} index={index} />
         </div>
-        <ChecksPanel board={board} className="order-1 lg:order-2" />
+        <div className="order-1 space-y-3.5 lg:order-2">
+          <Decisions board={board} index={index} canAccept={canAccept} accepting={accepting} onAccept={accept} />
+          <ChecksPanel board={board} />
+        </div>
       </div>
     </div>
   );
