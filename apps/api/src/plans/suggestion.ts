@@ -10,10 +10,22 @@ export type Planned = Exclude<PlannerResult, { status: 'unavailable' }>;
 const keyOf = (decision: PlannerDecision) =>
   (decision.kind === 'early_leave' ? `early_leave:${decision.vehicleId}:${decision.tripNo}` : `${decision.kind}:${decision.orderId}`);
 
+// The driver of each vehicle the suggestion uses (D-97): the one the draft before gave it, else the depot's first free
+// driver in staff ID order, the vehicles taking theirs in id order. staff is the depot's drivers in that order, and
+// earlier each vehicle's driver in the draft before. A driver kept by a vehicle is free for no other, and the driver of
+// a vehicle the suggestion leaves out is free again. A driver is chosen per vehicle, so both its trips have them (D-31).
+// A vehicle has none only once every driver of the depot is taken.
+export function driversFor(vehicleIds: readonly string[], earlier: ReadonlyMap<string, string>, staff: readonly string[]): Map<string, string | null> {
+  const used = [...new Set(vehicleIds)].sort();
+  const kept = new Set(used.flatMap((vehicleId) => earlier.get(vehicleId) ?? []));
+  const free = staff.filter((driverId) => !kept.has(driverId));
+  return new Map(used.map((vehicleId) => [vehicleId, earlier.get(vehicleId) ?? free.shift() ?? null]));
+}
+
 // The planner names a split's two parts split:<id>:keep and split:<id>:rest until the build has made them. parts maps
-// each of those names to the part's own id, and drivers each vehicle to the driver the draft gave it. Every trip,
-// stop, leaving time and deferral is the planner's own, with the planner's "Mix brands". builtAt is the clock instant
-// of the build. The suggestion's plan is the draft as made here; the build keeps the draft as the board reads it back.
+// each of those names to the part's own id, and drivers each vehicle to its driver (driversFor). Every trip, stop,
+// leaving time and deferral is the planner's own, with the planner's "Mix brands". builtAt is the clock instant of the
+// build. The suggestion's plan is the draft as made here; the build keeps the draft as the board reads it back.
 export function suggestionOf(
   result: Planned, parts: ReadonlyMap<string, string>, drivers: ReadonlyMap<string, string | null>, builtAt: string,
 ): { draft: DraftPlan; suggestion: Suggestion } {

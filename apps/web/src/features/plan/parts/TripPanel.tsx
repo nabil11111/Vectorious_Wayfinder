@@ -3,10 +3,12 @@ import type { BoardOrder, Brand, DraftDeferral, DraftPlan, DraftTrip, PlanBoard,
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { splitOrder, type BoardScreen, type Undo } from '../board';
-import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setDriver, setLeaveAt, takeOff, tripOf } from '../draft';
-import { countOf, figure, hhmm, litres, orderAmount, vehicleSize } from '../words';
+import { defer, keyOf, moveStop, planOf, removeTrip, sameTrip, setLeaveAt, takeOff, tripOf } from '../draft';
+import { countOf, figure, hhmm, litres, orderAmount, ordersAmount, vehicleSize } from '../words';
 import { DeferForm } from './DeferForm';
+import { DepotRow } from './DepotRow';
 import { DriverMenu } from './DriverMenu';
+import { driverChange } from './drivers';
 import { vehicleIcon } from './icons';
 import { LeaveField } from './LeaveField';
 import type { BoardIndex } from './lookup';
@@ -47,6 +49,11 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
   const problems = inStep ? index.problems(trip.vehicleId, trip.tripNo) : [];
   const has = (code: string) => problems.some((problem) => problem.code === code);
   const undo = screen.undo?.tripKey === key ? screen.undo : null;
+  // Each stop's shop and what is unloaded there, for its dot on the timeline (spec 022).
+  const stopShops = new Map(trip.stops.flatMap((stop) => {
+    const shop = index.shop(stop.outletId);
+    return shop ? [[stop.outletId, { name: shop.name, goods: ordersAmount(shop.brand, stop.orderIds.flatMap((id) => index.order(id) ?? [])) }] as const] : [];
+  }));
 
   const split = async (order: BoardOrder, keep: { productId: string; quantity: number }[]) => {
     const refused = await act((date, ref) => splitOrder(date, { ...ref, orderId: order.id, keep }));
@@ -57,6 +64,11 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
     change(defer(draft, deferrals));
     setForm(null);
   };
+  // One change of the draft, with Undo when the driver came from another vehicle and the two swapped (spec 022).
+  const chooseDriver = (driverId: string | null) => {
+    const chosen = driverChange(draft, key, trip.vehicleId, driverId);
+    change(chosen.plan, chosen.undo);
+  };
 
   return (
     <div className="flex min-h-full flex-col">
@@ -65,7 +77,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
         <div className="min-w-0 flex-1 basis-56">
           <h2 className="text-base leading-5 font-bold">
             Planning · {trip.vehicleId} ·{' '}
-            <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={(driverId) => change(setDriver(draft, trip.vehicleId, driverId))} />
+            <DriverMenu draft={draft} vehicleId={trip.vehicleId} drivers={board.drivers} driverId={trip.driverId} onChoose={chooseDriver} />
           </h2>
           <p className="mt-1 text-xs leading-[15px] text-muted-foreground">{vehicle ? `${vehicleSize(vehicle)} · ` : ''}trip {trip.tripNo} of 2</p>
         </div>
@@ -94,7 +106,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
       </div>
 
       <div className="px-3.5 pt-3">
-        <Timeline times={times} problems={problems} onLeaveAt={(minutes) => change(setLeaveAt(draft, key, minutes))} />
+        <Timeline times={times} depot={board.depot} shops={stopShops} problems={problems} onLeaveAt={(minutes) => change(setLeaveAt(draft, key, minutes))} />
       </div>
 
       {undo && (
@@ -105,6 +117,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
       )}
 
       <h3 className="px-3.5 pt-3 pb-2 text-xs leading-[15px] font-semibold text-muted-foreground">Stops in order</h3>
+      {times && <DepotRow end="start" depot={board.depot} at={times.leaveAt} className="mx-3.5" />}
       <ol className="mx-3.5">
         {trip.stops.map((stop, i) => {
           const shop = index.shop(stop.outletId);
@@ -140,6 +153,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onSwap, onR
           );
         })}
       </ol>
+      {times && <DepotRow end="end" depot={board.depot} at={times.backAt} className="mx-3.5" />}
 
       <div className="px-3.5 pt-1">
         <button type="button" onClick={onAddStop} className="flex h-9 items-center gap-2 rounded-md px-1.5 text-xs font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">

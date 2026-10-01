@@ -111,9 +111,20 @@ export function swapTruck(plan: DraftPlan, key: TripKey, vehicleId: string): { p
 export const setLeaveAt = (plan: DraftPlan, key: TripKey, leaveAt: number | null): DraftPlan =>
   ({ ...plan, trips: plan.trips.map((trip) => (keyOf(trip) === key ? { ...trip, leaveAt } : trip)) });
 
-// Chooses a vehicle's driver, written on both its trips, or null for none (rule 6).
-export const setDriver = (plan: DraftPlan, vehicleId: string, driverId: string | null): DraftPlan =>
-  ({ ...plan, trips: plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId } : trip)) });
+// The vehicle other than this one that a driver drives in the draft, or null.
+export const vehicleOfDriver = (plan: DraftPlan, driverId: string, besides: string) =>
+  plan.trips.find((trip) => trip.driverId === driverId && trip.vehicleId !== besides)?.vehicleId ?? null;
+
+// Chooses a vehicle's driver, written on both its trips, or null for none (rule 6). A driver who drives another
+// vehicle swaps: that vehicle takes this one's driver, or none, on every trip of each, so nobody drives two (D-97).
+export function setDriver(plan: DraftPlan, vehicleId: string, driverId: string | null): DraftPlan {
+  const other = driverId === null ? null : vehicleOfDriver(plan, driverId, vehicleId);
+  const before = driverOf(plan, vehicleId);
+  return {
+    ...plan,
+    trips: plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId } : trip.vehicleId === other ? { ...trip, driverId: before } : trip)),
+  };
+}
 
 // Defers orders, each with its own code and reason (rule 7). A deferred order leaves its stop.
 export function defer(plan: DraftPlan, deferrals: DraftDeferral[]): DraftPlan {
