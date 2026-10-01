@@ -8,16 +8,16 @@ const STEP = 'flex size-[46px] shrink-0 items-center justify-center rounded-[12p
 // typed as it is: a minus, a fraction or more than max is never turned into another number (Q-25). While it holds one,
 // the screen says so in a line of its own, whose id is `invalid`: the box is marked red, and − and + wait until it is
 // a count again, as the loader's flag box and the shop's quantity box do.
-export function Counter({ label, value, text, max, of, invalid, disabled = false, onStep, onType, onLeave }: {
+export function Counter({ label, value, text, max, of, invalid, disabled = false, onStep, onType, onLeave, className }: {
   label: string; value: number; text?: string; max: number; of: number; invalid?: string; disabled?: boolean;
-  onStep: (value: number) => void; onType: (text: string) => void; onLeave: () => void;
+  onStep: (value: number) => void; onType: (text: string) => void; onLeave: () => void; className?: string;
 }) {
   const wrong = invalid !== undefined;
   const shown = text ?? String(value);
   const off = disabled || wrong;
   const step = (by: number) => onStep(Math.min(max, Math.max(0, value + by)));
   return (
-    <div role="group" className="flex items-center">
+    <div role="group" className={cn('flex items-center', className)}>
       <button type="button" tabIndex={-1} aria-label={`One less: ${label}`} disabled={off || value <= 0} className={STEP} onClick={() => step(-1)}>−</button>
       <span className="flex min-w-[74px] items-baseline justify-center px-1.5 font-heading text-[28px] leading-8 font-bold tabular-nums">
         <input

@@ -1,7 +1,7 @@
 import { DEPOT_TIME_ZONE, type Brand, type DriverDay, type DriverLine, type DriverProblem, type DriverStop, type DriverTrip, type tripFigures } from '@wayfinder/contracts';
 import { answeredBy, brandOfShop, clockTime, leaves, shortDay, tripPlace, unitsWords, untilLeaving, whole } from '@/features/loader/words';
 import { countOf, ENTRANCE } from '@/features/plan/words';
-import { countOf as amountOf } from '@/features/store/words';
+import { countOf as amountOf, plural } from '@/features/store/words';
 import { inDepot } from '@/lib/clock';
 
 // The words and formats of the driver's screens (spec 013, plan.md "Words"). Nothing here works a count out: every
@@ -113,8 +113,12 @@ export const backByLine = (trip: DriverTrip) => `back by ${clockTime(trip.backBy
 
 // ── Unload and Something's wrong ─────────────────────────────────────────────────────────────────────────────
 
-// A line's name on its card: "Chilled" or "Dry" for Fresh, the item's name for Style and Tech.
-export const lineName = (line: DriverLine, brand: Brand | null) => (brand === 'Fresh' ? (line.temp === 'chilled' ? 'Chilled' : 'Dry') : line.name);
+// A line's name on its card: "Chilled" or "Dry" for Fresh. For Style and Tech the item, after its unit as the loader's
+// list words it, so a driver tells the crates apart (Q-32): "crates of 3 · Washing machines", "boxes · Folded clothing".
+export const lineName = (line: DriverLine, brand: Brand | null) => {
+  if (brand === 'Fresh') return line.temp === 'chilled' ? 'Chilled' : 'Dry';
+  return `${line.quantity === 1 ? line.unit : plural(line.unit)} · ${line.name}`;
+};
 
 // "Loader flagged 1 carton short at the depot"
 export const loaderShortLine = (line: DriverLine, counts: LineFigures) => `Loader flagged ${amountOf(counts.short, line.unit)} short at the depot`;

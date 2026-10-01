@@ -12,7 +12,7 @@ import { NextStopPage } from './NextStopPage';
 import { TodaysTrip } from './TripPage';
 import { UnloadPage } from './UnloadPage';
 import { tripsOf, type DriverView } from './view';
-import { backOnlineLines, overLoadedLine, wholeCountsLine } from './words';
+import { backOnlineLines, lineName, overLoadedLine, wholeCountsLine } from './words';
 
 // The driver's screens as the live QA run found them (phase 4, Q-25 to Q-32). The pages are drawn as the phone would
 // draw them, from a day as the server sends it and the app clock on Thu 25 Jun. These fixtures live in the test only.
@@ -386,5 +386,55 @@ describe('Q-31 Day done after two trips', () => {
     expect(text).toContain('Still on the truck');
     expect(text).toContain('Trip 2 none today');
     expect(text).not.toContain('Total');
+  });
+});
+
+// ── Q-32 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// Lakshan's VEH045 at Tech Kandy City Centre, and Asanka's VEH011 trip 2 at Style Liberty Plaza, both arrived.
+function arrivedWith(n: number, brand: 'Style' | 'Tech', shop: string, lines: LineSpec[]) {
+  const stop = stopOf(n, 1, shop, lines, { arrivedAt: at('04:02') });
+  return { trip: tripOf(n, { brand, vehicleId: brand === 'Tech' ? 'VEH045' : 'VEH011', stops: [stop] }), stop };
+}
+const techCityCentre = () => arrivedWith(300, 'Tech', 'Tech Kandy City Centre', [
+  { n: 301, quantity: 2, temp: 'dry', name: 'Refrigerators', unit: 'crate of 2' },
+  { n: 302, quantity: 1, temp: 'dry', name: 'Refrigerators', unit: 'crate of 2' },
+  { n: 303, quantity: 2, temp: 'dry', name: 'Small appliances', unit: 'pallet' },
+  { n: 304, quantity: 2, temp: 'dry', name: 'Washing machines', unit: 'crate of 3' },
+]);
+const styleLibertyPlaza = () => arrivedWith(310, 'Style', 'Style Liberty Plaza', [
+  { n: 311, quantity: 50, temp: 'dry', name: 'Folded clothing', unit: 'box' },
+  { n: 312, quantity: 45, temp: 'dry', name: 'Hanging garments', unit: 'rail box' },
+  { n: 313, quantity: 25, temp: 'dry', name: 'Shoes', unit: 'carton' },
+]);
+// The element that names a line on its card, by its words.
+const nameOf = (html: string, words: string) => html.match(new RegExp(`<span[^>]*>${words}</span>`))?.[0] ?? '';
+
+describe('Q-32 each line on Unload names its item in full', () => {
+  it('names a Style or Tech line by its unit as the loader\'s list words it and the item, and a Fresh line by its temperature', () => {
+    const tech = techCityCentre().stop.lines;
+    expect(tech.map((line) => lineName(line, 'Tech'))).toEqual([
+      'crates of 2 · Refrigerators', 'crate of 2 · Refrigerators', 'pallets · Small appliances', 'crates of 3 · Washing machines',
+    ]);
+    expect(styleLibertyPlaza().stop.lines.map((line) => lineName(line, 'Style'))).toEqual(['boxes · Folded clothing', 'rail boxes · Hanging garments', 'cartons · Shoes']);
+    const fresh = arrivedAt().stop.lines;
+    expect(fresh.map((line) => lineName(line, 'Fresh'))).toEqual(['Chilled', 'Dry']);
+  });
+
+  it('wraps a long name to a second line, with the count under it when the card is narrow, rather than cutting it', () => {
+    for (const [at, words] of [[techCityCentre(), 'crates of 3 · Washing machines'], [styleLibertyPlaza(), 'rail boxes · Hanging garments']] as const) {
+      const html = unload(at);
+      const name = nameOf(html, words);
+      expect(name).not.toBe('');
+      expect(name).not.toMatch(/truncate|text-ellipsis|whitespace-nowrap|line-clamp/);
+      // The card's row lets the counter go under the name, so the name keeps the card's width.
+      expect(html.slice(html.lastIndexOf('<div', html.indexOf(name)), html.indexOf(name))).toMatch(/flex-wrap/);
+    }
+  });
+
+  it('keeps a Fresh line as it was: its temperature beside the counter on one row', () => {
+    const html = unload(arrivedAt());
+    expect(nameOf(html, 'Chilled')).toMatch(/truncate/);
+    expect(html.slice(html.lastIndexOf('<div', html.indexOf(nameOf(html, 'Chilled'))), html.indexOf(nameOf(html, 'Chilled')))).not.toMatch(/flex-wrap/);
   });
 });

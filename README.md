@@ -367,7 +367,8 @@ Anything we built differently from our Designathon submission, and why.
 - **No dock and no address.** Today's trip names no dock (D-40), and a stop's line under its name is the district and
   entrance, "Colombo · street".
 - **A stop lists its lines,** so Nugegoda's two chilled orders are two counters, as the loader's screens do. Style and Tech
-  lines name the item.
+  lines name the unit and the item in full, "crates of 3 · Washing machines", as the loader's list does, wrapping to a
+  second line with the counter under them on a phone, since the item is how a driver tells the crates apart.
 - **A refusal has two answers,** "Bring them back to Peliyagoda" and "Send 2 replacements on Fri 26 Jun", with "Send to
   driver and shop". No "Write off on the road" and no "shop credited, claim opened": a write-off is a record the depot adds
   later.

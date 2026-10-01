@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router';
 import type { DriverStop, DriverTrip } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Counter } from './parts/Counter';
 import { GOODS, ICON } from './parts/icons';
 import { TopArea } from './parts/TopArea';
@@ -19,6 +20,7 @@ export function UnloadPage({ view, trip, figures, stop }: { view: DriverView; tr
   const tally = useTally(stop.id);
   const counts = figures.byStop[trip.stops.indexOf(stop)]!;
   const brand = brandOf(trip, stop);
+  const fresh = brand === 'Fresh';
   const loadedOf = (i: number) => counts.byLine[i]!.loaded;
   const wrong = stop.lines.map((line, i) => tally.wrongOf(line.lineId, loadedOf(i)));
   const counted = stop.lines.every((line, i) => tally.countOf(line.lineId) === loadedOf(i)) && wrong.every((reading) => reading === null);
@@ -36,9 +38,11 @@ export function UnloadPage({ view, trip, figures, stop }: { view: DriverView; tr
           return (
             <li key={line.lineId}>
               <Card className="px-4 py-4">
-                <div className="flex items-center gap-3">
+                {/* A Fresh line's name is a word, beside its counter. A Style or Tech line's is its unit and item in full,
+                    wrapping to a second line, and on a narrow card its counter goes under it (Q-32). */}
+                <div className={cn('flex items-center gap-3', !fresh && 'flex-wrap gap-y-2.5')}>
                   <img src={GOODS[line.temp]} alt="" className="size-9 shrink-0 object-contain" />
-                  <span className="min-w-0 flex-1 truncate font-heading text-lg leading-6 font-bold">{name}</span>
+                  <span className={cn('flex-1 font-heading text-lg leading-6 font-bold', fresh ? 'min-w-0 truncate' : 'min-w-[150px] break-words')}>{name}</span>
                   <Counter
                     label={name}
                     value={tally.countOf(line.lineId)}
@@ -49,6 +53,7 @@ export function UnloadPage({ view, trip, figures, stop }: { view: DriverView; tr
                     onStep={(n) => tally.step(line.lineId, n)}
                     onType={(text) => tally.type(line.lineId, text, each.loaded)}
                     onLeave={() => tally.leave(line.lineId, each.loaded)}
+                    className="ml-auto"
                   />
                 </div>
                 {reading && (
