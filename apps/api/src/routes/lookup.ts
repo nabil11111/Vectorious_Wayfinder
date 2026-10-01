@@ -1,6 +1,15 @@
+import { LookupFleetQuery, LookupOrdersQuery } from '@wayfinder/contracts';
 import { Router } from 'express';
-import { requireDepot, requireRole } from '../middleware/auth';
+import { getLookupFleet } from '../lookup/fleet';
+import { getLookupOrders } from '../lookup/orders';
+import { depotCallerOf, requireDepot, requireRole } from '../middleware/auth';
 
-// Spec 017: the read handlers follow these shared dispatcher/depot checks in T1.
 export const lookupRouter = Router();
 lookupRouter.use(requireRole('dispatcher'), requireDepot);
+lookupRouter.get('/orders', async (req, res) => {
+  res.json(await getLookupOrders(depotCallerOf(req), LookupOrdersQuery.parse(req.query)));
+});
+lookupRouter.get('/fleet', async (req, res) => {
+  LookupFleetQuery.parse(req.query);
+  res.json(await getLookupFleet(depotCallerOf(req)));
+});
