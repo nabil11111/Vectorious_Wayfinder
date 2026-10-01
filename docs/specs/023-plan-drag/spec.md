@@ -14,10 +14,6 @@ board. The buttons and menus stay, for the keyboard and for anyone who prefers t
 - **An order onto a trip.** Drag an unplanned order, or a whole "brand · district" group, from Unplanned orders onto
   the open trip's stops: it becomes a stop where it is dropped, between two stops or at the end. Dropped on a trip's
   card in Done, it joins that trip at the end.
-- **An order onto a truck.** Dropped on a truck in Unassigned trucks, it starts that truck's trip with it, and the
-  trip opens in the middle.
-- **A truck into the middle.** Drag a truck from Unassigned trucks into the middle to start its trip, which opens
-  empty with "Add a stop".
 - **Stops up and down.** Drag a stop up or down in "Stops in order" to change the order. The other stops make room as
   it moves, and the timeline and checks follow once it is dropped.
 - **A stop off its trip.** Drag a stop onto Unplanned orders to take it off the trip. Drag it onto another trip's card
@@ -28,6 +24,9 @@ board. The buttons and menus stay, for the keyboard and for anyone who prefers t
 - **While dragging.** The dragged order, stop or truck follows the pointer as a small card naming it. Every place it
   can land is outlined, and the place under it is filled with the brand's light tint. Releasing anywhere else, or
   pressing Escape, puts it back with nothing changed.
+
+Dragging a truck was dropped before the build: spec 026 removes the trucks panel and starts a trip from an order
+and the crew picker (D-100).
 
 ## Rules, with worked examples
 1. **One drop, one change.** Every drop is one change of the draft. It is saved, checked by the plan checker and
