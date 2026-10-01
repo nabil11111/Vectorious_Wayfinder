@@ -58,7 +58,9 @@ class FakeDatabase {
   }
 }
 
-const hooks = vi.hoisted(() => ({ db: undefined as unknown }));
+// The signal is there unless a test takes it away, and the loop's "signal back" and "signal lost" are kept, so a test
+// can bring the signal back as the probe would.
+const hooks = vi.hoisted(() => ({ db: undefined as unknown, signal: true, back: [] as (() => void)[], lost: [] as (() => void)[] }));
 vi.mock('idb', () => ({ openDB: async () => hooks.db }));
 // The loop starts from the owner's hook; outside React its snapshot is read directly.
 vi.mock('react', async (original) => ({
@@ -68,14 +70,14 @@ vi.mock('react', async (original) => ({
 vi.mock('../src/lib/phone/signal', () => ({
   ANSWER_WITHIN_MS: 15_000,
   retryDelay: () => 20,
-  hasSignal: () => true,
+  hasSignal: () => hooks.signal,
   answered: () => undefined,
   noAnswer: () => undefined,
   probeNow: () => undefined,
   startSignal: () => undefined,
-  whenBack: () => undefined,
-  whenLost: () => undefined,
-  useSignal: () => true,
+  whenBack: (change: () => void) => { hooks.back.push(change); },
+  whenLost: (change: () => void) => { hooks.lost.push(change); },
+  useSignal: () => hooks.signal,
   within: async <T,>(run: (signal: AbortSignal) => Promise<T>, cancel?: AbortSignal) => {
     const limit = new AbortController();
     cancel?.addEventListener('abort', () => limit.abort(), { once: true });
@@ -172,6 +174,9 @@ beforeEach(() => {
   vi.resetModules();
   db = new FakeDatabase();
   hooks.db = db;
+  hooks.signal = true;
+  hooks.back = [];
+  hooks.lost = [];
   vi.stubGlobal('window', Object.assign(new EventTarget(), { setTimeout, clearTimeout }));
 });
 afterEach(() => {
@@ -283,5 +288,30 @@ describe('the driver\'s phone', () => {
     expect(db.states()).toEqual(['refused']);
     expect(phone.sync().notSaved).toBe(false);
     expect(server.posted.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('ties "Back online" to the trip its stops belong to, and takes it away once that trip is checked in (Q-30)', async () => {
+    hooks.signal = false;
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [], named: [] };
+    serve(server);
+    const phone = await open(DILSHAN);
+    // With no signal, the arrival and the closed shop wait on the phone.
+    await phone.sender.saveAction(arrive(), 'Stop 1 · Fresh Nugegoda');
+    await phone.sender.saveAction(closed(), 'Stop 1 · Fresh Nugegoda');
+    expect(server.posted).toEqual([]);
+
+    // The signal comes back: both go, and the green line names Nugegoda and the trip it belongs to.
+    hooks.signal = true;
+    for (const back of hooks.back) back();
+    await until(() => phone.sync().backOnline !== null);
+    expect(server.posted).toHaveLength(2);
+    expect(phone.sync().backOnline).toEqual({ names: ['Nugegoda'], belongsTo: [TRIP] });
+
+    // Checking the trip in takes the line away, so it never comes back on the next trip.
+    await phone.sender.saveAction({ kind: 'finish', writeId: crypto.randomUUID(), tripId: TRIP, at: '2026-06-24T22:26:00.000Z', revision: 1 }, 'End of trip · VEH035');
+    expect(phone.sync().backOnline).toBeNull();
+    // The end of the trip goes too, and the loop is idle again before the test lets the server go.
+    await until(() => phone.queue().length === 0);
+    expect(server.posted).toHaveLength(3);
   });
 });

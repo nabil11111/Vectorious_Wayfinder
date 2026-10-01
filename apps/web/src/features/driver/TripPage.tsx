@@ -6,21 +6,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { newWriteId } from '@/features/loader/loading';
 import { truckIcon } from '@/features/loader/parts/icons';
 import { useAppClock } from '@/lib/clock';
+import { ClosedBand, HandBackCard } from './DonePage';
 import { TopArea } from './parts/TopArea';
 import { ActionBar, BIG, Card, PLAIN, Problem } from './parts/ui';
 import { readAgain, retrySync, useSave, useSync } from './queue';
 import type { DriverView } from './view';
 import {
-  aboutTrip, brandOf, COULD_NOT_READ, leavingLine, loadedLine, noTripLine, NOT_SAVED, notReadyChip, NOTHING_SENT_UNTIL_READ, placeLine, startWhenLoaded,
-  stopsCount, stopUnitsLine, tripDayLine, windowLine, type Figures,
+  aboutTrip, betweenTripsLine, brandOf, COULD_NOT_READ, leavingLine, loadedLine, noTripLine, NOT_SAVED, notReadyChip, NOTHING_SENT_UNTIL_READ, placeLine,
+  startWhenLoaded, stopsCount, stopUnitsLine, tripDayLine, windowLine, type Figures,
 } from './words';
 
 // Driver · Today's trip at /driver (spec 013): the trip and its stops in plan order, and "Start trip" once the loader
-// has marked the truck ready. Until then the chip says "Not loaded yet" or "Being loaded" and the button waits.
+// has marked the truck ready. Until then the chip says "Not loaded yet" or "Being loaded" and the button waits. A trip
+// that follows one checked in opens with that trip's close on top and its hand-back card under it, until it starts, so
+// the driver knows trip 1 went and what to hand in before the truck is loaded again (Q-29).
 export function TodaysTrip({ view, trip, figures }: { view: DriverView; trip: DriverTrip; figures: Figures }) {
   const { at, readNow } = useAppClock();
   const { save, saving, failed } = useSave();
   const ready = trip.status === 'ready';
+  const { closed } = view;
 
   // "Start trip" makes the ready trip out, at the app clock's time at the press, naming the trip's revision on screen
   // (rule 3).
@@ -32,8 +36,11 @@ export function TodaysTrip({ view, trip, figures }: { view: DriverView; trip: Dr
 
   return (
     <div>
-      <TopArea waitingRecords={view.waitingRecords} />
+      <TopArea waitingRecords={view.waitingRecords}>
+        {closed && <ClosedBand line={betweenTripsLine(closed.trip, closed.figures, view.waitingRecords)} waiting={view.waitingRecords} />}
+      </TopArea>
       {failed && <Problem>{NOT_SAVED}</Problem>}
+      {closed && <HandBackCard trip={closed.trip} figures={closed.figures} className="mb-[19px]" />}
       <p className="text-xs leading-4 font-semibold text-muted-foreground">{tripDayLine(trip)}</p>
 
       <Card className="mt-2.5 px-3.5 pt-[15px] pb-[13px]">

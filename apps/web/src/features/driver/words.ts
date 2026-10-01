@@ -1,7 +1,7 @@
 import { DEPOT_TIME_ZONE, type Brand, type DriverDay, type DriverLine, type DriverProblem, type DriverStop, type DriverTrip, type tripFigures } from '@wayfinder/contracts';
 import { answeredBy, brandOfShop, clockTime, leaves, shortDay, tripPlace, unitsWords, untilLeaving, whole } from '@/features/loader/words';
 import { countOf, ENTRANCE } from '@/features/plan/words';
-import { countOf as amountOf } from '@/features/store/words';
+import { countOf as amountOf, plural } from '@/features/store/words';
 import { inDepot } from '@/lib/clock';
 
 // The words and formats of the driver's screens (spec 013, plan.md "Words"). Nothing here works a count out: every
@@ -37,6 +37,10 @@ const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 // "1 h 5 min", "3 min".
 const span = (minutes: number) => (minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60} min` : ''}`);
+
+// A brand's unit, one and many.
+const UNIT: Record<Brand, [string, string]> = { Fresh: ['carton', 'cartons'], Style: ['box', 'boxes'], Tech: ['item', 'items'] };
+const unitOf = (brand: Brand | null, n: number) => (brand ? UNIT[brand] : ['unit', 'units'] as const)[n === 1 ? 0 : 1];
 
 // ── Today's trip ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -109,11 +113,24 @@ export const backByLine = (trip: DriverTrip) => `back by ${clockTime(trip.backBy
 
 // ── Unload and Something's wrong ─────────────────────────────────────────────────────────────────────────────
 
-// A line's name on its card: "Chilled" or "Dry" for Fresh, the item's name for Style and Tech.
-export const lineName = (line: DriverLine, brand: Brand | null) => (brand === 'Fresh' ? (line.temp === 'chilled' ? 'Chilled' : 'Dry') : line.name);
+// A line's name on its card: "Chilled" or "Dry" for Fresh. For Style and Tech the item, after its unit as the loader's
+// list words it, so a driver tells the crates apart (Q-32): "crates of 3 · Washing machines", "boxes · Folded clothing".
+export const lineName = (line: DriverLine, brand: Brand | null) => {
+  if (brand === 'Fresh') return line.temp === 'chilled' ? 'Chilled' : 'Dry';
+  return `${line.quantity === 1 ? line.unit : plural(line.unit)} · ${line.name}`;
+};
 
 // "Loader flagged 1 carton short at the depot"
 export const loaderShortLine = (line: DriverLine, counts: LineFigures) => `Loader flagged ${amountOf(counts.short, line.unit)} short at the depot`;
+
+// Under a count box that holds a minus, a fraction or anything but a whole number, and under a refusal's box that holds
+// more than was loaded (Q-25): "Counts are whole numbers from 0 to the 12 loaded."
+export const wholeCountsLine = (loaded: number) => `Counts are whole numbers from 0 to the ${whole(loaded)} loaded.`;
+
+// Under an unload box that holds more than was loaded. One more at the door than left the depot means something of
+// another shop's is in the stack (Q-25): "15 is more than the 12 loaded. Check the stack for another shop's cartons."
+export const overLoadedLine = (count: number, loaded: number, brand: Brand | null) =>
+  `${whole(count)} is more than the ${whole(loaded)} loaded. Check the stack for another shop's ${unitOf(brand, 2)}.`;
 
 // A line to pick for a refusal, by what is on the truck: "48 cartons chilled", or "10 boxes · Folded clothing".
 export const pickLine = (line: DriverLine, counts: LineFigures, brand: Brand | null) =>
@@ -175,11 +192,13 @@ export function answerLine(problem: DriverProblem, stop: DriverStop, brand: Bran
 export const waitingLine = (n: number) => `${whole(n)} waiting to send`;
 export const noSignalLine = (n: number) => `No signal · ${n > 0 ? waitingLine(n) : 'everything is sent'}`;
 
-// "Back online · 1 stop sent" and "Wellawatte reached the depot".
+// "Back online · 1 stop sent" and "Wellawatte reached the depot". Up to three places are named, and beyond three the
+// first three and how many more (Q-27): "Ampitiya, Mulgampola, Katukele and 2 more reached the depot".
 export function backOnlineLines(names: string[]) {
   const stops = names.filter((name) => !name.startsWith('the '));
   const what = stops.length === names.length ? countOf(names.length, 'stop') : countOf(names.length, 'record');
-  return { title: `Back online · ${what} sent`, line: `${capital(andList(names))} reached the depot` };
+  const named = names.length > 3 ? [...names.slice(0, 3), `${whole(names.length - 3)} more`] : names;
+  return { title: `Back online · ${what} sent`, line: `${capital(andList(named))} reached the depot` };
 }
 
 export const signInLine = (n: number) => (n > 0 ? `Sign in again to send ${whole(n)} waiting ${n === 1 ? 'record' : 'records'}.` : 'Sign in again.');
@@ -192,10 +211,6 @@ export const NOTHING_SENT_UNTIL_READ = 'Nothing is sent or saved until it is rea
 // ── Trip done and Day done ──────────────────────────────────────────────────────────────────────────────────
 
 export const headBackLine = (day: DriverDay, trip: DriverTrip) => `Head back to ${day.depot} · back by ${clockTime(trip.backBy)}`;
-
-// A brand's unit, one and many.
-const UNIT: Record<Brand, [string, string]> = { Fresh: ['carton', 'cartons'], Style: ['box', 'boxes'], Tech: ['item', 'items'] };
-const unitOf = (brand: Brand | null, n: number) => (brand ? UNIT[brand] : ['unit', 'units'] as const)[n === 1 ? 0 : 1];
 
 // "Cartons delivered", "Boxes delivered", "Units delivered" for a trip of several brands.
 export const deliveredLabel = (trip: DriverTrip) => `${capital(unitOf(trip.brand, 2))} delivered`;
@@ -267,9 +282,36 @@ export function nextTripLine(day: DriverDay, trip: DriverTrip) {
   return { label: `Trip ${trip.tripNo + 1}`, value: next ? leaves(next) : 'none today' };
 }
 
-export const tripClosedLine = (figures: Figures, waiting: number) =>
-  (waiting > 0 ? `Trip closed · ${waitingLine(waiting)}` : `Trip closed · ${whole(figures.stopsDone)} of ${countOf(figures.stops, 'stop')} · all records sent`);
+// "Trip closed · 2 of 2 stops · all records sent", or "Trip closed · 1 waiting to send" while records wait. Named by its
+// number where the day has more than one trip: "Trip 1 closed · …".
+export function tripClosedLine(figures: Figures, waiting: number, tripNo?: number) {
+  const closed = tripNo === undefined ? 'Trip closed' : `Trip ${tripNo} closed`;
+  return waiting > 0 ? `${closed} · ${waitingLine(waiting)}` : `${closed} · ${whole(figures.stopsDone)} of ${countOf(figures.stops, 'stop')} · all records sent`;
+}
+
+// On the next trip's Today's trip, until it starts (Q-29): "Trip 1 closed · 4 of 4 stops · all records sent · checked
+// in 03:56".
+export const betweenTripsLine = (trip: DriverTrip, figures: Figures, waiting: number) =>
+  [tripClosedLine(figures, waiting, trip.tripNo), trip.backAt && `checked in ${clockTime(trip.backAt)}`].filter(Boolean).join(' · ');
 export const backAtLine = (day: DriverDay) => `Back at ${day.depot}`;
+
+// A line of Day done after more than one trip, for a trip or for the whole day (Q-31), with what was delivered counted
+// against what was loaded: "4 of 4 stops · 105 of 144 cartons delivered · 39 handed back".
+export function dayDoneLine(counts: Pick<Figures, 'stops' | 'stopsDone' | 'loaded' | 'delivered' | 'onTruck'>, brand: Brand | null) {
+  return [
+    `${whole(counts.stopsDone)} of ${countOf(counts.stops, 'stop')}`,
+    `${whole(counts.delivered)} of ${unitsWords(brand, counts.loaded)} delivered`,
+    counts.onTruck > 0 ? `${whole(counts.onTruck)} handed back` : 'nothing handed back',
+  ].join(' · ');
+}
+
+// The brand a day's totals are counted in: its trips' one brand, or none, in units, when they carried more than one.
+export const dayBrand = (trips: DriverTrip[]): Brand | null => {
+  const [first] = trips;
+  return first && trips.every((trip) => trip.brand === first.brand) ? first.brand : null;
+};
+export const DAY_TOTAL = 'Total';
+export const tripLabel = (tripNo: number) => `Trip ${tripNo}`;
 export const checkedInLine = (trip: DriverTrip) => (trip.backAt ? `Checked in at the depot ${clockTime(trip.backAt)}` : 'Checked in at the depot');
 export const SIGN_OUT_WAITS = 'Sign out once everything is sent.';
 

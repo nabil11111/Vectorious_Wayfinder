@@ -250,14 +250,14 @@ The one-to-one map below names the test/check; do not replace it with one broad 
 | AC-13 | `another depots records stay private` | Same file |
 | AC-14 | `snapshot and reset return one generation without deadlock` | Same file |
 | AC-15 | `brand and district counts distinguish stops trips and distinct vehicles` | `apps/api/src/operations/figures.test.ts` (unit) |
-| AC-16 | `attention names missing reports and retries without predictions` | `apps/api/src/operations/attention.test.ts` (unit) |
+| AC-16 | `attention names missing reports and retries without predictions` and `Q-24 words a trip past its leaving time by what the dock recorded` (unit); `Q-24 a truck past its leaving time says what the dock recorded` (read); `Q-24 Live day past a truck's leaving time`, `Q-24 the trucks past their leaving time on the dashboard` (screens) | `apps/api/src/operations/attention.test.ts`, `apps/api/tests/operations-read.test.ts`, `apps/web/src/features/live/parts/rows.test.ts`, `apps/web/src/features/dispatcher/parts/NeedsYouCard.test.tsx` |
 | AC-17 | `replayed late and every problem kind yield unique business time events` | `apps/api/tests/operations-events.test.ts` |
 | AC-18 | `latest fifty events never survive their reset` | Same file |
 | AC-20 | `loading publication names its actual sender and generation` | `apps/api/tests/loading-publication.test.ts` |
 | AC-21 | `publication comparison pairs whole trip moves once by exact orders` | `apps/web/src/features/loader/changes.test.ts` (unit) |
 | AC-22 | `withdrawal reload got it and scope changes preserve or clear comparison` | Same file (storage lifecycle) |
 | AC-23 | `first visit progress and storage failure cannot invent a change` | Same file |
-| AC-24 | `existing topics invalidate operations and keep normal invalidations` | `apps/web/src/lib/live.test.ts` |
+| AC-24 | `existing topics invalidate operations and keep normal invalidations`, and `Q-28 a driver message fetches the problems again too` | `apps/web/src/lib/live.test.ts` |
 | AC-25 | `return removes out row but retains days finished trip` | `apps/api/tests/operations-read.test.ts` |
 | AC-26 | `dashboard desktop` | Lead's written click-through record at join |
 | AC-27 | `live desktop and details` | Same record |

@@ -10,7 +10,7 @@ import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import * as board from '../src/plans/board';
 import { driverStop, heldDriverRows } from './driver-plan';
-import { code, kandyTrip, resetDay, sendWalkthroughPlan, signIn, THU, WED } from './loading-plan';
+import { answeredTruck, code, kandyTrip, loaderScreen, resetDay, sendWalkthroughPlan, signIn, THU, truckOf, WED } from './loading-plan';
 import { journey, operations, shownTrip, FRI } from './operations-plan';
 import { serve, stop } from './serve';
 const clock = vi.hoisted(() => ({ at: '' }));
@@ -72,6 +72,28 @@ it('AC-4 ready truck separates dock load from delivery', async () => {
   const day = await read();
   expect(shownTrip(day)).toMatchObject({ status: 'ready', figures: { ordered: 118, loaded: 117, short: 1, delivered: 0 }, onSoFar: { units: 117 }, lastReportAt: null, action: 'decided' });
   expect(day.counts).toMatchObject({ stopsDelivered: 0, vehiclesOut: 0 });
+});
+it('Q-24 a truck past its leaving time says what the dock recorded: not loaded, still loading, or departure not reported', async () => {
+  const leaves = depotInstant(THU, 276).toISOString();
+  await sendWalkthroughPlan(walk);
+  freeze(THU, 277);
+  expect(shownTrip(await read()).attention).toEqual({ kind: 'not_loaded', plannedAt: leaves, sentence: 'Not loaded · planned 04:36', word: 'still at the dock' });
+  // Kasun starts VEH035 and loads Wellawatte's 94 cartons, then the clock passes 04:36 again.
+  freeze(THU, 150);
+  const loader = loaderScreen(kasun);
+  const loading = await loader.read();
+  const truck = answeredTruck(await loader.start(truckOf(loading, 'VEH035'), loading.plan!), 'VEH035');
+  answeredTruck(await loader.stopLoaded(truck, 2), 'VEH035');
+  freeze(THU, 277);
+  expect(shownTrip(await read()).attention).toEqual({
+    kind: 'still_loading', plannedAt: leaves, on: 94, units: 118, sentence: 'Still loading · 94 of 118 on · planned 04:36', word: 'still at the dock' });
+});
+it('Q-24 a ready truck not reported out past its leaving time keeps "Departure not reported", watching', async () => {
+  await road.ready();
+  freeze(THU, 277);
+  const day = await read();
+  expect(shownTrip(day).attention).toEqual({ kind: 'departure_unreported', plannedAt: depotInstant(THU, 276).toISOString(), sentence: 'Departure not reported · planned 04:36', word: 'watching' });
+  expect(day.counts.vehiclesOut).toBe(0);
 });
 it('AC-5 recorded departure and delivery leave schedule unchanged', async () => {
   let trip = await road.started();

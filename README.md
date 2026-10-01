@@ -137,7 +137,8 @@ are what the demo clock shows.
     then "1 · Fresh Nugegoda · 23 of 24 cartons" and "2 · Fresh Wellawatte · 94 cartons". Press **Start trip**.
 13. **A delivery.** Next stop: "Stop 1 of 2 · Fresh Nugegoda", "Unload 23 cartons · 20 chilled · 3 dry" and the shop's
     note. Press **I've arrived**, count 12 and 8 chilled and 3 dry ("Loader flagged 1 carton short at the depot" sits
-    under the dry line), press **Done unloading**, then **Take photo** (on a laptop, pick any picture) and **Save
+    under the dry line; a typed 15 or -3 stays as typed with a line under it, and Done unloading waits), press **Done
+    unloading**, then **Take photo** (on a laptop, pick any picture) and **Save
     delivery**: "✓ Stop 1 Fresh Nugegoda delivered · synced" and "Stop 2 of 2 · Fresh Wellawatte".
 14. **No signal.** Turn the network off: DevTools, Network, "Offline". Press **I've arrived**: the chip turns "Offline"
     with 1 waiting. Press **Something's wrong**, keep "Shop refused some", pick "48 cartons chilled", press + on Refused
@@ -184,6 +185,12 @@ At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements
 "Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Wasantha's next stop again, and delivering it ends
 at 117 of 118. **Bring them back** ends with "Hand them in; they go on the next run.", and Wellawatte's two orders are
 placed again for Friday's plan.
+
+**A second trip.** A truck the plan sends out twice, such as VEH057 at Kandy, gives its driver both trips. **I'm back at the
+depot** on trip 1 opens trip 2's Today's trip under "✓ Trip 1 closed · 4 of 4 stops · all records sent · checked in
+03:56", with trip 1's hand-back card ("Still on the truck", what to hand in) until trip 2 starts. After trip 2, Day done
+shows a line per trip, "Trip 1 · 4 of 4 stops · 105 of 144 cartons delivered · 39 handed back", the day's totals, and
+"Trip 3 · none today".
 
 ### The look-up pages
 
@@ -365,7 +372,10 @@ Anything we built differently from our Designathon submission, and why.
 - **One answer per problem:** "Decide" opens its card, where the design also draws Warn, Skip, Credit and Resend, and an
   answered row reads "Decided", never "Warned". There is no Undo.
 - **Recorded times only (D-68):** the trucks table shows the planned arrival and the planned return, never an estimate,
-  and the tiles say "stops delivered · partial or closed", "fuel · litres this week" and "deferred on this plan".
+  and the tiles say "stops delivered · partial or closed", "fuel · litres this week" and "deferred on this plan". A
+  truck past its leaving time says what the dock recorded, "Not loaded · planned 03:30 · still at the dock" or "Still
+  loading · 120 of 437 on", and only a ready one "Departure not reported", so the dispatcher sees which trucks are
+  still on the dock.
 - **Every open problem shows in full** in Needs you, as spec 012 built it, not one focused card with short "Next" rows.
 - **Events say "· photo"** without opening it, and the Trip column shows the trip's number only.
 - **Between 1024 and 1279 wide** the tiles take three columns and the trucks table folds the driver and trip under the
@@ -396,19 +406,29 @@ Anything we built differently from our Designathon submission, and why.
 - **No dock and no address.** Today's trip names no dock (D-40), and a stop's line under its name is the district and
   entrance, "Colombo · street".
 - **A stop lists its lines,** so Nugegoda's two chilled orders are two counters, as the loader's screens do. Style and Tech
-  lines name the item.
+  lines name the unit and the item in full, "crates of 3 · Washing machines", as the loader's list does, wrapping to a
+  second line with the counter under them on a phone, since the item is how a driver tells the crates apart.
 - **A refusal has two answers,** "Bring them back to Peliyagoda" and "Send 2 replacements on Fri 26 Jun", with "Send to
   driver and shop". No "Write off on the road" and no "shop credited, claim opened": a write-off is a record the depot adds
   later.
 - **A closed shop is answered with "Try again on this trip" or "Bring them back";** no frame draws them.
 - **"Nothing to hand back"** says the short carton never left the depot, without "It goes on Monday's run".
 - **"Done unloading" stays grey until every line is counted,** where the frame draws it orange at 2 of 6: a stop that
-  cannot be counted in full goes through "Something's wrong".
+  cannot be counted in full goes through "Something's wrong". A typed count stays as it was typed and says under the box
+  when it is not a whole number or is more than was loaded, rather than being changed.
 - **The driver's bell has no count.**
 - **The top bar carries the demo chip,** as "Demo" alone beside the status chip on a phone, and the status chip hides its
   words below 380 px wide so both fit.
 - **"Back online" takes the top line's place,** with the dispatcher's answer under it, so the driver never closes the bar
-  to read it, and it shows on Trip done when the stop that waited was the last one.
+  to read it, and it shows on Trip done when the stop that waited was the last one. Its lines wrap where the frame cuts
+  them, and beyond three stops it names three and how many more, so the driver can always read which stops went. It
+  belongs to its trip and goes when that trip is checked in, so it never shows on a second trip.
+- **Between trips,** the second trip's Today's trip opens with "✓ Trip 1 closed · 4 of 4 stops · all records sent ·
+  checked in 03:56" and trip 1's hand-back card until it starts. The frames draw no state between two trips, and the
+  driver must know trip 1 went and what to hand in before the truck is loaded again.
+- **Day done after two trips** shows a line per trip, "Trip 1 · 4 of 4 stops · 105 of 144 cartons delivered · 39 handed
+  back", and the day's totals, then "Trip 3 · none today". The frame draws a one-trip day, and the driver's last screen
+  should show the whole day rather than only the last trip.
 - **States the design lacks:** not loaded yet, no trip, could not load, the waiting sheet, not accepted, sign in again,
   could not save on this phone, the unusable photo, the answer on the phone, a stop to try again, and Day done with
   records waiting.

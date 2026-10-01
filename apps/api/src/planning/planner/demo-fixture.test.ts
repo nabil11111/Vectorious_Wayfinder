@@ -1,11 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { parse } from 'csv-parse/sync';
 import { describe, expect, it, vi } from 'vitest';
 import * as checker from '../check';
 import { checkPlan } from '../check';
 import { computeLoad } from '../load';
-import type { EngineOrder, PlannerInput, PlannerResult } from '../types';
+import type { EngineOrder, PlannerInput, PlannerOrder, PlannerResult } from '../types';
 import { buildSuggestedPlan } from './build';
 import { prepareInput } from './priority';
-import { demoFixture, threeHundredOrders } from './testing/demo';
+import { demoFixture, kandyFixture, threeHundredOrders } from './testing/demo';
 
 const quantities = (orders: EngineOrder[]) => {
   const totals = new Map<string, number>();
@@ -65,6 +67,23 @@ describe('the exact seeded planner day without a database', () => {
     ]);
   });
 
+  it('spec 020 reconstructs Kandy\'s seeded day: 64 orders by the same rules, none waiting, and 22 vehicles with a full fuel week', async () => {
+    const { input } = await kandyFixture();
+    expect([input.date, input.depotId]).toEqual(['2026-06-25', 'Kandy']);
+    expect(input.orders).toHaveLength(64);
+    expect(input.orders.every((o) => o.deliveryDate === input.date && o.timesDeferred === 0 && o.splitFrom === null)).toBe(true);
+    // The seed's own totals (tests/demo-day.test.ts).
+    expect(computeLoad(input.orders.flatMap((o) => o.lines), input.products)).toMatchObject({ units: 3025, kg: 24694.1, m3: 165.513 });
+    // OUT076: 45 + (836 mod 21) = 62 dry cartons and 38 + (380 mod 23) = 50 chilled ones, under the seed's ids.
+    expect(input.orders.filter((o) => o.outletId === 'OUT076').map((o) => [o.id, o.lines])).toEqual([
+      ['d503f849-bc1c-5b87-bbe6-b7370452bd5d', [{ productId: 'fresh-dry-carton', quantity: 62 }]],
+      ['21756f46-df43-53ca-b243-a31e015300e7', [{ productId: 'fresh-chilled-carton', quantity: 50 }]],
+    ]);
+    expect(input.vehicles).toHaveLength(22);
+    expect(input.vehicles.every((v) => v.depotId === 'Kandy' && v.available && v.litresUsedThisWeek === 0)).toBe(true);
+    expect(buildSuggestedPlan(input).status).not.toBe('unavailable');
+  });
+
   it('AC-21 returns a valid plan with every seeded unit accounted for exactly once', async () => {
     const { input } = await demoFixture();
     const result = buildSuggestedPlan(input);
@@ -119,32 +138,104 @@ describe('the exact seeded planner day without a database', () => {
     }
   });
 
-  it('AC-17 keeps every reason within 200 characters and whole words on varied days made from the seeded one', async () => {
-    // A fixed sample of days: some of the day's orders on a few of its working vehicles, about a third of them waiting
-    // and larger, so splits and refused remainders come up, and on half the days drivers with long three-part names.
-    const { input } = await demoFixture();
+  it('AC-17 keeps every reason within 200 characters and whole words on varied days made from Peliyagoda\'s and Kandy\'s seeded ones', async () => {
+    // A fixed sample of days, Peliyagoda's and Kandy's by turns: some of the day's orders on a few of its working vehicles,
+    // about a third of them waiting and larger, and every other pair of days a heavy one, a few waiting orders with lines
+    // near the 999 a line can hold. So splits and refused remainders come up. On half the days drivers have long
+    // three-part names, and on half the shops have the names the seed gives them, of up to 26 characters, where the
+    // fixtures' ids leave a reason the shop's district, of up to 12.
+    const seeded = [(await demoFixture()).input, (await kandyFixture()).input];
+    const shopNames: { outlet_id: string; name: string }[] = parse(readFileSync(new URL('../../../../../data/fixtures/outlet-names.csv', import.meta.url)), { columns: true });
+    const nameOf = new Map(shopNames.map((row) => [row.outlet_id, row.name]));
+    // The multiplication is done in whole 32-bit numbers: as a plain product it runs past 2^53 and loses its last
+    // digits, and the numbers then come round again every 10,466 draws or sooner.
     let seed = 7;
-    const next = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const next = () => { seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff; return seed / 2147483648; };
     const some = <T>(rows: T[], n: number) => rows.map((row) => [next(), row] as const).sort(([a], [b]) => a - b).slice(0, n).map(([, row]) => row);
+    const waiting = (order: PlannerOrder, nearCap: boolean): PlannerOrder => ({
+      ...order, deliveryDate: '2026-06-24', timesDeferred: 1,
+      lines: order.lines.map((line) => ({ ...line, quantity: nearCap ? 900 + Math.floor(next() * 100) : line.quantity * (2 + Math.floor(next() * 4)) })),
+    });
     const names = ['Chaminda Kumara Wickramasinghe', 'Dilshan Pradeep Jayawardena', 'Lasantha Bandara Ekanayake', 'Priyantha Gamini Senanayake'];
-    const reasons: string[] = [];
-    for (let day = 0; day < 60; day += 1) {
+    const reasons: { depot: string; reason: string }[] = [];
+    for (let day = 0; day < 64; day += 1) {
+      const seededDay = seeded[day % 2]!;
+      const heavy = day % 4 >= 2;
+      const input = next() < 0.5 ? { ...seededDay, outlets: seededDay.outlets.map((o) => ({ ...o, name: nameOf.get(o.id) ?? o.name })) } : seededDay;
       const fleet = some(input.vehicles.filter((v) => v.available), 2 + Math.floor(next() * 6));
-      const named = next() < 0.5;
-      const orders = some(input.orders, 10 + Math.floor(next() * 40)).map((order) => (next() < 0.3
-        ? { ...order, deliveryDate: '2026-06-24', timesDeferred: 1, lines: order.lines.map((line) => ({ ...line, quantity: line.quantity * (2 + Math.floor(next() * 4)) })) }
-        : order));
-      const result = buildSuggestedPlan({ ...input, orders, vehicles: fleet.map((v, i) => (named ? { ...v, driverName: names[i % names.length]! } : v)) });
-      if (result.status !== 'unavailable') reasons.push(...[...result.choices, ...result.decisions].map((entry) => entry.reason));
+      const withDrivers = next() < 0.5;
+      const orders = heavy
+        ? some(input.orders, 3 + Math.floor(next() * 6)).map((order) => waiting(order, true))
+        : some(input.orders, 10 + Math.floor(next() * 40)).map((order) => (next() < 0.3 ? waiting(order, next() < 0.3) : order));
+      const result = buildSuggestedPlan({ ...input, orders, vehicles: fleet.map((v, i) => (withDrivers ? { ...v, driverName: names[i % names.length]! } : v)) });
+      if (result.status === 'unavailable') continue;
+      reasons.push(...[...result.choices, ...result.decisions, ...result.input.plan.deferrals].map((entry) => ({ depot: input.depotId, reason: entry.reason })));
     }
-    expect(reasons.length).toBeGreaterThan(1000);
-    for (const reason of reasons) {
+    expect(reasons.filter((r) => r.depot === 'Peliyagoda').length).toBeGreaterThan(500);
+    expect(reasons.filter((r) => r.depot === 'Kandy').length).toBeGreaterThan(500);
+    for (const { reason } of reasons) {
       expect(reason.length, reason).toBeLessThanOrEqual(200);
       expect(reason, reason).not.toContain('…');
     }
-    // The sample reaches every wording: drivers' names where they fit, and the tight form where even kind and id do not.
-    expect(reasons.some((reason) => names.some((name) => reason.includes(`${name}'s `)))).toBe(true);
-    expect(reasons.some((reason) => / wait: reached at /.test(reason))).toBe(true);
+    // The sample reaches every wording: shops' and drivers' names where they fit, the tight form where even kind and id
+    // do not, and the tightest, with no deciding rule in brackets, where even the tight form does not.
+    expect(reasons.some(({ reason }) => shopNames.some(({ name }) => reason.includes(name)))).toBe(true);
+    expect(reasons.some(({ reason }) => names.some((name) => reason.includes(`${name}'s `)))).toBe(true);
+    expect(reasons.some(({ reason }) => / wait: reached at /.test(reason))).toBe(true);
+    expect(reasons.some(({ reason }) => /; \d+ (?:cartons|boxes|items) (?:on|joined) (?:dry truck|reefer truck|reefer van|van) VEH\d{3}(?:'s second trip)?(?:;|$)/.test(reason))).toBe(true);
+  });
+
+  it('AC-17 keeps the three longest reasons the sweeps found within 200 characters, the limit before the load', async () => {
+    // Kandy days at 201 characters even at the tightest wording, cut down to the orders that shape them: two remainders
+    // refused for weight on a Kegalle split, and the same at rank 103, behind 100 orders of 999 fridges that wait since
+    // Monday, are divided already and so are refused whole. The last wording says the limit first and the load after it,
+    // which keeps every fact in four fewer characters.
+    const { input: kandy } = await kandyFixture();
+    type Line = [productId: string, quantity: number];
+    const day = (vehicles: [id: string, driverName?: string][], orders: [outletId: string, lines: Line[], wantedFor: string, timesDeferred: number][]): PlannerInput => ({
+      ...kandy,
+      vehicles: vehicles.map(([id, driverName]) => ({ ...kandy.vehicles.find((v) => v.id === id)!, ...(driverName ? { driverName } : {}) })),
+      orders: orders.map(([outletId, lines, deliveryDate, timesDeferred]) => ({
+        ...kandy.orders.find((o) => o.outletId === outletId && o.lines[0]!.productId === lines[0]![0])!,
+        deliveryDate, timesDeferred, lines: lines.map(([productId, quantity]) => ({ productId, quantity })),
+      })),
+    });
+    const reasonFor = (input: PlannerInput, outletId: string) => {
+      const result = buildSuggestedPlan(input);
+      if (result.status === 'unavailable') throw new Error('Expected a checked suggestion');
+      const order = input.orders.find((o) => o.outletId === outletId && o.lines[0]!.productId === 'fresh-chilled-carton')!;
+      return result.choices.find((choice) => choice.orderId === order.id)!.reason;
+    };
+    const chilled = (outletId: string, cartons: number, wantedFor: string, timesDeferred: number) =>
+      [outletId, [['fresh-chilled-carton', cartons]], wantedFor, timesDeferred] as [string, Line[], string, number];
+    const dry = (outletId: string, cartons: number, wantedFor: string, timesDeferred: number) =>
+      [outletId, [['fresh-dry-carton', cartons]], wantedFor, timesDeferred] as [string, Line[], string, number];
+
+    const first = reasonFor(day([['VEH041'], ['VEH039']], [
+      dry('OUT080', 384, '2026-06-23', 2), chilled('OUT086', 216, '2026-06-24', 2), chilled('OUT081', 947, '2026-06-24', 2),
+      chilled('OUT101', 977, '2026-06-23', 1), chilled('OUT118', 941, '2026-06-23', 2), chilled('OUT079', 210, '2026-06-24', 2),
+      ['OUT091', [['style-folded', 70], ['style-hanging', 42], ['style-shoes', 25], ['style-bags', 12]], '2026-06-23', 2],
+      chilled('OUT119', 991, '2026-06-24', 2), ['OUT093', [['tech-tv', 912], ['tech-small', 920]], '2026-06-23', 2],
+      chilled('OUT078', 360, '2026-06-24', 1), chilled('OUT076', 976, '2026-06-24', 1), chilled('OUT105', 990, '2026-06-24', 1),
+    ]), 'OUT119');
+    expect(first).toBe('Rank 12: waited since Wed; chilled; Kegalle by 07:59; 390 cartons joined reefer truck VEH041\'s second trip; 601 wait: Reefer truck VEH039 over its 6,180 kg limit with 9,722.1 kg on its second trip.');
+
+    const second = reasonFor(day([['VEH047', 'Chaminda Kumara Wickramasinghe'], ['VEH039', 'Lasantha Bandara Ekanayake'], ['VEH043', 'Chaminda Kumara Wickramasinghe']], [
+      chilled('OUT105', 985, '2026-06-24', 1), dry('OUT086', 92, '2026-06-23', 1), chilled('OUT119', 948, '2026-06-24', 1),
+      chilled('OUT079', 210, '2026-06-24', 1), chilled('OUT085', 933, '2026-06-24', 2), chilled('OUT076', 995, '2026-06-24', 2),
+      chilled('OUT112', 230, '2026-06-24', 1), chilled('OUT108', 343, '2026-06-24', 2), chilled('OUT118', 957, '2026-06-24', 1),
+      dry('OUT112', 177, '2026-06-23', 2),
+    ]), 'OUT119');
+    expect(second).toBe('Rank 10: waited since Wed; chilled; Kegalle by 07:59; 564 cartons joined reefer truck VEH043\'s second trip; 384 wait: Reefer truck VEH039 over its 6,180 kg limit with 8,224.8 kg on its second trip.');
+
+    const tech = ['OUT093', 'OUT094', 'OUT095', 'OUT103', 'OUT115'];
+    const behind = day([['VEH040'], ['VEH058']], [chilled('OUT101', 120, '2026-06-24', 1), chilled('OUT108', 978, '2026-06-24', 1), chilled('OUT083', 996, '2026-06-24', 1)]);
+    behind.orders.unshift(...Array.from({ length: 100 }, (_, i) => ({
+      id: `ahead-${i + 1}`, outletId: tech[i % tech.length]!, deliveryDate: '2026-06-22', timesDeferred: 3, splitFrom: `ahead-parent-${i + 1}`,
+      lines: [{ productId: 'tech-fridge', quantity: 999 }],
+    })));
+    expect(reasonFor(behind, 'OUT108')).toBe('Rank 103: waited since Wed; chilled; Nuwara Eliya by 07:45; 150 cartons on reefer van VEH058\'s second trip; 828 wait: Reefer truck VEH040 over its 5,510 kg limit with 5,713.2 kg on its second trip.');
+    for (const reason of [first, second, reasonFor(behind, 'OUT108')]) expect(reason.length).toBeLessThanOrEqual(200);
   });
 
   it('AC-17 says fridge truck in every seeded chilled deferral', async () => {

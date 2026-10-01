@@ -144,6 +144,25 @@ describe('reviewed explanations through the complete planner', () => {
     clearReasons(result);
   });
 
+  it('keeps a Kandy split explanation within 200 characters by leaving out its deciding rule, last of all', () => {
+    // A review case: five large waiting orders on three of Kandy's fridge trucks. Even tight, the explanation for
+    // OUT092 was 203 characters, so it leaves out "(only usable run)" and keeps every truck, trip, quantity and limit.
+    const waiting = { deliveryDate: '2026-06-24', timesDeferred: 1 };
+    const result = success(buildSuggestedPlan(plannerInput([
+      plannerOrder('OUT084', 'OUT084', 'fresh-dry-carton', 620, waiting),
+      plannerOrder('OUT112', 'OUT112', 'fresh-chilled-carton', 806, waiting),
+      plannerOrder('OUT092', 'OUT092', 'style-hanging', 674, waiting),
+      plannerOrder('OUT089', 'OUT089', 'style-hanging', 851, waiting),
+      plannerOrder('OUT116', 'OUT116', 'fresh-chilled-carton', 973, waiting),
+    ], { depotId: 'Kandy', vehicles: [vehicle('VEH039'), vehicle('VEH042'), vehicle('VEH043')] })));
+    expect(result.choices.find((choice) => choice.orderId === 'OUT092')!.reason)
+      .toBe('Rank 5: waited since Wed; dry; Kandy by 17:00; 88 boxes on reefer truck VEH043\'s second trip; 586 wait: Reefer truck VEH042 carries 9,590 kg on its second trip, over its 6,180 kg limit.');
+    // The others fit sooner and keep their deciding rules.
+    expect(result.choices.find((choice) => choice.orderId === 'OUT112')!.reason)
+      .toBe('Rank 2: waited since Wed; chilled; Badulla by 07:45; 713 cartons on reefer truck VEH043 (only usable run); 93 wait: reached at 09:44 by reefer truck VEH039\'s second trip, after 07:45.');
+    clearReasons(result);
+  });
+
   it('explains a fuel excess hidden by equal rounded needed and remaining litres', () => {
     const day = plannerInput([plannerOrder('fuel-rounding', 'OUT006')], { vehicles: [{ ...vehicle('VEH012'), weeklyFuelQuotaL: 3.5, litresUsedThisWeek: 0 }] });
     day.outlets.find((shop) => shop.id === 'OUT006')!.name = 'Fresh Supermarket Colombo Central Distribution';

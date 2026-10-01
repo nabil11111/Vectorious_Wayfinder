@@ -125,7 +125,11 @@ five orders, 118 cartons ordered, 117 loaded and one dry carton short. Times are
    or the current time outside it. A label includes the date across midnight. The now line is the app time only when
    it is on the row's date. Never animate a truck between stops or fill a line up to now as evidence of travel.
 
-   A trip not yet out after its planned leave says "Departure not reported · planned 04:36". For an out trip, use
+   A trip not yet out after its planned leave says what the dock recorded, in the server's words, a sentence and a
+   short word (Q-24): a trip never loaded "Not loaded · planned 03:30" and "still at the dock", a trip being loaded
+   "Still loading · 120 of 437 on · planned 03:30" (on so far of its units) and "still at the dock", and only a ready
+   trip "Departure not reported · planned 04:36" and "watching", since it alone may have left without reporting it. The
+   dashboard's Watching row carries the same sentence: "Watching · VEH006 · Galle · Not loaded · planned 03:30". For an out trip, use
    013's `nextStop`, including its retry order: an unfinished next stop past planned arrival with no arrival says
    "Arrival not reported · planned 05:00". These are amber Watching rows, not new issues or inferred lateness. Once a
    stop is sent back, say "Retry requested [time]"; the old planned arrival is not a new overdue target. An arrived
@@ -142,7 +146,10 @@ five orders, 118 cartons ordered, 117 loaded and one dry carton short. Times are
    problem, sorted by their oldest open issue's `raisedAt` then id; then Watching trips by their unreported planned
    time; then other out trips by planned leave. Break remaining ties by plan date, vehicle id and trip number.
 5. **Open, filters and decisions (D-72).** The dashboard's problem summaries link to
-   `/dispatcher/live?issue=<id>`, and its truck Open to `?trip=<id>`. Live day opens the named trip's inline details
+   `/dispatcher/live?issue=<id>`, and its truck Open to `?trip=<id>`. A summary, like a truck's row on Live day, names
+   its problem as Live day's card does, the shop first: "Fresh Nugegoda · 1 dry carton short", "Fresh Kotahena · 3
+   chilled cartons refused", a shop's report by its reason, "Fresh Peradeniya · 1 chilled carton damaged" or "Fresh
+   Ampitiya · Chilled goods not cold" (spec 015, rule 12), and only a closed shop "Nobody at Fresh Mulgampola" (Q-39). Live day opens the named trip's inline details
    and focuses the issue card if named. All trucks shows the complete list. Problems only shows trips with an open
    issue or rule 4's unreported-departure/arrival attention; totals stay unfiltered. Needs you remains all open issues.
    Needs you keeps 012's departure 10: **every open problem in full**, oldest first; it is not one focused card
@@ -153,7 +160,9 @@ five orders, 118 cartons ordered, 117 loaded and one dry carton short. Times are
    remaining open issue. If another dispatcher already answered it, refetch and say "That problem was already
    answered." A trip no longer in this view says "That trip is no longer in this view." No historical lookup follows.
 6. **Refreshing.** Reuse the one SSE stream. A relevant committed change causes a fresh read, normally visible within
-   a second locally. No server report exists for a write still on the driver's phone. On reconnect or a demo/clock
+   a second locally. A `driver` message also reads the problems again, so a card's "Still on VEH057 · 39 cartons · 1
+   stop left" follows the trip on Live day and the dashboard, to "no stops left" once the last stop is done. No server
+   report exists for a write still on the driver's phone. On reconnect or a demo/clock
    change refetch as 008 does; retain the one-minute fallback. A stale browser view says so. No SSE payload or write
    response is installed as the day, and an older GET must not overwrite a newer one. The clock/attention query is
    refreshed when its day changes, as well as once a minute for a newly overdue report.
@@ -239,14 +248,14 @@ branch, not on fabricated API data. AC-19 was removed after review; the other cr
 - [ ] **AC-13** When another depot has a trip and issue, the system shall exclude them from every operations count, row and event.
 - [ ] **AC-14** When a read races a demo reset, the system shall finish both without deadlock and return one whole generation, with no old event or mixed trip/line membership.
 - [ ] **AC-15** When a fixture has one vehicle on two trips in different districts of the same brand, a mixed-brand trip and a stop completed with zero goods loaded, the system shall return distinct brand as well as district totals, count that vehicle once in its brand, list each trip once, exclude the empty delivery from delivered stops and exclude split parents from demand.
-- [ ] **AC-16** When the next report is missing past its sent time, the system shall produce rule 4's unreported departure/arrival attention, stop doing so on arrival, and show Retry requested instead for a reopened stop, without an ETA or offline claim.
+- [ ] **AC-16** When the next report is missing past its sent time, the system shall produce rule 4's attention, "Not loaded", "Still loading" with what is on so far, or "Departure not reported" by what the dock recorded, or an unreported arrival, stop doing so on arrival, and show Retry requested instead for a reopened stop, without an ETA or offline claim.
 - [ ] **AC-17** When the walkthrough's records are read twice, including a repeated driver write, a late-synced refusal and a joined 015 receipt problem, the system shall return rule 7's ordered, unique events by problem kind at their business times, with only a photo marker and the same result on both reads.
 - [ ] **AC-18** When more than 50 scoped events exist and a reset follows, the system shall return the newest 50 with the truncated flag before reset and none of those old records after reset, despite the surviving audit log.
 - [ ] **AC-20** When a loader reads a sent or resent publication, the system shall give its demo generation, publication time and publisher from that exact plan.sent revision, never its original creator or audit wall time.
 - [ ] **AC-21** When two observed publications rebuild only trip/stop ids or move exactly one trip's orders to another vehicle, the system shall respectively show no change or one Moved row with bell 1, and shall separately identify departure, driver, sequence, quantity and partial-move changes without pairing unrelated trips.
 - [ ] **AC-22** When a loader's list goes published → withdrawn → republished, the system shall keep the old baseline only in storage while showing the wait sentence without old truck cards or Start, then show the comparison on resend and retain it through a tab reload and Got it, clearing it on account/day/depot/demo-generation change or sign-out.
 - [ ] **AC-23** When a loader first visits or ordinary loading/driver/issue progress changes the list at the same publication, the system shall establish or keep the baseline without a Plan changed notice, and a failed storage write shall show the storage sentence while leaving current loading usable.
-- [ ] **AC-24** When plans, loading, driver, orders or issues are announced, the system shall invalidate the operations query as well as the topic's existing query; clock/demo/reconnect shall refetch it through 008's existing path.
+- [ ] **AC-24** When plans, loading, driver, orders or issues are announced, the system shall invalidate the operations query as well as the topic's existing query, and on driver the problems query too; clock/demo/reconnect shall refetch it through 008's existing path.
 - [ ] **AC-25** When a truck finishes its route and returns, the system shall remove it from Trucks out now, retain it on the day's Live timeline with its return time and preserve its two-stop totals.
 - [ ] **AC-26** When Ruwan opens Dashboard at 1440 × 900 after the refusal and in the closed-shop alternative, the system shall show each tile's own bar (including 1 / 2 delivered as half), the sourced truck columns in problems-first order, the existing issue summary and next run, without a district map or unsupported actions.
 - [ ] **AC-27** When Ruwan opens Live day at 1440 × 900, the system shall draw the planned and recorded marks, server brand totals, grouped trips, legend and event rail, and Open shall expose labelled stop facts without a proof viewer.

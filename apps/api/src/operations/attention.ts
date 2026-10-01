@@ -1,5 +1,5 @@
 import { nextStop, type DriverTrip, type Issue, type IssueReason, type OperationsStatus, type OperationsTimeline, type OperationsTrip, type TripAttention } from '@wayfinder/contracts';
-import { depotDate, depotInstant } from '../lib/clock';
+import { depotDate, depotInstant, depotMinutes } from '../lib/clock';
 import { progress } from './figures';
 
 // An open problem's reason as a truck's row says it, "Won't fit" (Q-20) as well as "Wrong item".
@@ -8,8 +8,31 @@ const REASON_SUMMARY: Record<IssueReason, string> = {
   nobody_there: 'Nobody there', missing: 'Missing', not_cold: 'Not cold',
 };
 
-export function attentionOf(trip: DriverTrip, arrivals: Map<string, string>, at: string): TripAttention {
-  if (['planned', 'loading', 'ready'].includes(trip.status) && at > trip.leavesAt) return { kind: 'departure_unreported', plannedAt: trip.leavesAt };
+// "03:30" at the depot, and "1,200" with the thousands marked, as the dispatcher's pages write them.
+const clockOf = (instant: string) => {
+  const minutes = depotMinutes(new Date(instant));
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+};
+const WHOLE = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 });
+
+// What the dock has on a trip that is not out yet: the units loaded so far and the trip's units in all.
+export interface DockProgress { on: number; units: number }
+
+// A trip past its planned leave and not out says what the dock recorded (rule 4, Q-24): a trip never loaded is still at
+// the dock, so is one still loading, and only a ready trip may have left without reporting it.
+function departureOf(trip: DriverTrip, dock: DockProgress | null): TripAttention {
+  const planned = `planned ${clockOf(trip.leavesAt)}`;
+  if (trip.status === 'planned') return { kind: 'not_loaded', plannedAt: trip.leavesAt, sentence: `Not loaded · ${planned}`, word: 'still at the dock' };
+  if (trip.status === 'loading') {
+    if (!dock) throw new Error(`No loading progress for trip ${trip.tripId}.`);
+    return { kind: 'still_loading', plannedAt: trip.leavesAt, on: dock.on, units: dock.units,
+      sentence: `Still loading · ${WHOLE.format(dock.on)} of ${WHOLE.format(dock.units)} on · ${planned}`, word: 'still at the dock' };
+  }
+  return { kind: 'departure_unreported', plannedAt: trip.leavesAt, sentence: `Departure not reported · ${planned}`, word: 'watching' };
+}
+
+export function attentionOf(trip: DriverTrip, arrivals: Map<string, string>, at: string, dock: DockProgress | null = null): TripAttention {
+  if (['planned', 'loading', 'ready'].includes(trip.status) && at > trip.leavesAt) return departureOf(trip, dock);
   const next = nextStop(trip);
   if (trip.status !== 'out' || !next || next.arrivedAt) return { kind: 'none' };
   if (next.retriedAt) return { kind: 'retry_requested', stopId: next.id, requestedAt: next.retriedAt };
@@ -35,7 +58,7 @@ export function outRowOf(trip: DriverTrip, arrivals: Map<string, string>, issues
 const priority = (row: OperationsTrip) => {
   const status = row.outRow?.status;
   if (status?.kind === 'open_problem') return [0, status.raisedAt, status.issueId] as const;
-  if (status?.kind === 'departure_unreported' || status?.kind === 'arrival_unreported') return [1, status.plannedAt, ''] as const;
+  if (status && 'plannedAt' in status) return [1, status.plannedAt, ''] as const;
   return [2, row.detailRecorded ? row.schedule.leavesAt : '~', ''] as const;
 };
 export function compareOut(a: OperationsTrip, b: OperationsTrip) {

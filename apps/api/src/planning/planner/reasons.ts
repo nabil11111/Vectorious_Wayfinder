@@ -13,14 +13,17 @@ export type RejectionStage = 'over_capacity' | 'window' | 'fuel';
 
 // How fully a reason is worded, from the fullest to the shortest. The planner keeps every reason within 200 characters
 // (spec 011) by taking the first wording that fits: whole sentences, then the short forms, both naming trucks by their
-// drivers (spec 026); then the short forms with every truck by its kind and id; and only then the tight form, which
-// leaves out words that carry no fact, such as the "the" before a truck and a shop the reason has named already, but
-// never a fact or part of a word.
-export type Wording = 'full' | 'short' | 'plain' | 'tight';
-const WORDINGS: readonly Wording[] = ['full', 'short', 'plain', 'tight'];
+// drivers (spec 026); then the short forms with every truck by its kind and id; then the tight form, which leaves out
+// words that carry no fact, such as the "the" before a truck and a shop the reason has named already; then the
+// tightest, which also leaves out the deciding rule in brackets, "(only usable run)"; and last the shortest, which
+// also says a refused truck's limit before its load: "Reefer truck VEH039 over its 6,180 kg limit with 9,722.1 kg on its
+// second trip". None leaves out a truck, a trip, a quantity, a time or a limit, or cuts a word.
+export type Wording = 'full' | 'short' | 'plain' | 'tight' | 'tightest' | 'shortest';
+const WORDINGS: readonly Wording[] = ['full', 'short', 'plain', 'tight', 'tightest', 'shortest'];
 
-// The whole reason in the fullest wording that fits. A tight reason still longer keeps its length rather than lose a
-// fact; on days like the demo's it never comes to that (demo-fixture.test.ts).
+// The whole reason in the fullest wording that fits. One still longer at the shortest keeps its length rather than be
+// cut or lose a fact: the 200 characters are the planner's own aim (spec 011), and the contract takes up to 1,000.
+// The longest the sweeps found came to 201 before the shortest wording and fit with it (demo-fixture.test.ts).
 export function fittedReason(render: (wording: Wording) => string): string {
   let reason = '';
   for (const wording of WORDINGS) {
@@ -31,11 +34,13 @@ export function fittedReason(render: (wording: Wording) => string): string {
 }
 
 // A truck, and one of its trips, as a wording names them: by the driver the planner's input gives the vehicle until the
-// wording falls back to kind and id, and in the tight form without "the" and with a second trip after the truck.
+// wording falls back to kind and id, and in the tight forms without "the" and with a second trip after the truck.
 const byDriver = (wording: Wording) => wording === 'full' || wording === 'short';
+const isTight = (wording: Wording) => wording === 'tight' || wording === 'tightest' || wording === 'shortest';
+const withoutRule = (wording: Wording) => wording === 'tightest' || wording === 'shortest';
 const truckIn = (vehicle: EngineVehicle, wording: Wording) =>
-  (wording === 'tight' ? kindAndId(vehicle) : vehicleCalled(vehicle, byDriver(wording) ? vehicle.driverName : undefined));
-const tripIn = (vehicle: EngineVehicle, tripNo: number, wording: Wording) => (wording === 'tight'
+  (isTight(wording) ? kindAndId(vehicle) : vehicleCalled(vehicle, byDriver(wording) ? vehicle.driverName : undefined));
+const tripIn = (vehicle: EngineVehicle, tripNo: number, wording: Wording) => (isTight(wording)
   ? `${kindAndId(vehicle)}${isSecondTrip(tripNo) ? '\'s second trip' : ''}`
   : tripCalled(vehicle, tripNo, byDriver(wording) ? vehicle.driverName : undefined));
 // A trial with no driver's name on its trucks or trips, so the checker's own sentence it gives names none either.
@@ -176,7 +181,8 @@ export function placementReason(input: PlannerInput, order: PlannerOrder, attemp
       'vehicle ID breaks the tie': 'vehicle ID tie',
     };
     const why = attempt.selectionReason ? shorter[attempt.selectionReason] ?? attempt.selectionReason : 'fits delivery limits';
-    return `${existing ? 'joined' : 'on'} ${tripIn(vehicle, tripNo, wording)} (${why})`;
+    // The tightest wordings leave out the deciding rule, and only that.
+    return `${existing ? 'joined' : 'on'} ${tripIn(vehicle, tripNo, wording)}${withoutRule(wording) ? '' : ` (${why})`}`;
   }
   const placed = existing
     ? `joined ${truckIn(vehicle, wording)} on ${itsTrip(tripNo) ?? 'its run'} to ${district}`
@@ -208,13 +214,16 @@ export function refusedReason(
     const theVehicle = again ? 'It' : capital(truckIn(vehicle, wording));
     const onTrip = again ? itsTrip(tripNo) ?? 'it' : tripIn(vehicle, tripNo, wording);
     const never = again ? 'it can never be reached in time' : `${onTrip} can never reach it in time`;
-    if (problem.code === 'over_weight' && trip) return `${theVehicle} carries ${kg(trip.load.kg)}${onItsTrip(tripNo)}, over its ${kg(vehicle.weightCapKg)} limit.`;
-    if (problem.code === 'over_volume' && trip) return `${theVehicle} carries ${m3(trip.load.m3)}${onItsTrip(tripNo)}, over its ${m3(vehicle.volumeCapM3)} limit.`;
+    const over = (load: string, limit: string) => (wording === 'shortest'
+      ? `${again ? 'It is' : theVehicle} over its ${limit} limit with ${load}${onItsTrip(tripNo)}.`
+      : `${theVehicle} carries ${load}${onItsTrip(tripNo)}, over its ${limit} limit.`);
+    if (problem.code === 'over_weight' && trip) return over(kg(trip.load.kg), kg(vehicle.weightCapKg));
+    if (problem.code === 'over_volume' && trip) return over(m3(trip.load.m3), m3(vehicle.volumeCapM3));
     if (problem.code === 'fuel_over_quota') {
       const fuel = checked.vehicles.find((fuel) => fuel.vehicleId === vehicle.id)!;
       const left = fuel.quotaL - fuel.litresBefore;
       // In the tight form the litres it needs and has left say it is over, unless rounding them hides that.
-      if (wording === 'tight') {
+      if (isTight(wording)) {
         return Math.round(fuel.litresPlan * 10) > Math.round(left * 10)
           ? `${theVehicle} needs ${litres(fuel.litresPlan)}, with ${litreFigure(left)} left of its quota.`
           : `${theVehicle} exceeds its quota before rounding: ${litres(fuel.litresPlan)} needed, ${litreFigure(left)} left.`;
@@ -231,7 +240,7 @@ export function refusedReason(
       const deadline = shop.brand === 'Fresh' && stop.windowClose >= FRESH_DEADLINE ? FRESH_DEADLINE : stop.windowClose;
       // The tight form leaves out the order's own shop, which its rank has named already, though another shop it would
       // make late keeps its name; and it leaves out "is" and "the deadline", keeping the times.
-      if (wording === 'tight') {
+      if (isTight(wording)) {
         return `${stop.outletId === order.outletId ? '' : `${place} `}reached at ${toClock(stop.arriveAt)} by ${onTrip}, after ${toClock(deadline)}.`;
       }
       return `${place} is reached at ${toClock(stop.arriveAt)} by ${onTrip}, after the ${toClock(deadline)} deadline.`;

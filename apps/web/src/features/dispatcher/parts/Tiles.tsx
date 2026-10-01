@@ -3,10 +3,8 @@ import type { IssueList, OperationsCounts, OperationsDay } from '@wayfinder/cont
 import { ICON } from '@/features/live/parts/icons';
 import { Bar, CARD } from '@/features/live/parts/ui';
 import { openCount, sumCounts, sumFuel, sumNextRun } from '@/features/live/sums';
-import { FUEL_UNAVAILABLE, NO_NEXT_DAY, NO_QUOTA, deliveredNote, fuelLitres, ratio } from '@/features/live/words';
-import { weekday } from '@/features/store/words';
-import { clockTime, whole } from '@/features/loader/words';
-import { inDepot } from '@/lib/clock';
+import { FUEL_UNAVAILABLE, NO_NEXT_DAY, NO_QUOTA, deliveredNote, fuelLitres, needYouNow, nextRunOrders, ratio, trucksOutNow } from '@/features/live/words';
+import { whole } from '@/features/loader/words';
 import { cn } from '@/lib/utils';
 
 // What the next run's tile says when the depots shown run their next days apart; each has its own line in Next run.
@@ -37,12 +35,12 @@ export function Tiles({ depots, days, issues }: { depots: string[]; days: Operat
   const next = sumNextRun(days.map((day) => day.nextRun));
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-      <Tile icon={ICON.alert} value={open === null ? '–' : whole(open)} label="need you now" tone={open ? 'bad' : undefined} />
+      <Tile icon={ICON.alert} value={open === null ? '–' : whole(open)} label={needYouNow(open)} tone={open ? 'bad' : undefined} />
       <Tile icon={ICON.delivered} value={ratio(c.stopsDelivered, c.stopsTotal)} label={deliveredLabel(c, depots, noPlan)}
         bar={<Bar progress={c.deliveryProgress} label="Stops delivered" />} />
-      <Tile icon={ICON.trucks} value={ratio(c.vehiclesOut, c.vehiclesTotal)} label="trucks out now" bar={<Bar progress={c.truckProgress} label="Trucks out now" />} />
+      <Tile icon={ICON.trucks} value={ratio(c.vehiclesOut, c.vehiclesTotal)} label={trucksOutNow(c.vehiclesTotal)} bar={<Bar progress={c.truckProgress} label="Trucks out now" />} />
       <Tile icon={ICON.nextRun} value={next && next !== 'differ' ? whole(next.orders) : '–'}
-        label={next === 'differ' ? NEXT_RUNS_DIFFER : next ? `orders for ${weekday(next.date)} · closes ${inDepot(Date.parse(next.cutoffAt)).weekday} ${clockTime(next.cutoffAt)}` : NO_NEXT_DAY} />
+        label={next === 'differ' ? NEXT_RUNS_DIFFER : next ? nextRunOrders(next) : NO_NEXT_DAY} />
       <Tile icon={ICON.fuel} value={!fuel || fuel.percent === null ? '–' : `${fuel.percent}%`}
         label={!fuel ? FUEL_UNAVAILABLE : fuel.percent === null ? NO_QUOTA : `fuel · ${fuelLitres(fuel)} this week`}
         bar={fuel && <Bar tone="quiet" progress={{ numerator: fuel.percent === null ? null : fuel.litres, denominator: fuel.quotaLitres, percent: fuel.percent }} label="Fuel recorded and committed this week" />} />
