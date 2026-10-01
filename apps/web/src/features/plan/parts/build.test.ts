@@ -1,6 +1,6 @@
 import { PlanBoard, type PlanRef } from '@wayfinder/contracts';
 import { expect, it, vi } from 'vitest';
-import { buildPlan, type BuildAct } from './build';
+import { buildPlan, suggestionLine, type BuildAct } from './build';
 
 // Nabil, 1 Oct, with spec 023: once "Build the suggested plan" goes through, the board opens View plan for its day,
 // where the plan's trips, decisions and checks are laid out. A refused build, and one that loaded the board again,
@@ -38,4 +38,18 @@ it('spec 023 stays on the board when the build is refused or the board is loaded
   // Stale: the board loads again with its line, and the queue answers nothing.
   expect(await buildPlan(async () => null, open)).toBeNull();
   expect(open).not.toHaveBeenCalled();
+});
+
+// L-18: under "No trip open", the suggested plan's line says how many of its decisions are still to make while the draft
+// holds the suggestion, and nothing once Start over or Undo has taken all of it away.
+it('L-18 says the suggestion\'s decisions only while the draft still holds it', () => {
+  const decision = (n: number, open: boolean) => ({
+    key: `late_order:00000000-0000-4000-8000-00000000000${n}`, kind: 'late_order' as const, reason: 'No fridge truck was left.', orderId: `00000000-0000-4000-8000-00000000000${n}`,
+    vehicleId: null, tripNo: null, leaveAt: null, acceptedAt: null, open,
+  });
+  const suggestion = { builtAt: '2026-06-24T10:31:00.000Z', choices: [], inDraft: true, decisions: [decision(1, true), decision(2, true), decision(3, false)] };
+  expect(suggestionLine(suggestion)).toEqual({ at: 'Suggested plan · 16:01', open: 2, toMake: '2 decisions to make' });
+  expect(suggestionLine({ ...suggestion, decisions: [decision(3, false)] })).toMatchObject({ open: 0, toMake: 'no decisions to make' });
+  expect(suggestionLine({ ...suggestion, inDraft: false, decisions: [decision(1, false), decision(2, false)] })).toBeNull();
+  expect(suggestionLine(null)).toBeNull();
 });

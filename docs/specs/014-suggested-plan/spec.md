@@ -122,6 +122,10 @@ are depot time.
    the checker finds no block and no decision is open. Accepting a decision clears none of the checker's warnings, and
    warnings never stop a send, so the plan is ready, with warnings, and they stay on View plan. *The seeded suggestion
    keeps one long wait, of 43 minutes at Fresh Bambalapitiya, and a Fresh workload of 278 of 270 minutes.*
+   While the draft holds nothing of the suggestion any more (no order on the truck and trip it gave it, and none it
+   deferred), as after Start over or an Undo back past the build (spec 027), the middle's "Suggested plan · 16:00 · N
+   decisions to make" line is not shown, so it never says "no decisions to make" about a plan that is not on the board
+   (L-18). The API says whether the draft holds it.
 9. **The numbers.** As spec 010's rule 12: the API works out every number shown, and the planner writes every rank
    and reason. The screen counts the rows it lists ("Decisions · N", "N decisions to make") and nothing else.
 

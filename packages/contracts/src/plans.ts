@@ -143,10 +143,13 @@ export const Suggestion = z.object({
 export type Suggestion = z.infer<typeof Suggestion>;
 
 // The suggestion as the board answers it. A decision is open while it is not accepted and the saved draft still holds
-// the planner's own choice (spec 014, rule 6). The saved draft stays on the server.
+// the planner's own choice (spec 014, rule 6). inDraft says whether the draft still holds anything of the suggestion: an
+// order on the truck and trip it gave it, or an order it deferred. Once Start over or Undo has taken it all away, the
+// board says nothing of the suggestion's decisions (L-18). The saved draft stays on the server.
 export const BoardSuggestion = z.object({
   builtAt: Moment,
   choices: z.array(SuggestionChoice).max(300),
+  inDraft: z.boolean(),
   decisions: z.array(SuggestionDecision.extend({ open: z.boolean() })).max(700),
 });
 export type BoardSuggestion = z.infer<typeof BoardSuggestion>;

@@ -71,9 +71,22 @@ describe('when a decision is open', () => {
       decisions: [early, { ...late, acceptedAt: ACCEPTED }, waited] };
     const draft = edited((plan) => { plan.trips[0]!.leaveAt = 210; });
     expect(boardSuggestion(stored, draft)).toEqual({
-      builtAt: BUILT, choices: stored.choices,
+      builtAt: BUILT, choices: stored.choices, inDraft: true,
       decisions: [{ ...early, open: false }, { ...late, acceptedAt: ACCEPTED, open: false }, { ...waited, open: true }],
     });
+  });
+
+  it('L-18 says whether the draft still holds anything of the suggestion: an order on the truck it gave it, or one it deferred', () => {
+    const stored: Suggestion = { builtAt: BUILT, plan: suggested, choices: [], decisions: [early, late] };
+    expect(boardSuggestion(stored, suggested).inDraft).toBe(true);
+    // Started over, or undone back past the build: nothing of it is left, and no decision is open.
+    const emptied = edited((plan) => { plan.trips = []; plan.deferrals = []; });
+    expect(boardSuggestion(stored, emptied)).toMatchObject({ inDraft: false, decisions: [{ open: false }, { open: false }] });
+    // A trip of its own, or the suggestion's order on another truck, is not the suggestion.
+    expect(boardSuggestion(stored, edited((plan) => { plan.deferrals = []; plan.trips[0]!.vehicleId = 'VEH001'; })).inDraft).toBe(false);
+    // One of its trips or one of its deferrals, even reworded, is.
+    expect(boardSuggestion(stored, edited((plan) => { plan.deferrals = []; })).inDraft).toBe(true);
+    expect(boardSuggestion(stored, edited((plan) => { plan.trips = []; plan.deferrals[0]!.reason = 'Friday.'; })).inDraft).toBe(true);
   });
 });
 
