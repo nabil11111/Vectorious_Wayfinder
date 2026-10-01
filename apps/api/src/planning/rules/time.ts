@@ -2,8 +2,8 @@ import { levelOf, type Problem, type ProblemCode } from '@wayfinder/contracts';
 import { PlanInputError } from '../errors';
 import { lookup } from '../lookup';
 import { budgetMinutes, earliestLeaveFor, FRESH_DEADLINE, timeTrip, tripsOf } from '../timeline';
-import type { Minutes, PlanInput, PlanTrip, TimeProblems } from '../types';
-import { capital, itsTrip, toClock, tripCalled, vehicleCalled } from '../words';
+import type { EngineVehicle, Minutes, PlanInput, PlanTrip, TimeProblems } from '../types';
+import { capital, driverOf, itsTrip, toClock, tripCalled, vehicleCalled } from '../words';
 
 // Time (spec 007, AC-29 to AC-33, AC-37 to AC-39, AC-47 and AC-49): a trip stays in one district the data has
 // a drive to, a vehicle runs at most two trips and the second after the first, every shop is reached inside
@@ -14,8 +14,9 @@ type About = Pick<Problem, 'vehicleId' | 'tripNo' | 'stopSeq' | 'outletId' | 'or
 
 const list = new Intl.ListFormat('en-GB');
 const minutes = (n: number) => `${n} ${n === 1 ? 'minute' : 'minutes'}`;
-const overBudget = (vehicle: string, trips: string, took: number, budget: number) =>
-  `${capital(vehicle)}'s ${trips} trips take ${took} minutes of driving and unloading, ${took - budget} over the day's ${budget}.`;
+// A driver's name already has the possessive, so "Chaminda's dry truck" comes after its trips (spec 026).
+const overBudget = (vehicle: EngineVehicle, driverName: string | undefined, trips: string, took: number, budget: number) =>
+  `${driverName ? `The ${trips} trips of ${vehicleCalled(vehicle, driverName)}` : `${capital(vehicleCalled(vehicle))}'s ${trips} trips`} take ${took} minutes of driving and unloading, ${took - budget} over the day's ${budget}.`;
 
 // The latest leaving time before the trip's own that reaches every stop in time, or null when there is none
 // (AC-47). Leaving earlier never makes a stop later, so it steps back a minute at a time and the first time
@@ -42,9 +43,10 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
   const vehicleIds = new Set(input.plan.trips.map((trip) => vehicleOf(trip.vehicleId).id));
   for (const vehicleId of vehicleIds) {
     const vehicle = vehicleOf(vehicleId);
-    const theVehicle = capital(vehicleCalled(vehicle));
     // In the order the trips are timed in, so each one meets its own times below.
     const trips = tripsOf(input, vehicleId);
+    const driverName = driverOf(trips, vehicleId);
+    const theVehicle = capital(vehicleCalled(vehicle, driverName));
     const numbers = trips.map((trip) => trip.tripNo);
     const odd = numbers.find((n) => n !== 1 && n !== 2);
     if (numbers.length > 2) {
@@ -62,7 +64,7 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
     for (const [i, trip] of trips.entries()) {
       const name = `${vehicleId} trip ${trip.tripNo}`;
       const about = { vehicleId, tripNo: trip.tripNo };
-      const onTrip = tripCalled(vehicle, trip.tripNo);
+      const onTrip = tripCalled(vehicle, trip.tripNo, trip.driverName);
       const shops = trip.stops.map((stop) => outletOf(stop.outletId));
       const districts = [...new Set(shops.map((shop) => shop.district))];
       const [district, ...others] = districts;
@@ -72,7 +74,7 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
       if (district === undefined) continue;
       if (others.length > 0) {
         // The stops of the first district stay, and the others move.
-        report('cross_district', about, `${theVehicle} goes to ${list.format(districts)} on ${itsTrip(trip.tripNo) ?? 'one trip'}, and a trip stays in one district.`,
+        report('cross_district', about, `${capital(vehicleCalled(vehicle, trip.driverName))} goes to ${list.format(districts)} on ${itsTrip(trip.tripNo) ?? 'one trip'}, and a trip stays in one district.`,
           `Move the ${list.format(others)} stops to ${others.length === 1 ? 'another trip' : 'other trips'}.`);
         continue;
       }
@@ -133,8 +135,8 @@ export const timeProblems: TimeProblems = (input, vehicleTimes) => {
     if (day) {
       const { freshMin, styleTechMin } = budgetMinutes(input, day);
       const { fresh, styleTech } = input.settings.budgetMin;
-      if (freshMin > fresh) report('over_time_budget', { vehicleId }, overBudget(vehicleCalled(vehicle), 'Fresh', freshMin, fresh));
-      if (styleTechMin > styleTech) report('over_time_budget', { vehicleId }, overBudget(vehicleCalled(vehicle), 'Style and Tech', styleTechMin, styleTech));
+      if (freshMin > fresh) report('over_time_budget', { vehicleId }, overBudget(vehicle, driverName, 'Fresh', freshMin, fresh));
+      if (styleTechMin > styleTech) report('over_time_budget', { vehicleId }, overBudget(vehicle, driverName, 'Style and Tech', styleTechMin, styleTech));
     }
   }
 

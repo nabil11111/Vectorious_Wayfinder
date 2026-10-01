@@ -3,7 +3,7 @@ import { PlanInputError } from '../errors';
 import { tripLitres } from '../fuel';
 import { lookup } from '../lookup';
 import type { DayProblems } from '../types';
-import { capital, itsTrip, litres, vehicleCalled } from '../words';
+import { capital, driverOf, itsTrip, litres, vehicleCalled } from '../words';
 
 // Fuel and the day (spec 007, AC-34 to AC-36): the weekly fuel quota, the operating day and whether each
 // vehicle is available. The sentences follow spec 024: the vehicle by its kind.
@@ -24,7 +24,7 @@ export const dayProblems: DayProblems = (input, vehicleFuel) => {
     if (!withFuel.has(vehicle.id)) throw new PlanInputError(`No fuel figures were given for ${vehicle.id}`);
     if (!vehicle.available) {
       report('vehicle_off', { vehicleId: vehicle.id, tripNo: trip.tripNo },
-        `${capital(vehicleCalled(vehicle))} has ${itsTrip(trip.tripNo) ?? 'a trip'} on a day it is not available.`, 'Move this trip to another vehicle.');
+        `${capital(vehicleCalled(vehicle, trip.driverName))} has ${itsTrip(trip.tripNo) ?? 'a trip'} on a day it is not available.`, 'Move this trip to another vehicle.');
     }
   }
 
@@ -45,7 +45,7 @@ export const dayProblems: DayProblems = (input, vehicleFuel) => {
     const by = overTenths > 0 ? litres(overTenths / 10) : 'less than 0.1 litres';
     report(
       'fuel_over_quota', { vehicleId: vehicle.id },
-      `${capital(vehicleCalled(vehicle))} has used ${litres(fuel.litresBefore)} this week and this plan needs ${litres(needs)} more, ${by} over its weekly quota of ${litres(fuel.quotaL)}.`,
+      `${capital(vehicleCalled(vehicle, driverOf(input.plan.trips, vehicle.id)))} has used ${litres(fuel.litresBefore)} this week and this plan needs ${litres(needs)} more, ${by} over its weekly quota of ${litres(fuel.quotaL)}.`,
       `Take ${by} of driving off this vehicle.`,
     );
   }

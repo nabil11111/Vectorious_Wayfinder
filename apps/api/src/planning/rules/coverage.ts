@@ -29,11 +29,11 @@ export const coverageProblems: CoverageProblems = (input) => {
 
   for (const trip of input.plan.trips) {
     const vehicle = vehicleOf(trip.vehicleId);
-    const onTrip = tripCalled(vehicle, trip.tripNo);
+    const onTrip = tripCalled(vehicle, trip.tripNo, trip.driverName);
     const about = { vehicleId: vehicle.id, tripNo: trip.tripNo };
     if (trip.stops.length === 0) {
       // A first or only trip is not numbered, so the sentence says it is one of the vehicle's trips.
-      const empty = itsTrip(trip.tripNo) === null ? `${vehicleCalled(vehicle)} has a trip with no stops.` : `${onTrip} has no stops.`;
+      const empty = itsTrip(trip.tripNo) === null ? `${vehicleCalled(vehicle, trip.driverName)} has a trip with no stops.` : `${onTrip} has no stops.`;
       report('empty_trip', about, capital(empty), 'Add a stop or remove the trip.');
     }
 

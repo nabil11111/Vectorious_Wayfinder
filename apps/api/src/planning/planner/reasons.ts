@@ -139,11 +139,11 @@ export function placementReason(input: PlannerInput, order: PlannerOrder, attemp
       'vehicle ID breaks the tie': 'vehicle ID tie',
     };
     const why = attempt.selectionReason ? shorter[attempt.selectionReason] ?? attempt.selectionReason : 'fits delivery limits';
-    return `${existing ? 'joined' : 'on'} ${tripCalled(vehicle, tripNo)} (${why})`;
+    return `${existing ? 'joined' : 'on'} ${tripCalled(vehicle, tripNo, vehicle.driverName)} (${why})`;
   }
   const placed = existing
-    ? `joined ${vehicleCalled(vehicle)} on ${itsTrip(tripNo) ?? 'its run'} to ${district}`
-    : `new ${isSecondTrip(tripNo) ? 'second trip' : 'run'} on ${vehicleCalled(vehicle)} to ${district}`;
+    ? `joined ${vehicleCalled(vehicle, vehicle.driverName)} on ${itsTrip(tripNo) ?? 'its run'} to ${district}`
+    : `new ${isSecondTrip(tripNo) ? 'second trip' : 'run'} on ${vehicleCalled(vehicle, vehicle.driverName)} to ${district}`;
   return `${placed}, ${attempt.selectionReason ?? 'within its capacity, receiving hours and fuel'}`;
 }
 
@@ -166,8 +166,8 @@ export function refusedReason(
     const tripNo = problem.tripNo ?? attempt.slot.tripNo;
     const trip = checked.trips.find((trip) => trip.vehicleId === vehicle.id && trip.tripNo === tripNo);
     const again = vehicle.id === named;
-    const theVehicle = again ? 'It' : capital(vehicleCalled(vehicle));
-    const onTrip = again ? itsTrip(tripNo) ?? 'it' : tripCalled(vehicle, tripNo);
+    const theVehicle = again ? 'It' : capital(vehicleCalled(vehicle, vehicle.driverName));
+    const onTrip = again ? itsTrip(tripNo) ?? 'it' : tripCalled(vehicle, tripNo, vehicle.driverName);
     const never = again ? 'it can never be reached in time' : `${onTrip} can never reach it in time`;
     if (problem.code === 'over_weight' && trip) return `${theVehicle} carries ${kg(trip.load.kg)}${onItsTrip(tripNo)}, over its ${kg(vehicle.weightCapKg)} limit.`;
     if (problem.code === 'over_volume' && trip) return `${theVehicle} carries ${m3(trip.load.m3)}${onItsTrip(tripNo)}, over its ${m3(vehicle.volumeCapM3)} limit.`;
@@ -197,7 +197,7 @@ export function earlyLeaveReason(
   input: PlannerInput, trip: { vehicleId: string; tripNo: number; leaveAt: number; usual: number }, rank: number, order: PlannerOrder,
 ): string {
   const vehicle = lookup(input.vehicles, 'vehicle')(trip.vehicleId);
-  return `The rank ${rank} order for ${shopName(input, order)} makes ${tripCalled(vehicle, trip.tripNo)} leave at ${toClock(trip.leaveAt)} instead of ${toClock(trip.usual)}.`;
+  return `The rank ${rank} order for ${shopName(input, order)} makes ${tripCalled(vehicle, trip.tripNo, vehicle.driverName)} leave at ${toClock(trip.leaveAt)} instead of ${toClock(trip.usual)}.`;
 }
 
 export function deferralDecisions(input: PlannerInput, order: PlannerOrder, deferral: PlanDeferral): PlannerDecision[] {

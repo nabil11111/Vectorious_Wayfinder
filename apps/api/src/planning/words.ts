@@ -1,4 +1,4 @@
-import type { EngineVehicle, Minutes } from './types';
+import type { EngineVehicle, Minutes, PlanTrip } from './types';
 
 // How the checker writes times, amounts, orders and vehicles in its messages, so every rule reads the same.
 
@@ -30,18 +30,23 @@ export const litres = (n: number) => `${trim(n, 1)} litres`;
 // It comes with no "a" or "an", because 800 kg would need the other one. The sentence puts "the" in front.
 export const orderCalled = (kilos: number, chilled: boolean, shop: string) => `${kg(kilos)} ${chilled ? 'chilled' : 'dry'} order for ${shop}`;
 
-// What a sentence calls a vehicle (spec 024): its kind in the board's own words and its id, "the reefer truck
-// VEH001", "the dry truck VEH044", "the reefer van VEH035" or "the van VEH037".
+// What a sentence calls a vehicle: by its driver when its trip has one, "Chaminda's dry truck" (spec 026), and
+// otherwise by its kind in the board's own words and its id, "the reefer truck VEH001", "the dry truck VEH044", "the
+// reefer van VEH035" or "the van VEH037" (spec 024).
 type Vehicle = Pick<EngineVehicle, 'id' | 'type' | 'temp'>;
 const kindOf = ({ type, temp }: Vehicle) => (type === 'van' ? (temp === 'reefer' ? 'reefer van' : 'van') : temp === 'reefer' ? 'reefer truck' : 'dry truck');
-export const vehicleCalled = (vehicle: Vehicle) => `the ${kindOf(vehicle)} ${vehicle.id}`;
+export const vehicleCalled = (vehicle: Vehicle, driverName?: string) => (driverName ? `${driverName}'s ${kindOf(vehicle)}` : `the ${kindOf(vehicle)} ${vehicle.id}`);
+// The driver a sentence about a whole vehicle names: the one its trips carry. A vehicle has one driver for both its
+// trips (D-31), so the first trip that names one is enough.
+export const driverOf = (trips: readonly PlanTrip[], vehicleId: string) => trips.find((trip) => trip.vehicleId === vehicleId && trip.driverName)?.driverName;
 
 // A trip is numbered only where that tells it from the vehicle's other trip (spec 024). A vehicle's second trip is
 // "the second trip of the reefer truck VEH001", or "its second trip" once the sentence has named the vehicle. Its
 // first or only trip gets no number: it is the vehicle itself, and itsTrip gives null for the sentence to say it
 // in its own words.
 export const isSecondTrip = (tripNo: number) => tripNo === 2;
-export const tripCalled = (vehicle: Vehicle, tripNo: number) => (isSecondTrip(tripNo) ? `the second trip of ${vehicleCalled(vehicle)}` : vehicleCalled(vehicle));
+export const tripCalled = (vehicle: Vehicle, tripNo: number, driverName?: string) =>
+  (isSecondTrip(tripNo) ? `the second trip of ${vehicleCalled(vehicle, driverName)}` : vehicleCalled(vehicle, driverName));
 export const itsTrip = (tripNo: number) => (isSecondTrip(tripNo) ? 'its second trip' : null);
 // " on its second trip" after what a vehicle carries, and nothing for its first or only trip.
 export const onItsTrip = (tripNo: number) => (isSecondTrip(tripNo) ? ' on its second trip' : '');

@@ -30,7 +30,8 @@ export const cargoProblems: CargoProblems = (input, tripLoads) => {
   for (const tripLoad of tripLoads) {
     const { vehicleId, tripNo, load } = tripLoad;
     const vehicle = vehicleOf(vehicleId);
-    const carries = `${capital(vehicleCalled(vehicle))} carries`;
+    const driverName = input.plan.trips.find((trip) => trip.vehicleId === vehicleId && trip.tripNo === tripNo)?.driverName;
+    const carries = `${capital(vehicleCalled(vehicle, driverName))} carries`;
     const overKg = over(load.kg, vehicle.weightCapKg, 100);
     if (overKg > 0) {
       report('over_weight', { vehicleId, tripNo }, `${carries} ${kg(load.kg)}${onItsTrip(tripNo)}, ${kg(overKg)} over its ${kg(vehicle.weightCapKg)} limit.`, `Take ${kg(overKg)} off this trip.`);
@@ -48,8 +49,8 @@ export const cargoProblems: CargoProblems = (input, tripLoads) => {
     // Weight and volume are checked from the loads handed in, so a trip without one would pass unchecked.
     if (!loaded.has(name)) throw new PlanInputError(`No load was given for ${name}`);
     const about = { vehicleId: vehicle.id, tripNo: trip.tripNo };
-    const theVehicle = capital(vehicleCalled(vehicle));
-    const onTrip = tripCalled(vehicle, trip.tripNo);
+    const theVehicle = capital(vehicleCalled(vehicle, trip.driverName));
+    const onTrip = tripCalled(vehicle, trip.tripNo, trip.driverName);
     if (vehicle.depotId !== input.depotId) {
       report('wrong_depot', about, `${theVehicle} belongs to the ${vehicle.depotId} depot, and ${itsTrip(trip.tripNo) ?? 'it'} is in the ${input.depotId} plan.`, `Move this trip to a ${input.depotId} vehicle.`);
     }

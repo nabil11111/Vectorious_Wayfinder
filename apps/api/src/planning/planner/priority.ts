@@ -152,6 +152,8 @@ export function prepareInput(input: PlannerInput): PlannerInput {
     scaled(vehicle.volumeCapM3, `${at} volumeCapM3`, 1000, true);
     scaled(vehicle.kmPerL, `${at} kmPerL`, 100, true);
     for (const field of ['weeklyFuelQuotaL', 'litresUsedThisWeek'] as const) scaled(vehicle[field], `${at} ${field}`, 10);
+    // The usual driver is optional (spec 026), and one that is given is a name to call the truck by.
+    if (vehicle.driverName !== undefined) text(vehicle.driverName, `${at} driverName`);
   }
   for (const row of input.travel) {
     text(row.depotId, 'travel depotId');

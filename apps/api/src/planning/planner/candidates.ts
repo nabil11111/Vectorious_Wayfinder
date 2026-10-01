@@ -61,12 +61,14 @@ export function candidateSlots(input: PlanInput, order: EngineOrder): CandidateS
 // Only this vehicle's complete day goes to the checker during a trial. No unplanned order can produce a
 // coverage block, and every previously accepted order on its other trip is still protected.
 export function candidateInput(input: PlanInput, order: EngineOrder, slot: CandidateSlot): PlanInput {
+  const vehicle = lookup(input.vehicles, 'vehicle')(slot.vehicleId);
   const trips = input.plan.trips.filter((t) => t.vehicleId === slot.vehicleId).map(({ leaveAt: _leaveAt, ...trip }) => ({
     ...trip, stops: trip.stops.map((stop) => ({ ...stop, orderIds: [...stop.orderIds] })),
   }));
   let changed = trips.find((t) => t.tripNo === slot.tripNo);
   if (!changed) {
-    changed = { vehicleId: slot.vehicleId, tripNo: slot.tripNo, stops: [] };
+    // A new trip takes the vehicle's driver, so the checker's sentences about it name him (spec 026).
+    changed = { vehicleId: slot.vehicleId, tripNo: slot.tripNo, ...(vehicle.driverName === undefined ? {} : { driverName: vehicle.driverName }), stops: [] };
     trips.push(changed);
   }
   const stop = changed.stops.find((s) => s.outletId === order.outletId);
@@ -80,7 +82,7 @@ export function candidateInput(input: PlanInput, order: EngineOrder, slot: Candi
   const ids = new Set(trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds)));
   const orders = [...input.orders.filter((o) => ids.has(o.id) && o.id !== order.id), order];
   return {
-    ...input, orders, vehicles: [lookup(input.vehicles, 'vehicle')(slot.vehicleId)],
+    ...input, orders, vehicles: [vehicle],
     plan: { trips: trips.sort((a, b) => a.tripNo - b.tripNo), deferrals: [] },
   };
 }
