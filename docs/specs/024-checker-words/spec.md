@@ -26,7 +26,7 @@ themselves, their codes, levels, figures and suggested leaving times stay exactl
 | --- | --- | --- |
 | van_only | VEH044 trip 1 stops at Tech Kadugannawa, which only a van can reach, and VEH044 is a truck. | Tech Kadugannawa only takes vans, and it is on the dry truck VEH044. · Move it to a van. |
 | needs_reefer | VEH044 trip 1 carries the 276 kg chilled order for Fresh Nugegoda, and VEH044 is not a fridge vehicle. | The 276 kg chilled order for Fresh Nugegoda needs a fridge, and it is on the dry truck VEH044. · Move it to a reefer truck or van. |
-| no_tail_lift | VEH036 trip 1 carries the 380 kg dry order for Tech Matara, which needs a tail lift, and VEH036 is a van without one. | The 380 kg dry order for Tech Matara needs a tail lift, and it is on the van VEH036, which has none. · Move it to a truck. |
+| no_tail_lift | VEH036 trip 1 carries the 380 kg dry order for Tech Matara, which needs a tail lift, and VEH036 is a van without one. | The 380 kg dry order for Tech Matara needs a tail lift, and it is on the van VEH036; vans are taken to have no tail lift. · Move it to a truck, or check how the shop unloads it. |
 | over_weight | VEH044 trip 1 carries 7,450 kg and its limit is 7,200 kg. | The dry truck VEH044 carries 7,450 kg, 250 kg over its 7,200 kg limit. · Take 250 kg off this trip. |
 | mixed_brands | VEH012 trip 1 mixes shops of 2 brands, Fresh and Style. | The dry truck VEH012 has Fresh and Style shops on one trip. · Split them, or turn on Mix brands. |
 | cross_district | VEH012 trip 1 has stops in 2 districts, Kandy and Matale, and a trip stays inside one district. | The dry truck VEH012 goes to Kandy and Matale on one trip, and a trip stays in one district. · Move the Matale stops to another trip. |

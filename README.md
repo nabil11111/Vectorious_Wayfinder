@@ -245,6 +245,25 @@ Press **Reset the demo day** first if you walked the one above.
    workload listed with "Ready, with warnings". Press **Send plan to loaders and drivers**: "✓ Sent 16:06 ·
    loaders and 26 drivers".
 
+## What the plan assumes
+
+Every plan, suggested or hand-made, is timed, fuelled and checked from the booklet's data, which is coarse in places.
+The checker and the planner assume the following; none of it is calibrated against real trips, so a planned time is
+the plan's estimate, not a promise.
+
+- **Legs are district averages.** A trip's drive out is the depot-to-district figure, and each hop between shops is
+  the district's average leg. Two routes through the same shops in another order come out the same in distance and
+  fuel.
+- **Clear roads.** Drive times are the free-flow figures, with no traffic, monsoon or disruption, so a checked
+  arrival can be optimistic.
+- **A fixed unloading allowance per stop.** Each stop takes the booklet's minutes for its brand and dock type,
+  whatever the quantity.
+- **The drive back takes as long as the drive out.** The data has no return leg.
+- **A 30-minute reload** between a vehicle's two trips (a setting).
+- **Every truck has a tail lift and no van does.** The fleet data has no such field (D-24). A tail-lift item on a van
+  is a warning that says "vans are taken to have no tail lift", because a van-only shop may have its own way to
+  unload.
+
 ## Departures from the design
 
 Anything we built differently from our Designathon submission, and why.

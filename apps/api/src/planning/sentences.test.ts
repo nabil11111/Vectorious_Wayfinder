@@ -113,13 +113,13 @@ const cargo: Case[] = [
   {
     code: 'no_tail_lift', way: 'the spec\'s example on a dry van, which VEH037 is',
     input: () => plan('Peliyagoda', [tripOf('VEH037', 1, [washer])]),
-    said: [{ message: 'The 380 kg dry order for Tech Matara needs a tail lift, and it is on the van VEH037, which has none.', fix: 'Move it to a truck.' }],
+    said: [{ message: 'The 380 kg dry order for Tech Matara needs a tail lift, and it is on the van VEH037; vans are taken to have no tail lift.', fix: 'Move it to a truck, or check how the shop unloads it.' }],
   },
   {
     // The spec's example calls VEH036 "the van", and in the data it is a fridge van.
     code: 'no_tail_lift', way: 'on a reefer van, which VEH036 is',
     input: () => plan('Peliyagoda', [tripOf('VEH036', 1, [washer])]),
-    said: [{ message: 'The 380 kg dry order for Tech Matara needs a tail lift, and it is on the reefer van VEH036, which has none.', fix: 'Move it to a truck.' }],
+    said: [{ message: 'The 380 kg dry order for Tech Matara needs a tail lift, and it is on the reefer van VEH036; vans are taken to have no tail lift.', fix: 'Move it to a truck, or check how the shop unloads it.' }],
   },
   {
     code: 'wrong_depot', way: 'a vehicle of another depot than the plan',
@@ -421,7 +421,7 @@ const DRIVEN: Case[] = [
   withDriver('van_only', 'on a second trip', { VEH044: 'Chaminda' },
     [{ message: 'Tech Kadugannawa only takes vans, and it is on the second trip of Chaminda\'s dry truck.', fix: 'Move it to a van.' }]),
   withDriver('no_tail_lift', 'the spec\'s example on a dry van, which VEH037 is', { VEH037: 'Chaminda' },
-    [{ message: 'The 380 kg dry order for Tech Matara needs a tail lift, and it is on Chaminda\'s van, which has none.', fix: 'Move it to a truck.' }]),
+    [{ message: 'The 380 kg dry order for Tech Matara needs a tail lift, and it is on Chaminda\'s van; vans are taken to have no tail lift.', fix: 'Move it to a truck, or check how the shop unloads it.' }]),
   withDriver('wrong_depot', 'a vehicle of another depot than the plan', { VEH059: 'Chaminda' },
     [{ message: 'Chaminda\'s van belongs to the Kandy depot, and it is in the Peliyagoda plan.', fix: 'Move this trip to a Peliyagoda vehicle.' }]),
   withDriver('wrong_depot', 'a shop of another depot than the vehicle', { VEH008: 'Chaminda' },

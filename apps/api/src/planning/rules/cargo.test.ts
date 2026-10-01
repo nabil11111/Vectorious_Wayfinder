@@ -108,7 +108,7 @@ describe('rules for what a vehicle carries', () => {
     // Two crates of washing machines, 420.0 kg, for OUT093 on van VEH059.
     expect(carried('Kandy', 'VEH059', [order('washers', 'OUT093', 'tech-washer', 2)])).toEqual([{
       code: 'no_tail_lift', level: 'warn', vehicleId: 'VEH059', tripNo: 1, stopSeq: 1, outletId: 'OUT093', orderId: 'washers',
-      message: 'The 420 kg dry order for OUT093 needs a tail lift, and it is on the van VEH059, which has none.', fix: 'Move it to a truck.',
+      message: 'The 420 kg dry order for OUT093 needs a tail lift, and it is on the van VEH059; vans are taken to have no tail lift.', fix: 'Move it to a truck, or check how the shop unloads it.',
     }]);
 
     // Trucks have a tail lift (D-24), and a van with nothing that needs one is fine.
