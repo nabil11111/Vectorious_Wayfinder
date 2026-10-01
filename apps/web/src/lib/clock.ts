@@ -47,6 +47,19 @@ export function shownAt(clock: HeldClock, reading: number): number {
   return clock.holdsAt === null ? ran : Math.min(ran, Date.parse(clock.holdsAt));
 }
 
+const MINUTE = 60_000;
+
+// How long after a reading of the steady timer the time on screen next changes: when the minute it shows ends, or
+// when the clock reaches the point where it waits, whichever comes first. null once it waits, as nothing changes
+// then until the clock is moved. The depot is a whole number of minutes from UTC, so its minutes end with UTC's.
+export function nextDrawIn(clock: HeldClock, reading: number): number | null {
+  const at = shownAt(clock, reading);
+  const minuteEnds = at - (at % MINUTE) + MINUTE;
+  if (clock.holdsAt === null) return minuteEnds - at;
+  const holds = Date.parse(clock.holdsAt);
+  return at >= holds ? null : Math.min(minuteEnds, holds) - at;
+}
+
 const depotFormat = new Intl.DateTimeFormat('en-GB', {
   timeZone: DEPOT_TIME_ZONE, hourCycle: 'h23',
   weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -86,7 +99,8 @@ export interface AppClock {
   retry: () => void;
 }
 
-// The time on screen. It comes from GET /clock, runs on by itself and is drawn again every 15 seconds.
+// The time on screen. It comes from GET /clock and runs on by itself. It is drawn again the moment its minute
+// ends, so it turns with the app clock and nothing stamped in that minute looks ahead of it (Q-05).
 export function useAppClock(): AppClock {
   const query = useQuery({ queryKey: clockKey, initialData: keptClock, initialDataUpdatedAt: 0, networkMode: 'always', queryFn: async ({ signal }) => {
     const clock = await api<ClockState>('/clock', { signal });
@@ -96,10 +110,15 @@ export function useAppClock(): AppClock {
   const state = query.data;
   const retry = () => void query.refetch();
   const [reading, setReading] = useState(() => performance.now());
+  // After each drawing, and with each clock the server sends, the next drawing waits for the minute to end. A
+  // timer that fires a moment early draws the same minute and waits the rest.
   useEffect(() => {
-    const timer = window.setInterval(() => setReading(performance.now()), 15_000);
-    return () => window.clearInterval(timer);
-  }, []);
+    if (!state) return;
+    const wait = nextDrawIn(state, Math.max(performance.now(), state.heldAt));
+    if (wait === null) return;
+    const timer = window.setTimeout(() => setReading(performance.now()), wait);
+    return () => window.clearTimeout(timer);
+  }, [state, reading]);
 
   // A later read that fails leaves the clock it had running on, so only a first read that failed is shown.
   if (!state) return { state, at: null, time: '--:--', waiting: false, failed: query.isError, retry };
