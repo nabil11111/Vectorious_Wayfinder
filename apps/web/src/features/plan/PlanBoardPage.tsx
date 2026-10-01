@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
 import { keyOf, placesOf, startTrip, swapTruck, tripOf, type TripKey } from './draft';
 import { BoardHeader, type Tab } from './parts/BoardHeader';
+import { BuildPanel } from './parts/BuildPanel';
 import { DoneList } from './parts/DoneList';
 import { FindSlot } from './parts/FindSlot';
 import { ICON } from './parts/icons';
@@ -23,7 +24,8 @@ import { clockTime, planFor, shortDay } from './words';
 
 // The plan board (spec 010, Dispatcher · Edit plan and its states). The dispatcher builds the board's day by
 // hand: trips from the orders and trucks on the left, the open trip in the middle, the other trips on the right.
-// Every number on it comes from the board the API sent.
+// With no trip open, the middle builds the suggested plan instead (spec 014). Every number on it comes from the
+// board the API sent.
 export function PlanBoardPage() {
   const query = useBoard();
   useOrdersFollow();
@@ -167,7 +169,14 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
       />
     );
   } else {
-    inMiddle = <NoTripOpen onBlank={() => show({ kind: 'pick', pick: { kind: 'start', group: null, orders: [], startWith: [] } })} />;
+    inMiddle = (
+      <BuildPanel
+        screen={screen}
+        act={saver.act}
+        onBlank={() => show({ kind: 'pick', pick: { kind: 'start', group: null, orders: [], startWith: [] } })}
+        onBuilding={() => setTab('planning')}
+      />
+    );
   }
 
   // The column being worked in, which a desktop's tabs mark. On a phone the tabs choose the column shown.
@@ -210,17 +219,6 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
           <DoneList screen={screen} index={index} openKey={open ? keyOf(open) : null} onOpen={openTrip} />
         </Column>
       </div>
-    </div>
-  );
-}
-
-// The middle column with no trip open.
-function NoTripOpen({ onBlank }: { onBlank: () => void }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-      <img src={ICON.route} alt="" className="size-[62px] object-contain" />
-      <h2 className="text-xl leading-6 font-bold">No trip open</h2>
-      <Button variant="outline" className={plainButton('h-10 px-5 text-sm')} onClick={onBlank}>Start a blank trip</Button>
     </div>
   );
 }

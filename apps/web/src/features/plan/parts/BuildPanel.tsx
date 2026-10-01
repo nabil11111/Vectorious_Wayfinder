@@ -1,0 +1,105 @@
+import { useEffect, useRef, useState } from 'react';
+import type { PlanBoard, PlanRef } from '@wayfinder/contracts';
+import {
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { suggestPlan, type BoardScreen } from '../board';
+import { BUILD, BUILDING, buildingLine, KEEP_DRAFT, REPLACE_TITLE, replaceLine, suggestedAt, toMake } from '../words';
+import { ICON } from './icons';
+import { orangeButton, plainButton } from './look';
+
+// A write the board's queue runs once the draft is saved. It says why it was refused, or null.
+type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>) => Promise<string | null>;
+
+// The middle column with no trip open (Edit plan · empty and · building, spec 014): "Build the suggested plan" in
+// orange beside "Start a blank trip". Over a draft with a trip or a deferral it asks first (D-52). While the build is
+// out the column shows Building and the board holds still. A refusal shows the server's sentence in red with Try
+// again, and one that loads the board again says so in spec 010's line. After a build, the line says when it was
+// suggested and how many of the planner's decisions are still to make.
+export function BuildPanel({ screen, act, onBlank, onBuilding }: { screen: BoardScreen; act: Act; onBlank: () => void; onBuilding: () => void }) {
+  const { board, draft } = screen;
+  const [asking, setAsking] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [refused, setRefused] = useState<string | null>(null);
+  // The rows View plan lists as open: the screen counts them, nothing else.
+  const open = board.suggestion?.decisions.filter((decision) => decision.open).length ?? 0;
+
+  const build = async () => {
+    setAsking(false);
+    setRefused(null);
+    setBuilding(true);
+    onBuilding();
+    const problem = await act((date, ref) => suggestPlan(date, ref));
+    setBuilding(false);
+    setRefused(problem);
+  };
+  const press = () => {
+    if (draft.trips.length > 0 || draft.deferrals.length > 0) setAsking(true);
+    else void build();
+  };
+
+  // The frames' measures: the route picture at 72, then 14 between it, the title, the bar and the line or buttons.
+  if (building) {
+    return (
+      <div role="status" className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+        <img src={ICON.route} alt="" className="size-[72px] object-contain" />
+        <h2 className="mt-3.5 text-xl leading-6 font-bold">{BUILDING}</h2>
+        <MovingBar />
+        {board.counts && <p className="mt-3.5 text-[13px] leading-4 text-muted-foreground">{buildingLine(board.counts.ordersDue, board.counts.vehiclesWorking)}</p>}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+      <img src={ICON.route} alt="" className="size-[72px] object-contain" />
+      <h2 className="mt-3.5 text-xl leading-6 font-bold">No trip open</h2>
+      {board.suggestion && (
+        <p className="mt-1.5 text-[13px] leading-4 text-muted-foreground">
+          {suggestedAt(board.suggestion.builtAt)} · <span className={open > 0 ? 'font-semibold text-warn-ink' : undefined}>{toMake(open)}</span>
+        </p>
+      )}
+      <div className="mt-3.5 flex flex-wrap justify-center gap-2.5">
+        <Button className={orangeButton('h-11 px-6 text-sm')} disabled={screen.acting} focusableWhenDisabled onClick={press}>{BUILD}</Button>
+        <Button variant="outline" className={plainButton('h-11 px-6 text-sm')} onClick={onBlank}>Start a blank trip</Button>
+      </div>
+      {refused && (
+        <p role="alert" className="mt-4 flex max-w-md items-center gap-3 rounded-[10px] bg-bad-tint px-3 py-[7px] text-left text-xs leading-[15px] font-semibold text-bad">
+          {refused}
+          <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => { void build(); }}>Try again</button>
+        </p>
+      )}
+      <AlertDialog open={asking} onOpenChange={setAsking}>
+        <AlertDialogContent className="gap-3.5 rounded-lg p-5 sm:max-w-sm">
+          <AlertDialogHeader className="gap-2">
+            <AlertDialogTitle className="text-base leading-5 font-bold">{REPLACE_TITLE}</AlertDialogTitle>
+            <AlertDialogDescription className="text-[13px] leading-[18px] text-muted-foreground">
+              {replaceLine(board.orders.length, draft.trips.length, draft.deferrals.length)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="-mx-5 -mb-5 rounded-b-lg px-5 py-3.5">
+            <AlertDialogCancel className={plainButton('h-10 px-5 text-[13px]')}>{KEEP_DRAFT}</AlertDialogCancel>
+            <Button className={orangeButton('h-10 px-5 text-[13px]')} onClick={() => { void build(); }}>{BUILD}</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// Edit plan · building's bar. One request has no progress to tell, so the bar moves while it is out (departure 2), and
+// holds still where the frame draws it for someone who asked for less motion.
+function MovingBar() {
+  const bar = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const element = bar.current;
+    if (!element || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const moving = element.animate([{ transform: 'translateX(-100%)' }, { transform: 'translateX(160%)' }], { duration: 1400, iterations: Infinity, easing: 'ease-in-out' });
+    return () => moving.cancel();
+  }, []);
+  return (
+    <span role="progressbar" aria-label={BUILDING} className="relative mt-3.5 block h-2 w-80 max-w-full overflow-hidden rounded-full bg-border">
+      <span ref={bar} className="absolute inset-y-0 left-0 w-[62.5%] rounded-full bg-good" />
+    </span>
+  );
+}
