@@ -108,11 +108,28 @@ async function nextTurn() {
 
 let retries = 0;
 let retryTimer = 0;
-// No answer from the server's side (a 5xx or a 429): try again on the retry schedule, from the fetch.
+let backingOff = false;
+// A fetch or a send with no answer, a 5xx or a 429: the loop starts again from the fetch on the retry schedule, after
+// 2, 4 and 8 seconds and then every 15, with the same write, id and body.
 function later() {
   window.clearTimeout(retryTimer);
-  retryTimer = window.setTimeout(ring, retryDelay(retries));
+  backingOff = true;
+  retryTimer = window.setTimeout(() => {
+    backingOff = false;
+    ring();
+  }, retryDelay(retries));
   retries += 1;
+}
+// The loop got through, so the next failure starts the schedule over.
+function through() {
+  retries = 0;
+  backingOff = false;
+  window.clearTimeout(retryTimer);
+}
+// The signal back after it was lost sends what waits at once, unless the loop is waiting out a failure of its own: a
+// send that keeps failing while the server's health answers still backs off.
+function signalBack() {
+  if (!backingOff) ring();
 }
 
 type Outcome =
@@ -157,7 +174,7 @@ async function fetchDay(who: Account, turn: number): Promise<boolean> {
   switch (outcome.kind) {
     case 'answer': break;
     case 'cancelled': return false;
-    case 'no-answer': update({ failure: UNREACHABLE }); return false;
+    case 'no-answer': later(); update({ failure: UNREACHABLE }); return false;
     case 'retry': later(); update({ failure: outcome.message }); return false;
     case 'signed-out': update({ signedOut: true }); return false;
     case 'refused': update({ failure: outcome.message }); return false;
@@ -177,8 +194,6 @@ async function fetchDay(who: Account, turn: number): Promise<boolean> {
   }
   await keepDay(who.id, day.data);
   if (turn !== generation) return false;
-  retries = 0;
-  window.clearTimeout(retryTimer);
   update({ fetched: true, failure: null });
   return true;
 }
@@ -188,13 +203,14 @@ async function sendWrite(entry: Queued, turn: number) {
   if (turn !== generation) return;
   switch (outcome.kind) {
     // The answer is the day, but it is never shown: the loop fetches the day again at once (D-50).
-    case 'answer': ring(); return;
+    case 'answer': through(); ring(); return;
     // A refused write is never sent again, and the writes after it carry on.
-    case 'refused': await refuseWrite(entry, { code: outcome.code, message: outcome.message }); ring(); return;
-    case 'retry': later(); return;
+    case 'refused': through(); await refuseWrite(entry, { code: outcome.code, message: outcome.message }); ring(); return;
     case 'signed-out': update({ signedOut: true }); return;
-    // No answer: the signal is gone, and its return rings the loop with the same write, id and body.
-    case 'no-answer': case 'cancelled': return;
+    // No answer, a 5xx or a 429: the same write, id and body go again on the retry schedule. With no answer the
+    // signal is gone too, and the probe asks for it meanwhile.
+    case 'retry': case 'no-answer': later(); return;
+    case 'cancelled': return;
   }
 }
 
@@ -204,8 +220,11 @@ async function turn() {
   const kept = readKept();
   if (!who || sync.signedOut || !hasSignal() || !kept.ready || kept.userId !== who.id) return;
   if (!(await fetchDay(who, now))) return;
+  // The account may have changed while the day was kept; its writes are not this turn's to send.
+  if (now !== generation) return;
   const [next] = waitingOf();
   if (!next) {
+    through();
     settle();
     return;
   }
@@ -239,7 +258,7 @@ function setOwner(next: Owner) {
 async function own(): Promise<never> {
   setOwner('owner');
   startSignal();
-  whenBack(ring);
+  whenBack(signalBack);
   return run();
 }
 
@@ -299,8 +318,7 @@ export function fetchNow() {
 
 // "Retry sync": ask for the signal at once, and with one, fetch and send now.
 export function retrySync() {
-  retries = 0;
-  window.clearTimeout(retryTimer);
+  through();
   probeNow();
   ring();
 }
