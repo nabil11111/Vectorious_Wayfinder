@@ -394,6 +394,9 @@ it('AC-37 returns the exact refusal JPEG read-only, scopes it to the depot and v
   const res = await ruwan.get(`/api/v1/issues/${problem.id}/photo`).buffer(true);
   expect(res.status).toBe(200);
   expect(res.headers['content-type']).toMatch(/^image\/jpeg(?:;|$)/);
+  expect(res.headers['cache-control']).toBe('private, no-store');
+  expect(res.headers['x-content-type-options']).toBe('nosniff');
+  expect(res.headers['cross-origin-resource-policy']).toBe('same-origin');
   expect(res.body).toEqual(jpeg);
   const other = await ruwan.get(`/api/v1/issues/${foreign.id}/photo`);
   expect(code(other)).toEqual([400, 'unknown_record']);

@@ -14,7 +14,7 @@ issuesRouter.get('/', async (req, res) => { res.json(await listIssues(depotCalle
 
 issuesRouter.get('/:issueId/photo', async (req, res) => {
   const jpeg = await issuePhoto(depotCallerOf(req), Issue.shape.id.parse(req.params.issueId));
-  res.type('image/jpeg').send(jpeg);
+  res.set('Cache-Control', 'private, no-store').type('image/jpeg').send(jpeg);
 });
 
 // POST /issues/:issueId/decide: the answer, naming the problem's revision (DecideIssueRequest). It answers the open list
