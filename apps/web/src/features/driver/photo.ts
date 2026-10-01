@@ -25,14 +25,34 @@ function dataUrlOf(blob: Blob) {
   });
 }
 
-export async function photoOf(file: File): Promise<string> {
-  let picture: ImageBitmap;
+interface Picture { source: CanvasImageSource; width: number; height: number; done: () => void }
+
+// The picture, upright. createImageBitmap turns it by its EXIF orientation; a browser whose createImageBitmap cannot
+// read it, such as an older Safari, decodes it through an image element instead, from a data URL the content policy
+// allows, and draws it upright as images are by default.
+async function pictureOf(file: File): Promise<Picture> {
+  if ('createImageBitmap' in window) {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      return { source: bitmap, width: bitmap.width, height: bitmap.height, done: () => bitmap.close() };
+    } catch (error) {
+      console.warn('createImageBitmap could not read the picture; decoding it as an image instead.', error);
+    }
+  }
   try {
-    picture = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const image = new Image();
+    image.src = await dataUrlOf(file);
+    await image.decode();
+    return { source: image, width: image.naturalWidth, height: image.naturalHeight, done: () => image.removeAttribute('src') };
   } catch (error) {
     throw new UnusablePhoto(`That picture could not be read: ${String(error)}`);
   }
+}
+
+export async function photoOf(file: File): Promise<string> {
+  const picture = await pictureOf(file);
   try {
+    if (picture.width < 1 || picture.height < 1) throw new UnusablePhoto('The picture has no size.');
     const canvas = document.createElement('canvas');
     for (const { side, quality } of TRIES) {
       const scale = Math.min(1, side / Math.max(picture.width, picture.height));
@@ -40,13 +60,13 @@ export async function photoOf(file: File): Promise<string> {
       canvas.height = Math.max(1, Math.round(picture.height * scale));
       const context = canvas.getContext('2d');
       if (!context) throw new UnusablePhoto('This phone could not draw the photo.');
-      context.drawImage(picture, 0, 0, canvas.width, canvas.height);
+      context.drawImage(picture.source, 0, 0, canvas.width, canvas.height);
       const jpeg = await jpegOf(canvas, quality);
       if (jpeg && jpeg.type === 'image/jpeg' && jpeg.size <= PHOTO_MAX_BYTES) return await dataUrlOf(jpeg);
     }
     throw new UnusablePhoto('The photo stayed over 500 KB.');
   } finally {
-    picture.close();
+    picture.done();
   }
 }
 
