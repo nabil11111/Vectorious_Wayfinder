@@ -51,6 +51,20 @@ describe('Q-38 the receipt\'s count box', () => {
     expect(card('999')).toMatch(/<input[^>]*value="999"/);
   });
 
+  // L-12: Nadeesha selected 12 and typed 15. The 1 typed on the way was taken as the count, so the card said "More than
+  // the 12 handed over." and "11 cartons missing" with "What's wrong?" at once.
+  it('shows only its own line while the box holds an over-count, never a missing line from a digit typed on the way', () => {
+    for (const [text, held] of [['60', 6], ['999', 9], ['-3', 3]] as const) {
+      const html = card(text, held);
+      expect(lineUnder(html)?.[2]).toBe(text === '-3' ? 'Whole numbers from 0 to 50.' : 'More than the 50 handed over.');
+      expect(html).not.toContain('missing');
+      expect(html).not.toContain('What’s wrong?');
+    }
+    // The form reports nothing for that line either, so no photo or note is asked for.
+    expect(receiptCounts([{ lineId: 'a', expected: 12 }], { a: 1 }, { a: '15' })).toMatchObject({ short: false, canConfirm: false });
+    expect(receiptCounts([{ lineId: 'a', expected: 12 }, { lineId: 'b', expected: 5 }], { a: 1, b: 4 }, { a: '15' })).toMatchObject({ short: true, canConfirm: false });
+  });
+
   it('shows the count the form holds with no line when the box is right, and stops − at 0 and + at what was handed over', () => {
     for (const html of [card(undefined, 48), card('048', 48)]) {
       expect(html).not.toMatch(/aria-invalid="true"/);

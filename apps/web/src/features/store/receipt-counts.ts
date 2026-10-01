@@ -26,7 +26,8 @@ export function receiptCounts(lines: { lineId: string; expected: number }[], cou
   return {
     countAt,
     wrongOf,
-    short: lines.some((line, i) => countAt(i) < line.expected),
+    // A line whose box is wrong is not short: its count is what was typed on the way, "1" on the way to "15" (L-12).
+    short: lines.some((line, i) => wrongOf(line.lineId) === null && countAt(i) < line.expected),
     canConfirm: !anyWrong,
   };
 }
