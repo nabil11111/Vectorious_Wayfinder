@@ -36,11 +36,12 @@ export const switchTo = (pressed: string, chosen: string, switching: boolean) =>
 // clock (the same for both depots) are dropped. Each page then shows its loading state until the new depot's read
 // arrives, and the new account opens the live stream again (lib/live.ts), since a stream carries the depot it opened
 // with.
-// It answers whether the plan board held changes the server had not saved, which went with it.
+// It answers whether the plan board held changes the server had not saved, which went with it: 'dropped', or 'unsure'
+// when a save of them was sent and never answered (retireBoard).
 export async function takeSwitch(qc: QueryClient, me: Me) {
   await qc.cancelQueries({ predicate: (query) => query.queryKey[0] !== clockKey[0] });
   // Signed out, or someone else signed in, meanwhile: nothing is put back, in the cache or in storage.
-  if (!signedInAs(qc, me.id)) return false;
+  if (!signedInAs(qc, me.id)) return null;
   commit(qc, me);
   qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] && query.queryKey[0] !== clockKey[0] });
   // The board's queue holds changes outside the cache, so it goes too, whatever page is on show.
@@ -97,7 +98,10 @@ async function takeSession(qc: QueryClient, session: Me, newest: () => boolean) 
   const answered = await planChangesAnswered(qc);
   // Meanwhile a newer read may have taken over, someone else signed in, or the tab took this depot already.
   if (!newest() || shownDepot() !== before) return;
-  if (await takeSwitch(qc, session)) toast(answered ? PLAN_DROPPED : planUnsure(before), { id: 'plan-dropped', duration: 6000, classNames: { title: 'text-pretty' } });
+  // Dropped only when every save was answered and the changes were turned down: a save the server never answered, such
+  // as one whose answer was lost before its retry was turned down, may have been kept.
+  const dropped = await takeSwitch(qc, session);
+  if (dropped) toast(answered && dropped === 'dropped' ? PLAN_DROPPED : planUnsure(before), { id: 'plan-dropped', duration: 6000, classNames: { title: 'text-pretty' } });
 }
 
 // Every read of the session takes the next number, and only the newest may apply: an answer a later read overtook is

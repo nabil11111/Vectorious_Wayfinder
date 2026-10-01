@@ -304,7 +304,7 @@ it('D-95 signing out retires the plan board\'s queue, and says nothing of change
   const tab = tabOf();
   inTab(tab);
   useDispatcherPage();
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   signOut(tab);
   expect(held.retired).toHaveBeenCalledWith(tab.qc);
   expect(toast).not.toHaveBeenCalled();
@@ -316,7 +316,7 @@ it('D-95 a switch made in another tab that drops plan changes not yet saved says
   inTab(there);
   useDispatcherPage();
   // The board on this tab still had changes waiting to be saved when another tab switched to Kandy.
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
   await followSwitch(there.qc, { id: 'u1' });
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
@@ -337,7 +337,7 @@ it('D-95 a switch that drops nothing says nothing, and this tab\'s own switch ne
   const here = tabOf();
   inTab(here);
   useDispatcherPage();
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   await switching(here, 'Kandy');
   // Its message to the other tab lands here too, which is on Kandy already.
   await later(10, null);
@@ -829,7 +829,7 @@ it('Q-13 a plan change on its way when another tab switches is waited for, and o
   expect(there.qc.getQueryData(meKey)).toEqual(RUWAN);
   // The save is answered: kept, so nothing is left unsaved.
   held.planWriting = false;
-  held.retired.mockReturnValue(false);
+  held.retired.mockReturnValue(null);
   await following;
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
   expect(held.retired).toHaveBeenCalledWith(there.qc);
@@ -848,7 +848,7 @@ it('Q-13 a plan change on its way that the server refused is said to be dropped,
   expect(toast).not.toHaveBeenCalled();
   // Refused: the session had moved first, so the change was not kept.
   held.planWriting = false;
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   await following;
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
   expect(toast).toHaveBeenCalledWith(PLAN_DROPPED, expect.objectContaining({ id: 'plan-dropped' }));
@@ -889,7 +889,7 @@ it('Q-13 an account refresh that finds the session on another depot while a plan
   expect(held.retired).not.toHaveBeenCalled();
   // The change is answered and was kept: the tab takes Kandy, every part of it together, and says nothing.
   held.planWriting = false;
-  held.retired.mockReturnValue(false);
+  held.retired.mockReturnValue(null);
   await later(100, null);
   expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
   expect(drawn.at(-1)).toBe('Kandy');
@@ -907,6 +907,24 @@ it('Q-13 an account refresh that finds the session on another depot while a plan
   stopDrawing();
 });
 
+it('Q-13 a plan change whose save got no answer is never said to be dropped, even once its retry is turned down: the tab says it may not be kept', async () => {
+  const there = tabOf();
+  inTab(there);
+  useDispatcherPage();
+  // The save went out and the server kept it, but its answer was lost, and its retry is out as another tab switches.
+  held.planWriting = true;
+  serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+  const following = followSwitch(there.qc, { id: 'u1' });
+  await later(30, null);
+  // The retry is turned down, since the session left Peliyagoda: nothing is on its way, and the first save may stand.
+  held.planWriting = false;
+  held.retired.mockReturnValue('unsure');
+  await following;
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).toHaveBeenCalledWith(planUnsure('Peliyagoda'), expect.objectContaining({ id: 'plan-dropped' }));
+  expect(toast).not.toHaveBeenCalledWith(PLAN_DROPPED, expect.anything());
+});
+
 it('Q-13 a plan change still unanswered after the wait is never said to be dropped: the tab follows and says it may not be kept', async () => {
   expect(planUnsure('Peliyagoda')).toBe('The depot was switched in another tab while a plan change was on its way. Check Peliyagoda\'s plan board for it.');
   vi.useFakeTimers();
@@ -917,7 +935,7 @@ it('Q-13 a plan change still unanswered after the wait is never said to be dropp
     inTab(there);
     useDispatcherPage();
     held.planWriting = true;
-    held.retired.mockReturnValue(true);
+    held.retired.mockReturnValue('dropped');
     serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
     const following = followSwitch(there.qc, { id: 'u1' });
     await vi.advanceTimersByTimeAsync(PLAN_ANSWER_WAIT_MS - 100);

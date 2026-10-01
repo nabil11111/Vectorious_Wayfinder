@@ -243,6 +243,11 @@ class PlanSaver {
     return this.seq !== this.savedSeq;
   }
 
+  // A save is out, or one got no answer: the server may have kept what it carried.
+  unsure() {
+    return this.running || this.unanswered.length > 0;
+  }
+
   // Shows a board: its numbers always, and its draft too when nothing on screen is waiting to be saved. An
   // "Undo" lasts only while the plan's revision is the one its move's save made.
   private take(board: PlanBoard, withDraft: boolean) {
@@ -557,12 +562,13 @@ export function usePlanSaver() {
 
 // A depot switch retires the board's queue whatever page is on show (spec 020): no save waiting to try again, and no
 // change held for the depot before, is sent once the session works on the other depot. It says whether the queue held
-// changes the server had not saved, so a switch made in another tab can say they were dropped.
-export function retireBoard(qc: QueryClient) {
+// changes the server had not saved, so a switch made in another tab can say they were dropped, or 'unsure' when a save
+// was sent and never answered, which the server may have kept.
+export function retireBoard(qc: QueryClient): 'dropped' | 'unsure' | null {
   const saver = savers.get(qc);
   savers.delete(qc);
-  if (!saver) return false;
-  const unsaved = saver.unsaved();
+  if (!saver) return null;
+  const unsaved = saver.unsaved() ? (saver.unsure() ? 'unsure' : 'dropped') : null;
   saver.stop();
   return unsaved;
 }
