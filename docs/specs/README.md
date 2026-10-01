@@ -77,3 +77,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [022](022-trip-times-and-drivers/spec.md) | The trip's depot times, each stop's times on hover, and every trip's driver | Done |
 | [023](023-plan-drag/spec.md) | Planning by drag and drop | Done |
 | [024](024-checker-words/spec.md) | The plan checker in plain words | Done |
+| [026](026-crews/spec.md) | Crews: a truck and its driver picked as one | In progress |

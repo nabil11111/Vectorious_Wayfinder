@@ -414,3 +414,10 @@ buttons and menus would put them, with the pointer or the keyboard, and each dro
 makes, checked by the same checker. The empty middle offers "Build the suggested plan" and a drop area in place of
 "Start a blank trip". Drag and drop uses `@dnd-kit`, which handles the pointer, the keyboard and announcements (Nabil,
 1 Oct, spec 023).
+
+**D-100 · 1 Oct · Trucks are picked as crews and named by their drivers.** A dispatcher remembers drivers, not truck
+numbers, and the same driver mostly drives the same truck on the same roads. So the plan board picks a truck and its
+driver together from one list sorted by fit, district last run and fuel. The "Unassigned trucks" panel goes, giving
+Unplanned orders the column. Sentences call a truck "Chaminda's dry truck". The plan board's and View plan's cards
+read "Chaminda · dry truck" with no vehicle number, which stays only where someone must find the actual truck (the
+loader, the driver, Fleet) (Nabil, 1 Oct, spec 026).
