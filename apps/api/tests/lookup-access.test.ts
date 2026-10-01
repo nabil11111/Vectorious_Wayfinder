@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import request from 'supertest';
 import { beforeAll, expect, it, vi } from 'vitest';
 import { db } from '../src/db/client';
@@ -9,7 +9,7 @@ import { driverStop, heldDriverRows } from './driver-plan';
 import { code, kandyTrip, signIn, THU } from './loading-plan';
 import { lookupHarness } from './lookup-plan';
 import { jpeg, photo } from './receipt-plan';
-import { decide } from './operations-plan';
+import { decide, photo as driverProof } from './operations-plan';
 const clock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async original => {
   const actual = await original<typeof import('../src/lib/clock')>();
@@ -43,7 +43,7 @@ it('AC-2 lists inline details and proof stay inside the depot, with absent and d
   expect(proof.status).toBe(200);
   // Journey's proof bytes are checked against its metadata's fixed route, without a public URL.
   expect(proof.type).toBe('image/jpeg');
-  expect(proof.body.length).toBeGreaterThan(0);
+  expect(proof.body).toEqual(Buffer.from(driverProof.split(',')[1]!, 'base64'));
   expect(await heldDriverRows()).toEqual(before);
   trip = await h.road.write(trip, 'closed', 228, 2, { photo });
   const problem = trip.problems.find(row => row.kind === 'closed')!;
@@ -51,7 +51,7 @@ it('AC-2 lists inline details and proof stay inside the depot, with absent and d
   const image = await h.ruwan.get('/api/v1/issues/' + problem.id + '/photo');
   expect(image.status).toBe(200);
   expect(image.body).toEqual(jpeg);
-  const [plan] = await db.select().from(plans).where(eq(plans.date, THU));
+  const [plan] = await db.select().from(plans).where(and(eq(plans.date, THU), eq(plans.depotId, 'Peliyagoda')));
   await db.update(plans).set({ status: 'draft' }).where(eq(plans.id, plan!.id));
   expect(code(await h.ruwan.get('/api/v1/lookup/stops/' + own + '/photo'))).toEqual([400, 'unknown_record']);
   expect(await h.history('?date=' + THU)).toMatchObject({ publication: null, counts: null, trips: [] });
@@ -65,5 +65,6 @@ it('AC-3 lookup validates dates ranges proof ids and every unknown or repeated q
   }
   expect(await h.history('?date=2025-02-28')).toMatchObject({ publication: null, counts: null, trips: [] });
   expect((await h.orders('?date=2025-02-28')).rows).toEqual([]);
+  expect((await h.orders('?date=9999-12-31')).rows).toEqual([]);
   expect(await heldDriverRows()).toEqual(before);
 });
