@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kg, litres, m3, orderCalled, toClock, toMinutes } from './words';
+import { capital, itsTrip, kg, litres, m3, orderCalled, toClock, toMinutes, tripCalled, vehicleCalled } from './words';
 
 describe('how the checker writes times and amounts', () => {
   it('reads a time of day as minutes after midnight and back', () => {
@@ -30,5 +30,27 @@ describe('how the checker writes times and amounts', () => {
     expect(orderCalled(331.2, false, 'Fresh Nugegoda')).toBe('331.2 kg dry order for Fresh Nugegoda');
     // It has no "a" or "an" in front, because 800 kg would need the other one. A sentence says "the".
     expect(orderCalled(800, false, 'Tech Galle')).toBe('800 kg dry order for Tech Galle');
+  });
+
+  it('spec 024 calls a vehicle by its kind, in the board\'s own words, and its id', () => {
+    expect(vehicleCalled({ id: 'VEH001', type: 'truck', temp: 'reefer' })).toBe('the reefer truck VEH001');
+    expect(vehicleCalled({ id: 'VEH044', type: 'truck', temp: 'ambient' })).toBe('the dry truck VEH044');
+    expect(vehicleCalled({ id: 'VEH035', type: 'van', temp: 'reefer' })).toBe('the reefer van VEH035');
+    expect(vehicleCalled({ id: 'VEH037', type: 'van', temp: 'ambient' })).toBe('the van VEH037');
+  });
+
+  it('spec 024 numbers a trip only to tell a vehicle\'s second trip from its first', () => {
+    const truck = { id: 'VEH001', type: 'truck', temp: 'reefer' } as const;
+    expect(tripCalled(truck, 2)).toBe('the second trip of the reefer truck VEH001');
+    // A first or only trip gets no number: it is the vehicle.
+    expect(tripCalled(truck, 1)).toBe('the reefer truck VEH001');
+    // After a sentence has named the vehicle.
+    expect(itsTrip(2)).toBe('its second trip');
+    expect(itsTrip(1)).toBeNull();
+  });
+
+  it('starts a sentence that leads with a vehicle with a capital', () => {
+    expect(capital('the dry truck VEH044 carries 7,450 kg.')).toBe('The dry truck VEH044 carries 7,450 kg.');
+    expect(capital('Tech Kadugannawa only takes vans.')).toBe('Tech Kadugannawa only takes vans.');
   });
 });
