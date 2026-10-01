@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import { nextStop, type Me } from '@wayfinder/contracts';
 import { AppShell } from '@/components/layout/AppShell';
-import { useMe } from '@/features/auth/api';
+import { keepAccountThroughSignOut, useMe } from '@/features/auth/api';
 import { DayDone, TripDone } from './DonePage';
 import { NextStopPage } from './NextStopPage';
 import { ProofPage } from './ProofPage';
@@ -22,10 +22,12 @@ import { OTHER_TAB } from './words';
 // The driver's area (spec 013). The router hands over everything under /driver, so the area's own routes live here:
 // /driver shows the screen the trip is at, and /driver/proof, /driver/wrong and /driver/saved the steps of a stop. The
 // driver frames draw no tabs. One tab owns the driver's app (rule 10); any other says so and does nothing until that
-// one closes. The screens are built at 390 wide and are never wider than 480.
+// one closes. The screens are built at 390 wide and are never wider than 480. While the area is open a 401 keeps the
+// account and the screens, and the top of the screen asks the driver to sign in again (AC-45).
 export function DriverHome() {
   const { data: me } = useMe();
   const owner = useOwner();
+  useEffect(() => keepAccountThroughSignOut(), []);
   return (
     <AppShell place={me?.depotId ?? undefined} status={owner === 'owner' ? <StatusChip /> : undefined}>
       <div className="mx-auto w-full max-w-[480px]">

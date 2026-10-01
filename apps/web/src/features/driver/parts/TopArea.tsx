@@ -15,7 +15,8 @@ export function TopArea({ waitingRecords, children }: { waitingRecords: number; 
   return (
     <div className="-mx-4 -mt-4 mb-4 md:mx-0 md:mt-0 md:space-y-2">
       {signedOut && (
-        // Sign in again (no frame): the writes wait under this account until the same driver signs in again.
+        // Sign in again (no frame): the writes wait under this account until the same driver signs in again. "Sign in"
+        // opens the sign-in page, which comes back to /driver; the account stays kept on the phone meanwhile.
         <div className="flex items-center gap-3 border-b border-warn/40 bg-warn-tint px-4 py-3 md:rounded-[12px] md:border-b-0">
           <p role="alert" className="min-w-0 flex-1 text-[13px] leading-4 font-semibold text-warn-ink">{signInLine(waitingRecords)}</p>
           <button type="button" className={ACTION} onClick={() => qc.setQueryData(meKey, null)}>

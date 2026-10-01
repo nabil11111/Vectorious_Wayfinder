@@ -119,6 +119,27 @@ describe('the account kept for offline startup', () => {
     expect(storage.getItem('account-owned-waiting-record')).toBe('still waiting');
   });
 
+  it('in the driver\'s area a 401 keeps the account, kept and cached, and elsewhere it still signs out', async () => {
+    storage.setItem(ACCOUNT_KEY, JSON.stringify(dilshan));
+    client.setQueryData(['me'], dilshan);
+    const auth = await import('../src/features/auth/api');
+    auth.useMe();
+    const leave = auth.keepAccountThroughSignOut();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ error: { code: 'signed_out', message: 'Sign in again.' } }, 401)));
+    const { api } = await import('../src/lib/api');
+    await expect(api('/driver')).rejects.toMatchObject({ status: 401, code: 'signed_out' });
+    await expect(fetchQuery(query('me'))).resolves.toEqual(dilshan);
+    await flush();
+    expect(JSON.parse(storage.getItem(ACCOUNT_KEY)!)).toEqual(dilshan);
+    expect(client.getQueryData(['me'])).toEqual(dilshan);
+
+    leave();
+    await expect(api('/driver')).rejects.toMatchObject({ status: 401 });
+    await flush();
+    expect(storage.getItem(ACCOUNT_KEY)).toBeNull();
+    expect(client.getQueryData(['me'])).toBeNull();
+  });
+
   it.each(['logout', 'login'] as const)('a cancelled account read cannot restore old identity after %s', async action => {
     storage.setItem(ACCOUNT_KEY, JSON.stringify(dilshan));
     const pending = deferredFetch();
