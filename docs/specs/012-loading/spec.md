@@ -319,7 +319,8 @@ are examples.
   changed 03:02 · Ruwan, dispatcher", the "changed" chips, "Got it" and the loader's bell count), the rest of Live day
   (its counts, "All trucks", "Problems only" and "Wave 2", the truck rows and timelines with "Decide" and "Decided",
   "Drops and events", "Undo" after an answer, and "Next · … · Open next"), and changing a plan once a truck is loading,
-  such as taking an order off it or swapping the truck.
+  such as taking an order off it or swapping the truck. Spec 016 built these, without "Wave 2" and "Undo"; changing a plan
+  once loading has begun stays out (D-70).
 - **A4:** the driver's side of a ready truck (the loaded counts on the phone, leaving and coming back as `out` and
   `done`), the driver's problems as new kinds with their answers ("Bring them back to Kandy", "Send 2 replacements",
   "Write off on the road", "Send to driver and shop"), and the photo store (D-22) the flag's photo waits for.
@@ -345,8 +346,7 @@ are examples.
    would need a new order for the missing cartons, which nothing here makes; the shop sees them short at receipt (A5).
 9. The ready screen names the trip's driver ("Dilshan sees the short carton on stop 1 before driving."), where the
    design names Kasun, who is our loader.
-10. Live day shows only its "Needs you" column, with every open problem in full, and the placeholder where A7's trucks
-    go (D-39).
+10. Live day's "Needs you" column shows every open problem in full (D-39), and spec 016 keeps it so beside its trucks.
 11. States the design lacks: no plan out, nothing to load, every truck loaded, no day left, a truck not on the list,
     waiting for the answer, saving, not saved, refused, and nothing needs you.
 

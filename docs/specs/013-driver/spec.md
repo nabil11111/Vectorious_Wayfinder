@@ -470,7 +470,8 @@ Friday's plan while Thursday's stop 2 stays closed.
   29", a new order for the shop.
 - **A7:** the rest of Live day (the trucks' timelines, counts, "Drops and events" such as "VEH041 · Fresh Hatton · 5 ·
   photo", "Undo", "Next · … · Open next", a truck shown "offline · 12:38" and the "Watching" row, "35 min behind" and
-  arrival estimates), and the bell's count on the driver's phone.
+  arrival estimates), and the bell's count on the driver's phone. Spec 016 built the timelines, counts and events; the
+  truck shown offline, "Watching" by presence, delays, estimates, "Undo" and the driver's bell count stay out.
 - **A8:** History, where every stop keeps its receipt and photo, and the attempts the audit log keeps.
 - **Spec 012, open question 1:** the loader's flag photo. It can use `photos` with the flag's problem id in a small task
   after this piece.

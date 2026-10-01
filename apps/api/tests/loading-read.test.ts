@@ -57,11 +57,11 @@ afterAll(async () => {
 
 it("AC-2 answers the loader's day before any send, the day before until 16:00 and no day after the calendar, and writes nothing", async () => {
   const before = await heldRows();
-  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', day: THU, plan: null, trucks: [] });
+  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', demoDay: originalClock.day, day: THU, plan: null, trucks: [] });
   freeze(WED, 15 * 60 + 59);
-  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', day: WED, plan: { id: demoId('plan', `${WED}:Peliyagoda`), revision: 0 }, trucks: [] });
+  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', demoDay: originalClock.day, day: WED, plan: { id: demoId('plan', `${WED}:Peliyagoda`), revision: 0, publishedAt: depotInstant('2026-06-23', 17 * 60).toISOString(), publishedBy: null }, trucks: [] });
   freeze('2026-06-27', 16 * 60);
-  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', day: null, plan: null, trucks: [] });
+  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', demoDay: originalClock.day, day: null, plan: null, trucks: [] });
   expect(await heldRows()).toEqual(before);
 });
 
@@ -114,7 +114,7 @@ it('AC-5 announces loading on send and on back to edit, and then has no plan and
   vi.mocked(announce).mockClear();
   expect((await ruwan.post(`/api/v1/plans/${THU}/unsend`).send({ planId: sent.plan.id, revision: sent.plan.revision })).status).toBe(200);
   expect(announce).toHaveBeenCalledWith({ topic: 'loading', depotId: 'Peliyagoda' });
-  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', day: THU, plan: null, trucks: [] });
+  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', demoDay: originalClock.day, day: THU, plan: null, trucks: [] });
 });
 
 it('AC-5 leaves a truck that is out or done off the list', async () => {
@@ -123,7 +123,7 @@ it('AC-5 leaves a truck that is out or done off the list', async () => {
   for (const status of ['out', 'done'] as const) {
     await db.update(trips).set({ status }).where(and(eq(trips.planId, plan.id), eq(trips.vehicleId, 'VEH004')));
     const day = await loadingDay();
-    expect(day.plan).toEqual({ id: plan.id, revision: plan.revision });
+    expect(day.plan).toEqual({ id: plan.id, revision: plan.revision, publishedAt: plan.publishedAt!.toISOString(), publishedBy: 'Ruwan' });
     expect(day.trucks.map((t) => t.vehicleId)).toEqual(['VEH035']);
   }
 });

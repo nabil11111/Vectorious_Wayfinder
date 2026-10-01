@@ -59,7 +59,7 @@ async function loaderWrite(caller: DepotCaller, tripId: string, writeId: string,
   const done = await db.transaction(async (tx) => {
     const open = await openTrip(tx, caller, tripId, withDepot);
     const told = open.trip.lastWriteId === writeId.toLowerCase() ? [] : await work(tx, open);
-    return { day: await loadingDayOf(tx, caller.depotId, open.moment.at), told };
+    return { day: await loadingDayOf(tx, caller.depotId, open.moment), told };
   });
   for (const change of done.told) announce(change);
   return done.day;

@@ -1,0 +1,41 @@
+import { randomUUID } from 'node:crypto';
+import type { DriverTrip, Issue, OperationsTrip } from '@wayfinder/contracts';
+import { expect, it } from 'vitest';
+import { attentionOf, outRowOf, compareOut, timelineOf } from './attention';
+import { depotInstant } from '../lib/clock';
+const at = (min: number) => depotInstant('2026-06-25', min).toISOString();
+const trip: DriverTrip = { tripId: randomUUID(), revision: 0, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1, brand: 'Fresh', district: 'Colombo', status: 'ready',
+  leavesAt: at(276), backBy: at(370), readyAt: at(156), leftAt: null, backAt: null, problems: [], stops: [{ id: randomUUID(), seq: 1, revision: 0, retriedAt: null, outletId: 'OUT001', shopName: 'Fresh Nugegoda', district: 'Colombo', dockType: 'street', windowOpen: '05:00', windowClose: '09:00', note: null, arrivedAt: null, doneAt: null, outcome: null, lines: [] }] };
+const arrivals = new Map([[trip.stops[0]!.id, at(300)]]);
+
+it('AC-16 attention names missing reports and retries without predictions', () => {
+  expect(attentionOf(trip, arrivals, at(276))).toEqual({ kind: 'none' });
+  expect(attentionOf(trip, arrivals, at(277))).toEqual({ kind: 'departure_unreported', plannedAt: at(276) });
+  const out = { ...trip, status: 'out' as const, leftAt: at(211) };
+  expect(attentionOf(out, arrivals, at(300))).toEqual({ kind: 'none' });
+  expect(attentionOf(out, arrivals, at(301))).toEqual({ kind: 'arrival_unreported', stopId: trip.stops[0]!.id, plannedAt: at(300) });
+  const retry = { ...out, stops: [{ ...out.stops[0]!, retriedAt: at(302) }] };
+  expect(attentionOf(retry, arrivals, at(500))).toEqual({ kind: 'retry_requested', stopId: trip.stops[0]!.id, requestedAt: at(302) });
+  expect(outRowOf(retry, arrivals, [], at(500))).toMatchObject({ arrivalIsOriginal: true, plannedArrival: at(300), plannedReturn: at(370), progress: { numerator: 0, denominator: 1, percent: 0 } });
+  const arrived = { ...retry, stops: [{ ...retry.stops[0]!, arrivedAt: at(510) }] };
+  expect(outRowOf(arrived, arrivals, [], at(600)).status.kind).toBe('at_stop');
+  const done = { ...out, stops: [{ ...out.stops[0]!, outcome: 'closed' as const, doneAt: at(400) }] };
+  expect(outRowOf(done, arrivals, [], at(500))).toMatchObject({ nextStop: null, plannedArrival: null, status: { kind: 'returning' }, progress: { percent: 100 } });
+  const issue = { id: randomUUID(), kind: 'closed', reason: 'nobody_there', status: 'open', raisedAt: at(400) } as Issue;
+  expect(outRowOf(done, arrivals, [issue], at(500)).status).toMatchObject({ kind: 'open_problem', issueId: issue.id, summary: 'Nobody there' });
+});
+
+it('AC-16 out trucks sort open problems then watching then scheduled leave', () => {
+  const base = { date: '2026-06-25', vehicleId: 'VEH035', tripNo: 1, detailRecorded: true, schedule: { leavesAt: at(276), backAt: at(370) } };
+  const row = (tripId: string, status: object) => ({ ...base, tripId, outRow: { status } }) as OperationsTrip;
+  const normal = row('normal', { kind: 'out' });
+  const watch = row('watch', { kind: 'arrival_unreported', plannedAt: at(300) });
+  const later = row('later', { kind: 'open_problem', raisedAt: at(400), issueId: 'b' });
+  const first = row('first', { kind: 'open_problem', raisedAt: at(400), issueId: 'a' });
+  expect([normal, later, watch, first].sort(compareOut).map(row => row.tripId)).toEqual(['first', 'later', 'watch', 'normal']);
+});
+
+it('AC-16 timeline expands at two hour ticks across midnight and hides another dates now line', () => {
+  expect(timelineOf('2026-06-25', [at(30), at(1501)], at(600))).toMatchObject({ start: at(0), end: at(1560), now: at(600) });
+  expect(timelineOf('2026-06-25', [], at(1500))).toEqual({ start: at(120), end: at(1320), now: null, ticks: Array.from({ length: 11 }, (_, n) => at(120 + 120 * n)) });
+});

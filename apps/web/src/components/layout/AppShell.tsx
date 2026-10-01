@@ -68,7 +68,7 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
           <PopoverTrigger aria-label={me.displayName} className="flex shrink-0 items-center gap-2.5 rounded-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-border"><img src={AVATAR[me.role]} alt="" className="size-6" /></span>
             {/* Between 1024 and 1280 the tabs take the room, so the name waits behind the avatar. */}
-            <span className="hidden leading-tight sm:block lg:hidden xl:block">
+            <span className="hidden leading-tight sm:block lg:hidden wide:block">
               <span className="block text-sm font-bold">{me.displayName}</span>
               <span className="block text-xs text-muted-foreground">{who}</span>
             </span>

@@ -38,3 +38,4 @@ export * from './plans';
 export * from './issues';
 export * from './loading';
 export * from './driver';
+export * from './operations';

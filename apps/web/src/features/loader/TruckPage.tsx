@@ -8,12 +8,14 @@ import { orangeButton, plainButton } from '@/features/plan/parts/look';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
-import { useLoadingDay, useLoaderWrites, type LoaderWrites, type WriteKind } from './loading';
+import { SEE_CHANGES, usePlanChanges } from './changes';
+import { useKeptRefusal, useLoadingDay, useLoaderWrites, type LoaderWrites, type WriteKind } from './loading';
 import { DISPATCHER_ICON } from './parts/icons';
 import { BackLink, LoadCard, StopList } from './parts/LoadCard';
 import { LoadFailed, NotOnList } from './parts/LoadFailed';
 import { NextList } from './parts/TruckRow';
-import { ActionBar, Card, Label, NotSaved, Refused, Tag, TickBox } from './parts/ui';
+import { ActionBar, Card, Label, NotSaved, Tag, TickBox } from './parts/ui';
+import { KeptRefusal } from './TrucksPage';
 import { useTicks } from './ticks';
 import { allOnLine, answeredBy, answerSentence, brandOfStop, countOf, lineWords, readyLine, readyNote, truckName, waitingLine, whole } from './words';
 
@@ -38,7 +40,18 @@ function TruckScreen({ tripId }: { tripId: string }) {
   }
   const stale = query.isError ? <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : null;
   const truck = query.data.trucks.find((t) => t.tripId === tripId);
-  if (!truck) return <NotOnList />;
+  // A truck gone because the plan was sent again (spec 016): the list's sentence, and the way to what changed.
+  // The refusal and the write waiting for Try again stay on screen with it (AC-31).
+  if (!truck) {
+    return (
+      <>
+        <KeptRefusal />
+        {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
+        <ChangesLink className="mb-3" />
+        <NotOnList />
+      </>
+    );
+  }
   if (truck.status === 'ready') return <ReadyTruck day={query.data} truck={truck} stale={stale} />;
   return <LoadTruck day={query.data} truck={truck} writes={writes} stale={stale} />;
 }
@@ -50,6 +63,7 @@ const SMALL = 'h-[52px] w-full rounded-[12px] text-[15px]';
 
 function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: LoadingTruck; writes: LoaderWrites; stale: ReactNode }) {
   const { at } = useAppClock();
+  const refusal = useKeptRefusal();
   const ticks = useTicks(truck.tripId);
   // The stop being loaded is the last one not on yet (rule 4): the stops come last stop first.
   const current = truck.stops.find((stop) => !stop.loaded) ?? null;
@@ -90,7 +104,9 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
     <div>
       <BackLink to="/loader">Trucks</BackLink>
       <div className="mt-2.5 lg:mt-3.5">
-        {writes.refused && <Refused>{writes.refused}</Refused>}
+        <KeptRefusal />
+        {/* A start refused because the plan changed (012's refusal) offers the comparison when there is one. */}
+        {refusal && <ChangesLink className="mb-3" />}
         {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
         {stale && <div className="mb-3">{stale}</div>}
       </div>
@@ -229,5 +245,14 @@ function TruckSkeleton() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// "See what changed", when this tablet holds a comparison that Got it has not closed.
+function ChangesLink({ className }: { className?: string }) {
+  const { kept } = usePlanChanges();
+  if (!kept?.changes || kept.closed) return null;
+  return (
+    <Link to="/loader/changes" className={plainButton(cn('h-10 w-fit rounded-[12px] px-4 text-[13px]', className))}>{SEE_CHANGES}</Link>
   );
 }

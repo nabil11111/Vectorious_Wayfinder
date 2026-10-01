@@ -50,7 +50,12 @@ export function useLive() {
         if (!change.success) return;
         const { topic } = change.data;
         if (topic === 'clock' || topic === 'demo') void followClock(qc, topic);
-        else void qc.invalidateQueries({ queryKey: [topic] });
+        else {
+          void qc.invalidateQueries({ queryKey: [topic] });
+          if (['plans', 'loading', 'driver', 'orders', 'issues'].includes(topic)) {
+            void qc.invalidateQueries({ queryKey: ['operations'] });
+          }
+        }
       });
       stream.onopen = () => {
         if (broken) void qc.invalidateQueries();
