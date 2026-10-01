@@ -66,3 +66,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [010](010-plan-board/spec.md) | The plan board: the dispatcher plans by hand | Done |
 | [011](011-planner/spec.md) | The planner: the suggested plan's engine | Done |
 | [012](012-loading/spec.md) | Loading: the loader loads and flags, the dispatcher answers | Done |
+| [016](016-live-day/spec.md) | Watching the day: dashboard, Live day and the loader's changed plan | Spec |
