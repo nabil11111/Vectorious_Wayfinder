@@ -229,8 +229,13 @@ export const switchDepotMutation = (qc: QueryClient): UseMutationOptions<Me, Err
     // tab's next request and the tab reads again), and one that did not changes nothing.
     const read = await readOnce(qc);
     if (!signedInAs(qc, asker.id)) return asker;
-    // A newer read overtook this one, and that read decides.
-    if (!read.newest()) return asker;
+    // A newer read overtook this one, and that read decides here. A request named for the depot before that the server
+    // refused as the switch landed reads the session too, and is such a read. The switch may have gone through all the
+    // same, so the other tabs are told, and each reads the session for itself (Q-12).
+    if (!read.newest()) {
+      channelOf(qc).postMessage({ id: asker.id });
+      return asker;
+    }
     let session = read.session;
     if (session === null) {
       if (answer === null) throw noAnswer;
@@ -241,11 +246,15 @@ export const switchDepotMutation = (qc: QueryClient): UseMutationOptions<Me, Err
     const shown = committed.get(qc) ?? asker;
     if (session.depotId !== shown.depotId) {
       await takeSwitch(qc, session);
-      if (signedInAs(qc, session.id)) channelOf(qc).postMessage({ id: session.id });
-    } else if (noAnswer !== null) {
-      // The session is still on the depot on show: the switch did not go through.
-      throw noAnswer;
+    } else if (session.depotId === asker.depotId) {
+      // The session is still on the depot the switch was pressed on: the switch did not go through, or another tab
+      // switched back since, which told the other tabs itself.
+      if (noAnswer !== null) throw noAnswer;
+      return session;
     }
+    // Every other tab of the session is told, also when a refused request's read took the switch here before this read
+    // did (Q-12): this tab then has nothing left to take, and a switch whose answer was lost went through.
+    if (signedInAs(qc, session.id)) channelOf(qc).postMessage({ id: session.id });
     return session;
   },
   onError: () => { toast(SWITCH_FAILED, { id: 'depot-switch', duration: 6000, classNames: { title: 'text-pretty' } }); },

@@ -202,7 +202,7 @@ it('D-95 only the newest read of the session applies: an answer a later read ove
   expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
 });
 
-it('D-95 a switch whose read of the session was overtaken leaves the depot to the newer read, and says nothing', async () => {
+it('D-95 a switch whose read of the session was overtaken leaves the depot to the newer read and shows no line, and the other tabs still hear of it', async () => {
   const tab = tabOf();
   inTab(tab);
   useDispatcherPage();
@@ -216,7 +216,9 @@ it('D-95 a switch whose read of the session was overtaken leaves the depot to th
   await later(10, null);
   expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
   expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
-  expect(Channel.sent).toEqual([]);
+  // The switch may have gone through, so the other tabs are told all the same (Q-12). The message names the account
+  // only: each tab reads the session, which is on Peliyagoda again, and changes nothing.
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
   expect(toast).not.toHaveBeenCalled();
 });
 
@@ -725,6 +727,90 @@ it('AC-7 a tab on one depot follows a switch to Both made in another tab, and th
   await followSwitch(back.qc, { id: 'u1' });
   expect(back.qc.getQueryData(meKey)).toEqual(RUWAN);
   expect(cached(back.qc)).toEqual(['["clock"]', '["me"]']);
+});
+
+// ── The other tabs hear of a switch, whichever read takes it here (Q-12) ────────────────────────────────────────
+
+// The server as a switch meets it while requests named for the depot before are still on their way: the switch answers
+// after switchAfter ms, with Kandy or with no answer at all (it went through either way), and each read of the session
+// answers Kandy after its own delay, in turn.
+function raceServer(switchAfter: number, switched: Response | Error, ...sessionAfter: number[]) {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (String(url).endsWith('/api/v1/me/depot')) {
+      await later(switchAfter, null);
+      if (switched instanceof Error) throw switched;
+      return switched.clone();
+    }
+    if (String(url).endsWith('/api/v1/auth/me')) return later(sessionAfter.shift() ?? 0, Response.json(IN_KANDY));
+    throw new Error(`not asked for: ${url}`);
+  }));
+}
+
+// Another tab of the session on Peliyagoda, as a background tab: it hears the browser's switch messages and reads the
+// session when one comes, and it hears none of this tab's refusals.
+function backgroundTab() {
+  const there = tabOf();
+  const ear = new Channel(Channel.all[0]!.name);
+  ear.addEventListener('message', (event) => { void followSwitch(there.qc, (event as MessageEvent).data); });
+  return there;
+}
+
+it('Q-12 a switch whose own read of the session a refused request\'s read overtakes still tells the other tabs, which follow it', async () => {
+  const here = tabOf();
+  inTab(here);
+  useDispatcherPage();
+  const there = backgroundTab();
+  // The switch answers at once and its read of the session is slow. Meanwhile a request named for Peliyagoda, which the
+  // server refused as the switch landed, starts a newer read, and that read takes Kandy here.
+  raceServer(0, Response.json(IN_KANDY), 40, 0, 0);
+  const switched = switching(here, 'Kandy');
+  await later(5, null);
+  window.dispatchEvent(new Event(DEPOT_CHANGED));
+  await switched;
+  await later(60, null);
+  expect(here.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  // So no tab of the session is left on Peliyagoda, its plan and its name under the account.
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(cached(there.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(toast).not.toHaveBeenCalled();
+});
+
+it('Q-12 a switch whose new depot a refused request\'s read took before the switch answered still tells the other tabs', async () => {
+  const here = tabOf();
+  inTab(here);
+  useDispatcherPage();
+  const there = backgroundTab();
+  // The switch answers late. A request named for Peliyagoda, refused once the switch went through, answers first, and its
+  // read of the session takes Kandy here before the switch's own read finds Kandy already on show.
+  raceServer(20, Response.json(IN_KANDY), 0, 0, 0);
+  const switched = switching(here, 'Kandy');
+  await later(5, null);
+  window.dispatchEvent(new Event(DEPOT_CHANGED));
+  await later(10, null);
+  expect(here.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  await expect(switched).resolves.toEqual(IN_KANDY);
+  await later(20, null);
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).not.toHaveBeenCalled();
+});
+
+it('Q-12 a switch whose answer was lost, when a refused request\'s read took the new depot first, went through: no failure line, and the other tabs are told', async () => {
+  const here = tabOf();
+  inTab(here);
+  useDispatcherPage();
+  const there = backgroundTab();
+  raceServer(20, lost(), 0, 0, 0);
+  const switched = switching(here, 'Kandy');
+  await later(5, null);
+  window.dispatchEvent(new Event(DEPOT_CHANGED));
+  await expect(switched).resolves.toEqual(IN_KANDY);
+  await later(20, null);
+  expect(here.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).not.toHaveBeenCalled();
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
 });
 
 // ── A plan change on its way as another tab switches (Q-13) ─────────────────────────────────────────────────────
