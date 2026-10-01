@@ -188,11 +188,13 @@ export function answerLine(problem: DriverProblem, stop: DriverStop, brand: Bran
 export const waitingLine = (n: number) => `${whole(n)} waiting to send`;
 export const noSignalLine = (n: number) => `No signal · ${n > 0 ? waitingLine(n) : 'everything is sent'}`;
 
-// "Back online · 1 stop sent" and "Wellawatte reached the depot".
+// "Back online · 1 stop sent" and "Wellawatte reached the depot". Up to three places are named, and beyond three the
+// first three and how many more (Q-27): "Ampitiya, Mulgampola, Katukele and 2 more reached the depot".
 export function backOnlineLines(names: string[]) {
   const stops = names.filter((name) => !name.startsWith('the '));
   const what = stops.length === names.length ? countOf(names.length, 'stop') : countOf(names.length, 'record');
-  return { title: `Back online · ${what} sent`, line: `${capital(andList(names))} reached the depot` };
+  const named = names.length > 3 ? [...names.slice(0, 3), `${whole(names.length - 3)} more`] : names;
+  return { title: `Back online · ${what} sent`, line: `${capital(andList(named))} reached the depot` };
 }
 
 export const signInLine = (n: number) => (n > 0 ? `Sign in again to send ${whole(n)} waiting ${n === 1 ? 'record' : 'records'}.` : 'Sign in again.');

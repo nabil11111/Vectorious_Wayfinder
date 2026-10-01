@@ -380,7 +380,8 @@ Anything we built differently from our Designathon submission, and why.
 - **The top bar carries the demo chip,** as "Demo" alone beside the status chip on a phone, and the status chip hides its
   words below 380 px wide so both fit.
 - **"Back online" takes the top line's place,** with the dispatcher's answer under it, so the driver never closes the bar
-  to read it, and it shows on Trip done when the stop that waited was the last one.
+  to read it, and it shows on Trip done when the stop that waited was the last one. Its lines wrap where the frame cuts
+  them, and beyond three stops it names three and how many more, so the driver can always read which stops went.
 - **States the design lacks:** not loaded yet, no trip, could not load, the waiting sheet, not accepted, sign in again,
   could not save on this phone, the unusable photo, the answer on the phone, a stop to try again, and Day done with
   records waiting.

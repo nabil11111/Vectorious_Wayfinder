@@ -102,15 +102,15 @@ function NoSignal({ waiting }: { waiting: number }) {
 }
 
 // Driver · connection restored: the green bar with the sync picture, what was sent and where it reached, and the dark
-// tick that closes it.
+// tick that closes it. Its lines wrap at the phone's width rather than being cut, and the bar grows with them (Q-27).
 function BackOnline({ names }: { names: string[] }) {
   const { title, line } = backOnlineLines(names);
   return (
-    <Band tone="good" className="flex h-[54px] items-center gap-3 border-b border-good/15 md:border-b-0">
+    <Band tone="good" className="flex min-h-[54px] items-center gap-3 border-b border-good/15 py-2 md:border-b-0">
       <img src={ICON.sync} alt="" className="size-[30px] shrink-0 object-contain" />
       <div role="status" className="min-w-0 flex-1">
-        <p className="truncate text-[13px] leading-4 font-bold">{title}</p>
-        <p className="mt-0.5 truncate text-[11px] leading-[14px] text-muted-foreground">{line}</p>
+        <p className="text-[13px] leading-4 font-bold">{title}</p>
+        <p className="mt-0.5 text-[11px] leading-[14px] text-muted-foreground">{line}</p>
       </div>
       <button type="button" aria-label="Close" onClick={closeBackOnline} className="flex h-[25px] w-[31px] shrink-0 items-center justify-center rounded-full bg-secondary outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         {/* The design draws a plain tick here, so it is the outline set's. */}

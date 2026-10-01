@@ -7,9 +7,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { clockKey } from '@/lib/clock';
 import { Counter } from './parts/Counter';
 import { NO_PAIR, readBox, refusalPair, tallyFor } from './tally';
+import { TripDone } from './DonePage';
 import { UnloadPage } from './UnloadPage';
 import type { DriverView } from './view';
-import { overLoadedLine, wholeCountsLine } from './words';
+import { backOnlineLines, overLoadedLine, wholeCountsLine } from './words';
 
 // The driver's screens as the live QA run found them (phase 4, Q-25 to Q-32). The pages are drawn as the phone would
 // draw them, from a day as the server sends it and the app clock on Thu 25 Jun. These fixtures live in the test only.
@@ -18,6 +19,14 @@ import { overLoadedLine, wholeCountsLine } from './words';
 vi.mock('react', async (original) => {
   const react = await original<typeof import('react')>();
   return { ...react, useSyncExternalStore: <T,>(subscribe: (change: () => void) => () => void, snapshot: () => T, serverSnapshot?: () => T) => react.useSyncExternalStore(subscribe, snapshot, serverSnapshot ?? snapshot) };
+});
+
+// The phone's signal and its sync loop's state, as each test sets them: a signal, and nothing waiting by default.
+const hooks = vi.hoisted(() => ({ signal: true, sync: {} as Record<string, unknown> }));
+vi.mock('@/lib/phone/signal', async (original) => ({ ...await original<typeof import('@/lib/phone/signal')>(), useSignal: () => hooks.signal, hasSignal: () => hooks.signal }));
+vi.mock('./queue', async (original) => {
+  const queue = await original<typeof import('./queue')>();
+  return { ...queue, useSync: () => ({ signedOut: false, fetched: true, failure: null, backOnline: null, notSaved: false, unanswered: [], ...hooks.sync }) };
 });
 
 // ── The day ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -58,8 +67,49 @@ function viewOf(day: DriverDay): DriverView {
   };
 }
 
+// Thu 25 Jun at the depot, "03:47" as an instant.
+const at = (time: string) => {
+  const [h, m] = time.split(':').map(Number) as [number, number];
+  return new Date(Date.UTC(2026, 5, 24, 18, 30) + (h * 60 + m) * 60_000).toISOString();
+};
+
+// VEH057 trip 1 at Kandy, Asitha's, as the QA run drove it: Fresh Mahaiyawa took 5 of its 9 chilled cartons (the loader
+// went 4 short), Ampitiya 42, Mulgampola was closed and its 39 cartons were brought back, and Katukele took 58. 105 of
+// 148 delivered. `status` is where the trip is; with 'done' it was checked in at 03:56.
+const MULGAMPOLA_PROBLEM = id(6, 1);
+function veh057trip1(status: 'out' | 'done' = 'done'): DriverTrip {
+  const done = (time: string, outcome: 'delivered' | 'closed') => ({ arrivedAt: at(time), doneAt: at(time), outcome });
+  const stops = [
+    stopOf(1, 1, 'Fresh Mahaiyawa', [{ n: 1, quantity: 9, loaded: 5, delivered: 5 }], done('03:48', 'delivered')),
+    stopOf(2, 2, 'Fresh Ampitiya', [{ n: 2, quantity: 42, delivered: 42 }], done('03:48', 'delivered')),
+    stopOf(3, 3, 'Fresh Mulgampola', [{ n: 3, quantity: 39 }], done('03:50', 'closed')),
+    stopOf(4, 4, 'Fresh Katukele', [{ n: 4, quantity: 50, delivered: 50 }, { n: 5, quantity: 8, delivered: 8 }], done('03:51', 'delivered')),
+  ];
+  return tripOf(57, {
+    status, leftAt: at('03:45'), backAt: status === 'done' ? at('03:56') : null, stops,
+    problems: [{
+      id: MULGAMPOLA_PROBLEM, kind: 'closed', stopId: stops[2]!.id, reason: 'nobody_there', note: 'Gate locked, lights off.', raisedAt: at('03:50'), hasPhoto: true,
+      lines: [{ lineId: stops[2]!.lines[0]!.lineId, counted: 39 }], decision: 'bring_back', decidedBy: 'Ruwan', decidedAt: at('03:55'),
+    }],
+  });
+}
+
+// VEH057 trip 2: Fresh Watapuluwa's 57 chilled and 65 dry cartons, leaving 07:08. Planned until the loader starts it.
+function veh057trip2(status: DriverTrip['status'] = 'planned', more: Partial<DriverTrip> = {}): DriverTrip {
+  // Nothing is loaded before the trip is ready, and all of it is delivered once it is done.
+  const loaded = status === 'planned' || status === 'loading' ? null : undefined;
+  const delivered = (n: number) => (status === 'done' ? n : null);
+  const stop = stopOf(9, 1, 'Fresh Watapuluwa', [
+    { n: 9, quantity: 57, loaded, delivered: delivered(57) }, { n: 10, quantity: 65, temp: 'dry', loaded, delivered: delivered(65) },
+  ], status === 'done' ? { arrivedAt: at('04:00'), doneAt: at('04:01'), outcome: 'delivered' } : {});
+  return tripOf(58, {
+    tripNo: 2, status, leavesAt: at('07:08'), backBy: at('07:56'), readyAt: status === 'planned' || status === 'loading' ? null : at('03:59'),
+    leftAt: status === 'out' || status === 'done' ? at('03:59') : null, backAt: status === 'done' ? at('04:01') : null, stops: [stop], ...more,
+  });
+}
+
 // Thu 25 Jun 03:47 at the depot.
-const CLOCK: ClockState = { demo: true, now: '2026-06-24T22:17:00.000Z', part: 'on_the_road', holdsAt: null, next: null, revision: 1, day: 1 };
+const CLOCK: ClockState ={ demo: true, now: '2026-06-24T22:17:00.000Z', part: 'on_the_road', holdsAt: null, next: null, revision: 1, day: 1 };
 
 // A driver screen, drawn with the app clock in the query.
 function draw(element: ReactNode): string {
@@ -188,5 +238,45 @@ describe('Q-25 the driver\'s unload count', () => {
     const fine = renderToStaticMarkup(<Counter label="Chilled" value={3} max={12} of={12} onStep={() => {}} onType={() => {}} onLeave={() => {}} />);
     expect(fine).toMatch(/<input[^>]*value="3"/);
     expect(buttonsOf(fine).some((tag) => /\sdisabled=""/.test(tag))).toBe(false);
+  });
+});
+
+// ── Q-27 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// Trip done on VEH057 trip 1 at 03:52, its last stops saved with no signal and just sent.
+const tripDone = (sync: Record<string, unknown>) => {
+  hooks.sync = sync;
+  const trip = veh057trip1('out');
+  const day = dayOf(trip, veh057trip2());
+  const html = draw(<TripDone view={viewOf(day)} day={day} trip={trip} figures={tripFigures(trip)} />);
+  hooks.sync = {};
+  return html;
+};
+// The green bar: from its green band to its closing tick, or '' when there is none.
+function barOf(html: string) {
+  const words = html.indexOf('Back online');
+  if (words === -1) return '';
+  const band = html.lastIndexOf('<div', html.lastIndexOf('bg-good-tint', words));
+  return html.slice(band, html.indexOf('</button>', words) + '</button>'.length);
+}
+
+describe('Q-27 "Back online" names the stops that reached the depot', () => {
+  it('names every stop up to three, and three and the count of the rest beyond', () => {
+    expect(backOnlineLines(['Ampitiya', 'Mulgampola', 'Katukele'])).toEqual({
+      title: 'Back online · 3 stops sent', line: 'Ampitiya, Mulgampola and Katukele reached the depot',
+    });
+    expect(backOnlineLines(['Ampitiya', 'Mulgampola', 'Katukele', 'Watapuluwa', 'Mahaiyawa'])).toEqual({
+      title: 'Back online · 5 stops sent', line: 'Ampitiya, Mulgampola, Katukele and 2 more reached the depot',
+    });
+    expect(backOnlineLines(['Ampitiya', 'Mulgampola', 'Katukele', 'the end of the trip']).line).toBe('Ampitiya, Mulgampola, Katukele and 1 more reached the depot');
+    expect(backOnlineLines(['Wellawatte']).line).toBe('Wellawatte reached the depot');
+  });
+
+  it('wraps its lines at the phone\'s width rather than cutting them', () => {
+    const bar = barOf(tripDone({ backOnline: ['Ampitiya', 'Mulgampola', 'Katukele'] }));
+    expect(textOf(bar)).toContain('Back online · 3 stops sent Ampitiya, Mulgampola and Katukele reached the depot');
+    expect(bar).not.toMatch(/truncate|text-ellipsis|whitespace-nowrap/);
+    // The band grows with its lines, rather than holding them to one fixed height.
+    expect(bar).not.toMatch(/class="(?:[^"]*\s)?h-\[54px\]/);
   });
 });
