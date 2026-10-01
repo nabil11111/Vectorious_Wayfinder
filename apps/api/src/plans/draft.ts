@@ -10,7 +10,7 @@ import { CUTOFF_MINUTES } from '../orders/orderable-day';
 import { toClock } from '../planning';
 import type { Planner } from '../routes/plans';
 import { boardOf, operatingDays, type BoardMoment } from './board';
-import { boardDay, dayLabel } from './board-day';
+import { boardDay, dayMovedOn } from './board-day';
 
 export interface OpenPlan { plan: typeof plans.$inferSelect; moment: BoardMoment }
 export const unknownRecord = (id: string) => new HttpError(400, 'unknown_record', 'That record does not belong to this depot and planning day.', { id });
@@ -27,7 +27,7 @@ export async function openPlan(tx: Tx, caller: Planner, date: string, ref: PlanR
   if (ref.planId === null ? ref.demoDay !== moment.demoDay : !existing || existing.id !== ref.planId) throw stale();
   const day = boardDay(depotDate(moment.at), depotMinutes(moment.at), await operatingDays(tx));
   if (!day) throw new HttpError(409, 'no_plan_day', 'No delivery day is left to plan.');
-  if (day.date !== date) throw new HttpError(409, 'day_moved', `Trucks for ${dayLabel(date)} leave from 03:30, so its plan can no longer be sent.`, { date: day.date });
+  if (day.date !== date) throw new HttpError(409, 'day_moved', dayMovedOn(date, published), { date: day.date });
   if (!day.open) throw new HttpError(409, 'orders_open', 'Orders for this day are still open.', { date, cutoffAt: depotInstant(day.cutoffDate, CUTOFF_MINUTES).toISOString() });
   if (ref.planId !== null) {
     if (!existing || existing.id !== ref.planId) throw stale();

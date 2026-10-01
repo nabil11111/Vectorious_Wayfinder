@@ -19,6 +19,7 @@ export function sumOrders(all: OrdersSummary[]): OrdersSummary {
 const sumMeasure = (all: HistoryMeasure[]): HistoryMeasure => ({
   units: all.some((measure) => measure.units === null) ? null : added(all.map((measure) => measure.units!)),
   known: added(all.map((measure) => measure.known)), total: added(all.map((measure) => measure.total)),
+  missing: added(all.map((measure) => measure.missing)), soFar: added(all.map((measure) => measure.soFar)),
 });
 export function sumHistory(all: HistoryCounts[]): HistoryCounts {
   if (all.length === 1) return all[0]!;
@@ -26,6 +27,7 @@ export function sumHistory(all: HistoryCounts[]): HistoryCounts {
   const stage = (key: Exclude<keyof HistoryStages, 'ordered'>) => sumMeasure(all.map((counts) => counts.stages[key]));
   return {
     trips: sum('trips'), stops: sum('stops'), orders: sum('orders'), delivered: sum('delivered'), finished: sum('finished'), partial: sum('partial'),
+    noGoods: sum('noGoods'), closed: sum('closed'),
     late: sum('late'), short: sum('short'), returned: sum('returned'), deferred: sum('deferred'), confirmations: sum('confirmations'), receivedOrders: sum('receivedOrders'),
     stages: {
       ordered: added(all.map((counts) => counts.stages.ordered)), loaded: stage('loaded'), handedOver: stage('handedOver'), received: stage('received'),

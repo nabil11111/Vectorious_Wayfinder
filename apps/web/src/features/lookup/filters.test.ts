@@ -22,7 +22,7 @@ const KURUNEGALA = shop('OUT080', 'Tech Kurunegala', 'Tech', 'Kurunegala');
 
 type Shop = typeof NUGEGODA;
 const load = (units: number) => ({ kg: units * 7, m3: units / 20, units, needsReefer: false, needsTailLift: false, keepUpright: false });
-const planned = (seq: number) => ({ tripId: id(800), vehicleId: 'VEH035', tripNo: 1, stopId: id(700 + seq), seq, plannedArrival: '2026-06-24T23:22:00.000Z' });
+const planned = (seq: number) => ({ tripId: id(800), vehicleId: 'VEH035', tripNo: 1, stopId: id(700 + seq), seq, plannedArrival: '2026-06-24T23:22:00.000Z', closed: [] });
 const deferral = { code: 'no_reefer' as const, reason: 'No fridge truck was left for Matara.' };
 
 // One order of Thursday's list, with its own inline detail.
@@ -32,7 +32,7 @@ function row(n: number, outlet: Shop, { temp = 'dry', wanted = THU, status = 'pl
   return {
     id: id(n), wantedDate: wanted, placedAt: '2026-06-24T03:00:00.000Z', temp, status,
     lines: [{ lineId: id(1000 + n), productId: `P-${temp}`, name: temp === 'chilled' ? 'Chilled cartons' : 'Dry cartons', unit: 'carton', quantity: 4 }],
-    note: null, load: load(4), outlet, splitFrom,
+    note: null, load: load(4), outlet, splitFrom, broughtBack: false, deferredEarlier: false,
     original: splitFrom ? { id: splitFrom, wantedDate: wanted, placedAt: null, temp, status: 'split', lines: [], note: null, load: load(8) } : null,
     parts: [],
     days: [{ date: THU, carriedOver: wanted < THU, publication: sent, assignment: day === 'planned' ? planned(n % 9 + 1) : null, deferral: day === 'deferred' ? deferral : null }],
@@ -80,6 +80,10 @@ it('AC-6 Orders filters its returned rows without a new request', async () => {
   expect(shopsOf(shownOrders(read.rows, { search: '', filter: 'deferred' }))).toEqual(['Fresh Dickwella 04', 'Tech Kurunegala 01']);
   expect(shopsOf(shownOrders(read.rows, { search: '', filter: 'split' }))).toEqual(['Style Liberty Plaza 03']);
   expect(shopsOf(shownOrders(read.rows, { search: 'fresh', filter: 'deferred' }))).toEqual(['Fresh Dickwella 04']);
+  // Before a day is sent, Deferred keeps the orders the server says still wait deferred from an earlier plan, the same
+  // rows its header counts (Q-48).
+  const waiting = read.rows.map((each) => (each.id === id(6) ? { ...each, status: 'deferred' as const, deferredEarlier: true, days: [{ ...each.days[0]!, publication: null, assignment: null }] } : each));
+  expect(shopsOf(shownOrders(waiting, { search: '', filter: 'deferred' }))).toEqual(['Fresh Wellawatte 06', 'Fresh Dickwella 04', 'Tech Kurunegala 01']);
 
   // The page's view: the summary is the server's own object, "Showing N of M" is the shown array and the returned
   // rows, and the detail is the selected row itself, whatever filter hides it.

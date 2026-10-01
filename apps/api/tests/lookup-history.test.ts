@@ -1,13 +1,13 @@
-import { PlanCheck } from '@wayfinder/contracts';
+import { PlanCheck, tripFigures } from '@wayfinder/contracts';
 import { eq } from 'drizzle-orm';
 import { expect, it, vi } from 'vitest';
 import { db } from '../src/db/client';
 import { orderLines, orders, outlets, plans, stops } from '../src/db/schema';
 import { depotInstant } from '../src/lib/clock';
-import { driverStop, heldDriverRows } from './driver-plan';
+import { driverStop, driverTrip, heldDriverRows } from './driver-plan';
 import { sendWalkthroughPlan, THU, WED } from './loading-plan';
 import { lookupHarness } from './lookup-plan';
-import { decide, FRI, photo } from './operations-plan';
+import { decide, FRI, operations, photo, shownTrip } from './operations-plan';
 import { deliveredWalkthrough, receiptOf, shopScreen } from './receipt-plan';
 const clock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async original => {
@@ -52,6 +52,17 @@ it.each(['refused', 'closed'] as const)('AC-13 zero handover finishes without de
     : { handedOver: { units: 0 }, received: { units: null }, notDelivered: { units: 0 }, refused: { units: 94 } });
   expect(stop.attempts).toHaveLength(kind === 'closed' ? 1 : 0);
 });
+// Q-45: Kandy's Dashboard and Live day read "8 / 64 stops delivered · 1 partial · 1 closed" and History "8 / 64 stops
+// delivered · 1 partial". History's header counts a closed stop, and a stop with none delivered, as Live day does.
+it.each(['refused', 'closed'] as const)('Q-45 the header counts a %s stop with nothing handed over the way Live day does', async kind => {
+  const trip = await h.road.wellawatte();
+  await h.road.write(trip, kind === 'refused' ? 'refuse' : 'closed', 228, 2, kind === 'refused'
+    ? { reason: 'damaged', note: '', lines: driverStop(trip, 2).lines.map(line => ({ lineId: line.lineId, refused: line.loaded })) } : {});
+  const { counts } = await operations(h.ruwan), day = await read();
+  expect(day.counts).toMatchObject({ delivered: 1, partial: 0, noGoods: kind === 'refused' ? 1 : 0, closed: kind === 'closed' ? 1 : 0 });
+  expect([day.counts!.delivered, day.counts!.partial, day.counts!.noGoods, day.counts!.closed])
+    .toEqual([counts.stopsDelivered, counts.partialStops, counts.noGoodsStops, counts.closedStops]);
+});
 // L-13: VEH035 with Nugegoda confirmed and Wellawatte closed read "Handed over · not recorded · 2 of 3 lines", although
 // nothing more can be recorded for Wellawatte's lines. A closed shop was handed nothing, so the trip's figures are whole.
 it('L-13 counts a closed shop as nothing handed over, received or short on the receipt, so the trip reads whole figures', async () => {
@@ -68,6 +79,34 @@ it('L-13 counts a closed shop as nothing handed over, received or short on the r
   expect(day.counts).toMatchObject({ delivered: 1, finished: 2, confirmations: 1, stages: whole });
   // The closed shop is still not delivered, and has no receipt or proof to wait for.
   expect(closed).toMatchObject({ receipt: null, proof: null, flags: { short: false } });
+});
+// Q-43: Kandy's VEH057 trip 1, with Mulgampola closed and its cartons brought back, read "Handed over not recorded · 4 of
+// 5 lines" in History while the driver's Trip done said 105 of 148 delivered. A closed stop counts as nothing handed
+// over on every page, so History, Live day and the driver's phone read the same whole figure for the trip and the day.
+it('Q-43 a trip with a closed shop brought back reads the same whole handed over in History, Live day and on the phone', async () => {
+  let trip = await h.road.write(await h.road.wellawatte(), 'closed', 228, 2, { photo });
+  await decide(h.ruwan, trip.problems.find(row => row.kind === 'closed')!.id, 'bring_back');
+  trip = await h.road.write(driverTrip(await h.road.driver.read()), 'finish', 235);
+  const phone = tripFigures(trip), live = shownTrip(await operations(h.ruwan)).figures, day = await read();
+  expect([phone.delivered, live.delivered]).toEqual([23, 23]);
+  expect(day.trips[0]!.stages.handedOver).toEqual({ units: 23, known: 5, total: 5, missing: 0, soFar: 23 });
+  expect(day.counts!.stages.handedOver).toEqual(day.trips[0]!.stages.handedOver);
+  expect(day.trips[0]!.stages.notDelivered.units).toBe(phone.notDelivered);
+  // The closed shop's lines read nothing handed over, never a dash, beside its not-delivered cartons.
+  const closed = day.trips[0]!.stops[1]!;
+  expect(closed.lines.map(line => [line.loaded, line.delivered, line.notDelivered])).toEqual([[48, 0, 48], [46, 0, 46]]);
+  expect(closed.attempts).toMatchObject([{ notDelivered: 94, decision: 'bring_back' }]);
+});
+// Q-44: "Not recorded yet … (33 of 163 lines)" gave the lines that were recorded, and read as the ones missing; and with
+// one trip still to run the day showed no loaded or handed over total at all. Each stage says how many lines it is
+// still missing and what its recorded lines add up to so far.
+it('Q-44 a stage not recorded on every line says the lines it is missing and the units so far', async () => {
+  // Nugegoda's three lines are handed over; the driver has only reached Wellawatte.
+  await h.road.wellawatte();
+  const day = await read();
+  expect(day.counts!.stages).toMatchObject({ ordered: 118, loaded: { units: 117, known: 5, total: 5, missing: 0, soFar: 117 },
+    handedOver: { units: null, known: 3, total: 5, missing: 2, soFar: 23 }, received: { units: null, known: 0, total: 5, missing: 5, soFar: 0 } });
+  expect(day.trips[0]!.stages.handedOver).toEqual(day.counts!.stages.handedOver);
 });
 it('AC-16 three received orders make one confirmation, 22 cartons and separate receipt and depot shortages', async () => {
   const trip = await deliveredWalkthrough(h, { wellawatte: 'refused' });

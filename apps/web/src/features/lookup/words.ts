@@ -53,6 +53,8 @@ export const NO_ORDERS_IN_RANGE = 'No orders in these four weeks.';
 export const NO_MATCH = 'No orders match these filters.';
 export const NO_SKIPS = 'No shops skipped in these four weeks.';
 export const NO_SENT_PLAN = 'No sent plan';
+// Beside the deferred count of a day not sent yet: its orders were deferred by earlier sent plans (Q-48).
+export const ON_EARLIER_PLANS = 'on earlier plans';
 export const NO_SENT_PLANS = 'No sent plans';
 export const PICK_ORDER = 'Choose an order to see its lines and its sent plans.';
 export const showing = (shown: number, total: number) => `Showing ${whole(shown)} of ${whole(total)}`;
@@ -63,8 +65,22 @@ export const STATUS_WORDS: Record<OrderStatus, string> = {
   draft: 'Draft', placed: 'Placed', planned: 'Planned', deferred: 'Deferred', loaded: 'Loaded', delivered: 'Delivered', received: 'Received',
   cancelled: 'Cancelled', split: 'Split',
 };
+// An order placed again by "Bring them back" at a closed shop and on no later sent plan yet (Q-46), as the shop's Today
+// says it.
+export const BROUGHT_BACK = 'Brought back · waiting for the next plan';
+// The order's current status in the table: "Planned", or that it was brought back and waits (Q-46).
+export const statusWords = (row: Pick<LookupOrderRow, 'status' | 'broughtBack'>) => (row.broughtBack ? BROUGHT_BACK : STATUS_WORDS[row.status]);
 // The current status, said as now: "Now planned", which a dated sent plan never is.
-export const nowWords = (status: OrderStatus) => `Now ${STATUS_WORDS[status].toLowerCase()}`;
+export const nowWords = (row: Pick<LookupOrderRow, 'status' | 'broughtBack'>) => (row.broughtBack ? BROUGHT_BACK : `Now ${STATUS_WORDS[row.status].toLowerCase()}`);
+// A closed visit on the order's history (Q-46): "nobody at the shop 03:50 · VEH057 · 3", then its answer, "brought back
+// to the depot 03:52", "answered Try again on this trip 03:52" or "not answered yet".
+type ClosedVisit = NonNullable<LookupOrderRow['days'][number]['assignment']>['closed'][number];
+export const closedVisitWords = (visit: ClosedVisit, assignment: { vehicleId: string; tripNo: number; seq: number }) =>
+  `nobody at the shop ${clockTime(visit.at)} · ${truckStop(assignment)}`;
+export function closedAnswerWords(visit: ClosedVisit) {
+  if (visit.decision === null || visit.decidedAt === null) return 'not answered yet';
+  return visit.decision === 'bring_back' ? `brought back to the depot ${clockTime(visit.decidedAt)}` : `answered ${DECISION_WORDS[visit.decision]} ${clockTime(visit.decidedAt)}`;
+}
 
 // A deferral's short name, as the plan board writes the six reasons: "No fridge truck".
 export const deferralName = (code: DeferralCode) => DEFERRAL[code].label;
@@ -125,16 +141,19 @@ export const showingTrips = (shown: number, total: number) => `Showing ${whole(s
 export const TRIP_STATUS_WORDS: Record<LookupTripRef['status'], string> = { planned: 'Not loaded', loading: 'Loading', ready: 'Ready', out: 'Out', done: 'Back' };
 export const OUTCOME_WORDS = { delivered: 'delivered', refused: 'refused some', closed: 'nobody there' } as const;
 
-// A stage's units, or that it was not recorded with how many lines were: "117", "not recorded (2 of 5 lines)".
+// A stage's units, or that it was not recorded with how many of its lines are still missing (Q-44): "117", "not
+// recorded on 2 of 5 lines".
 export const measureWords = (measure: HistoryMeasure) =>
-  (measure.units === null ? `not recorded (${whole(measure.known)} of ${whole(measure.total)} lines)` : whole(measure.units));
-// The stages not recorded yet, grouped by how many lines each has: "Not recorded yet: loaded, handed over and received
-// (0 of 5 lines)", or null when every stage is recorded.
+  (measure.units === null ? `not recorded on ${missingLines(measure)}` : whole(measure.units));
+// "2 of 5 lines": the lines a stage has not recorded yet, never the ones it has (Q-44).
+export const missingLines = (measure: HistoryMeasure) => `${whole(measure.missing)} of ${whole(measure.total)} lines`;
+// The stages not recorded yet, grouped by how many of their lines are still missing: "Not recorded yet: loaded, handed
+// over and received (130 of 163 lines)", or null when every stage is recorded.
 export function unrecordedWords(stages: [string, HistoryMeasure][]) {
   const groups = new Map<string, string[]>();
   for (const [label, measure] of stages) {
     if (measure.units !== null) continue;
-    const coverage = `${whole(measure.known)} of ${whole(measure.total)} lines`;
+    const coverage = missingLines(measure);
     groups.set(coverage, [...(groups.get(coverage) ?? []), label]);
   }
   if (groups.size === 0) return null;

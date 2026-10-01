@@ -3,10 +3,11 @@ import { eq } from 'drizzle-orm';
 import { expect, it, vi } from 'vitest';
 import { db } from '../src/db/client';
 import { deferrals, orders, plans } from '../src/db/schema';
+import { depotInstant } from '../src/lib/clock';
 import { heldDriverRows } from './driver-plan';
 import { code, kandyTrip, sendWalkthroughPlan, THU, WED } from './loading-plan';
 import { lookupHarness } from './lookup-plan';
-import { FRI, photo } from './operations-plan';
+import { decide, FRI, photo } from './operations-plan';
 const clock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async original => {
   const actual = await original<typeof import('../src/lib/clock')>();
@@ -42,6 +43,50 @@ it('AC-4 AC-5 and AC-35 keep all five loaded orders through delivery and an unan
   await check(2, 3);
 });
 
+// Q-46: Mulgampola's order, brought back from the closed shop, read "Placed · VEH057 · 3 · never deferred" with nothing in
+// its history about the closed shop or the return. The read says it was brought back and keeps each closed visit with
+// its answer on that day's truck stop.
+it('Q-46 an order brought back from a closed shop reads as brought back, with the closed shop and the return in its history', async () => {
+  const trip = await h.road.write(await h.road.wellawatte(), 'closed', 228, 2, { photo });
+  const closed = trip.problems.find(problem => problem.kind === 'closed')!;
+  h.freeze(THU, 230);
+  await decide(h.ruwan, closed.id, 'bring_back');
+  const at = (minute: number) => depotInstant(THU, minute).toISOString();
+  const thursday = await h.orders('?date=' + THU), back = thursday.rows.filter(row => row.outlet.id === 'OUT002');
+  expect(back.map(row => [row.status, row.broughtBack])).toEqual([['placed', true], ['placed', true]]);
+  for (const row of back) expect(row.days[0]!.assignment!.closed).toEqual([{ issueId: closed.id, at: at(228), decision: 'bring_back', decidedAt: at(230) }]);
+  // Nugegoda's orders were delivered, never closed or brought back.
+  expect(thursday.rows.filter(row => row.outlet.id === 'OUT001').map(row => [row.broughtBack, row.days[0]!.assignment!.closed])).toEqual([[false, []], [false, []], [false, []]]);
+  // Friday's list carries it over, still brought back and waiting.
+  const friday = await h.orders('?date=' + FRI);
+  expect(friday.rows.filter(row => row.outlet.id === 'OUT002').map(row => [row.broughtBack, row.days[0]!.carriedOver])).toEqual([[true, true], [true, true]]);
+  // Once Friday's sent plan takes it, it is planned again and no longer waits.
+  h.freeze(THU, 960);
+  await h.publish(FRI, ['OUT002']);
+  expect((await h.orders('?date=' + THU)).rows.filter(row => row.outlet.id === 'OUT002').map(row => [row.status, row.broughtBack])).toEqual([['planned', false], ['planned', false]]);
+});
+
+// Q-48: Friday's Orders read "0 deferred" above six rows whose Status read "Deferred". Before a day is sent, the listed
+// orders still deferred from an earlier sent plan count as deferred, as their rows read; once it is sent, its own
+// plan's deferrals do.
+it('Q-48 a day with no sent plan counts the listed orders still deferred from an earlier plan, as their rows read', async () => {
+  await sendWalkthroughPlan(h);
+  const friday = await h.orders('?date=' + FRI), waiting = friday.rows.filter(row => row.status === 'deferred').map(row => row.id).sort();
+  expect(waiting).toHaveLength(99);
+  expect(friday.summary).toMatchObject({ planned: 0, deferred: 99 });
+  expect(friday.rows.filter(row => row.deferredEarlier).map(row => row.id).sort()).toEqual(waiting);
+  // Thursday's own sent plan still counts its own deferrals, and no row of it waits deferred from an earlier one.
+  const thursday = await h.orders('?date=' + THU);
+  expect(thursday.summary).toMatchObject({ planned: 5, deferred: 99 });
+  expect(thursday.rows.some(row => row.deferredEarlier)).toBe(false);
+  // Once Friday is sent, its own plan's deferrals count.
+  h.freeze(THU, 960);
+  const sent = await h.publish(FRI, [friday.rows.find(row => row.status === 'deferred' && row.outlet.brand === 'Fresh')!.outlet.id]);
+  const after = await h.orders('?date=' + FRI);
+  expect(after.summary!.deferred).toBe(sent.plan.deferrals.length);
+  expect(after.rows.some(row => row.deferredEarlier)).toBe(false);
+});
+
 it.each([
   { name: 'carried over', outletId: 'OUT030', wanted: WED, carriedOver: 5 },
   { name: 'wanted that day', outletId: 'OUT003', wanted: THU, carriedOver: 4 },
@@ -75,7 +120,8 @@ it.each([
 
 
 it('AC-4 seeded delivery day keeps wanted and carried orders and its own publication counts', async () => {
-  expect(await h.orders()).toMatchObject({ date: THU, summary: { orders: 102, planned: 0, deferred: 0, carriedOver: 4, split: 0 } });
+  // Before Send the four orders Wednesday's plan deferred still read Deferred, and count so (Q-48).
+  expect(await h.orders()).toMatchObject({ date: THU, summary: { orders: 102, planned: 0, deferred: 4, carriedOver: 4, split: 0 } });
   const sent = await sendWalkthroughPlan(h);
   const before = await heldDriverRows(), day = await h.orders();
   expect(day.summary).toEqual({ orders: 104, planned: 5, deferred: 99, carriedOver: 4, split: 0 });
@@ -84,7 +130,7 @@ it('AC-4 seeded delivery day keeps wanted and carried orders and its own publica
   expect(day.rows.every(row => row.status !== 'draft' && row.status !== 'split')).toBe(true);
   expect(await heldDriverRows()).toEqual(before);
   expect((await h.ruwan.post(`/api/v1/plans/${THU}/unsend`).send({ planId: sent.plan.id, revision: sent.plan.revision })).status).toBe(200);
-  expect((await h.orders()).summary).toEqual({ orders: 104, planned: 0, deferred: 0, carriedOver: 4, split: 0 });
+  expect((await h.orders()).summary).toEqual({ orders: 104, planned: 0, deferred: 4, carriedOver: 4, split: 0 });
   h.freeze(THU, 210);
   expect((await h.orders()).date).toBe(FRI);
   expect((await h.orders(`?date=${THU}`)).summary!.orders).toBe(104);

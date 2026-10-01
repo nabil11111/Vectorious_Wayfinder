@@ -104,6 +104,7 @@ where two stops are needed, VEH004 with OUT026 and OUT028 as in spec 010's AC-11
 3. **Starting (D-33).** "Start loading" makes a `planned` trip `loading`. It takes the planning locks of spec 010 and
    checks that the plan is still sent at the revision the loader's screen showed. From then on the plan cannot go back
    to edit, and View plan says so where "Back to edit" was: "Loading has started, so this plan cannot go back to edit."
+   The board carries that sentence in `lockedReason`, and View plan shows it whatever day the board is on by then (Q-19).
    A plan taken back to edit before that leaves the list, which then says no plan is
    out. The drawn "Plan changed" screens come with A7. *Ruwan takes Thursday's plan back at Wed 16:30: Kasun's list
    says no plan is out for Thu 25 Jun. Once Kasun has started VEH035, View plan has no "Back to edit" and an unsend is

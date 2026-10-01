@@ -53,7 +53,8 @@ The design drew a replay of February's records; the app draws the live day (D-92
    stores". Shops with no stop today stay in the total. On a plan sent before the driver's piece, whose stop details
    were not recorded, the counts are unknown and the list shows a dash, as the tile does.
 4. **Labels.** The served districts' names at the design's offsets from their centres, "Peliyagoda" by the depot,
-   "INDIAN OCEAN" in the sea. No individual shop markers.
+   "INDIAN OCEAN" in the sea on Peliyagoda's and Both's maps. Kandy's map is inland, with only a thin strip of the
+   west coast's sea, so it has no sea's name (Q-10). No individual shop markers.
 5. **The view switch** shows the dispatcher's depot chosen; the other two are greyed and say whose depot this is,
    as the top bar does (D-32). It never fetches another depot.
 

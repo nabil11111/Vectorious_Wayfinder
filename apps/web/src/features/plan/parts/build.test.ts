@@ -10,7 +10,7 @@ vi.mock('sonner', () => ({ toast: vi.fn() }));
 
 const BUILT = PlanBoard.parse({
   depot: 'Peliyagoda', demoDay: 1, day: { date: '2026-06-25', cutoffAt: '2026-06-24T10:30:00.000Z', open: true },
-  plan: { mixBrands: false, trips: [], deferrals: [], id: '00000000-0000-4000-8000-000000000100', revision: 1, status: 'draft', savedAt: '2026-06-24T10:30:00.000Z', sentAt: null, canUnsend: false },
+  plan: { mixBrands: false, trips: [], deferrals: [], id: '00000000-0000-4000-8000-000000000100', revision: 1, status: 'draft', savedAt: '2026-06-24T10:30:00.000Z', sentAt: null, canUnsend: false, lockedReason: null },
   dropped: [], check: null, orders: [], shops: [], vehicles: [], drivers: [], figures: null, counts: null, suggestion: null,
 });
 const REF: PlanRef = { planId: null, demoDay: 1 };

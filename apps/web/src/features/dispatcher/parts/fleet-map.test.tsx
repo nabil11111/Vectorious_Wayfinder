@@ -359,9 +359,9 @@ describe('the sea\'s name (Q-10)', () => {
   // "INDIAN OCEAN" in 7 px Inter capitals is about 51 px long, on a 10 px line from the y the card puts it at.
   const LABEL = { width: 52, height: 10 };
 
-  it('Q-10 "INDIAN OCEAN" sits wholly on the sea in every view, inside the frame', () => {
-    for (const view of ['Peliyagoda', 'Kandy', 'Both'] as const) {
-      const [x, y] = OCEAN_LABEL[view];
+  it('Q-10 "INDIAN OCEAN" sits wholly on the sea in every view that names it, inside the frame', () => {
+    for (const view of ['Peliyagoda', 'Both'] as const) {
+      const [x, y] = OCEAN_LABEL[view]!;
       expect([x >= 0, y >= 0, x + LABEL.width <= 340, y + LABEL.height <= 280]).toEqual([true, true, true, true]);
       const rings = FLEET_MAP[view].districts.flatMap((district) => ringsOf(district.d));
       const land: Point[] = [];
@@ -372,12 +372,14 @@ describe('the sea\'s name (Q-10)', () => {
     }
   });
 
-  it('Q-10 the card writes it at its own view\'s place', () => {
+  it('Q-10 the card writes it at its own view\'s place, and not on Kandy\'s inland view', () => {
     const at = (markup: string) => /<text x="([^"]+)" y="([^"]+)" font-size="7" class="fill-map-ocean">INDIAN OCEAN<\/text>/.exec(markup)?.slice(1).map(Number);
-    const kandy = at(wide(card(dayWith([], {}, 'Kandy'))));
-    expect(kandy?.[0]).toBe(OCEAN_LABEL.Kandy[0]);
-    expect(kandy![1]).toBeGreaterThan(OCEAN_LABEL.Kandy[1]);
-    expect(kandy![1]).toBeLessThan(OCEAN_LABEL.Kandy[1] + LABEL.height);
-    expect(at(wide(card(dayWith([]))))?.[0]).toBe(OCEAN_LABEL.Peliyagoda[0]);
+    // Kandy's view is the hill country with a strip of the west coast, too little sea for the name, so it has none.
+    expect(OCEAN_LABEL.Kandy).toBeNull();
+    expect(wide(card(dayWith([], {}, 'Kandy')))).not.toContain('INDIAN OCEAN');
+    const peliyagoda = at(wide(card(dayWith([]))));
+    expect(peliyagoda?.[0]).toBe(OCEAN_LABEL.Peliyagoda![0]);
+    expect(peliyagoda![1]).toBeGreaterThan(OCEAN_LABEL.Peliyagoda![1]);
+    expect(peliyagoda![1]).toBeLessThan(OCEAN_LABEL.Peliyagoda![1] + LABEL.height);
   });
 });

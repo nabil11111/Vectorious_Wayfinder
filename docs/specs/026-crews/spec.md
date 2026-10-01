@@ -43,7 +43,8 @@ Nabil, 1 Oct:
   header keeps "26 / 35 trucks". The empty middle's drop area reads "or drag an order here to start a trip".
 - **Trucks named by their drivers, everywhere a dispatcher plans.**
   - Every sentence names a truck by its driver: "Chaminda's dry truck", or "the second trip of Chaminda's dry truck".
-    That covers the checker's lines (spec 024), the planner's "why?" and notifications.
+    That covers the checker's lines (spec 024), the planner's "why?" and notifications, and the check a plan is sent
+    with, which View plan shows beside its rows once the plan is sent (Q-47).
   - The plan board's and View plan's cards and headers read the same way: "Chaminda · dry truck", and "Chaminda · dry
     truck · trip 2" for a second trip. The vehicle number is not shown there (Nabil, 1 Oct: "We won't be showing by
     vehicle ID").

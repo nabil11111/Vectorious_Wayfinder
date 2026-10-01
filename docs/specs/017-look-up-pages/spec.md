@@ -50,8 +50,8 @@ were also inspected. These exports stay outside the repo. Frame names below give
 
 | Screen | State | Frame | What shows |
 | --- | --- | --- | --- |
-| Orders `/dispatcher/orders` | Rows and selected order | Dispatcher · Orders, `102:76375` | Heading **Orders for Thu 25 Jun**, opening on the board's day. Date picker, Day / Last 4 weeks, search **Shop or outlet id**, All / Carried over / Deferred / Split. Brand/district groups, table and detail rail. Wanted date, ordered load, window, selected day's truck/stop and **Planned arrival**, current status and deferral count. Summary names orders, planned, deferred, carried over and split parts; planned/deferred come from the selected day's own sent plan. |
-| | Selected order | Same frame | Detail is already in the list row: placed time if recorded, wanted date, ordered lines, note, selected-day plan links, published deferral reasons and split original/parts. History links name their plan date. No receipt/replacement ancestry, Plan first or Call button. |
+| Orders `/dispatcher/orders` | Rows and selected order | Dispatcher · Orders, `102:76375` | Heading **Orders for Thu 25 Jun**, opening on the board's day. Date picker, Day / Last 4 weeks, search **Shop or outlet id**, All / Carried over / Deferred / Split. Brand/district groups, table and detail rail. Wanted date, ordered load, window, selected day's truck/stop and **Planned arrival**, current status and deferral count. Summary names orders, planned, deferred, carried over and split parts; planned/deferred come from the selected day's own sent plan, and before it is sent deferred counts the orders still deferred from an earlier one (Q-48). |
+| | Selected order | Same frame | Detail is already in the list row: placed time if recorded, wanted date, ordered lines, note, selected-day plan links, published deferral reasons and split original/parts. History links name their plan date. Each closed visit on a listed day's stop and its answer: "nobody at the shop 03:50 · VEH057 · 3", "brought back to the depot 03:52". An order placed again by Bring them back and on no later sent plan reads **Brought back · waiting for the next plan** in the Status column and the detail, not Placed (Q-46). No receipt/replacement ancestry, Plan first or Call button. |
 | | Skipped lately · 4 weeks | Same frame, lower detail rail | Shops with published deferrals in the 28 dates ending on the selected day; one skip per shop per plan, latest date/reasons and count, under rule 11. Independent of table search/filter. |
 | | Empty day / no search match / no skipped shops | No frame | “No orders for this delivery day.” / “No orders match these filters.” / “No shops skipped in these four weeks.” Clear filters keeps the day. No valid default board day says “Choose a delivery day”; no fallback to a guessed date. |
 | History `/dispatcher/history` | Sent plan, trips and selected stop | Dispatcher · History, `112:78211` | Date picker, up to three latest published dates, All / Late / Short / Returned / Deferred and brand filter. Brand/district cards, one row per trip, static planned timeline with labelled recorded marks. Detail rail: loading, ordered/loaded/handed-over/received lines, earlier closed attempts, problem answers and proof links. No Play, speed buttons or moving replay cursor. |
@@ -90,7 +90,10 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    Thursday has 102 orders; afterwards it has **104**, including four carried over. Last 4 weeks ending Thursday
    has 127 before place, 129 afterwards. Count planned and deferred from that day's own published stop membership
    and deferral ids, never from current order status or a later plan: the manual send gives **5 planned, 99 deferred**.
-   Before Send and after Back to edit those publication counts are zero, with “No sent plan” beside them. A range
+   Before Send and after Back to edit those publication counts are zero, with “No sent plan” beside them; deferred
+   then counts the listed orders still deferred from an earlier sent plan, the rows whose Status reads Deferred, with
+   “on earlier plans” beside it (Q-48): Thursday's four carried-over orders before Send, Friday's 99 after Thursday is
+   sent. The Deferred filter keeps the same rows. A range
    counts distinct order ids across its days and distinct ids in its own publications for each plan count; an order
    may be deferred on one day and planned on another, so those two range counts overlap and are never added.
 3. **One list supplies the table and detail.** Every row carries its ordered lines, note, split original/parts,
@@ -124,7 +127,8 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    received. Do not add a receipt's total order shortfall to those differences again. For an old closed attempt,
    loaded/not delivered comes from its `issue_lines.counted`. A closed stop was handed nothing: its handed over,
    received and receipt short are recorded zeros, never the orders' later counts, even if the orders later travel on
-   Friday, so a trip with a closed shop still reads whole figures (L-13). Use the existing calculators/helpers on the server; screens format, filter by returned
+   Friday, so a trip with a closed shop still reads whole figures, the same handed over as Live day and the driver's
+   Trip done (L-13, Q-43). Use the existing calculators/helpers on the server; screens format, filter by returned
    flags and draw, without calculating business figures.
 
    | History figure | Exact meaning |
@@ -132,6 +136,7 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    | Trips / stops | Trip rows / distinct current stops of this publication. Attempts never add stops. |
    | Stops delivered | Current delivered/refused outcomes with more than zero units handed over. Partial deliveries are marked; a closed or completely refused stop is not delivered. |
    | Finished / partial | Stops with a current outcome / delivered stops with a refusal quantity above zero. |
+   | None delivered / closed | Delivered or refused stops with nothing handed over / stops whose current outcome is closed. The header says them beside stops delivered as Live day and the Dashboard do, "8 / 64 stops delivered · 1 partial · 1 closed" (Q-45). |
    | Late | Current recorded arrival strictly after the saved effective window close; no arrival is unknown, never late from elapsed time alone. |
    | Short | Distinct current stops with any known depot short, refused quantity or receipt short above zero. A not-cold report with no count difference is a problem, not a short quantity. |
    | Returned | Distinct stops with a closed problem answered Bring them back, or a refusal answered Bring them back or Send replacements (015 still sends the refused goods back). Label “Return instructed”; this is not a depot return scan. Earlier retry attempts alone do not make it returned. |
@@ -142,7 +147,9 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    Late/Short/Returned select trips with a matching stop; Deferred shows the deferral list instead of inventing trip
    rows. Brand selects actual stop/order brands; matching a mixed trip keeps its whole row, with nonmatching stops
    labelled rather than silently removed. Missing execution detail makes the affected aggregate null, with its
-   recorded/total coverage, instead of silently counting missing detail as zero. No publication means a separate
+   recorded/total coverage, instead of silently counting missing detail as zero. A stage not recorded yet is said by
+   the lines it is still missing, "Not recorded yet: loaded and handed over (130 of 163 lines)", never by the lines it
+   has; and the header shows loaded and handed over from the lines recorded so far, "4,031 loaded so far" (Q-44). No publication means a separate
    empty state; a publication with no trips has zero trip/stop counts and its genuine deferrals.
 7. **A receipt belongs to its stop.** Use `stopId` as the receipt reference: 015 confirms a stop once and adds no
    receipt id. Show confirmed time, time received by the server, cold answer, line counts and report/decision if any.
@@ -168,7 +175,9 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    date then trip number/id and show all in detail. Otherwise use today's first unfinished trip by saved leave time
    then trip number/id, else today's latest returned trip by back time then trip number/id descending, else No trip
    recorded today. Say Planned, Loading, Ready or Returned with its recorded time
-   as applicable. “Not recorded out” means no such out trip, not physically at the depot. Never guess a permanent
+   as applicable. “Not recorded out” means a vehicle on today's sent plan with a trip past its saved leave time that
+   never left, and no out trip (Q-42): never one that went out and came back, nor one with no trip today, and never a
+   claim that it stands at the depot. Never guess a permanent
    driver. Today's workshop reason is independent of trip state; an out trip remains visible even if someone
    archived its vehicle. No no-signal minutes or ETA.
 10. **Fuel (D-86).** The selected calendar day's ISO year/week picks Mon–Sat `fuel_log` rows for those vehicle ids.
@@ -226,7 +235,7 @@ AC-9, AC-19, AC-25 and AC-26 are removed with their excluded work; 33 criteria r
 - [x] **AC-1** When any lookup GET is called without the required session/role/depot, the system shall return the existing permission errors and write nothing.
 - [x] **AC-2** When lookup lists or a proof request could name another depot, the system shall reveal no records from that depot, including inline details and photo links.
 - [x] **AC-3** When a date, range or photo id is malformed, the system shall return `invalid_input` without changing records.
-- [x] **AC-4** When Orders opens on the seeded board day, the system shall show Thursday's 102 orders before placement and 104 at README step 3, including four carried over; Send shall show five planned and 99 deferred from Thursday's plan, and Back to edit shall remove those publication counts.
+- [x] **AC-4** When Orders opens on the seeded board day, the system shall show Thursday's 102 orders before placement and 104 at README step 3, including four carried over; Send shall show five planned and 99 deferred from Thursday's plan, and Back to edit shall remove those publication counts, leaving the four orders Wednesday's plan deferred (Q-48).
 - [x] **AC-5** When Last 4 weeks ends on Thu 25 Jun, the system shall union 29 May–25 Jun delivery-day lists, counting each order once, for 127 before placement and 129 afterwards.
 - [x] **AC-6** When Orders search or Carried over / Deferred / Split is selected, the system shall filter its already-returned rows in the browser with stable order, unchanged summary and no additional API search or detail request.
 - [x] **AC-7** When an order is split and later joined back, the system shall count only live leaf orders, expose the original through detail, and deduplicate inherited deferrals by plan without inventing orders.

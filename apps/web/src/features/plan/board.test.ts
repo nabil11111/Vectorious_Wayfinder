@@ -29,7 +29,7 @@ const MIXED: DraftPlan = { mixBrands: true, trips: [], deferrals: [] };
 // A board open for planning with no trip on it yet, for a depot, and its plan once saved.
 const boardOf = (depot: string, planId: string | null = null, revision = 0) => PlanBoard.parse({
   depot, demoDay: 1, day: { date: '2026-06-25', cutoffAt: '2026-06-24T10:30:00.000Z', open: true },
-  plan: { mixBrands: planId !== null, trips: [], deferrals: [], id: planId, revision, status: 'draft', savedAt: null, sentAt: null, canUnsend: false },
+  plan: { mixBrands: planId !== null, trips: [], deferrals: [], id: planId, revision, status: 'draft', savedAt: null, sentAt: null, canUnsend: false, lockedReason: null },
   dropped: [], check: null, orders: [], shops: [], vehicles: [], drivers: [], figures: null, counts: null, suggestion: null,
 });
 

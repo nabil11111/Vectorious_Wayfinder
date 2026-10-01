@@ -33,10 +33,17 @@ export type LookupDeferral = z.infer<typeof LookupDeferral>;
 const OrderedLine = z.object({ lineId: z.uuid(), productId: z.string(), name: z.string(), unit: z.string(), quantity: Count });
 export const LookupOrderDetail = z.object({ id: z.uuid(), wantedDate: Day, placedAt: Moment.nullable(), temp: Temp, status: OrderStatus,
   lines: z.array(OrderedLine), note: z.string().nullable(), load: Load });
+// Each time nobody was at the shop on that day's stop, with the dispatcher's answer (Q-46).
+const ClosedVisit = z.object({ issueId: z.uuid(), at: Moment, decision: IssueDecision.nullable(), decidedAt: Moment.nullable() });
 export const LookupOrderDay = z.object({ date: Day, carriedOver: z.boolean(), publication: LookupPublication.nullable(),
-  assignment: z.object({ tripId: z.uuid(), vehicleId: z.string(), tripNo: Count, stopId: z.uuid(), seq: Count, plannedArrival: Moment }).nullable(),
+  assignment: z.object({ tripId: z.uuid(), vehicleId: z.string(), tripNo: Count, stopId: z.uuid(), seq: Count, plannedArrival: Moment,
+    closed: z.array(ClosedVisit) }).nullable(),
   deferral: Reason.nullable() });
-export const LookupOrderRow = LookupOrderDetail.extend({ outlet: LookupShop, splitFrom: z.uuid().nullable(),
+// broughtBack: placed again by "Bring them back" at a closed shop and on no later sent plan yet (Q-46), as the shop's
+// own Today says it. deferredEarlier: deferred by an earlier sent plan and listed on a day with no sent plan yet, so it
+// counts as deferred there, as its row reads (Q-48).
+export const LookupOrderRow = LookupOrderDetail.extend({ outlet: LookupShop, splitFrom: z.uuid().nullable(), broughtBack: z.boolean(),
+  deferredEarlier: z.boolean(),
   original: LookupOrderDetail.nullable(), parts: z.array(LookupOrderDetail), days: z.array(LookupOrderDay),
   deferralHistory: z.array(Reason.extend({ planId: z.uuid(), date: Day })), timesDeferred: Count });
 export type LookupOrderRow = z.infer<typeof LookupOrderRow>;
@@ -54,8 +61,10 @@ export const LookupPhoto = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('issue'), issueId: z.uuid(), takenAt: Moment }),
 ]);
 export type LookupPhoto = z.infer<typeof LookupPhoto>;
-// Coverage is in lines: an incomplete measure is null; a genuinely empty set is zero with 0/0 coverage.
-export const HistoryMeasure = z.object({ units: Count.nullable(), known: Count, total: Count });
+// Coverage is in lines: an incomplete measure is null; a genuinely empty set is zero with 0/0 coverage. missing is the
+// lines not recorded yet and soFar the units of the lines that are (Q-44), so a day with a trip still to run reads
+// "4,031 loaded so far" and "not recorded yet (130 of 163 lines)".
+export const HistoryMeasure = z.object({ units: Count.nullable(), known: Count, total: Count, missing: Count, soFar: Count });
 export type HistoryMeasure = z.infer<typeof HistoryMeasure>;
 export const HistoryStages = z.object({ ordered: Count, loaded: HistoryMeasure, handedOver: HistoryMeasure, received: HistoryMeasure,
   depotShort: HistoryMeasure, refused: HistoryMeasure, receiptShort: HistoryMeasure, notDelivered: HistoryMeasure });
@@ -82,8 +91,10 @@ export const HistoryStop = z.object({ id: z.uuid(), seq: Count, outlet: LookupSh
   lines: z.array(HistoryLine), stages: HistoryStages, flags: HistoryFlags, receipt: HistoryReceipt.nullable(),
   proof: LookupPhoto.nullable(), problems: z.array(HistoryProblem), attempts: z.array(HistoryClosedAttempt) });
 export type HistoryStop = z.infer<typeof HistoryStop>;
+// noGoods and closed are what the delivered count leaves out, as Live day counts them (Q-45): stops delivered or refused
+// with nothing handed over, and stops nobody was at.
 export const HistoryCounts = z.object({ trips: Count, stops: Count, orders: Count, delivered: Count, finished: Count, partial: Count,
-  late: Count, short: Count, returned: Count, deferred: Count, confirmations: Count, receivedOrders: Count, stages: HistoryStages });
+  noGoods: Count, closed: Count, late: Count, short: Count, returned: Count, deferred: Count, confirmations: Count, receivedOrders: Count, stages: HistoryStages });
 export type HistoryCounts = z.infer<typeof HistoryCounts>;
 export const HistoryTrip = z.object({ tripId: z.uuid(), planId: z.uuid(), date: Day, vehicleId: z.string(), vehicleType: z.enum(['truck', 'van']),
   vehicleTemp: z.enum(['reefer', 'ambient']), archived: z.boolean(), tripNo: Count, driver: z.object({ id: z.uuid(), name: z.string() }).nullable(),
@@ -108,6 +119,9 @@ export type LookupFuel = z.infer<typeof LookupFuel>;
 export const LookupVehicle = z.object({ id: z.string(), type: z.enum(['truck', 'van']), temp: z.enum(['reefer', 'ambient']),
   group: z.enum(['reefer_trucks', 'dry_trucks', 'vans']), weightCapKg: z.number(), volumeCapM3: z.number(), fuelType: z.string(),
   kmPerL: z.number(), weeklyFuelQuotaL: z.number(), archivedAt: Moment.nullable(), offReason: z.string().nullable(), recordedOut: z.boolean(),
+  // Not recorded out (Q-42): on today's sent plan with a trip past its leave time that never left, and not out now. A
+  // vehicle that went out and came back, or has no trip today, is not one.
+  notRecordedOut: z.boolean(),
   selectedTrip: LookupTripRef.nullable(), outTrips: z.array(LookupTripRef), todayTrips: z.array(LookupTripRef), recentTrips: z.array(LookupTripRef),
   fuel: LookupFuel.nullable() });
 export type LookupVehicle = z.infer<typeof LookupVehicle>;

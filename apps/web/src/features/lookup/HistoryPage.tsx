@@ -7,6 +7,7 @@ import { useMe } from '@/features/auth/api';
 import { DepotHeading } from '@/features/dispatcher/parts/DepotHeading';
 import { partId, useScope } from '@/features/dispatcher/scope';
 import { useOnline } from '@/features/live/operations';
+import { deliveredExtras } from '@/features/live/words';
 import { plainButton } from '@/features/plan/parts/look';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
@@ -260,12 +261,13 @@ function ClearFilters({ onClick }: { onClick: () => void }) {
 }
 
 // The whole publication's own counts, never the filtered rows (rule 6): trips, stops, orders, stops delivered of all
-// stops with the partial ones, late, short, return instructed, deferred orders and shop confirmations. On both depots
+// stops with the partial, none delivered and closed ones as Live day says them (Q-45), late, short, return instructed, deferred orders and shop confirmations. On both depots
 // together they are the two sent plans' added up.
 function summaryOf(c: HistoryCounts): Figure[] {
   return [
     { value: whole(c.trips), label: c.trips === 1 ? 'trip' : 'trips' },
-    { value: `${whole(c.delivered)} / ${whole(c.stops)}`, label: `stops delivered${c.partial ? ` · ${whole(c.partial)} partial` : ''}` },
+    { value: `${whole(c.delivered)} / ${whole(c.stops)}`,
+      label: ['stops delivered', ...deliveredExtras({ partialStops: c.partial, noGoodsStops: c.noGoods, closedStops: c.closed })].join(' · ') },
     { value: whole(c.orders), label: c.orders === 1 ? 'order on trips' : 'orders on trips' },
     { value: whole(c.late), label: 'late', tone: c.late > 0 ? 'warn' : undefined },
     { value: whole(c.short), label: 'short', tone: c.short > 0 ? 'bad' : undefined },
@@ -277,7 +279,9 @@ function summaryOf(c: HistoryCounts): Figure[] {
 }
 
 // The publication's units at each stage that is recorded, and in one line the stages not recorded yet with how many of
-// their lines are (rule 6): a stage never becomes a zero it did not record.
+// their lines are still missing (rule 6): a stage never becomes a zero it did not record. Loaded and handed over, the
+// day's "how much went out", show what their recorded lines add up to so far until every line is recorded (Q-44).
+const SO_FAR = new Set(['loaded', 'handed over']);
 function stagesOf(counts: HistoryCounts) {
   const s = counts.stages;
   const stages: [string, typeof s.loaded][] = [
@@ -286,7 +290,8 @@ function stagesOf(counts: HistoryCounts) {
   ];
   const figures: Figure[] = [
     { value: whole(s.ordered), label: 'ordered' },
-    ...stages.flatMap(([label, measure]) => (measure.units === null ? [] : [{ value: whole(measure.units), label }])),
+    ...stages.flatMap(([label, measure]) => (measure.units !== null ? [{ value: whole(measure.units), label }]
+      : SO_FAR.has(label) ? [{ value: whole(measure.soFar), label: `${label} so far` }] : [])),
   ];
   return { figures, unrecorded: unrecordedWords(stages) };
 }

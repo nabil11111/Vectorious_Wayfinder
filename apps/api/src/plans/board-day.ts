@@ -35,3 +35,8 @@ export function dayLabel(date: string): string {
 // noise, so 35.91 of 38, exactly 94.5%, is 95 and not 94.
 export const percent = (value: number, total: number) => total ? Math.round(Number(((value * 100) / total).toFixed(6))) : 0;
 
+// Why a sent plan cannot go back to edit (Q-19), in the words Back to edit is refused with, so View plan can say it
+// where the button was: a truck started loading, or the plan's day has left the board. Sending a day that has left
+// the board is refused in the same words.
+export const LOADING_STARTED = 'Loading has started, so this plan cannot go back to edit.';
+export const dayMovedOn = (date: string, unsend: boolean) => `Trucks for ${dayLabel(date)} leave from 03:30, so its plan can no longer ${unsend ? 'go back to edit' : 'be sent'}.`;

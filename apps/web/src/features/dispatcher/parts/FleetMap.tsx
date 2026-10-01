@@ -35,7 +35,7 @@ const pathOf = (points: readonly (readonly [number, number])[]) => points.map((p
 // The map's view is the depot the read is for, the one the dispatcher chose (D-93), or Both, which draws both depots
 // together (spec 021). A view the shapes do not have gets no drawing, and says so.
 const viewOf = (view: string): MapView | null => (view === 'Peliyagoda' || view === 'Kandy' || view === 'Both' ? view : null);
-type Drawing = MapDrawing & { ocean: readonly [number, number] };
+type Drawing = MapDrawing & { ocean: readonly [number, number] | null };
 
 // The dashboard's district map (spec 019), the card right of Needs you on Dispatcher · Dashboard (53:11540), as the
 // design's map-fleet-overview.js draws it, with the live day's numbers (D-92). From 640 wide it is the frame's card
@@ -154,7 +154,7 @@ function ActiveChip({ active, style, className }: { active: string; style?: CSSP
 }
 
 // The 340 by 280 map in the script's order: sea, districts, lines, arrows, the trip badges, district names and line
-// ends, the depot and "INDIAN OCEAN" last.
+// ends, the depot and "INDIAN OCEAN" last, where the view has sea enough for it.
 function MapPicture({ drawing, read, style, className }: { drawing: Drawing | null; read: MapRead; style?: CSSProperties; className?: string }) {
   const { width, height } = FLEET_MAP_SIZE;
   const trips = drawing?.arrows.map((arrow) => `${truckName(arrow)} to ${arrow.district}`) ?? [];
@@ -194,7 +194,7 @@ function MapPicture({ drawing, read, style, className }: { drawing: Drawing | nu
               {place.label && <text x={n2(place.label[0])} y={n2(baseline(place.label[1], 9))} fontSize={9} fontWeight={600} className="fill-map-heading">{place.name}</text>}
             </g>
           ))}
-          <text x={drawing.ocean[0]} y={n2(baseline(drawing.ocean[1], 7))} fontSize={7} className="fill-map-ocean">INDIAN OCEAN</text>
+          {drawing.ocean && <text x={drawing.ocean[0]} y={n2(baseline(drawing.ocean[1], 7))} fontSize={7} className="fill-map-ocean">INDIAN OCEAN</text>}
         </>
       ) : <text x={width / 2} y={height / 2} textAnchor="middle" fontSize={11} className="fill-map-muted">No district map for {read.name}.</text>}
     </svg>

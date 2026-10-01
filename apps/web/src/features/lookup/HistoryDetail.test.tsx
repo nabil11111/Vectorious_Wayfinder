@@ -14,7 +14,8 @@ const at = (hhmm: string, day = '25') => new Date(`2026-06-${day}T${hhmm}:00+05:
 const shop = (outletId: string, name: string) => ({ id: outletId, name, brand: 'Fresh' as const, district: 'Colombo', windowOpen: '05:00:00', windowClose: '07:30:00', mallWindow: null });
 const measure = (values: (number | null)[]): HistoryMeasure => {
   const known = values.filter((value): value is number => value !== null);
-  return { units: known.length === values.length ? known.reduce((sum, value) => sum + value, 0) : null, known: known.length, total: values.length };
+  const soFar = known.reduce((sum, value) => sum + value, 0);
+  return { units: known.length === values.length ? soFar : null, known: known.length, total: values.length, missing: values.length - known.length, soFar };
 };
 const stagesOf = (lines: HistoryLine[]) => ({
   ordered: lines.reduce((sum, line) => sum + line.quantity, 0), loaded: measure(lines.map((line) => line.loaded)), handedOver: measure(lines.map((line) => line.delivered)),
@@ -101,8 +102,9 @@ it('History shows each stop\'s own shop confirmation and says one that is not th
   expect(text).toContain('3 of 4 Dry carton at the dock');
   expect(text).toContain('answered Go short · Ruwan 02:35');
   expect(text).toContain('answered Bring them back · Ruwan 05:45');
-  // The trip's stage totals: received is not recorded for the refusing stop's line, so it is said with its coverage.
-  expect(text).toContain('Received not recorded · 3 of 4 lines');
+  // The trip's stage totals: received is not recorded for the refusing stop's line, so it says the one line it is
+  // missing, never the three it has (Q-44).
+  expect(text).toContain('Received not recorded on 1 of 4 lines');
   expect(text).toContain('Handed over 69');
   expect(text).not.toMatch(/Signed|signature/i);
 });

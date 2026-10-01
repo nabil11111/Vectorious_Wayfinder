@@ -12,7 +12,7 @@ import { indexOf } from './lookup';
 const ORDER = '00000000-0000-4000-8000-000000000001';
 const BOARD = PlanBoard.parse({
   depot: 'Peliyagoda', demoDay: 1, day: { date: '2026-06-25', cutoffAt: '2026-06-24T10:30:00.000Z', open: true },
-  plan: { mixBrands: false, trips: [], deferrals: [], id: null, revision: 0, status: 'draft', savedAt: null, sentAt: null, canUnsend: false },
+  plan: { mixBrands: false, trips: [], deferrals: [], id: null, revision: 0, status: 'draft', savedAt: null, sentAt: null, canUnsend: false, lockedReason: null },
   dropped: [], check: null,
   orders: [{
     id: ORDER, outletId: 'OUT020', temp: 'dry', deliveryDate: '2026-06-25', lines: [{ productId: 'style-bags', name: 'Bags', unit: 'box', quantity: 3 }],

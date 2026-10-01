@@ -33,7 +33,7 @@ const TRIPS: DraftTrip[] = [
 ];
 const BOARD = PlanBoard.parse({
   depot: 'Peliyagoda', demoDay: 1, day: { date: '2026-06-25', cutoffAt: '2026-06-24T10:30:00.000Z', open: true },
-  plan: { mixBrands: false, trips: TRIPS, deferrals: [], id: uuid(100), revision: 3, status: 'draft', savedAt: '2026-06-24T10:31:00.000Z', sentAt: null, canUnsend: false },
+  plan: { mixBrands: false, trips: TRIPS, deferrals: [], id: uuid(100), revision: 3, status: 'draft', savedAt: '2026-06-24T10:31:00.000Z', sentAt: null, canUnsend: false, lockedReason: null },
   dropped: [],
   check: {
     ok: true, problems: [], vehicles: [],

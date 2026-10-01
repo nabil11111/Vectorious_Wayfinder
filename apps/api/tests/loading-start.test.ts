@@ -119,6 +119,22 @@ it("AC-9 starts VEH035: loading, its revision up, the audit row and the loading 
   expect(await heldRows()).toEqual(before);
 });
 
+// Q-19: once a truck started loading, View plan dropped "Back to edit" and said nothing, and later that morning nothing
+// either. The board says why the plan cannot go back to edit in the server's own sentence, the one Back to edit would
+// be refused with, whatever the board's day is by then.
+it('Q-19 a sent plan that cannot go back to edit says why, in the sentence the refusal gives', async () => {
+  const { truck, plan } = await sent();
+  expect((await board()).plan).toMatchObject({ canUnsend: true, lockedReason: null });
+  answeredTruck(await loader.start(truck, plan), 'VEH035');
+  const locked = await board(), refused = await unsend(locked);
+  expect(code(refused)).toEqual([409, 'loading_started']);
+  expect(locked.plan).toMatchObject({ canUnsend: false, lockedReason: refused.body.error.message });
+  expect(locked.plan.lockedReason).toBe('Loading has started, so this plan cannot go back to edit.');
+  // Past 03:30 the board is on Friday, and the plan still says loading started.
+  freeze(THU, 11 * 60 + 26);
+  expect((await board()).plan).toMatchObject({ canUnsend: false, lockedReason: 'Loading has started, so this plan cannot go back to edit.' });
+});
+
 // Holds the depot's row as a plan write does, so requests sent meanwhile queue behind it in the order they came.
 async function holdDepot() {
   let release!: () => void;
