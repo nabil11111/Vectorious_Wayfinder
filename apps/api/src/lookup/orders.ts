@@ -1,5 +1,5 @@
 import { DeferralCode, LookupOrders, type LookupOrderRow, type LookupOrdersQuery } from '@wayfinder/contracts';
-import { and, between, desc, eq, inArray, lte, or } from 'drizzle-orm';
+import { and, between, desc, eq, inArray, lte, notInArray, or } from 'drizzle-orm';
 import { deferrals, orderLines, orders, outlets, plans, products, stopOrders, stops, trips } from '../db/schema';
 import { depotDate, depotInstant, depotMinutes } from '../lib/clock';
 import type { DepotCaller } from '../middleware/auth';
@@ -22,7 +22,7 @@ export function getLookupOrders(caller: DepotCaller, query: LookupOrdersQuery): 
     const deferred = planIds.length ? await tx.select().from(deferrals).where(inArray(deferrals.planId, planIds)) : [];
     const named = [...new Set([...assigned.map(row => row.orderId), ...deferred.map(row => row.orderId)])];
     const candidates = await tx.select({ order: orders, shop: outlets }).from(orders).innerJoin(outlets, eq(outlets.id, orders.outletId)).where(and(
-      eq(outlets.depotId, caller.depotId), inArray(orders.status, ['placed', 'planned', 'deferred', 'delivered', 'received']),
+      eq(outlets.depotId, caller.depotId), notInArray(orders.status, ['draft', 'split', 'cancelled']),
       or(between(orders.deliveryDate, from, date), named.length ? inArray(orders.id, named) : undefined,
         and(inArray(orders.status, ['placed', 'deferred']), lte(orders.deliveryDate, date)))));
     const admitted = candidates.map(row => ({ ...row, days: days.filter(day => {
