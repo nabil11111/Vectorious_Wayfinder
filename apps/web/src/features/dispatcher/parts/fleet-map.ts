@@ -1,4 +1,5 @@
 import { BOTH_DEPOTS, type OperationsDay, type OperationsMap, type OperationsMapDistrict } from '@wayfinder/contracts';
+import type { MapView } from '@/lib/map/fleet-map-shapes';
 import { clockTime, whole } from '@/features/loader/words';
 import { countOf } from '@/features/store/words';
 import { angleAt, pointAt } from '@/lib/map/geometry';
@@ -35,6 +36,11 @@ export const LABEL_OFFSETS: Readonly<Record<string, Point>> = {
   Galle: [-31, 14], Matara: [11, -4], Kandy: [22, -16], Kegalle: [-26, 9], 'Nuwara Eliya': [20, 19], Badulla: [18, -2],
 };
 export const DEPOT_LABEL_OFFSETS: Readonly<Record<string, Point>> = { Peliyagoda: [-91, -16] };
+
+// Where "INDIAN OCEAN" starts in each view: the design's place off the south-west coast, which is sea in Peliyagoda's
+// view and in Both's. Kandy's view is closer in on the hill country and keeps only a strip of the west coast's sea, so
+// its label sits in the frame's bottom-left corner, which is sea, clear of the coast and the frame's edge.
+export const OCEAN_LABEL: Readonly<Record<MapView, Point>> = { Peliyagoda: [20, 247], Kandy: [4, 267], Both: [20, 247] };
 
 // The design's spacing of the arrows on one line (rule 2): one alone at 55% of the line's length, two or more evenly
 // from 24% to 78%. Each sits on the first of 101 samples along the line that reaches its share of the length, turned

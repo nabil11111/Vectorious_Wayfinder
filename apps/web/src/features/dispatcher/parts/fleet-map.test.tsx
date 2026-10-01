@@ -6,7 +6,7 @@ import { meKey } from '@/features/auth/api';
 import { FLEET_MAP } from '@/lib/map/fleet-map-shapes';
 import { switchDepotMutation } from '../depots';
 import { FleetMap } from './FleetMap';
-import { LABEL_OFFSETS, arrowSpots, bothMapRead, deliveredList, drawingOf, liveLine, mapReadOf, statsOf, type MapShapes } from './fleet-map';
+import { LABEL_OFFSETS, OCEAN_LABEL, arrowSpots, bothMapRead, deliveredList, drawingOf, liveLine, mapReadOf, statsOf, type MapShapes } from './fleet-map';
 
 // Spec 019's card from plain reads: the header and its numbers (AC-3), the arrows and lines (AC-4) and Stores delivered
 // (AC-5), spec 020's view switch and the chosen depot's map (AC-6), and spec 021's Both (AC-5, AC-7). A trip here needs only what the map reads of it:
@@ -77,7 +77,7 @@ const SHAPES: MapShapes = {
 const shareAlong = (points: readonly Point[], at: readonly [number, number]) =>
   Math.hypot(at[0] - points[0][0], at[1] - points[0][1]) / Math.hypot(points[40][0] - points[0][0], points[40][1] - points[0][1]);
 // The card as the dashboard draws it, inside the app's query client, which its view switch uses.
-const card = (day: OperationsDay, qc = new QueryClient()) => renderToStaticMarkup(<QueryClientProvider client={qc}><FleetMap read={mapReadOf(day)} /></QueryClientProvider>);
+const card = (day: OperationsDay, qc = new QueryClient()) => renderToStaticMarkup(<QueryClientProvider client={qc}><FleetMap view={day.depot.id} read={mapReadOf(day)} /></QueryClientProvider>);
 // The wide card, as from 640 wide; the narrow one draws the same map again below it.
 const wide = (markup: string) => markup.slice(0, markup.indexOf('data-layout="narrow"'));
 const narrow = (markup: string) => markup.slice(markup.indexOf('data-layout="narrow"'));
@@ -237,7 +237,7 @@ describe('the view switch and the chosen depot (spec 020)', () => {
   });
 
   it('AC-7 the card on both depots\' read draws the Both view with Both chosen, at every width', () => {
-    const markup = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><FleetMap read={bothMapRead([dayWith([]), dayWith([], {}, 'Kandy')])} /></QueryClientProvider>);
+    const markup = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><FleetMap view="Both" read={bothMapRead([dayWith([]), dayWith([], {}, 'Kandy')])} /></QueryClientProvider>);
     for (const layout of [wide(markup), narrow(markup)]) {
       expect(views(layout)).toEqual([['Peliyagoda', 'button'], ['Kandy', 'button'], ['Both', 'chosen']]);
       expect(layout).toMatch(/<button[^>]*aria-pressed="true"[^>]*class="[^"]*bg-map-chosen[^"]*"[^>]*>Both<\/button>/);
@@ -320,5 +320,64 @@ describe('both depots together (spec 021)', () => {
     expect(bothMapRead([one, other]).map.districts.find((row) => row.district === 'Colombo')).toEqual({ district: 'Colombo', shops: 28, shopsDelivered: 3 });
     const unrecorded = { ...one, map: { shops: 4, districts: [{ district: 'Colombo', shops: 4, shopsDelivered: null }] } };
     expect(bothMapRead([one, unrecorded]).map.districts.find((row) => row.district === 'Colombo')).toEqual({ district: 'Colombo', shops: 28, shopsDelivered: null });
+  });
+});
+
+// The vertices of the shapes module's district paths, ring by ring (M, L, H, V and Z, absolute and relative).
+function ringsOf(d: string): Point[][] {
+  const tokens = d.match(/[A-Za-z]|-?(?:\d+\.?\d*|\.\d+)/g) ?? [];
+  const rings: Point[][] = [];
+  let at: Point = [0, 0];
+  let command = '';
+  for (let i = 0; i < tokens.length;) {
+    if (/[A-Za-z]/.test(tokens[i]!)) {
+      command = tokens[i++]!;
+      if (command === 'Z' || command === 'z') { at = rings[rings.length - 1]![0]!; continue; }
+    }
+    const [baseX, baseY] = command === command.toLowerCase() ? at : [0, 0];
+    const next = () => Number(tokens[i++]);
+    switch (command.toUpperCase()) {
+      case 'M': at = [baseX + next(), baseY + next()]; rings.push([at]); command = command === 'm' ? 'l' : 'L'; break;
+      case 'L': at = [baseX + next(), baseY + next()]; rings[rings.length - 1]!.push(at); break;
+      case 'H': at = [baseX + next(), at[1]]; rings[rings.length - 1]!.push(at); break;
+      case 'V': at = [at[0], baseY + next()]; rings[rings.length - 1]!.push(at); break;
+      default: throw new Error(`Unexpected path command ${command}`);
+    }
+  }
+  return rings;
+}
+const inRing = ([x, y]: Point, ring: Point[]) => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]!, [xj, yj] = ring[j]!;
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
+
+describe('the sea\'s name (Q-10)', () => {
+  // "INDIAN OCEAN" in 7 px Inter capitals is about 51 px long, on a 10 px line from the y the card puts it at.
+  const LABEL = { width: 52, height: 10 };
+
+  it('Q-10 "INDIAN OCEAN" sits wholly on the sea in every view, inside the frame', () => {
+    for (const view of ['Peliyagoda', 'Kandy', 'Both'] as const) {
+      const [x, y] = OCEAN_LABEL[view];
+      expect([x >= 0, y >= 0, x + LABEL.width <= 340, y + LABEL.height <= 280]).toEqual([true, true, true, true]);
+      const rings = FLEET_MAP[view].districts.flatMap((district) => ringsOf(district.d));
+      const land: Point[] = [];
+      for (let dy = 0; dy <= LABEL.height; dy += 1) {
+        for (let dx = 0; dx <= LABEL.width; dx += 1) if (rings.some((ring) => inRing([x + dx, y + dy], ring))) land.push([x + dx, y + dy]);
+      }
+      expect({ view, land }).toEqual({ view, land: [] });
+    }
+  });
+
+  it('Q-10 the card writes it at its own view\'s place', () => {
+    const at = (markup: string) => /<text x="([^"]+)" y="([^"]+)" font-size="7" class="fill-map-ocean">INDIAN OCEAN<\/text>/.exec(markup)?.slice(1).map(Number);
+    const kandy = at(wide(card(dayWith([], {}, 'Kandy'))));
+    expect(kandy?.[0]).toBe(OCEAN_LABEL.Kandy[0]);
+    expect(kandy![1]).toBeGreaterThan(OCEAN_LABEL.Kandy[1]);
+    expect(kandy![1]).toBeLessThan(OCEAN_LABEL.Kandy[1] + LABEL.height);
+    expect(at(wide(card(dayWith([]))))?.[0]).toBe(OCEAN_LABEL.Peliyagoda[0]);
   });
 });

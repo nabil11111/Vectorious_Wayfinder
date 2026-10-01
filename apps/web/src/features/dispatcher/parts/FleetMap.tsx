@@ -1,11 +1,13 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { BOTH_DEPOTS } from '@wayfinder/contracts';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ICON } from '@/features/live/parts/icons';
 import { CARD } from '@/features/live/parts/ui';
 import { truckName } from '@/features/loader/words';
-import { FLEET_MAP, FLEET_MAP_SIZE } from '@/lib/map/fleet-map-shapes';
+import { FLEET_MAP, FLEET_MAP_SIZE, type MapView } from '@/lib/map/fleet-map-shapes';
 import { cn } from '@/lib/utils';
 import { useSwitchDepot } from '../depots';
-import { CARD_SIZE, VIEWS, deliveredList, drawingOf, liveLine, statsOf, type MapDrawing, type MapRead, type MapShapes } from './fleet-map';
+import { CARD_SIZE, OCEAN_LABEL, VIEWS, deliveredList, drawingOf, liveLine, statsOf, type MapDrawing, type MapRead } from './fleet-map';
 
 // One of the frame's pixels. The wide card sets it to its own width over 520, so it is the frame scaled to its column
 // and never scrolls sideways, up to one and a half times the frame; the narrow card sets it to 1px.
@@ -32,14 +34,18 @@ const pathOf = (points: readonly (readonly [number, number])[]) => points.map((p
 
 // The map's view is the depot the read is for, the one the dispatcher chose (D-93), or Both, which draws both depots
 // together (spec 021). A view the shapes do not have gets no drawing, and says so.
-const shapesOf = (view: string): MapShapes | null => (view === 'Peliyagoda' || view === 'Kandy' || view === 'Both' ? FLEET_MAP[view] : null);
+const viewOf = (view: string): MapView | null => (view === 'Peliyagoda' || view === 'Kandy' || view === 'Both' ? view : null);
+type Drawing = MapDrawing & { ocean: readonly [number, number] };
 
 // The dashboard's district map (spec 019), the card right of Needs you on Dispatcher · Dashboard (53:11540), as the
 // design's map-fleet-overview.js draws it, with the live day's numbers (D-92). From 640 wide it is the frame's card
-// scaled to its column; below that its parts stack, the list under the map. Hover details are not built.
-export function FleetMap({ read }: { read: MapRead }) {
-  const shapes = shapesOf(read.view);
-  const drawing = shapes && drawingOf(read, shapes);
+// scaled to its column; below that its parts stack, the list under the map. Hover details are not built. view is the
+// depot on show, or Both; read is what the card draws, null until every depot's day is read, and failed says one could
+// not be.
+export function FleetMap({ view, read, failed = false }: { view: string; read: MapRead | null; failed?: boolean }) {
+  if (!read) return <WaitingMap view={view} failed={failed} />;
+  const mapView = viewOf(read.view);
+  const drawing: Drawing | null = mapView && { ...drawingOf(read, FLEET_MAP[mapView]), ocean: OCEAN_LABEL[mapView] };
   const list = deliveredList(read.map);
   const stats = statsOf(read);
   const last = VIEWS[VIEWS.length - 1];
@@ -94,6 +100,29 @@ export function FleetMap({ read }: { read: MapRead }) {
   );
 }
 
+// The card before its map can be drawn: a day still on its way, or one that could not be read. The drawing and its
+// figures need every depot's day, but the Map view switch stays, as it is the only depot switch below 1280 wide.
+function WaitingMap({ view, failed }: { view: string; failed: boolean }) {
+  return (
+    <section aria-label="District map" className={cn(CARD, 'px-4 pt-[15px] pb-4')} style={{ '--u': '1px' } as CSSProperties}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
+        {failed ? <h2 className="font-sans text-map-title" style={type(14, 600)}>District map</h2> : <Skeleton className="h-3.5 w-24 rounded-full" />}
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          <span className="text-map-muted" style={type(9)}>Map view</span>
+          <ViewSwitch depot={view} />
+        </div>
+      </div>
+      {failed ? (
+        <p className="mt-3 text-xs leading-4 text-muted-foreground">{view === BOTH_DEPOTS ? 'The map shows once both depots\' days are read.' : 'The map shows once the day is read.'}</p>
+      ) : (
+        <div role="status" aria-label="Loading the district map" className="mt-3">
+          <Skeleton className="aspect-[340/280] w-full rounded-[10px]" />
+        </div>
+      )}
+    </section>
+  );
+}
+
 // "Map view": the view the card draws chosen, and the others buttons that switch every page to them, as the top bar's
 // switch does (D-93), Both included (spec 021). This is how a dispatcher switches below 1280 wide, where the top bar
 // hides its switch. A button centres its words, so the box puts them where the frame does, 7 px from the top.
@@ -126,7 +155,7 @@ function ActiveChip({ active, style, className }: { active: string; style?: CSSP
 
 // The 340 by 280 map in the script's order: sea, districts, lines, arrows, the trip badges, district names and line
 // ends, the depot and "INDIAN OCEAN" last.
-function MapPicture({ drawing, read, style, className }: { drawing: MapDrawing | null; read: MapRead; style?: CSSProperties; className?: string }) {
+function MapPicture({ drawing, read, style, className }: { drawing: Drawing | null; read: MapRead; style?: CSSProperties; className?: string }) {
   const { width, height } = FLEET_MAP_SIZE;
   const trips = drawing?.arrows.map((arrow) => `${truckName(arrow)} to ${arrow.district}`) ?? [];
   const words = `${read.whose} districts on a schematic map. ${trips.length ? `On the road: ${trips.join(', ')}.` : 'No truck on the road.'}`;
@@ -165,7 +194,7 @@ function MapPicture({ drawing, read, style, className }: { drawing: MapDrawing |
               {place.label && <text x={n2(place.label[0])} y={n2(baseline(place.label[1], 9))} fontSize={9} fontWeight={600} className="fill-map-heading">{place.name}</text>}
             </g>
           ))}
-          <text x={20} y={n2(baseline(247, 7))} fontSize={7} className="fill-map-ocean">INDIAN OCEAN</text>
+          <text x={drawing.ocean[0]} y={n2(baseline(drawing.ocean[1], 7))} fontSize={7} className="fill-map-ocean">INDIAN OCEAN</text>
         </>
       ) : <text x={width / 2} y={height / 2} textAnchor="middle" fontSize={11} className="fill-map-muted">No district map for {read.name}.</text>}
     </svg>

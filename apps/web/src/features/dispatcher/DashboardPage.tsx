@@ -12,7 +12,7 @@ import { plainButton } from '@/features/plan/parts/look';
 import { reasonOf } from '@/features/store/words';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
-import { MapSkeleton, TilesSkeleton, TrucksSkeleton } from './parts/DashboardSkeleton';
+import { TilesSkeleton, TrucksSkeleton } from './parts/DashboardSkeleton';
 import { FleetMap } from './parts/FleetMap';
 import { bothMapRead, mapReadOf } from './parts/fleet-map';
 import { NeedsYouCard } from './parts/NeedsYouCard';
@@ -28,7 +28,7 @@ import { useScope } from './scope';
 // read, the lists hold both depots' rows, and a depot whose read failed says so with Try again while the other's rows
 // stay.
 export function DashboardPage() {
-  const { depots, both } = useScope();
+  const { scope, depots, both } = useScope();
   const ops = useOperations(depots);
   const issues = useIssueLists(depots);
   const clock = useAppClock();
@@ -39,8 +39,9 @@ export function DashboardPage() {
   const all = depots.length > 0 && shown.length === depots.length ? shown : null;
   const failed = depots.flatMap((depot, i) => (!ops[i]!.data && ops[i]!.isError ? [{ depot, query: ops[i]! }] : []));
   const watched = agreed(shown.map((day) => day.day));
-  // A failed refresh keeps the last read, so the card keeps drawing it; a first read that failed shows the error above.
-  const map = all ? <FleetMap read={both ? bothMapRead(all) : mapReadOf(all[0]!)} /> : failed.length ? null : <MapSkeleton />;
+  // A failed refresh keeps the last read, so the card keeps drawing it; a first read that failed shows the error above,
+  // and the card keeps its depot switch, the only one below 1280 wide.
+  const map = scope && <FleetMap view={scope} read={all ? (both ? bothMapRead(all) : mapReadOf(all[0]!)) : null} failed={failed.length > 0} />;
 
   return (
     <div className="lg:-mt-[7px]">

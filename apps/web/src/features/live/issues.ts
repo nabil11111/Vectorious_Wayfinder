@@ -71,6 +71,20 @@ export async function openIssuePhoto(issue: Pick<Issue, 'id'>, depot: string, si
   }
 }
 
+// On both depots together (spec 021) each depot's part of Live day shows only its own answers: the green line of the
+// answer sent last under the depot it was sent from, and the server's refusal of the latest answer under that answer's
+// depot. So an answer from one part never shows in the other's, while another answer is on its way or after it failed.
+// from names the depot each answer was sent from; decide is the part's own, which records it.
+export interface SentFrom { byIssue: Readonly<Record<string, string>>; latest: string | null }
+export function answeringIn(answering: Answering, depot: string, from: SentFrom, decide: Answering['decide']): Answering {
+  return {
+    ...answering,
+    sent: answering.sent && from.byIssue[answering.sent.id] === depot ? answering.sent : null,
+    refused: from.latest === depot ? answering.refused : null,
+    decide,
+  };
+}
+
 // Answers sent and not answered yet. A dispatcher's depot switch waits for none of them (spec 020).
 let answering = 0;
 export const answerOnItsWay = () => answering > 0;

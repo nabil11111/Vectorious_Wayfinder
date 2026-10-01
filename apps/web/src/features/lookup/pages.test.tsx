@@ -9,7 +9,7 @@ import { FleetPage } from './FleetPage';
 import { HistoryPage } from './HistoryPage';
 import { OrdersPage } from './OrdersPage';
 import { lookupKey } from './queries';
-import { NOT_A_DATE, PICK_TRIP, TRIP_NOT_ON_PLAN } from './words';
+import { NOT_A_DATE, NO_SENT_PLANS_YET, PICK_TRIP, TRIP_NOT_ON_PLAN } from './words';
 
 // The three pages as they first draw from what the query cache already holds (spec 017, rule 12; AC-29 and AC-34). A
 // read answered for another reset than the clock shows is never drawn, so none of its rows can be chosen; a date in the
@@ -230,4 +230,33 @@ it('AC-7 one depot\'s failed read shows only its part failed with Try again, and
   const fleet = both('fleet', {});
   expect(partsOf(await drawBoth(<HistoryPage />, '/dispatcher/history', [[history!, historyRead(1)]], [both('history', {})[1]!]))[1]!.text).toContain('Could not load history.');
   expect(partsOf(await drawBoth(<FleetPage />, '/dispatcher/fleet', [[fleet[0]!, fleetRead(1)]], [fleet[1]!]))[1]!.text).toContain('Could not load fleet.');
+});
+
+// ── History when every sent plan is still to come (Q-14) ────────────────────────────────────────────────────────
+
+// The read History gets with no date asked when the depot's sent plans are all after today: none is opened, but the
+// latest sent dates are listed for the chips.
+const sentLaterRead = (depot: Depot, publishedDates: string[]) => LookupHistory.parse({
+  ...scope(1, depot), date: null, publishedDates, publication: null, counts: null, groups: [], trips: [], deferrals: [],
+});
+
+it('Q-14 a depot whose sent plans are all still to come says so beside their chip, offers to open the soonest, and never says none was sent', () => {
+  held.clockDay = 1;
+  const later = draw(<HistoryPage />, '/dispatcher/history', [[lookupKey('history', held.me, 'Peliyagoda', {}), sentLaterRead('Peliyagoda', ['2026-06-26', THU])]]);
+  expect(later.text).not.toContain(NO_SENT_PLANS_YET);
+  expect(later.text).toContain('No plan is sent for today or earlier yet. The plan for Thu 25 Jun is sent.');
+  expect(later.html).toMatch(/<button[^>]*>Open Thu 25 Jun<\/button>/);
+  // The chips and the page agree: the chips list the same sent days.
+  expect(later.html).toMatch(/<button[^>]*aria-pressed="false"[^>]*>Thu 25 Jun<\/button>/);
+  // A depot with no sent plan at all still says so.
+  const none = draw(<HistoryPage />, '/dispatcher/history', [[lookupKey('history', held.me, 'Peliyagoda', {}), sentLaterRead('Peliyagoda', [])]]);
+  expect(none.text).toContain(NO_SENT_PLANS_YET);
+});
+
+it('Q-14 on both depots, Kandy\'s part says the same while Peliyagoda\'s shows its sent plan', async () => {
+  const [peliyagoda, kandy] = both('history', {});
+  const html = await drawBoth(<HistoryPage />, '/dispatcher/history', [[peliyagoda!, historyRead(1)], [kandy!, sentLaterRead('Kandy', [THU])]]);
+  const [, atKandy] = partsOf(html);
+  expect(atKandy!.text).toContain('No plan is sent for today or earlier yet. The plan for Thu 25 Jun is sent. Open Thu 25 Jun');
+  expect(atKandy!.text).not.toContain(NO_SENT_PLANS_YET);
 });
