@@ -232,13 +232,17 @@ Anything we built differently from our Designathon submission, and why.
   a judge can walk a whole delivery day in minutes, and the control that moves it (and resets the day) exists
   only in demo mode.
 - **A placed order cannot be edited.** The confirmation says "Orders for Thursday close at 16:00 today" where
-  the frame says "Edits close at 16:00 today". A shop that needs more places another order for the same day.
+  the frame says "Edits close at 16:00 today". A shop that needs more places another order for the same day: the
+  confirmation names the order just placed and lists the day's earlier orders apart, each with its own time, and a
+  second screen whose draft was placed elsewhere says so and links to it.
 - **Shop cards show only what exists so far.** Arrival times, the vehicle and driver, "Running late",
   "Delivery help", "Tuesday works for me", "All 6 received" and "plan updated" come with the dispatcher's,
   driver's and receipt pieces.
 - **The shop's order form.** The number between − and + can also be typed. The tail-lift line names every item
   that needs one, where the frame names only the fridge crate. Tech's form has the note for the driver, which the
-  Tech frame leaves out. The note uses 16 px text on phones, so iOS does not zoom in.
+  Tech frame leaves out. The note uses 16 px text on phones, so iOS does not zoom in. A typed number takes whole
+  numbers from 0 to 999 and says so under the box rather than changing what was typed, and the note counts down to
+  its 200 characters. Place pressed while a change is saving waits for the save, and Sign out waits for it too.
 - **Shop states the design does not draw:** nothing started, empty lists, could not load, not saved, day
   closed, no open day, and "Could not update. This may be out of date." when a background refresh fails. The
   desktop Style and Tech forms, confirmation and Help have no frames, so they follow the desktop Fresh form.
