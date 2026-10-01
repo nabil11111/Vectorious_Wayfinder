@@ -187,11 +187,11 @@ it.each(['new', 'replayed'] as const)('AC-22 answers a %s write from one snapsho
   answerRead.countdown = 1;
   const writing = driver.send(arrival).then(res => res);
   let committedStop: typeof stops.$inferSelect | undefined;
-  let announcements = 0;
+  let announcements: unknown[] = [];
   try {
     await vi.waitFor(() => expect(answerRead.paused).toBe(true));
     committedStop = (await db.select().from(stops).where(eq(stops.id, driverStop(trip, 1).id)))[0];
-    announcements = vi.mocked(announce).mock.calls.length;
+    announcements = vi.mocked(announce).mock.calls.map(([change]) => change);
     const answer = await ruwan.post(`/api/v1/issues/${problem.id}/decide`).send({ revision: problem.revision, decision: 'try_again' });
     expect(answer.status).toBe(200);
   } finally {
@@ -200,7 +200,8 @@ it.each(['new', 'replayed'] as const)('AC-22 answers a %s write from one snapsho
   }
   const result = answeredDay(await writing);
   expect(committedStop?.arrivedAt).toEqual(new Date(at(214)));
-  expect(announcements).toBe(mode === 'new' ? 1 : 0);
+  // A new arrival is told once, to the depot's drivers and to the shop for its bell (spec 025); a replayed one to nobody.
+  expect(announcements).toEqual(mode === 'new' ? [{ topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: driverStop(trip, 1).outletId }] : []);
   expect(driverStop(driverTrip(result), 1).arrivedAt).toBe(at(214));
   expect(result.appliedWriteIds.filter(id => id === arrival.writeId)).toEqual([arrival.writeId]);
   expect(await auditsOf(driverStop(trip, 1).id, 'stop.arrived')).toHaveLength(1);

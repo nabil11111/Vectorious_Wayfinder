@@ -1,10 +1,11 @@
-import type { DriverDay, DriverProblem, DriverStop, DriverTrip } from '@wayfinder/contracts';
+import type { DriverProblem, DriverStop, DriverTrip } from '@wayfinder/contracts';
 import { Check } from 'lucide-react';
 import { useSignal } from '@/lib/phone/signal';
+import { driverAnswerIcon } from '@/features/notifications/icons';
 import { cn } from '@/lib/utils';
 import { closeBackOnline, useSync, type Queued } from '../queue';
 import {
-  answerLine, backOnlineLines, brandOf, closedLine, DEPOT_DECIDES, deliveredLine, keepLine, noSignalLine, refusedLine, whole,
+  answerShortLine, backOnlineLines, brandOf, closedLine, DEPOT_DECIDES, deliveredLine, keepLine, noSignalLine, refusedLine, whole,
   type Figures,
 } from '../words';
 import { ICON } from './icons';
@@ -15,8 +16,8 @@ import { Band } from './ui';
 // the trip's latest problem or else the last stop done. An answer from the dispatcher shows under "Back online" at
 // once, so the driver never has to close the bar to read it. The green line shows only on the trip whose records it
 // names, so trip 1's never comes back on trip 2 (Q-30).
-export function TopLines({ day, trip, figures, waiting, waitingRecords, noSignalBar }: {
-  day: DriverDay; trip: DriverTrip; figures: Figures; waiting: Queued[]; waitingRecords: number; noSignalBar: boolean;
+export function TopLines({ trip, figures, waiting, waitingRecords, noSignalBar }: {
+  trip: DriverTrip; figures: Figures; waiting: Queued[]; waitingRecords: number; noSignalBar: boolean;
 }) {
   const signal = useSignal();
   const { backOnline } = useSync();
@@ -26,7 +27,7 @@ export function TopLines({ day, trip, figures, waiting, waitingRecords, noSignal
   return (
     <>
       {bar && <BackOnline names={bar.names} />}
-      {(!bar || answered) && <TopLine day={day} trip={trip} figures={figures} waiting={waiting} />}
+      {(!bar || answered) && <TopLine trip={trip} figures={figures} waiting={waiting} />}
     </>
   );
 }
@@ -40,15 +41,16 @@ function latestProblem(trip: DriverTrip): { problem: DriverProblem; stop: Driver
   return { problem, stop };
 }
 
-function TopLine({ day, trip, figures, waiting }: { day: DriverDay; trip: DriverTrip; figures: Figures; waiting: Queued[] }) {
+function TopLine({ trip, figures, waiting }: { trip: DriverTrip; figures: Figures; waiting: Queued[] }) {
   const latest = latestProblem(trip);
   if (latest) {
     const { problem, stop } = latest;
     const counts = figures.byStop[trip.stops.indexOf(stop)]!;
     const brand = brandOf(trip, stop);
     const onPhone = waiting.some((entry) => entry.write.writeId === problem.id);
+    // Once answered, only the answer's picture and short form, for a driver who glances (spec 025, AC-3b).
     const detail = problem.decision
-      ? answerLine(problem, stop, brand, counts, day.depot)
+      ? <span className="flex items-center gap-1.5 text-[13px] leading-4 font-bold text-foreground"><img src={driverAnswerIcon(problem.decision)} alt="" className="size-5 shrink-0 object-contain" />{answerShortLine(problem, stop, brand, counts)}</span>
       : problem.kind === 'refused' ? keepLine(brand, counts) : DEPOT_DECIDES;
     return (
       <Band tone="warn" className="pt-2 pb-[7px]">
@@ -59,7 +61,7 @@ function TopLine({ day, trip, figures, waiting }: { day: DriverDay; trip: Driver
           </p>
           <SentChip onPhone={onPhone} word="sent" />
         </div>
-        <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">{detail}</p>
+        <div className="mt-1 text-[11px] leading-[14px] text-muted-foreground">{detail}</div>
       </Band>
     );
   }

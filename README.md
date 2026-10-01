@@ -123,23 +123,31 @@ are what the demo clock shows.
    read, such as "No fridge truck was left for Colombo.", until nothing is unplanned.
 6. **Send.** Mark the trip done and open **View plan**: 5 of 104 orders on 1 trip, 99 deferred, checks all
    clear. Send the plan to loaders and drivers.
-7. **The shop sees it.** As Nadeesha (`S-001`), Orders shows her three orders "Planned · Thu 25 Jun". **Back to edit**
+7. **The shop sees it.** As Nadeesha (`S-001`), the bell in the top bar has a red count. Press it: a small pop-up (a sheet
+   from the bottom on a phone) lists her updates, newest first, and its top row reads "Thursday's delivery is planned:
+   Wasantha's reefer van, window 05:00 to 07:30" with the time Ruwan sent it. Pressing the row opens Today, and **Mark all
+   read** clears the count. Orders shows her three orders "Planned · Thu 25 Jun". **Back to edit**
    on View plan turns the plan into a draft again until loading starts, and her cards follow within a second.
 
 8. **Loading, last stop first.** Move the demo clock on to "Loading, Thu 02:30" and sign in as Kasun (`L-001`) on a phone (or
-   a narrow window). Today's trucks: VEH035 leaves 04:36, in 2 h 6 min, and "Goes in first" lists stop 2, Fresh
-   Wellawatte (94 cartons), above stop 1, Fresh Nugegoda (24). Start loading, tick Wellawatte's two lines and press
+   a narrow window). His bell's top row reads "Thursday's plan is out: 1 truck to load". Today's trucks: VEH035 leaves
+   04:36, in 2 h 6 min, and "Goes in first" lists stop 2, Fresh Wellawatte (94 cartons), above stop 1, Fresh Nugegoda
+   (24). Start loading, tick Wellawatte's two lines and press
    **Stop 2 loaded**: "94 /118" and "648 / 1,040 kg · 3.5 / 7.0 m³".
 9. **A problem at the dock.** On Fresh Nugegoda press **Flag a problem**, pick the 4 dry cartons, keep Short, count 3,
    add a note and send it to the dispatcher. The dry line reads "1 short", and Mark ready waits for the answer.
-10. **The dispatcher answers.** As Ruwan (`P-001`), the bell shows 1. Live day's "Needs you" holds the card "1 dry carton
-    short · Fresh Nugegoda · stop 1 · VEH035". Keep **Go short** and press **Send to loader**.
-11. **Ready.** On Kasun's phone the answer shows without a reload. Tick the chilled lines, press Stop 1 loaded and then
+10. **The dispatcher answers.** As Ruwan (`P-001`), the bell shows 1: "Kasun flagged 1 dry carton short for Fresh Nugegoda
+    on Wasantha's reefer van". Press the row, or **Open Live day** at the pop-up's foot: Live day's "Needs you" holds the
+    card "1 dry carton short · Fresh Nugegoda · stop 1 · VEH035". Keep **Go short** and press **Send to loader**.
+11. **Ready.** On Kasun's phone the answer shows without a reload, and a toast says "Ruwan answered on VEH035: Go with 1
+    dry carton short for Fresh Nugegoda." with **Open**. Tick the chilled lines, press Stop 1 loaded and then
     **Mark ready**: "VEH035 is ready · 117 of 118 on · 1 short". Nadeesha's three orders now read "Loaded", and View plan
     says "Loading has started, so this plan cannot go back to edit." where Back to edit was.
 
 12. **The driver's trip.** Move the demo clock on to "Trucks leave, Thu 03:30". On a phone, or Chrome at 390 wide,
-    sign in as Wasantha (`D-036`). Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda",
+    sign in as Wasantha (`D-036`). His bell holds "Your trip for Thursday is sent: VEH035 leaves 04:36 with 2 stops" and
+    "VEH035 is loaded and ready: 117 of 118 on, 1 short". Today's trip: "VEH035 · leaves 04:36", "✓ Loaded · 117 of 118 ·
+    1 dry short for Nugegoda",
     then "1 · Fresh Nugegoda · 23 of 24 cartons" and "2 · Fresh Wellawatte · 94 cartons". Press **Start trip**.
 13. **A delivery.** Next stop: "Stop 1 of 2 · Fresh Nugegoda", "Unload 23 cartons · 20 chilled · 3 dry" and the shop's
     note. Press **I've arrived**, count 12 and 8 chilled and 3 dry ("Loader flagged 1 carton short at the depot" sits
@@ -154,11 +162,14 @@ are what the demo clock shows.
     off: it opens on the same screen.
 15. **Back online.** Turn the network back on: within seconds "Back online · 1 stop sent · Wellawatte reached the depot",
     and the chip turns "Online".
-16. **The dispatcher answers.** As Ruwan (`P-001`), the bell shows 1. Live day's card: "2 chilled cartons refused", "Fresh
+16. **The dispatcher answers.** As Ruwan (`P-001`), the bell's top row reads "Fresh Wellawatte refused 2 chilled cartons
+    from Wasantha's reefer van: damaged"; press it. Live day's card: "2 chilled cartons refused", "Fresh
     Wellawatte · stop 2 · VEH035 · Wasantha · damaged, the shop took 46 of 48 chilled", with **Bring them back to
     Peliyagoda** chosen. Press **Send to driver**: "✓ Sent · VEH035 · 2 cartons back to Peliyagoda, Wasantha told".
-17. **Back at the depot.** On Wasantha's phone, without a reload: "Ruwan, dispatcher · Bring the 2 chilled cartons back to
-    Peliyagoda." Press **I'm back at the depot**: "✓ Trip closed · 2 of 2 stops · all records sent". Nadeesha's three
+17. **Back at the depot.** On Wasantha's phone, without a reload, a large card pops up over the screen: the answer's picture,
+    "Bring back · 2 chilled", and under it, small, "Ruwan" with the time and "Bring the 2 chilled cartons back to
+    Peliyagoda." A tap or a swipe closes it, and it goes by itself after 8 seconds. The trip's top line then keeps only
+    "Bring back · 2 chilled", and the full sentence stays in the bell's pop-up. Press **I'm back at the depot**: "✓ Trip closed · 2 of 2 stops · all records sent". Nadeesha's three
     Thursday orders now read "Delivered".
 
 18. **Watching the day.** Ruwan's **Dashboard** and **Live day** follow every step from 12 on without a reload. Before
@@ -176,10 +187,12 @@ are what the demo clock shows.
 20. **A receipt with no signal.** Turn the network off and press **Confirm delivery**: "Receipt saved on this phone",
     "Received 11 cartons · Missing 1 carton", "Saved at 08:30 · waiting to sync". Reload with the network still off: the
     same screen opens. Turn it back on: "Receipt sent to the depot" and "Sent at 08:31 · shortage unresolved".
-21. **The depot replaces it.** As Ruwan (`P-001`), the bell shows 1. Live day: "1 chilled carton missing", "Shop · Nadeesha",
+21. **The depot replaces it.** As Ruwan (`P-001`), the bell's top row reads "Nadeesha reported 1 chilled carton missing at
+    Fresh Nugegoda"; press it. Live day: "1 chilled carton missing", "Shop · Nadeesha",
     "Received · 11 of 12 chilled cartons, 1 missing", "Cold on arrival · yes", with **Send 1 replacement on Fri 26 Jun** chosen.
     Press **Send to shop**: "✓ Sent · Fresh Nugegoda · 1 replacement on Fri 26 Jun, Nadeesha told".
-22. **The shop sees it.** On Nadeesha's phone, without a reload, the receipt says "replacement on Fri 26 Jun". Orders,
+22. **The shop sees it.** On Nadeesha's phone, without a reload, a toast says "The depot answered your report, 1 chilled
+    carton missing: a replacement comes on Fri 26 Jun", and the receipt says "replacement on Fri 26 Jun". Orders,
     Past: "12 chilled cartons · 11 received · 1 short" with "1 missing chilled carton: a replacement comes on Fri 26 Jun", "8 chilled cartons ·
     All 8 received" and "4 dry cartons · 3 received · 1 short". Open: "1 chilled carton · Waiting for the delivery plan ·
     Replacement for Thu 25 Jun".
@@ -207,6 +220,18 @@ depot** on trip 1 opens trip 2's Today's trip under "✓ Trip 1 closed · 4 of 4
 03:56", with trip 1's hand-back card ("Still on the truck", what to hand in) until trip 2 starts. After trip 2, Day done
 shows a line per trip, "Trip 1 · 4 of 4 stops · 105 of 144 cartons delivered · 39 handed back", the day's totals, and
 "Trip 3 · none today".
+
+**The bell.** Every role's bell counts the person's unread updates and opens them, newest first, up to 30, each with its
+picture, line and time, and a press goes where the person acts on it. They are read from what the walkthrough recorded,
+so a reset brings back the seeded day's. Nadeesha hears of her orders placed, her delivery planned or moved to another
+day with its reason, the truck leaving, the driver arriving, delivering, being refused or finding the shop closed, and the
+depot's answer to her report. Ruwan hears of every new problem and of each truck ready, leaving and back, for the depot
+on show (both under Both). Kasun hears that the plan is out, changed or taken back to edit, and Ruwan's answers to the
+dock's flags. Wasantha hears of his trip sent or changed, his truck ready and Ruwan's answers. A new update also shows as
+a toast with **Open**, once in each tab. The pop-up's **Turn on alerts when Wayfinder is in the background** asks the
+browser, and the app never asks on its own; once allowed, an update that comes while the tab is hidden shows as a
+system notification. What has been read is kept in the browser, per account and demo day, so a new device starts with
+the day's updates unread.
 
 ### The look-up pages
 
@@ -304,6 +329,12 @@ Anything we built differently from our Designathon submission, and why.
   desktop Style and Tech forms, confirmation and Help have no frames, so they follow the desktop Fresh form.
 - **Today after placing** keeps the date and the shop's name as its header, where the frame has the title "Today".
 - **OUT001** has a street entrance and van-only parking in the booklet's data, where the design shows a rear dock.
+- **The bell's pop-up is ours.** The frames draw the bell and its red count, and no frame draws what it opens. It is
+  one pop-up for all four roles, built from the style guide's card and the design's 3D icons: a popover under the bell
+  from 1024 wide and a sheet from the bottom below, with "Mark all read", the role's own link at its foot ("Open Live
+  day" for the dispatcher, "See what changed" for the loader) and the button that turns on background alerts. The
+  count is the person's unread updates, where the dispatcher's bell counted open problems and the loader's the plan's
+  changes, and every role's bell now opens (D-99). A new update also shows as a toast, which no frame draws.
 - **Below 1024 wide the nav is bottom tabs** for every role, and the name beside the avatar waits until 1320, so
   the dispatcher's six tabs fit the top bar.
 
@@ -477,7 +508,10 @@ Anything we built differently from our Designathon submission, and why.
 - **"Done unloading" stays grey until every line is counted,** where the frame draws it orange at 2 of 6: a stop that
   cannot be counted in full goes through "Something's wrong". A typed count stays as it was typed and says under the box
   when it is not a whole number or is more than was loaded, rather than being changed.
-- **The driver's bell has no count.**
+- **The dispatcher's answer pops up as a large card** with its picture and three words, "Bring back · 2 chilled", that
+  closes at a tap or a swipe and by itself after 8 seconds, so a driver at the wheel can read it at a glance. The trip's
+  top line then keeps only those three words, where the frame writes the dispatcher's whole sentence; the sentence is in
+  the bell's pop-up. No frame draws the card.
 - **The top bar carries the demo chip,** as "Demo" alone beside the status chip on a phone, and the status chip hides its
   words below 380 px wide so both fit.
 - **"Back online" takes the top line's place,** with the dispatcher's answer under it, so the driver never closes the bar

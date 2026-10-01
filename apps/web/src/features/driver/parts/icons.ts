@@ -15,6 +15,7 @@ import sync from '@/assets/icons/icon-sync.png';
 import lorry from '@/assets/icons/icon-truck-lorry.png';
 import reefer from '@/assets/icons/icon-truck-reefer.png';
 import van from '@/assets/icons/icon-van.png';
+import { ANSWER_ICON } from '@/features/notifications/icons';
 
 // The design's own pictures on the driver's screens (spec 013, plan.md "Words"). The ticks are the outline set's, as
 // the design draws them plain.
@@ -29,7 +30,8 @@ export const shopIcon = (brand: Brand | null) => SHOP[brand ?? 'Fresh'];
 // The service worker keeps every picture, but it only answers a page it controls, which the first page after it is
 // installed is not. So the driver's area fetches every picture it can show as soon as it opens, while there is a
 // signal, and holds on to them: a screen first drawn later with no signal still has its pictures.
-const PICTURES = [...Object.values(ICON), chilled, goodsDry, shopFresh, shopStyle, shopTech, lorry, reefer, van];
+// The answers' pictures too, which the trip's top line shows with no signal (spec 025).
+const PICTURES = [...Object.values(ICON), chilled, goodsDry, shopFresh, shopStyle, shopTech, lorry, reefer, van, ...Object.values(ANSWER_ICON)];
 let held: HTMLImageElement[] | null = null;
 export function holdPictures() {
   held ??= PICTURES.map((src) => {

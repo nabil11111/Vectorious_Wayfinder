@@ -1,5 +1,5 @@
-import { DEPOT_TIME_ZONE, type Brand, type DriverDay, type DriverLine, type DriverProblem, type DriverStop, type DriverTrip, type tripFigures } from '@wayfinder/contracts';
-import { answeredBy, brandOfShop, clockTime, leaves, shortDay, tripPlace, unitsWords, untilLeaving, whole } from '@/features/loader/words';
+import { DEPOT_TIME_ZONE, driverAnswerShort, type Brand, type DriverDay, type DriverLine, type DriverProblem, type DriverStop, type DriverTrip, type tripFigures } from '@wayfinder/contracts';
+import { brandOfShop, clockTime, leaves, shortDay, tripPlace, unitsWords, untilLeaving, whole } from '@/features/loader/words';
 import { countOf, ENTRANCE } from '@/features/plan/words';
 import { countOf as amountOf, plural } from '@/features/store/words';
 import { inDepot } from '@/lib/clock';
@@ -184,17 +184,10 @@ function goodsWords(brand: Brand | null, counts: Pick<StopFigures, 'byTemp'>, ke
     .map((temp) => { const n = counts.byTemp[temp][key]; return `${whole(n)} ${temp} ${n === 1 ? 'carton' : 'cartons'}`; }).join(' and ');
 }
 
-// The dispatcher's answer as the driver reads it: "Ruwan, dispatcher · 03:52 · Bring the 2 chilled cartons back to
-// Peliyagoda.", and with replacements (spec 015, D-59) "… back to Peliyagoda. The shop gets 2 replacements on the next
-// run."
-export function answerLine(problem: DriverProblem, stop: DriverStop, brand: Brand | null, counts: StopFigures, depot: string) {
-  let what = '';
-  if (problem.decision === 'try_again') what = `Try ${stop.shopName} again after the other stops.`;
-  else if (problem.kind === 'refused') what = `Bring the ${goodsWords(brand, counts, 'refused', counts.refused)} back to ${depot}.`;
-  else what = `Bring the ${unitsWords(brand, counts.notDelivered)} back to ${depot}.`;
-  if (problem.decision === 'send_replacements') what += ` The shop gets ${whole(counts.refused)} ${counts.refused === 1 ? 'replacement' : 'replacements'} on the next run.`;
-  return `${answeredBy(problem)} · ${what}`;
-}
+// The dispatcher's answer in the trip's top line (spec 025, AC-3b): only its short form, "Bring back · 39 chilled", which
+// the contracts write beside the full sentence so the glanceable card, this line and the bell's row agree. The sentence
+// itself is in the bell's pop-up.
+export const answerShortLine = (problem: DriverProblem, stop: DriverStop, brand: Brand | null, counts: StopFigures) => driverAnswerShort(problem, stop, brand, counts);
 
 // ── The signal and the waiting writes ───────────────────────────────────────────────────────────────────────
 

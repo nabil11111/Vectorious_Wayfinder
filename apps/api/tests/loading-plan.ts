@@ -42,9 +42,19 @@ export const code = (res: request.Response) => [res.status, res.body.error?.code
 // on stop 1 and OUT002's two on stop 2, Dilshan driving, and with VEH004's trip to OUT026 and OUT028 when asked (spec
 // 010's AC-11), every other order of the day deferred. The clock then reads Thu 25 Jun 02:30.
 export async function sendWalkthroughPlan(walk: Walkthrough, { withVeh004 = false } = {}): Promise<PlanBoard> {
+  await placeWalkthroughDraft(walk);
+  return sendThursdaysPlan(walk, { withVeh004 });
+}
+
+// The walkthrough's first step alone: Nadeesha places her draft at Wed 15:30.
+export async function placeWalkthroughDraft(walk: Walkthrough): Promise<void> {
   walk.freeze(WED, 15 * 60 + 30);
   const next = (await walk.nadeesha.get('/api/v1/store/next-order')).body;
   expect((await walk.nadeesha.post('/api/v1/store/next-order/place').send({ deliveryDate: next.deliveryDate, refs: next.draft.refs })).status).toBe(200);
+}
+
+// Then Ruwan's plan, sent at 16:00, with the clock left at Thu 02:30.
+export async function sendThursdaysPlan(walk: Walkthrough, { withVeh004 = false } = {}): Promise<PlanBoard> {
   walk.freeze(WED, 16 * 60);
   const board = PlanBoard.parse((await walk.ruwan.get('/api/v1/plans')).body);
   const [dilshan] = await db.select({ id: users.id }).from(users).where(eq(users.username, 'dilshan'));

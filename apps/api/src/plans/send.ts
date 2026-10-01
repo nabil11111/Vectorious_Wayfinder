@@ -95,7 +95,7 @@ export async function unsendPlan(caller: Planner, date: string, body: UnsendPlan
     }
     await tx.update(plans).set({ status: 'draft', publishedAt: null, sentCheck: null }).where(eq(plans.id, opened.plan.id));
     await tx.insert(auditLog).values({ actorId: caller.userId, action: 'plan.unsent', entity: 'plan', entityId: opened.plan.id,
-      before: { revision: opened.plan.revision, status: 'published' }, after: { revision: opened.plan.revision + 1, status: 'draft' } });
+      before: { revision: opened.plan.revision, status: 'published' }, after: { revision: opened.plan.revision + 1, status: 'draft', unsentAt: opened.moment.at.toISOString() } });
     return finishPlan(tx, opened);
   });
   tellPlanAndShops(result);

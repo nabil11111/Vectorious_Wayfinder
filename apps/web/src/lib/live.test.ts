@@ -120,3 +120,22 @@ it('Q-28 a driver message fetches the problems again too, so a card\'s "stops le
   for (const depot of ['Peliyagoda', 'Kandy']) expect(client.getQueryState(['issues', depot])?.isInvalidated).toBe(true);
   client.clear();
 });
+
+it('spec 025 the topics that carry a person\'s updates fetch the bell again, and the others do not', () => {
+  const client = new QueryClient();
+  held.client = client;
+  vi.stubGlobal('EventSource', Stream);
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { clearTimeout, setTimeout }));
+  useLive();
+  cleanup = held.effect!();
+  const bell = ['notifications', 'ruwan', 'Peliyagoda'];
+  for (const topic of ['orders', 'plans', 'loading', 'driver', 'issues']) {
+    client.setQueryData(bell, { items: [] });
+    Stream.current.change({ data: JSON.stringify({ topic }) });
+    expect(client.getQueryState(bell)?.isInvalidated, topic).toBe(true);
+  }
+  client.setQueryData(bell, { items: [] });
+  Stream.current.change({ data: JSON.stringify({ topic: 'admin' }) });
+  expect(client.getQueryState(bell)?.isInvalidated).toBe(false);
+  client.clear();
+});
