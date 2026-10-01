@@ -153,7 +153,9 @@ five orders, 118 cartons ordered, 117 loaded and one dry carton short. Times are
    remaining open issue. If another dispatcher already answered it, refetch and say "That problem was already
    answered." A trip no longer in this view says "That trip is no longer in this view." No historical lookup follows.
 6. **Refreshing.** Reuse the one SSE stream. A relevant committed change causes a fresh read, normally visible within
-   a second locally. No server report exists for a write still on the driver's phone. On reconnect or a demo/clock
+   a second locally. A `driver` message also reads the problems again, so a card's "Still on VEH057 · 39 cartons · 1
+   stop left" follows the trip on Live day and the dashboard, to "no stops left" once the last stop is done. No server
+   report exists for a write still on the driver's phone. On reconnect or a demo/clock
    change refetch as 008 does; retain the one-minute fallback. A stale browser view says so. No SSE payload or write
    response is installed as the day, and an older GET must not overwrite a newer one. The clock/attention query is
    refreshed when its day changes, as well as once a minute for a newly overdue report.
@@ -246,7 +248,7 @@ branch, not on fabricated API data. AC-19 was removed after review; the other cr
 - [ ] **AC-21** When two observed publications rebuild only trip/stop ids or move exactly one trip's orders to another vehicle, the system shall respectively show no change or one Moved row with bell 1, and shall separately identify departure, driver, sequence, quantity and partial-move changes without pairing unrelated trips.
 - [ ] **AC-22** When a loader's list goes published → withdrawn → republished, the system shall keep the old baseline only in storage while showing the wait sentence without old truck cards or Start, then show the comparison on resend and retain it through a tab reload and Got it, clearing it on account/day/depot/demo-generation change or sign-out.
 - [ ] **AC-23** When a loader first visits or ordinary loading/driver/issue progress changes the list at the same publication, the system shall establish or keep the baseline without a Plan changed notice, and a failed storage write shall show the storage sentence while leaving current loading usable.
-- [ ] **AC-24** When plans, loading, driver, orders or issues are announced, the system shall invalidate the operations query as well as the topic's existing query; clock/demo/reconnect shall refetch it through 008's existing path.
+- [ ] **AC-24** When plans, loading, driver, orders or issues are announced, the system shall invalidate the operations query as well as the topic's existing query, and on driver the problems query too; clock/demo/reconnect shall refetch it through 008's existing path.
 - [ ] **AC-25** When a truck finishes its route and returns, the system shall remove it from Trucks out now, retain it on the day's Live timeline with its return time and preserve its two-stop totals.
 - [ ] **AC-26** When Ruwan opens Dashboard at 1440 × 900 after the refusal and in the closed-shop alternative, the system shall show each tile's own bar (including 1 / 2 delivered as half), the sourced truck columns in problems-first order, the existing issue summary and next run, without a district map or unsupported actions.
 - [ ] **AC-27** When Ruwan opens Live day at 1440 × 900, the system shall draw the planned and recorded marks, server brand totals, grouped trips, legend and event rail, and Open shall expose labelled stop facts without a proof viewer.

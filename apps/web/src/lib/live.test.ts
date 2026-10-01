@@ -103,3 +103,20 @@ it('tries the stream again as soon as the browser is back online', () => {
   expect(Stream.current).not.toBe(first);
   expect(Stream.current.url).toBe('/api/v1/events');
 });
+
+it('Q-28 a driver message fetches the problems again too, so a card\'s "stops left" follows the trip on Live day and the Dashboard', () => {
+  const client = new QueryClient();
+  held.client = client;
+  vi.stubGlobal('EventSource', Stream);
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { clearTimeout, setTimeout }));
+  const invalidate = vi.spyOn(client, 'invalidateQueries');
+  useLive();
+  cleanup = held.effect!();
+  // Each depot's problems are a read of their own, as on both depots together.
+  for (const depot of ['Peliyagoda', 'Kandy']) client.setQueryData(['issues', depot], { issues: [] });
+  Stream.current.change({ data: JSON.stringify({ topic: 'driver' }) });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['driver'] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['issues'] });
+  for (const depot of ['Peliyagoda', 'Kandy']) expect(client.getQueryState(['issues', depot])?.isInvalidated).toBe(true);
+  client.clear();
+});

@@ -257,7 +257,7 @@ The one-to-one map below names the test/check; do not replace it with one broad 
 | AC-21 | `publication comparison pairs whole trip moves once by exact orders` | `apps/web/src/features/loader/changes.test.ts` (unit) |
 | AC-22 | `withdrawal reload got it and scope changes preserve or clear comparison` | Same file (storage lifecycle) |
 | AC-23 | `first visit progress and storage failure cannot invent a change` | Same file |
-| AC-24 | `existing topics invalidate operations and keep normal invalidations` | `apps/web/src/lib/live.test.ts` |
+| AC-24 | `existing topics invalidate operations and keep normal invalidations`, and `Q-28 a driver message fetches the problems again too` | `apps/web/src/lib/live.test.ts` |
 | AC-25 | `return removes out row but retains days finished trip` | `apps/api/tests/operations-read.test.ts` |
 | AC-26 | `dashboard desktop` | Lead's written click-through record at join |
 | AC-27 | `live desktop and details` | Same record |
