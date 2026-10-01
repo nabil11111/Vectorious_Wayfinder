@@ -144,6 +144,13 @@ interface Step extends Undo { before: DraftPlan; after: DraftPlan }
 // The most steps the history keeps (spec 027).
 const HISTORY = 50;
 
+// Two boards hold the same orders: none split into parts or joined back between them, so a draft that named the
+// orders of one names orders the other still has.
+function sameOrders(one: PlanBoard, other: PlanBoard) {
+  const ids = new Set(one.orders.map((order) => order.id));
+  return other.orders.length === ids.size && other.orders.every((order) => ids.has(order.id));
+}
+
 export interface BoardScreen {
   // The board as the server last answered: its check, figures and counts belong to it.
   board: PlanBoard;
@@ -563,10 +570,9 @@ class PlanSaver {
       }
       const answer = await madeBy(this, () => run(date, refOf(before)));
       if (!this.stillMine()) return null;
-      // A build is one step, unless it split an order: the draft before it names the order whole, which the server would
-      // refuse once split, so the history ends there as for a change from elsewhere.
-      const known = new Set(before.orders.map((order) => order.id));
-      const step = said !== undefined && !answer.orders.some((order) => order.splitFrom !== null && !known.has(order.id));
+      // A build is one step, unless it split an order or joined one's parts back: the drafts before it name orders the
+      // server has since replaced, which it would refuse, so the history ends there as for a change from elsewhere.
+      const step = said !== undefined && sameOrders(before, answer);
       if (said) {
         this.past = step ? [...this.past, { ...said, before: held.draft, after: planOf(answer) }].slice(-HISTORY) : [];
         this.future = [];

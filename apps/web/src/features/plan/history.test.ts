@@ -159,24 +159,65 @@ it('AC-1 makes a build one step, which Undo puts back as the draft before it', a
   saver.stop();
 });
 
-it('AC-2 clears the history after a build that split an order, so no Undo sends a draft naming the order split since', async () => {
-  signedIn(RUWAN);
-  const { saver } = useBoardScreen(answered(START, 1));
-  saver.change(deferred(START, uuid(3)), { line: 'Fresh Pannala deferred', tripKey: null });
-  await saved(saver, 2);
-  // The build made two parts of an order: orders the board before did not have.
-  const part = (n: number) => ({
-    id: uuid(n), outletId: 'OUT005', temp: 'chilled', deliveryDate: '2026-06-25', lines: [{ productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: 6 }],
-    load: { kg: 41.4, m3: 0.222, units: 6, needsReefer: true, needsTailLift: false, keepUpright: false }, carriedOver: false, timesDeferred: 0, lastDeferral: null,
-    splitFrom: uuid(1), originalUnits: 12,
-  });
-  const built = answered(withTrip(START, 'VEH011', uuid(21)), 3);
+// An order on the board: whole, or a part of a split original (spec 010 rule 8).
+const order = (n: number, splitFrom: string | null = null) => ({
+  id: uuid(n), outletId: 'OUT005', temp: 'chilled', deliveryDate: '2026-06-25', lines: [{ productId: 'fresh-chilled-carton', name: 'Chilled carton', unit: 'carton', quantity: splitFrom === null ? 12 : 6 }],
+  load: { kg: 41.4, m3: 0.222, units: splitFrom === null ? 12 : 6, needsReefer: true, needsTailLift: false, keepUpright: false }, carriedOver: false, timesDeferred: 0, lastDeferral: null,
+  splitFrom, originalUnits: splitFrom === null ? null : 12,
+});
+const part = (n: number) => order(n, uuid(1));
+// A saved board whose orders are these.
+const withOrders = (draft: DraftPlan, revision: number, orders: ReturnType<typeof order>[]) => PlanBoard.parse({ ...answered(draft, revision), orders });
+// A build that answers this board.
+async function build(saver: ReturnType<typeof useBoardScreen>['saver'], board: PlanBoard) {
   const building = saver.act((date, ref) => sendPlan(date, ref), undefined, { line: 'Suggested plan built', tripKey: null });
   await settled();
-  answer(Response.json({ ...built, orders: [part(21), part(22)] }));
+  answer(Response.json(board));
   expect(await building).toBeNull();
+}
+
+it('AC-2 clears the history after a build that split an order, so no Undo sends a draft naming the order split since', async () => {
+  signedIn(RUWAN);
+  const { saver } = useBoardScreen(withOrders(START, 1, [order(1), order(3)]));
+  saver.change(deferred(START, uuid(3)), { line: 'Fresh Pannala deferred', tripKey: null });
+  await saved(saver, 2);
+  // The build made two parts of order 1, which the drafts before it name whole.
+  await build(saver, withOrders(withTrip({ ...START, trips: [] }, 'VEH011', uuid(21)), 3, [part(21), part(22), order(3)]));
   expect(saver.snapshot()!.history).toEqual({ undo: null, redo: null });
   expect(saver.undo()).toBeNull();
+  saver.stop();
+});
+
+it('AC-2 clears the history after a rebuild that joined an order\'s parts, made again or not, so no Undo sends a part since deleted', async () => {
+  signedIn(RUWAN);
+  // The suggested plan built before split order 1 into parts 21 and 22.
+  const split = withTrip({ ...START, trips: [] }, 'VEH011', uuid(21));
+  const { saver } = useBoardScreen(withOrders(split, 1, [part(21), part(22), order(3)]));
+  saver.change(withTrip(split, 'VEH001', uuid(22)), { line: 'Trip started on Dilshan\'s reefer truck', tripKey: 'VEH001-1' });
+  await saved(saver, 2);
+  // Built again: the parts joined back into order 1, planned whole. The drafts before name parts that are gone.
+  await build(saver, withOrders(withTrip({ ...START, trips: [] }, 'VEH011', uuid(1)), 3, [order(1), order(3)]));
+  expect(saver.snapshot()!.history).toEqual({ undo: null, redo: null });
+  expect(saver.undo()).toBeNull();
+
+  // A change, then built again: the parts joined and order 1 split anew into parts 23 and 24.
+  saver.change(deferred(saver.snapshot()!.draft, uuid(3)), { line: 'Fresh Pannala deferred', tripKey: null });
+  await saved(saver, 4);
+  await build(saver, withOrders(withTrip({ ...START, trips: [] }, 'VEH011', uuid(23)), 5, [part(23), part(24), order(3)]));
+  expect(saver.snapshot()!.history).toEqual({ undo: null, redo: null });
+  expect(saver.undo()).toBeNull();
+  saver.stop();
+});
+
+it('AC-1 keeps a build that split or joined nothing as one step', async () => {
+  signedIn(RUWAN);
+  const split = withTrip({ ...START, trips: [] }, 'VEH011', uuid(21));
+  const { saver } = useBoardScreen(withOrders(split, 1, [part(21), part(22), order(3)]));
+  // Built again with the same orders: the parts stay as they are.
+  await build(saver, withOrders(withTrip(split, 'VEH002', uuid(22)), 2, [part(21), part(22), order(3)]));
+  expect(saver.snapshot()!.history).toEqual({ undo: 'Suggested plan built', redo: null });
+  saver.undo();
+  expect(saver.snapshot()!.draft).toEqual(split);
   saver.stop();
 });
 
