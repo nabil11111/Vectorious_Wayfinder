@@ -2,13 +2,15 @@ import { Link } from 'react-router';
 import type { LoadingTruck } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import { CHANGED, truckKey } from '../changes';
-import { clockTime, leaves, truckName, tripPlace, unitsWords, whole } from '../words';
+import { clockTime, leaves, outOnWords, truckName, tripPlace, unitsWords, whole } from '../words';
 import { truckIcon } from './icons';
 import { Tag } from './ui';
 
 // How a truck stands, in its row's second line: "leaves 04:36 · 118 cartons", "leaves 04:36 · 94 of 118 on" while it
-// loads, and "ready 02:36 · 117 of 118 on" once it is ready.
+// loads, and "ready 02:36 · 117 of 118 on" once it is ready. A trip whose vehicle is still out on an earlier one says
+// that instead, "out on trip 1 · back by 06:38" (Q-26).
 function standing(truck: LoadingTruck) {
+  if (truck.outOn) return outOnWords(truck.outOn);
   if (truck.status === 'ready') return `${truck.readyAt ? `ready ${clockTime(truck.readyAt)}` : 'ready'} · ${whole(truck.on.units)} of ${whole(truck.units)} on`;
   if (truck.status === 'loading') return `${leaves(truck)} · ${whole(truck.on.units)} of ${whole(truck.units)} on`;
   return `${leaves(truck)} · ${unitsWords(truck.brand, truck.units)}`;

@@ -154,9 +154,30 @@ export const logoutMutation = (qc: QueryClient): UseMutationOptions<void, Error,
   },
 });
 
+// A screen that must ask its person before they sign out, such as the loader's flag form while its flag is not sent
+// (Q-22). Its question answers true when it holds the sign-out, and the screen then asks in its own words, offering to
+// sign out anyway. A screen hands its question over here and takes it back with the function this returns.
+const asksFirst = new Set<() => boolean>();
+export function askBeforeSignOut(asks: () => boolean) {
+  const entry = () => asks();
+  asksFirst.add(entry);
+  return () => { asksFirst.delete(entry); };
+}
+
+// Sign out as the avatar menu presses it: unless a screen holds it to ask first, start signs out. Every screen that holds
+// it asks. It answers whether the sign-out started.
+export function signOutUnlessAsked(start: () => void) {
+  const held = [...asksFirst].filter((asks) => asks()).length > 0;
+  if (!held) start();
+  return !held;
+}
+
+// signOut asks the screens first; signOutAnyway is the answer to a screen's question, and mutate signs out at once, as
+// the driver's Day done does.
 export function useLogout() {
   const qc = useQueryClient();
-  return useMutation(logoutMutation(qc));
+  const mutation = useMutation(logoutMutation(qc));
+  return { ...mutation, signOut: () => signOutUnlessAsked(() => mutation.mutate()), signOutAnyway: () => mutation.mutate() };
 }
 
 export const HOME: Record<Role, string> = {

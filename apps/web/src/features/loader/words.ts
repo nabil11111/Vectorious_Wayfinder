@@ -1,4 +1,4 @@
-import { BRANDS, type Brand, type FlagReason, type Issue, type IssueLine, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
+import { BRANDS, type Brand, type FlagReason, type Issue, type IssueLine, type LeftTruck, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
 import { clockTime, countOf, shortDay, unitsOf, vehicleKind } from '@/features/plan/words';
 import { countOf as amountOf, plural, TEMP_NAME } from '@/features/store/words';
 
@@ -29,6 +29,11 @@ export const unitsWords = (brand: Brand | null, units: number) => (brand ? units
 // "VEH035", and "VEH035 trip 2" for a truck's second trip of the day.
 export const truckName = (truck: { vehicleId: string; tripNo: number }) => (truck.tripNo > 1 ? `${truck.vehicleId} trip ${truck.tripNo}` : truck.vehicleId);
 
+// A truck its driver has driven away, as the API lists it (Q-34): "VEH011 left with Asanka at 04:11.", leaving out a
+// driver or a time the day does not have.
+export const leftLine = (left: Pick<LeftTruck, 'vehicleId' | 'tripNo' | 'driver' | 'leftAt'>) =>
+  `${truckName(left)} left${left.driver ? ` with ${left.driver}` : ''}${left.leftAt ? ` at ${clockTime(left.leftAt)}` : ''}.`;
+
 // "Fresh · Colombo", or the district alone when the trip mixes brands.
 export const tripPlace = (truck: Pick<LoadingTruck, 'brand' | 'district'>) => [truck.brand, truck.district].filter(Boolean).join(' · ');
 
@@ -51,14 +56,13 @@ export function untilLeaving(leavesAt: string, at: number | null): string | null
 
 // A truck's load and its limit in tenths of a tonne (Q-21): the limit to the nearest tenth, as the design writes it, and
 // the load rounded down, kept a tenth below the limit's figure while it is under the limit, so the two read the same
-// only when the truck is full: a 6,840 kg truck reads 6.8 t, and 6,810 kg on it 6.7 t. Tenths of a kilo keep 807.3 kg
-// exact.
+// only when the truck is full: a 6,840 kg truck reads 6.8 t, and 6,810 kg on it 6.7 t. At or over the limit the load
+// reads the limit's own figure, so a full 3,990 kg truck reads 4.0 / 4.0 t. Tenths of a kilo keep 807.3 kg exact.
 function tonnes(kg: number, capKg: number): [on: number, cap: number] {
   const on = Math.round(kg * 10);
   const cap = Math.round(capKg * 10);
-  const onTenths = Math.floor(on / 1000);
   const capTenths = Math.round(cap / 1000);
-  return [on < cap ? Math.min(onTenths, capTenths - 1) : onTenths, capTenths];
+  return [on >= cap ? capTenths : Math.min(Math.floor(on / 1000), capTenths - 1), capTenths];
 }
 
 // A vehicle under 2 t has its weight written in kilos (Q-21): a 1,040 kg van read "1.0 / 1.0 t" with 81 kg free.
@@ -66,16 +70,29 @@ const KILOS_UNDER_KG = 2000;
 
 // What is on the truck so far over the vehicle's limits, its weight never rounded up to look full (Q-21): a van's in
 // kilos rounded down, "959 / 1,040 kg · 5.1 / 7.0 m³", and a truck's in tonnes to one place rounded down, "4.5 / 6.8 t
-// · 21.0 / 33.4 m³". Cubic metres are to the nearest tenth. The API worked the load out; this only writes it down.
+// · 21.0 / 33.4 m³". At or over the limit the weight reads the limit's own figure. Cubic metres are to the nearest
+// tenth. The API worked the load out; this only writes it down.
 export function loadFigure(truck: LoadingTruck) {
   const volume = `${ONE_PLACE.format(truck.on.m3)} / ${ONE_PLACE.format(truck.volumeCapM3)} m³`;
-  if (truck.weightCapKg < KILOS_UNDER_KG) return `${whole(Math.floor(Math.round(truck.on.kg * 10) / 10))} / ${whole(truck.weightCapKg)} kg · ${volume}`;
+  if (truck.weightCapKg < KILOS_UNDER_KG) {
+    const kilos = truck.on.kg >= truck.weightCapKg ? truck.weightCapKg : Math.floor(Math.round(truck.on.kg * 10) / 10);
+    return `${whole(kilos)} / ${whole(truck.weightCapKg)} kg · ${volume}`;
+  }
   const [on, cap] = tonnes(truck.on.kg, truck.weightCapKg);
   return `${ONE_PLACE.format(on / 10)} / ${ONE_PLACE.format(cap / 10)} t · ${volume}`;
 }
 
 // "0 of 118 cartons on"
 export const onOfUnits = (truck: LoadingTruck) => `${whole(truck.on.units)} of ${unitsWords(truck.brand, truck.units)} on`;
+
+// A trip whose vehicle is still out on an earlier one (Q-26), as the API names it: "out on trip 1 · back by 06:38" in its
+// row, and on its load page "VEH057 is out on trip 1 · back by 06:38. Put the cartons ready on the dock; they go on
+// when it is back.", in the brand's units, and "units" when the trip mixes brands.
+type OutOn = NonNullable<LoadingTruck['outOn']>;
+export const outOnWords = (outOn: OutOn) => `out on trip ${outOn.tripNo} · back by ${clockTime(outOn.backBy)}`;
+export const outOnLine = (truck: Pick<LoadingTruck, 'vehicleId' | 'brand'> & { outOn: OutOn | null }) => (truck.outOn
+  ? `${truck.vehicleId} is ${outOnWords(truck.outOn)}. Put the ${truck.brand ? UNIT_WORD[truck.brand][1] : 'units'} ready on the dock; they go on when it is back.`
+  : null);
 
 // A line of a stop: "12 cartons chilled" for Fresh, and "10 boxes · Folded clothing" or "2 pallets of 8 ·
 // Televisions" with the item's name for Style and Tech.

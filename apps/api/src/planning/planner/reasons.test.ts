@@ -334,20 +334,28 @@ describe('the planner\'s own sentences in plain words', () => {
 // The planner's 200 characters hold for the whole reason (spec 011, spec 026): drivers' names give way to kind and id
 // first, and only then is the reason tightened, never by cutting a word or leaving out a fact.
 describe('every reason within 200 characters', () => {
-  it('takes the fullest wording that fits: whole sentences, the short forms, then kind and id, then the tight form', () => {
+  it('takes the fullest wording that fits: whole sentences, the short forms, kind and id, tight, without the deciding rule, and last the limit before the load', () => {
     const rendered: Wording[] = [];
     const sized = (lengths: Record<Wording, number>) => (wording: Wording) => {
       rendered.push(wording);
       return 'x'.repeat(lengths[wording]);
     };
-    expect(fittedReason(sized({ full: 200, short: 150, plain: 150, tight: 120 }))).toHaveLength(200);
+    expect(fittedReason(sized({ full: 200, short: 150, plain: 150, tight: 120, tightest: 100, shortest: 96 }))).toHaveLength(200);
     expect(rendered).toEqual(['full']);
     rendered.length = 0;
-    expect(fittedReason(sized({ full: 260, short: 206, plain: 165, tight: 150 }))).toHaveLength(165);
+    expect(fittedReason(sized({ full: 260, short: 206, plain: 165, tight: 150, tightest: 130, shortest: 126 }))).toHaveLength(165);
     expect(rendered).toEqual(['full', 'short', 'plain']);
     rendered.length = 0;
-    expect(fittedReason(sized({ full: 260, short: 230, plain: 207, tight: 183 }))).toHaveLength(183);
+    expect(fittedReason(sized({ full: 260, short: 230, plain: 207, tight: 183, tightest: 165, shortest: 161 }))).toHaveLength(183);
     expect(rendered).toEqual(['full', 'short', 'plain', 'tight']);
+    rendered.length = 0;
+    expect(fittedReason(sized({ full: 260, short: 240, plain: 220, tight: 203, tightest: 185, shortest: 181 }))).toHaveLength(185);
+    expect(rendered).toEqual(['full', 'short', 'plain', 'tight', 'tightest']);
+    rendered.length = 0;
+    expect(fittedReason(sized({ full: 260, short: 250, plain: 240, tight: 220, tightest: 201, shortest: 197 }))).toHaveLength(197);
+    expect(rendered).toEqual(['full', 'short', 'plain', 'tight', 'tightest', 'shortest']);
+    // Longer even then, it keeps its length rather than be cut.
+    expect(fittedReason(sized({ full: 260, short: 250, plain: 240, tight: 230, tightest: 210, shortest: 206 }))).toHaveLength(206);
   });
 
   it('names trucks by kind and id once the drivers\' names do not fit, and words them tightly only after that', () => {
@@ -361,6 +369,9 @@ describe('every reason within 200 characters', () => {
     expect(placed(false, 2, 'plain')).toBe('on the second trip of the dry truck VEH012 (vehicle ID tie)');
     expect(placed(false, 2, 'tight')).toBe('on dry truck VEH012\'s second trip (vehicle ID tie)');
     expect(placed(true, 1, 'tight')).toBe('joined dry truck VEH012 (fills existing run)');
+    // The last wording also leaves out the deciding rule, and keeps the truck and its trip.
+    expect(placed(false, 2, 'tightest')).toBe('on dry truck VEH012\'s second trip');
+    expect(placed(true, 1, 'tightest')).toBe('joined dry truck VEH012');
 
     // A late second trip to the order's own shop: kind and id, then also without the shop its rank has named already.
     const style = plannerOrder('style', 'OUT019', 'style-folded');
@@ -371,6 +382,7 @@ describe('every reason within 200 characters', () => {
     const late = tryCandidate(trial, fresh, { vehicleId: 'VEH012', tripNo: 2, existing: false });
     expect(refusedReason(lateDay, fresh, [late], 'window', 'plain')).toBe('Colombo is reached at 10:56 by the second trip of the dry truck VEH012, after the 08:00 deadline.');
     expect(refusedReason(lateDay, fresh, [late], 'window', 'tight')).toBe('reached at 10:56 by dry truck VEH012\'s second trip, after 08:00.');
+    expect(refusedReason(lateDay, fresh, [late], 'window', 'tightest')).toBe('reached at 10:56 by dry truck VEH012\'s second trip, after 08:00.');
     expect(refusedReason(lateDay, fresh, [late], 'window', 'tight', 'VEH012')).toBe('reached at 10:56 by its second trip, after 08:00.');
 
     // Another shop made late keeps its place, as the order's own is not the one named.
@@ -392,6 +404,14 @@ describe('every reason within 200 characters', () => {
     const full = tryCandidate(planInput(vanDay), waiting, { vehicleId: 'VEH035', tripNo: 1, existing: false });
     expect(refusedReason(vanDay, waiting, [full], 'over_capacity', 'plain')).toBe('The reefer van VEH035 carries 2,760 kg, over its 1,040 kg limit.');
     expect(refusedReason(vanDay, waiting, [full], 'over_capacity', 'tight')).toBe('Reefer van VEH035 carries 2,760 kg, over its 1,040 kg limit.');
+    // The last wording says the limit first and the load after it, four characters shorter with every figure kept.
+    expect(refusedReason(vanDay, waiting, [full], 'over_capacity', 'tightest')).toBe('Reefer van VEH035 carries 2,760 kg, over its 1,040 kg limit.');
+    expect(refusedReason(vanDay, waiting, [full], 'over_capacity', 'shortest')).toBe('Reefer van VEH035 over its 1,040 kg limit with 2,760 kg.');
+    expect(refusedReason(vanDay, waiting, [full], 'over_capacity', 'shortest', 'VEH035')).toBe('It is over its 1,040 kg limit with 2,760 kg.');
+    const rails = plannerOrder('rails', 'OUT019', 'style-hanging', 80);
+    const railsDay = plannerInput([rails], { vehicles: [vehicle('VEH008')] });
+    const railsFull = tryCandidate(planInput(railsDay), rails, { vehicleId: 'VEH008', tripNo: 2, existing: false });
+    expect(refusedReason(railsDay, rails, [railsFull], 'over_capacity', 'shortest')).toBe('Dry truck VEH008 over its 22 m³ limit with 24 m³ on its second trip.');
 
     // Fuel in the tight form: the litres it needs and has left say it is over, unless rounding hides that.
     const fuelRefused = (fleet: PlannerInput['vehicles'], shop: string, product?: string) => {

@@ -299,13 +299,15 @@ describe('a dispatcher on both depots', () => {
   }
 
   // On Kandy, the planning session builds Thursday's suggested plan, gives its first vehicle to D-037 and accepts the
-  // planner's decisions. Answers the board with the draft.
+  // planner's decisions. Answers the board with the draft. The suggestion names a driver for every vehicle (D-97), so
+  // the first vehicle's driver takes D-037's vehicle in exchange, and no driver has two.
   async function kandysDraft(): Promise<PlanBoard> {
     expect((await switchTo(planner.agent, 'Kandy')).status).toBe(200);
     const start = answered(await planner.agent.get('/api/v1/plans'));
     let board = answered(await planner.agent.post(`/api/v1/plans/${THU}/suggest`).send({ planId: null, demoDay: start.demoDay }));
-    const vehicleId = board.plan.trips[0]!.vehicleId;
-    const trips = board.plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId: ashen.me.id } : trip));
+    const { vehicleId, driverId: theirs } = board.plan.trips[0]!;
+    const trips = board.plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId: ashen.me.id }
+      : trip.driverId === ashen.me.id ? { ...trip, driverId: theirs } : trip));
     board = answered(await planner.agent.put(`/api/v1/plans/${THU}/draft`)
       .send({ planId: board.plan.id, revision: board.plan.revision, plan: { mixBrands: board.plan.mixBrands, trips, deferrals: board.plan.deferrals } }));
     const open = board.suggestion!.decisions.filter((decision) => decision.open).map((decision) => decision.key);

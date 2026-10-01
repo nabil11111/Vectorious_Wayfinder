@@ -66,8 +66,24 @@ export const LoadingTruck = z.object({
   stops: z.array(LoadingStop),
   // The open ones first, then the answered ones, latest first.
   issues: z.array(LoadingIssue),
+  // The vehicle's earlier trip it is still out on, and when that trip is due back, or null while the vehicle is at the
+  // depot (Q-26). Its goods are put ready on the dock meanwhile (rule 2).
+  outOn: z.object({ tripNo: z.number().int().min(1), backBy: Moment }).nullable(),
 });
 export type LoadingTruck = z.infer<typeof LoadingTruck>;
+
+// A truck of the day's sent plan that has left the dock: its driver started the trip, so it is off the list of trucks
+// to load, on the road or back (Q-34). A page open on it says so, where a truck the plan took away is not on the day.
+export const LeftTruck = z.object({
+  tripId: z.uuid(),
+  vehicleId: z.string(),
+  tripNo: z.number().int().min(1),
+  // The driver's name, or null for a trip with none.
+  driver: z.string().nullable(),
+  // When the driver started the trip, or null for a trip that left before the app kept the time.
+  leftAt: Moment.nullable(),
+});
+export type LeftTruck = z.infer<typeof LeftTruck>;
 
 export const LoadingDay = z.object({
   depot: z.string(),
@@ -78,6 +94,8 @@ export const LoadingDay = z.object({
   plan: z.object({ id: z.uuid(), revision: z.number().int().min(0), publishedAt: Moment, publishedBy: z.string().nullable() }).nullable(),
   // In leaving order, then by vehicle and trip number (rule 2).
   trucks: z.array(LoadingTruck),
+  // The sent plan's trucks that have left, in the order they left, then by vehicle and trip number (Q-34).
+  left: z.array(LeftTruck),
 });
 export type LoadingDay = z.infer<typeof LoadingDay>;
 
