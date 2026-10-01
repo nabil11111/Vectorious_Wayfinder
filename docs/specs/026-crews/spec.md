@@ -68,7 +68,8 @@ Nabil, 1 Oct:
 - [ ] AC-2 The plan board shall show no "Unassigned trucks" panel. Unplanned orders shall take the left column's full
   height, and the header shall keep the trucks count.
 - [ ] AC-3 Every sentence the checker, the planner's "why?" and the notifications write shall name a truck by its
-  driver ("Chaminda's dry truck"), or by kind and number when it has no driver. The plan board's and View plan's
+  driver ("Chaminda's dry truck"), or by kind and number when it has no driver. A planner's reason names trucks by
+  driver unless the 200-character reason has no room: it is tightened first, and the names give way last. The plan board's and View plan's
   cards and headers shall read "Chaminda · dry truck" with no vehicle number.
 - [ ] AC-4 The usual driver shall come from the latest sent plan, or else the fixed pairing, pinned by tests on
   the seeded day.
