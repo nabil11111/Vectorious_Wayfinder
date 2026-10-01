@@ -1,5 +1,5 @@
 import { hash } from '@node-rs/argon2';
-import { IssueList, PHONE_ACCOUNT_HEADER, type StoreOrder } from '@wayfinder/contracts';
+import { IssueList, PHONE_ACCOUNT_HEADER, PlanBoard, type DraftPlan, type StoreOrder } from '@wayfinder/contracts';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
@@ -10,6 +10,7 @@ import { auditLog, demoDay, phoneWrites, users } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { resetDay, signIn, THU, WED } from './loading-plan';
+import { FRI } from './operations-plan';
 import { deliveredWalkthrough, MORNING_DONE, receiptOf, shopScreen, type ReceiptWalk } from './receipt-plan';
 import { serve, stop } from './serve';
 import { PIN, signInAs } from './sign-in';
@@ -134,4 +135,44 @@ it('takes a closed shop\'s brought-back orders off Today, and Orders says they w
   expect(open.map((order) => [order.id, order.status, order.broughtBack])).toEqual([[CHILLED, 'placed', true], [DRY, 'placed', true]]);
   expect(linesOf(open, CHILLED)).toEqual(['48 chilled cartons: brought back to the depot, waiting for the next plan']);
   expect(linesOf(open, DRY)).toEqual(['46 dry cartons: brought back to the depot, waiting for the next plan']);
+});
+
+// L-14: Chamari at Fresh Wellawatte opened Today after the 48 chilled cartons were brought back, and nothing on it said
+// they did not come or what happens to them. Today keeps a line for each brought-back order, with its new day once a
+// sent plan takes it, until the day moves on.
+it('says on Today what happened to each order brought back from the closed shop, and its new day once a plan takes it', async () => {
+  await deliveredWalkthrough(walk, { wellawatte: 'closed' });
+  expect((await shop.list('today')).broughtBack).toBeNull();
+  await answer('closed', 'OUT002', 'bring_back', 3 * 60 + 52);
+  freeze(THU, 9 * 60 + 38);
+  const today = await shop.list('today');
+  expect(today.orders).toEqual([]);
+  expect(today.broughtBack).toEqual({ title: 'Not coming today', orders: [
+    { orderId: CHILLED, line: '48 chilled cartons brought back to the depot · waiting for the next plan' },
+    { orderId: DRY, line: '46 dry cartons brought back to the depot · waiting for the next plan' },
+  ] });
+  // Only Today says it.
+  for (const name of ['open', 'past'] as const) expect((await shop.list(name)).broughtBack).toBeNull();
+
+  // Ruwan sends Friday's plan with the chilled order on it; the dry one waits.
+  freeze(THU, 16 * 60);
+  const board = PlanBoard.parse((await ruwan.get('/api/v1/plans')).body);
+  expect(board.day?.date).toBe(FRI);
+  const [driver] = await db.select().from(users).where(eq(users.username, 'dilshan'));
+  const draft: DraftPlan = { mixBrands: false, trips: [{ vehicleId: 'VEH035', tripNo: 1, leaveAt: null, driverId: driver!.id, stops: [{ outletId: 'OUT002', orderIds: [CHILLED] }] }],
+    deferrals: board.orders.filter((order) => order.id !== CHILLED).map((order) => ({ orderId: order.id, code: 'dispatcher_choice', reason: 'Scheduled for a later run.' })) };
+  const saved = await ruwan.put(`/api/v1/plans/${FRI}/draft`).send({ planId: null, demoDay: board.demoDay, plan: draft });
+  expect(saved.status).toBe(200);
+  const ready = PlanBoard.parse(saved.body);
+  expect((await ruwan.post(`/api/v1/plans/${FRI}/send`).send({ planId: ready.plan.id, revision: ready.plan.revision })).status).toBe(200);
+  expect((await shop.list('today')).broughtBack!.orders).toEqual([
+    { orderId: CHILLED, line: '48 chilled cartons brought back to the depot · planned for Fri 26 Jun' },
+    { orderId: DRY, line: '46 dry cartons brought back to the depot · waiting for the next plan' },
+  ]);
+
+  // On Friday the chilled order is coming today, and Thursday's closed shop is no longer Today's news.
+  freeze(FRI, 60);
+  const friday = await shop.list('today');
+  expect(friday.orders.map((order) => order.id)).toEqual([CHILLED]);
+  expect(friday.broughtBack).toBeNull();
 });

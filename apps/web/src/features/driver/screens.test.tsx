@@ -12,7 +12,7 @@ import { NextStopPage } from './NextStopPage';
 import { TodaysTrip } from './TripPage';
 import { UnloadPage } from './UnloadPage';
 import { tripsOf, type DriverView } from './view';
-import { backOnlineLines, lineName, overLoadedLine, wholeCountsLine } from './words';
+import { backOnlineLines, handBack, lineName, overLoadedLine, wholeCountsLine } from './words';
 
 // The driver's screens as the live QA run found them (phase 4, Q-25 to Q-32). The pages are drawn as the phone would
 // draw them, from a day as the server sends it and the app clock on Thu 25 Jun. These fixtures live in the test only.
@@ -436,5 +436,38 @@ describe('Q-32 each line on Unload names its item in full', () => {
     const html = unload(arrivedAt());
     expect(nameOf(html, 'Chilled')).toMatch(/truncate/);
     expect(html.slice(html.lastIndexOf('<div', html.indexOf(nameOf(html, 'Chilled'))), html.indexOf(nameOf(html, 'Chilled')))).not.toMatch(/flex-wrap/);
+  });
+});
+
+// ── The hand-back card's one and many ─────────────────────────────────────────────────────────────────────────────
+
+// Wasantha's VEH035 in the landing recheck: Kotahena refused 1 chilled carton, and "Still on the truck" said "Hand them
+// to the depot check." One carton is "it", more are "them", in every hand-back sentence.
+describe('the hand-back card says it for one carton and them for more', () => {
+  const problem = (stop: DriverStop, kind: 'refused' | 'closed', counted: number, decision: 'bring_back' | null) => ({
+    id: id(6, stop.seq), kind, stopId: stop.id, reason: kind === 'refused' ? 'damaged' as const : 'nobody_there' as const, note: null, raisedAt: at('03:50'), hasPhoto: false,
+    lines: [{ lineId: stop.lines[0]!.lineId, counted }], decision, decidedBy: decision ? 'Ruwan' : null, decidedAt: decision ? at('03:55') : null,
+  });
+  const card = (n: number) => {
+    const done = (outcome: 'refused' | 'closed') => ({ arrivedAt: at('03:48'), doneAt: at('03:48'), outcome });
+    const stops = [
+      stopOf(11, 1, 'Fresh Kotahena', [{ n: 11, quantity: 53, delivered: 53 - n }], done('refused')),
+      stopOf(12, 2, 'Fresh Wellawatte', [{ n: 12, quantity: n }], done('closed')),
+      stopOf(13, 3, 'Fresh Dehiwala', [{ n: 13, quantity: n }], done('closed')),
+    ];
+    const trip = tripOf(35, { status: 'done', stops, problems: [problem(stops[0]!, 'refused', n, 'bring_back'), problem(stops[1]!, 'closed', n, 'bring_back'), problem(stops[2]!, 'closed', n, null)] });
+    return handBack(trip, tripFigures(trip)).text;
+  };
+
+  it('says it for one', () => {
+    expect(card(1)).toBe('1 chilled carton refused at Kotahena. Hand it to the depot check. '
+      + '1 carton for Wellawatte, nobody at the shop. Hand it in; it goes on the next run. '
+      + '1 carton for Dehiwala, nobody at the shop. The depot decides what happens to it.');
+  });
+
+  it('says them for more', () => {
+    expect(card(2)).toBe('2 chilled cartons refused at Kotahena. Hand them to the depot check. '
+      + '2 cartons for Wellawatte, nobody at the shop. Hand them in; they go on the next run. '
+      + '2 cartons for Dehiwala, nobody at the shop. The depot decides what happens to them.');
   });
 });

@@ -122,8 +122,9 @@ plan. Missing evidence remains missing even if a plausible figure could be worke
    handed over = delivered count; received = the shop's received count. Zero is a recorded zero, null is unknown.
    Depot short = ordered − loaded; refused = loaded − handed over on a refusal; receipt short = handed over −
    received. Do not add a receipt's total order shortfall to those differences again. For an old closed attempt,
-   loaded/not delivered comes from its `issue_lines.counted`; handed over and received are null, even if the orders
-   later travel on Friday. Use the existing calculators/helpers on the server; screens format, filter by returned
+   loaded/not delivered comes from its `issue_lines.counted`. A closed stop was handed nothing: its handed over,
+   received and receipt short are recorded zeros, never the orders' later counts, even if the orders later travel on
+   Friday, so a trip with a closed shop still reads whole figures (L-13). Use the existing calculators/helpers on the server; screens format, filter by returned
    flags and draw, without calculating business figures.
 
    | History figure | Exact meaning |

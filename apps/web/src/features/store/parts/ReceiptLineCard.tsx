@@ -72,8 +72,8 @@ function Note({ icon, children }: { icon: string; children: ReactNode }) {
 }
 
 // Confirm delivery's card for one line (Shop · Confirm delivery): the goods' picture and name, what the driver handed
-// over, the shop's own count, the units missing or damaged once the count is lower, and what the depot sent short or
-// the shop refused at the door, reported where it was found (D-56).
+// over, the shop's own count, the units missing or damaged once the count is lower and the box is right, and what the
+// depot sent short or the shop refused at the door, reported where it was found (D-56).
 export function CountCard({ brand, line, figures, count, text, reason, disabled, onStep, onType, onLeave, onReason }: {
   brand: Brand; line: StoreDeliveryLine; figures: LineFigures; count: number; text: string | undefined; reason: ShortReason; disabled: boolean;
   onStep: (count: number) => void; onType: (text: string) => void; onLeave: () => void; onReason: (reason: ShortReason) => void;
@@ -99,9 +99,10 @@ export function CountCard({ brand, line, figures, count, text, reason, disabled,
           {wrong === 'over' ? overLine(figures.expected) : countLine(figures.expected)}
         </p>
       )}
-      {short > 0 && (
+      {short > 0 && !wrong && (
         // What is wrong with this line's short units, its own answer (Q-40): a crate can come damaged while a pallet
-        // never came.
+        // never came. Not while the box holds a wrong number: the count held then is only what was typed on the way,
+        // and the box's own line says what is wrong (L-12).
         <div className="mt-[21px] flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
           <Chip tone="warn" size="sm" className="px-[9px] py-1.5">{shortChip(short, line.unit, reason)}</Chip>
           <div className="flex items-center gap-2.5">

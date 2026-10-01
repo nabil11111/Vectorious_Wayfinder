@@ -84,7 +84,7 @@ These are in `docs/decisions.md`.
 |  | Not on your list | No frame | "This delivery is not on your list." with "Back to Deliveries", for an address of another shop's stop. |
 | Today `/store` | Handed over | No frame | Spec 009's card with the chip "Delivered" and "Delivered 03:38 · VEH035 · Dilshan", and when less came than was ordered, "3 of 4 delivered · 1 short from the depot" or "46 of 48 delivered · 2 refused, damaged". |
 |  | Received | Shop · Today, and its desktop frame | The chip "Received 08:31" in green, and "All 8 received" or "11 received · 1 short". |
-|  | Nobody at the shop | No frame | The chip "Loaded" and "Nobody at the shop at 03:45 · VEH035". Once brought back the order leaves Today: it is not coming today (Q-41). |
+|  | Nobody at the shop | No frame | The chip "Loaded" and "Nobody at the shop at 03:45 · VEH035". Once brought back the order leaves "Coming today": it is not coming today (Q-41). Today says so instead, in a card "Not coming today" under Coming today, a line per order as the server words it, "48 chilled cartons brought back to the depot · waiting for the next plan", or "· planned for Fri 26 Jun" once a sent plan takes it, until the day moves on (L-14). |
 |  | The depot's answer | No frame | One line per problem of the delivery that counts the order, under the card's other lines (rule 11). |
 |  | Deliveries to confirm | No frame | For a shop with more than one delivery among those waiting and those confirmed today, while one still waits (Q-35): a card above Coming today, "2 deliveries to confirm", and a row per delivery still waiting as the server words it, "3 dry cartons · Delivered 04:06 · VEH038 · Lahiru", with "Confirm", which opens it; the first Confirm is orange. It counts down as each is confirmed and goes with the last. A shop with one delivery sees only its card's "Delivered". |
 | Orders `/store/orders` | Received | Shop · Orders · Past, Shop · Orders · desktop | The chip "All 8 received" in green or "11 received · 1 short" in yellow, and "Received 08:31", or "Arrived 08:25, after your window". A card whose receipt reported something opens that receipt. |
@@ -189,7 +189,8 @@ Thu 08:30. Times are depot time and depend on the judge's pace.
       the depot or refused line stays.
     - Nobody at the shop: "Nobody at the shop at 03:45 · VEH035", also once the order is placed again. Brought back and
       placed again, it is off Today's list whatever day it was for, and its card names no day until a sent plan takes it
-      (Q-41).
+      (Q-41). Today keeps a line for it the day it was brought back, worded by the server: the cartons the driver took
+      back, then "waiting for the next plan" or "planned for Fri 26 Jun" (L-14).
     - One line per problem of that stop that counts the order, which the server words: the cartons on this order it is
       about, then what happens to them (Q-36), so two answers on one card never read as one taking back the other. A
       refusal "2 damaged chilled cartons: the depot decides what happens to them", "…: they go back to the depot" or

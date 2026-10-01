@@ -3,6 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useNextOrder } from './next-order';
 import { useTodayOrders } from './orders';
+import { BroughtBackCard } from './parts/BroughtBackCard';
 import { LoadError, StaleNotice } from './parts/LoadError';
 import { NextOrderCard, PlacedCard } from './parts/NextOrderCard';
 import { OrderCard } from './parts/OrderCard';
@@ -13,8 +14,8 @@ import { clockTime, cutoffDay, shortDay, weekday } from './words';
 const heading = 'mb-[9px] text-[17px] leading-[23px] font-bold lg:mb-3 lg:text-lg lg:leading-[25px]';
 
 // Today (Shop · Today and Shop · Today · orders submitted): what is due today, the deliveries still to confirm when the
-// shop had more than one (Q-35), and the next order. On a phone
-// it is one column, and from 1024 px the next order moves to a column of its own on the right.
+// shop had more than one (Q-35), what happened to an order brought back from the closed shop (L-14), and the next
+// order. On a phone it is one column, and from 1024 px the next order moves to a column of its own on the right.
 export function TodayPage() {
   const next = useNextOrder();
   const today = useTodayOrders();
@@ -62,6 +63,8 @@ export function TodayPage() {
               <OrderCardSkeleton />
             </div>
           )}
+          {/* What happened to an order brought back today from the closed shop, under what is still coming (L-14). */}
+          {today.data?.broughtBack && <div className="mt-2.5 lg:mt-3.5"><BroughtBackCard broughtBack={today.data.broughtBack} /></div>}
         </section>
 
         <section className={cn(placedOnTop && 'order-first lg:order-none')}>

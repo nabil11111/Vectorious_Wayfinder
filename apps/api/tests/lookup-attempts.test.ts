@@ -37,7 +37,8 @@ it('AC-14 a Thursdays loading problem keeps its own counts after Fridays reload 
   await decide(h.ruwan, trip.problems.find(row => row.kind === 'closed')!.id, 'bring_back');
   await h.road.write(driverTrip(await h.road.driver.read()), 'finish', 235);
   const old = (await read()).trips[0]!.stops[1]!;
-  expect(old.lines.find(row => row.lineId === chilled.lineId)).toMatchObject({ loaded: 47, delivered: null, received: null });
+  // Closed, it was handed nothing and received nothing (L-13).
+  expect(old.lines.find(row => row.lineId === chilled.lineId)).toMatchObject({ loaded: 47, delivered: 0, received: 0 });
 
   h.freeze(THU, 960);
   await h.publish(FRI, ['OUT002']);
@@ -62,7 +63,7 @@ it('AC-14 a Thursdays loading problem keeps its own counts after Fridays reload 
   expect(current.lines.find(row => row.lineId === chilled.lineId)).toMatchObject({ loaded: 48, delivered: 48, received: 40 });
   const historical = (await read()).trips[0]!.stops[1]!;
   expect(historical.problems.find(row => row.id === loadingProblemId)!.lines).toMatchObject([
-    { lineId: chilled.lineId, counted: 47, loaded: 47, delivered: null, received: null },
+    { lineId: chilled.lineId, counted: 47, loaded: 47, delivered: 0, received: 0 },
   ]);
   expect(historical).toEqual(old);
 });
@@ -111,7 +112,7 @@ it('AC-14 and AC-8 Fridays reload and receipt cannot rewrite Thursdays 94 closed
   expect(current.trips[0]!.stops[0]!.receipt).toMatchObject({ received: 93, orderCount: 2 });
   const historical = (await read()).trips[0]!.stops[1]!;
   expect(historical).toEqual(old);
-  expect(historical).toMatchObject({ receipt: null, stages: { loaded: { units: 94 }, handedOver: { units: null }, received: { units: null }, notDelivered: { units: 94 } }, attempts: [{ notDelivered: 94, decision: 'bring_back' }] });
+  expect(historical).toMatchObject({ receipt: null, stages: { loaded: { units: 94 }, handedOver: { units: 0 }, received: { units: 0 }, notDelivered: { units: 94 } }, attempts: [{ notDelivered: 94, decision: 'bring_back' }] });
 });
 it('AC-15 retry keeps each issues own time counts photo and answer without audit arrival recovery', async () => {
   const different = Buffer.from(jpeg); different[different.length - 3] = 1;

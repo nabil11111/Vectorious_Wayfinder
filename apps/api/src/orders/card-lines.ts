@@ -69,6 +69,15 @@ export function problemLineOf(facts: ProblemLineFacts): string {
   }
 }
 
+// An order brought back from a closed shop, as Today says it (L-14): the cartons the driver took back, then that it
+// waits for the next plan, or the day of the sent plan that took it. "48 chilled cartons brought back to the depot ·
+// waiting for the next plan", "48 chilled cartons brought back to the depot · planned for Fri 26 Jun".
+export function broughtBackLine(brand: Brand, temp: Temp, units: number, day: string | null): string {
+  const [one, many] = UNIT[brand];
+  const goods = `${WHOLE.format(units)} ${brand === 'Fresh' ? `${temp} ` : ''}${units === 1 ? one : many}`;
+  return `${goods} brought back to the depot · ${day ? `planned for ${dayLabel(day)}` : 'waiting for the next plan'}`;
+}
+
 // Today's deliveries still to confirm (Q-35), for a shop with more than one delivery among those waiting and those
 // confirmed today: how many wait, and each with its stop and what came, "20 chilled and 3 dry cartons · Delivered 03:38 ·
 // VEH035 · Dilshan", the day before the time when it is not today. null when one delivery or none is the shop's, or none

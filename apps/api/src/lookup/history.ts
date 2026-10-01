@@ -76,11 +76,14 @@ export function getLookupHistory(caller: DepotCaller, query: LookupHistoryQuery)
           }) }) : null;
         if (receipt && delivery) { receipt.received = delivery.received!; receipt.short = delivery.short; }
         const loaded = trip.status !== 'planned' && trip.status !== 'loading';
+        // A closed shop was handed nothing, so nothing was received or short on a receipt: recorded zeros, which nothing
+        // later changes, not stages still to record (L-13). Its goods count under not delivered.
+        const closed = stop.outcome === 'closed';
         const lines: HistoryLine[] = stop.lines.map(line => {
           const counted = lineCounts.find(row => row.lineId === line.lineId)!, confirmed = delivery?.byLine.find(row => row.lineId === line.lineId);
-          return { ...line, loaded: loaded ? line.loaded : null, delivered: handed ? line.delivered : null,
-            received: receipt ? confirmed!.received : null, depotShort: loaded && line.loaded !== null ? counted.short : null,
-            refused: completed ? counted.refused : null, receiptShort: receipt ? confirmed!.short : null, notDelivered: completed ? counted.notDelivered : null };
+          return { ...line, loaded: loaded ? line.loaded : null, delivered: handed ? line.delivered : closed ? 0 : null,
+            received: receipt ? confirmed!.received : closed ? 0 : null, depotShort: loaded && line.loaded !== null ? counted.short : null,
+            refused: completed ? counted.refused : null, receiptShort: receipt ? confirmed!.short : closed ? 0 : null, notDelivered: completed ? counted.notDelivered : null };
         });
         const stages = stagesOf(lines);
         return { id: stop.id, seq: stop.seq, outlet: member.shop, orderIds: ownOrders.map(row => row.id).sort(),

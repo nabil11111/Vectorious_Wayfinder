@@ -251,11 +251,15 @@ export function handBack(trip: DriverTrip, figures: Figures) {
     const brand = brandOf(trip, stop);
     const place = placeOf(stop.shopName);
     const problem = problemOf(trip, stop);
+    // One carton is "it" and more are "them".
     if (counts.refused > 0) {
-      lines.push(`${goodsWords(brand, counts, 'refused', counts.refused)} refused at ${place}. Hand them to the depot check${problem?.hasPhoto ? ' with the refusal photo' : ''}.`);
+      const them = counts.refused === 1 ? 'it' : 'them';
+      lines.push(`${goodsWords(brand, counts, 'refused', counts.refused)} refused at ${place}. Hand ${them} to the depot check${problem?.hasPhoto ? ' with the refusal photo' : ''}.`);
     }
     if (counts.notDelivered > 0) {
-      const next = problem?.decision === 'bring_back' ? 'Hand them in; they go on the next run.' : 'The depot decides what happens to them.';
+      const one = counts.notDelivered === 1;
+      const next = problem?.decision === 'bring_back' ? (one ? 'Hand it in; it goes on the next run.' : 'Hand them in; they go on the next run.')
+        : `The depot decides what happens to ${one ? 'it' : 'them'}.`;
       lines.push(`${unitsWords(brand, counts.notDelivered)} for ${place}, nobody at the shop. ${next}`);
     }
   });
