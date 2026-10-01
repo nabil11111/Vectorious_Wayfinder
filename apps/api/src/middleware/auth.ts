@@ -103,3 +103,9 @@ export async function readDepotOf(req: Request): Promise<string> {
   if (!known) throw new HttpError(400, 'unknown_record', 'That depot is not on the list.', { id: depot });
   return known.id;
 }
+
+// The dispatcher asking and the depot their read is for (readDepotOf), for the reads that take a DepotCaller.
+export const readerOf = async (req: Request): Promise<DepotCaller> => ({ userId: req.user!.id, depotId: await readDepotOf(req) });
+
+// A read's own query without the depot it names, for the reads whose query shapes refuse a key they do not know.
+export const pageQueryOf = (req: Request): Record<string, unknown> => Object.fromEntries(Object.entries(req.query).filter(([key]) => key !== 'depot'));
