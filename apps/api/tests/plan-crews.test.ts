@@ -193,6 +193,20 @@ it('L-04 does not call a crew fitting whose truck is ready again only after ever
   expect(inPickerOrder(list)).toBe(true);
 });
 
+it('L-04 calls no crew ready too late for an empty trip\'s swap, so its trucks with a trip go by fuel left like the rest', async () => {
+  const built = await ruwan.post(`/api/v1/plans/${THU}/suggest`).send({ planId: null, demoDay: board.demoDay });
+  expect(built.status, JSON.stringify(built.body.error)).toBe(200);
+  // Swap truck on a trip with no stops asks for no orders: no window closes, so no truck is ready after it.
+  const list = await crews(THU, []);
+  const free = list.crews.filter((crew) => crew.unavailable === null);
+  expect(free.some((crew) => crew.readyAt !== null)).toBe(true);
+  expect(list.crews.flatMap((crew) => crew.misfits)).toEqual([]);
+  expect(free.every((crew) => crew.fits)).toBe(true);
+  // So the free crews run by fuel left alone: none ran a district these orders are in.
+  expect(free.map((crew) => crew.fuelLeftPct)).toEqual(free.map((crew) => crew.fuelLeftPct).sort((a, b) => b - a));
+  expect(inPickerOrder(list)).toBe(true);
+});
+
 it('reads the crews of the depot the dispatcher has switched to', async () => {
   expect((await ruwan.put('/api/v1/me/depot').send({ depotId: 'Kandy' })).status).toBe(200);
   try {

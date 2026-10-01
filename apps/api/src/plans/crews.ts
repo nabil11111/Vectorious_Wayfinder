@@ -81,7 +81,8 @@ export function findCrews(caller: Planner, date: string, { orders: asked }: Crew
     const here = new Set(orders.map((order) => shopOf(board, order.outletId).district));
     const misfitsOf = trialOf(input, orders);
     // The latest any of the orders' windows closes, as the planner reads a window: within its mall slot, and before 08:00
-    // for a Fresh shop. A truck ready again only after it cannot take them on a second trip (L-04).
+    // for a Fresh shop. A truck ready again only after it cannot take them on a second trip (L-04). With no orders asked,
+    // as for an empty trip's swap, no window closes and no truck is late.
     const closes = Math.max(...orders.map((order) => effectiveWindow(input.outlets.find((o) => o.id === order.outletId)!).close));
     const readyOf = (vehicleId: string) => board.check?.trips.find((t) => t.vehicleId === vehicleId && t.tripNo === 1)?.times?.readyAgainAt ?? null;
     // A driver is on one row only, the truck he drives on the draft (L-05). A truck the draft has no trip on takes its
@@ -97,7 +98,7 @@ export function findCrews(caller: Planner, date: string, { orders: asked }: Crew
       const own = board.plan.trips.filter((t) => t.vehicleId === vehicle.id);
       const ran = districts.get(vehicle.id) ?? [];
       const readyAt = own.length > 0 ? readyOf(vehicle.id) : null;
-      const misfits = [...misfitsOf(vehicle.id), ...(readyAt !== null && readyAt > closes ? [{ code: 'ready_late' as const, orderId: null, outletId: null }] : [])];
+      const misfits = [...misfitsOf(vehicle.id), ...(readyAt !== null && orders.length > 0 && readyAt > closes ? [{ code: 'ready_late' as const, orderId: null, outletId: null }] : [])];
       return {
         vehicleId: vehicle.id, driverId: driverOf(vehicle, own),
         type: vehicle.type, temp: vehicle.temp, weightCapKg: vehicle.weightCapKg, volumeCapM3: vehicle.volumeCapM3, fuelLeftPct: vehicle.fuelLeftPct, readyAt,
