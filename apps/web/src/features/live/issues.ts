@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DecideIssueRequest, DecideIssueResponse, Issue, IssueList, LoadingDecision } from '@wayfinder/contracts';
+import type { DecideIssueRequest, DecideIssueResponse, Issue, IssueDecision, IssueList } from '@wayfinder/contracts';
 import { ANSWER_WITHIN_MS, fetchAgain, worthRetrying } from '@/features/loader/loading';
 import { reasonOf } from '@/features/store/words';
 import { api } from '@/lib/api';
@@ -22,7 +22,8 @@ export interface Answering {
   refused: string | null;
   // The problem answered last, for the green line. It stays until the next answer or a reload.
   sent: Issue | null;
-  decide: (issue: Issue, decision: LoadingDecision) => void;
+  // A loader's flag takes "Go short" or "Load it all", a driver's problem "Bring them back" or "Try again" (D-48).
+  decide: (issue: Issue, decision: IssueDecision) => void;
 }
 
 // The answer to a problem (D-37). It names the revision of the problem on screen. The answer comes back with the open
@@ -34,7 +35,7 @@ export function useAnswer(): Answering {
   // One answer at a time: a second tap before the screen redraws must not send it again.
   const running = useRef(false);
 
-  const decide = async (issue: Issue, decision: LoadingDecision) => {
+  const decide = async (issue: Issue, decision: IssueDecision) => {
     if (running.current) return;
     running.current = true;
     setState((held) => ({ ...held, sending: issue.id, failed: null, refused: null }));

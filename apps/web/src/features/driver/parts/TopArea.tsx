@@ -1,0 +1,31 @@
+import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { meKey } from '@/features/auth/api';
+import { useSync } from '../sender';
+import { signInLine } from '../words';
+
+// The top of every driver screen, under the top bar: "Sign in again" when the session is gone, then the screen's own
+// band, the top line or a signal bar. On a phone it runs to the edges, as the frames draw it; from 768 px it sits in
+// the column.
+export function TopArea({ waitingRecords, children }: { waitingRecords: number; children?: ReactNode }) {
+  const { signedOut } = useSync();
+  const qc = useQueryClient();
+  return (
+    <div className="-mx-4 -mt-4 mb-4 md:mx-0 md:mt-0 md:space-y-2">
+      {signedOut && (
+        // Sign in again (no frame): the writes wait under this account until the same driver signs in again.
+        <div className="flex items-center gap-3 border-b border-warn/40 bg-warn-tint px-4 py-3 md:rounded-[12px] md:border-b-0">
+          <p role="alert" className="min-w-0 flex-1 text-[13px] leading-4 font-semibold text-warn-ink">{signInLine(waitingRecords)}</p>
+          <button
+            type="button"
+            className="-my-2 shrink-0 rounded-md px-1 py-2 text-[13px] leading-4 font-bold text-foreground underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            onClick={() => qc.setQueryData(meKey, null)}
+          >
+            Sign in
+          </button>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
