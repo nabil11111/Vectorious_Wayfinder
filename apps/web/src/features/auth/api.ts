@@ -85,7 +85,14 @@ export function useLogout() {
   return useMutation({
     onMutate: () => qc.cancelQueries({ queryKey: meKey }),
     mutationFn: () => api<void>('/auth/logout', { method: 'POST', json: {} }),
-    onSuccess: async () => { await qc.cancelQueries({ queryKey: meKey }); keepAccount(null); qc.clear(); qc.setQueryData(meKey, null); },
+    // The screens on show must see the empty account before the rest of the cache goes, or they keep the old one.
+    onSuccess: async () => {
+      await qc.cancelQueries({ queryKey: meKey });
+      keepAccount(null);
+      qc.setQueryData(meKey, null);
+      qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] });
+      qc.getMutationCache().clear();
+    },
   });
 }
 

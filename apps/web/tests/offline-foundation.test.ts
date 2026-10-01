@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import type { ClockState, Me } from '@wayfinder/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -138,6 +138,18 @@ describe('the account kept for offline startup', () => {
     await flush();
     expect(storage.getItem(ACCOUNT_KEY)).toBeNull();
     expect(client.getQueryData(['me'])).toBeNull();
+  });
+
+  it('signing out tells the screens on show that the account is gone, so they leave the page', async () => {
+    storage.setItem(ACCOUNT_KEY, JSON.stringify(dilshan));
+    const auth = await import('../src/features/auth/api');
+    client.setQueryData(['me'], dilshan);
+    const seen: unknown[] = [];
+    const stop = new QueryObserver(client, { queryKey: ['me'], enabled: false }).subscribe(result => seen.push(result.data));
+    auth.useLogout();
+    await mutation().onSuccess?.(undefined, undefined, undefined, { client });
+    stop();
+    expect(seen.at(-1)).toBeNull();
   });
 
   it.each(['logout', 'login'] as const)('a cancelled account read cannot restore old identity after %s', async action => {
