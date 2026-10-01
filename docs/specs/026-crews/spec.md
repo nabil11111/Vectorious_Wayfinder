@@ -33,8 +33,9 @@ Nabil, 1 Oct:
   2. then those that ran this district on the latest sent plan;
   3. then the most fuel left.
 
-  A truck in the workshop, or already on its two trips, is listed at the end, greyed, with its reason ("in the
-  workshop: brakes") and cannot be picked. A crew that does not fit stays pickable: the checker decides (spec 007),
+  A driver is on one row only, the truck he drives on the draft; a truck the draft has no trip on shows its usual driver
+  while he drives none there (L-05). A truck in the workshop, or already on its two trips, is listed at the end, greyed,
+  with its reason ("in the workshop: brakes") and cannot be picked; a workshop truck names no driver. A crew that does not fit stays pickable: the checker decides (spec 007),
   and the row says why it may not fit.
 - **No trucks panel.** "Unassigned trucks" leaves the left column, and Unplanned orders takes its whole height. The
   header keeps "26 / 35 trucks". The empty middle's drop area reads "or drag an order here to start a trip".

@@ -84,9 +84,9 @@ it('AC-4 pairs Peliyagoda\'s drivers in staff ID order with its trucks in id ord
   const list = await crews(THU, []);
   expect(list.crews).toHaveLength(38);
   // D-001 Dilshan drives VEH001, D-003 Chaminda VEH002 and so on to D-036 Wasantha on VEH035, the fridge van. The last
-  // three trucks are past the last driver.
+  // three trucks are past the last driver. A truck in the workshop names no driver (L-05): VEH003, VEH005 and VEH036.
   expect(pairs(list)).toEqual(Object.fromEntries([
-    ['VEH001', 'D-001'], ...Array.from({ length: 34 }, (_, i) => [veh(i + 2), staffId(i + 3)]), ['VEH036', null], ['VEH037', null], ['VEH038', null],
+    ['VEH001', 'D-001'], ...Array.from({ length: 34 }, (_, i) => [veh(i + 2), [3, 5].includes(i + 2) ? null : staffId(i + 3)]), ['VEH036', null], ['VEH037', null], ['VEH038', null],
   ]));
   // The seed's sent plans hold no trips, so no truck ran a district last time, and with no orders every truck fits.
   expect(list.crews.every((crew) => crew.lastDistricts.length === 0 && !crew.ranHere && crew.fits && crew.misfits.length === 0)).toBe(true);
@@ -118,7 +118,7 @@ it('AC-1 lists the crews for Fresh Nugegoda\'s chilled order: the fridge van tha
   expect(inPickerOrder(list)).toBe(true);
 });
 
-it('AC-1 names the draft\'s driver for a truck on the draft, keeps a usual driver the draft has elsewhere, and puts a truck on two trips last', async () => {
+it('AC-1 names the draft\'s driver for a truck on the draft, a driver once only, and puts a truck on two trips last', async () => {
   const plan: DraftPlan = { mixBrands: false, deferrals: [], trips: [
     { vehicleId: 'VEH002', tripNo: 1, leaveAt: null, driverId: dilshanId, stops: [] },
     { vehicleId: 'VEH002', tripNo: 2, leaveAt: null, driverId: dilshanId, stops: [] },
@@ -133,8 +133,9 @@ it('AC-1 names the draft\'s driver for a truck on the draft, keeps a usual drive
   expect(list.crews.slice(-4).map((crew) => crew.vehicleId)).toEqual(['VEH002', 'VEH003', 'VEH005', 'VEH036']);
   // VEH004 has a trip with no driver, and the draft's choice stands.
   expect(crewOf(list, 'VEH004')).toMatchObject({ driverId: null, unavailable: null });
-  // VEH001's usual driver drives VEH002 on the draft. The crew is still Dilshan and VEH001: picking it moves him (rule 2).
-  expect(crewOf(list, 'VEH001').driverId).toBe(dilshanId);
+  // VEH001's usual driver drives VEH002 on the draft, so he is on VEH002's row alone and VEH001 names no driver (L-05).
+  expect(crewOf(list, 'VEH001').driverId).toBeNull();
+  expect(list.crews.filter((crew) => crew.driverId === dilshanId).map((crew) => crew.vehicleId)).toEqual(['VEH002']);
   expect(inPickerOrder(list)).toBe(true);
 });
 

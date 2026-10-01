@@ -293,7 +293,8 @@ export type CrewMisfit = z.infer<typeof CrewMisfit>;
 
 // A truck of the depot with its driver (D-100): the one the draft gives it, or else its usual driver, who drove it on the
 // depot's latest sent plan or, with none there, the one a fixed pairing of the drivers in staff ID order with the
-// trucks in id order gives it. null when it has none.
+// trucks in id order gives it, while he drives no other truck on the draft. A driver is on one crew only, and a truck in
+// the workshop names none (L-05). null when it has none.
 export const Crew = z.object({
   vehicleId: z.string(),
   driverId: z.uuid().nullable(),
