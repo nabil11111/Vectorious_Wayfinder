@@ -1,13 +1,13 @@
 import { checkPlan } from '../check';
 import { computeLoad } from '../load';
 import { defaultLeaveAt } from '../timeline';
-import type { BuildSuggestedPlan, PlanInput, PlannerChoice, PlannerDecision, PlannerOrder, PlannerSplit } from '../types';
+import type { BuildSuggestedPlan, PlanDeferral, PlanInput, PlannerChoice, PlannerDecision, PlannerOrder, PlannerSplit } from '../types';
 import { compare, prepareInput } from './priority';
 import {
   deferralDecisions, deferralFor, earlyLeaveReason, fittedReason, furthestRejection, placementReason, priorityReason, quantityWord, refusedReason,
   type Placement, type Wording,
 } from './reasons';
-import { chooseWhole, type CandidateAttempt } from './candidates';
+import { aloneStage, chooseWhole, type CandidateAttempt } from './candidates';
 import { freeRunFor, type Relocations } from './repair';
 import { chooseAllocation, rebalance, splitLimitDetail } from './split';
 
@@ -90,8 +90,11 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
   };
 
   // A deferral waits for the pass below before it is final.
-  const pending: { order: PlannerOrder; original: PlannerOrder; rank: number; deferral: ReturnType<typeof deferralFor> }[] = [];
-  const defer = (order: PlannerOrder, original: PlannerOrder, rank: number, deferral: ReturnType<typeof deferralFor>) => {
+  // Its sentence is written once it is final, from whether the order could go alone (AC-17).
+  type Alone = ReturnType<typeof aloneStage>;
+  const pending: { order: PlannerOrder; original: PlannerOrder; rank: number; deferral: (alone: Alone) => PlanDeferral }[] = [];
+  const aloneOf = new Map<string, Alone>();
+  const defer = (order: PlannerOrder, original: PlannerOrder, rank: number, deferral: (alone: Alone) => PlanDeferral) => {
     pending.push({ order, original, rank, deferral });
   };
   for (const [i, order] of originals.entries()) {
@@ -101,13 +104,12 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
     const priority = (wording: Wording) => priorityReason(source, order, rank, wording);
     if (!best) {
       if (!allocation.code) throw new Error(`No allocation or deferral code for ${order.id}`);
-      const deferral = deferralFor(source, order, allocation.code, { detail: allocation.detail, attempts: allocation.attempts });
+      const { attempts, code, detail } = allocation;
       input.orders.push(order);
-      defer(order, order, rank, deferral);
-      const { attempts, code } = allocation;
+      defer(order, order, rank, (alone) => deferralFor(source, order, code, { ...(detail ? { detail } : {}), attempts, alone }));
       choices.push({
         orderId: order.id, rank, resultOrderIds: [order.id],
-        render: (wording) => `${priority(wording)}; ${placements.has(order.id) ? placed(order, order.id, wording) : refusedReason(source, order, attempts, code, wording)}`,
+        render: (wording) => `${priority(wording)}; ${placements.has(order.id) ? placed(order, order.id, wording) : refusedReason(source, order, attempts, code, wording, undefined, aloneOf.get(order.id))}`,
       });
       continue;
     }
@@ -142,15 +144,15 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
         accept({ ...balanced.rest, selectionReason: 'parts rebalanced so both go' }, order, rank, rest.id);
       } else {
         splits.push(proposal.split);
-        defer(rest, order, rank, deferralFor(source, rest, code, {
-          attempts: remainder.attempts, split: { keptUnits, remainingUnits },
-          detail: splitLimitDetail(input, rest, originals.length + splits.length, remainder.slots, code),
+        const detail = splitLimitDetail(input, rest, originals.length + splits.length, remainder.slots, code);
+        defer(rest, order, rank, (alone) => deferralFor(source, rest, code, {
+          attempts: remainder.attempts, split: { keptUnits, remainingUnits }, ...(detail ? { detail } : {}), alone,
         }));
       }
       // The first part's vehicle is named just before, so the refusal's short form may call it "it".
       const restReason = (wording: Wording) => (placements.has(rest.id)
         ? `${unitsOf(rest.id)} ${quantityWord(source, order)} ${placed(order, rest.id, wording)}`
-        : `${unitsOf(rest.id)} wait: ${refusedReason(source, rest, remainder.attempts, code, wording, placements.get(kept.id)!.slot.vehicleId)}`);
+        : `${unitsOf(rest.id)} wait: ${refusedReason(source, rest, remainder.attempts, code, wording, placements.get(kept.id)!.slot.vehicleId, aloneOf.get(rest.id))}`);
       choice.render = (wording) => `${priority(wording)}; ${unitsOf(kept.id)} ${quantityWord(source, order)} ${placed(order, kept.id, wording)}; ${restReason(wording)}`;
     } else {
       input.orders.push(order);
@@ -160,8 +162,11 @@ export const buildSuggestedPlan: BuildSuggestedPlan = (raw) => {
 
   // Spec 011, AC-23: once every order has had its turn, each waiting one, in priority order, may take a run freed by
   // moving goods the plan already carries. Nothing placed is displaced, so the pass only ever serves more.
-  for (const { order, original, rank, deferral } of pending) {
+  for (const { order, original, rank, deferral: write } of pending) {
     if (freeRun(order, original, rank)) continue;
+    const alone = aloneStage(input, order);
+    aloneOf.set(order.id, alone);
+    const deferral = write(alone);
     input.plan.deferrals.push(deferral);
     decisions.push(...deferralDecisions(source, order, deferral));
   }

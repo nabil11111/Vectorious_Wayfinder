@@ -100,13 +100,15 @@ are depot time.
    removes it with the plan.
 6. **Decisions (D-54).** The planner hands the dispatcher three kinds (spec 011, AC-3 and AC-9): `early_leave`, a trip
    set to leave before its usual time to meet a window (D-19); `waited_again`, an order that waited before and some of
-   whose goods wait again (D-10); and `late_order`, an order deferred because no truck can reach the shop in its window
-   or mall slot (D-11). A decision is open while it is not accepted and the saved draft still holds the planner's own
+   whose goods wait again (D-10); and `late_order`, an order deferred because no truck of the suggestion reached the
+   shop in its window or mall slot (D-11), whether no vehicle could even alone or only this plan's other goods kept it
+   off; its sentence says which (spec 011, AC-17). A decision is open while it is not accepted and the saved draft still holds the planner's own
    choice: the trip leaves at that time, or the order is deferred with the planner's code and reason. An edit that
    changes that choice (another time, the order put on a trip or left unplanned, the reason rewritten) ends the
    decision, because the dispatcher has decided by editing. On View plan the dispatcher accepts one decision or all of
    them, and an accepted one stays accepted. *The seeded suggestion has six: four chilled orders for Kurunegala and two
-   for Puttalam wait for their windows, each a `late_order`, and no trip leaves early. With VEH035 in the workshop,
+   for Puttalam wait, each a `late_order` that did not fit this suggested plan's fridge trucks in time, though each could
+   go alone on an empty one, and no trip leaves early. With VEH035 in the workshop,
    Fresh Nugegoda's carried-over chilled cartons have no fridge van (`no_van`) and add a `waited_again`.*
 7. **why?** An order's reason is the planner's: it names the order's rank, its priority (waited since when, chilled or
    dry, when its window closes) and what decided its trip, or why it waits (spec 011, AC-1 and AC-17). An order moved
@@ -239,8 +241,8 @@ depend on the judge's pace, so the clock times are examples.
    the middle, "No trip open" and "Build the suggested plan" in orange.
 3. Press it. "Building the plan · 102 orders · 35 trucks", then "Unplanned · 0", 27 trips under Done on "26 / 35
    trucks", "96 / 102 orders", and "Deferred · 6": the chilled orders of four Kurunegala shops and two Puttalam shops,
-   each with its sentence, such as "No truck could reach Fresh Pannala before its window closed at 07:45 on
-   Thursday." The middle says "Suggested plan · 16:00 · 6 decisions to make".
+   each with its sentence, such as "The order for Fresh Pannala didn't fit this suggested plan's fridge trucks on
+   Thursday; try it by hand on the board." The middle says "Suggested plan · 16:00 · 6 decisions to make".
 4. Under Done, open the Fresh · Matara trip with Fresh Dickwella's chilled cartons and press "why?" on its stop: rank
    1, waiting since Tuesday. Press "why?" on a deferred order: its sentence and "to decide".
 5. Open VEH035's trip 1, the fridge van with Fresh Nugegoda's chilled cartons, and choose Dilshan as its driver: an

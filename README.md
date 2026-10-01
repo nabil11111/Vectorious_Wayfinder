@@ -226,13 +226,15 @@ Press **Reset the demo day** first if you walked the one above.
    truck · Fresh · Matara"), "26 / 35 trucks", "96 / 102 orders", "41% fuel this week" and
    "57.02 / 140.7 m³ fridge space". "Deferred · 6" holds
    the chilled orders of four Kurunegala shops (Pannala, Polgahawela, Wariyapola, Mawathagama) and two Puttalam shops
-   (Wennappuwa, Puttalam), each with the sentence the shop will read, such as "No fridge truck could reach Fresh
-   Pannala before its window closed at 07:45 on Thursday." The middle says "Suggested plan · 16:00 · 6 decisions to
+   (Wennappuwa, Puttalam), each with the sentence the shop will read, such as "The order for Fresh Pannala didn't
+   fit this suggested plan's fridge trucks on Thursday; try it by hand on the board." Each could go alone on an empty
+   fridge truck, so none says it cannot be delivered. The middle says "Suggested plan · 16:00 · 6 decisions to
    make".
 4. **Ask why.** Under Done, open Priyantha's reefer truck, the Fresh · Matara trip. Its timeline runs from "Peliyagoda 03:30" to "back
    09:34", and pointing at Fresh Dickwella's dot shows "Stop 3 · Fresh Dickwella", "arrives 06:37 · leaves 06:52",
    "window 03:00 to 08:00" and "39 cartons chilled". Press **why?** on Fresh Dickwella: "Rank 1: waited since Tuesday;
-   chilled; …". Press **why?** on a deferred order: its rank, why no truck could take it, and "to decide".
+   chilled; …". Press **why?** on a deferred order: its rank, the closest run the planner tried and when that run would
+   have arrived, and "to decide".
 5. **An ordinary edit.** Open Wasantha's reefer van, the trip with Fresh Nugegoda's carried-over cartons. His name in
    the header is the driver menu: Dilshan's row says "drives VEH001 now; it will have no driver". Choose him: the
    header reads "Planning · Dilshan · reefer van", VEH001's card "reefer truck VEH001 · no driver", and "Dilshan moved

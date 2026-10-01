@@ -18,6 +18,36 @@ const plain = (reason: string) => {
 };
 
 describe('shop-facing deferrals and dispatcher explanations', () => {
+  it('AC-17 says an order that could go alone did not fit this suggested plan, and invites a try by hand', () => {
+    // alone is whether the order passes on an empty first run of a vehicle that may carry it (aloneStage). When it does,
+    // only this plan's other goods kept it off, so no sentence may say a truck could not reach the shop or was full.
+    const day = input();
+    for (const searched of ['over_capacity', 'window', 'fuel'] as const) {
+      const deferred = deferralFor(day, source, searched, { alone: 'fits' });
+      expect(deferred).toEqual({ orderId: 'waiting', code: searched, reason: 'The order for Colombo didn\'t fit this suggested plan\'s fridge vans on Thursday; try it by hand on the board.' });
+      plain(deferred.reason);
+    }
+    expect(deferralFor(day, source, 'over_capacity', { alone: 'fits', split: { keptUnits: 150, remainingUnits: 30 } }).reason)
+      .toBe('150 of the 180 cartons for Colombo go on Thursday; the other 30 didn\'t fit this suggested plan\'s fridge vans, so try them by hand on the board.');
+    // Too big for every vehicle alone, an order that can be divided still only did not fit this plan.
+    expect(deferralFor(day, source, 'over_capacity', { alone: 'over_capacity' }).reason).toMatch(/^The order for Colombo didn't fit this suggested plan's/);
+    const dry = plannerOrder('dry', 'OUT006', 'fresh-dry-carton', 4);
+    expect(deferralFor(plannerInput([dry]), dry, 'window', { alone: 'fits' }).reason).toBe('The order for Colombo didn\'t fit this suggested plan\'s trucks on Thursday; try it by hand on the board.');
+  });
+
+  it('AC-17 keeps the hard limit that stops an order even alone, with its own code and specific sentence', () => {
+    const day = input();
+    const child = { ...source, splitFrom: 'parent' };
+    // A part that cannot be divided again and is too big for any vehicle.
+    expect(deferralFor(day, child, 'over_capacity', { alone: 'over_capacity' })).toMatchObject({ code: 'over_capacity', reason: 'The order for Colombo is more than any fridge van can carry on Thursday.' });
+    // Searched as full, but even alone the shop cannot be reached in time: the window is the reason, with its time.
+    expect(deferralFor(day, source, 'over_capacity', { alone: 'window' })).toMatchObject({ code: 'window', reason: 'No fridge van could reach Colombo before its window closed at 07:30 on Thursday.' });
+    expect(deferralFor(day, source, 'window', { alone: 'fuel' })).toMatchObject({ code: 'fuel', reason: "The fridge vans that could reach Colombo on Thursday did not have enough of this week's fuel left." });
+    expect(deferralFor(day, source, 'over_capacity', { alone: 'no_vehicle' })).toMatchObject({ code: 'over_capacity', reason: 'No fridge van was free for Colombo on Thursday.' });
+    // A refusal before any trial keeps its sentence whatever the alone test says.
+    expect(deferralFor(day, source, 'no_reefer', { alone: 'fits' }).reason).toBe('No fridge truck was free for Colombo on Thursday.');
+  });
+
   it('AC-17 chooses the first exhausted stage across all attempts', () => {
     expect(furthestRejection([])).toBe('over_capacity');
     expect(furthestRejection(['over_capacity'])).toBe('over_capacity');

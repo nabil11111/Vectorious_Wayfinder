@@ -187,4 +187,22 @@ describe('F8 the planner\'s quality on the seeded days', () => {
     expect(run.served).toEqual(run.all);
     expect(run.blocks).toBe(0);
   });
+  it('F4 says the seeded deferrals did not fit this suggested plan, as each could go alone on an empty fridge truck', async () => {
+    // Independent evidence, through the checker alone: each waiting order is on time by itself on an empty first run of
+    // a fridge truck, so no sentence may say no truck could reach the shop.
+    const { input } = await demoFixture();
+    const result = built(buildSuggestedPlan(input));
+    const reefers = input.vehicles.filter((v) => v.available && v.temp === 'reefer' && v.type === 'truck');
+    expect(result.input.plan.deferrals).toHaveLength(6);
+    for (const deferral of result.input.plan.deferrals) {
+      const order = result.input.orders.find((o) => o.id === deferral.orderId)!;
+      const carries = reefers.filter((reefer) => checkPlan({
+        ...result.input, orders: [order], vehicles: [reefer],
+        plan: { trips: [{ vehicleId: reefer.id, tripNo: 1, stops: [{ outletId: order.outletId, orderIds: [order.id] }] }], deferrals: [] },
+      }).ok);
+      expect(carries.length).toBeGreaterThan(0);
+      expect(deferral.reason).toMatch(/^The order for \w+ didn't fit this suggested plan's fridge trucks on Thursday; try it by hand on the board\.$/);
+      expect(deferral.reason).not.toMatch(/could reach|were full|was full|did not have enough/);
+    }
+  });
 });

@@ -228,3 +228,24 @@ export function chooseWhole(input: PlanInput, order: EngineOrder): CandidateSlot
     stages: attempts.map((attempt) => attempt.stage as RejectionStage),
   };
 }
+
+// Spec 011, AC-17: whether an order could go at all, apart from the rest of the plan. It is tried alone on an empty
+// first run of each vehicle that may carry it, in AC-6's order, until one passes. Travel and unloading times do not
+// depend on the vehicle (spec 007), so a missed window on one is missed on all and ends the search; a vehicle too
+// small or short of fuel leaves the next to try. 'fits' means only this plan's other goods kept the order off, and
+// 'no_vehicle' that the depot has no working vehicle of the kind it needs.
+export function aloneStage(input: PlanInput, order: EngineOrder): 'fits' | 'no_vehicle' | RejectionStage {
+  const empty: PlanInput = { ...input, orders: [], plan: { trips: [], deferrals: [] } };
+  const { fleet } = compatibleFleet(empty, order);
+  if (!fleet.length) return 'no_vehicle';
+  const slots = fleet.map((v) => ({ vehicleId: v.id, tripNo: 1, existing: false })).sort(slotOrder(empty, order));
+  let furthest: RejectionStage = 'over_capacity';
+  for (const slot of slots) {
+    const { stage } = tryCandidate(empty, order, slot);
+    if (stage === 'accepted') return 'fits';
+    if (stage === 'window') return 'window';
+    if (stage === 'fuel') furthest = 'fuel';
+  }
+  return furthest;
+}
+

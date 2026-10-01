@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkPlan } from '../check';
 import { inputFor, order, vehicle } from '../testing/shared';
 import type { EngineOrder, EngineVehicle, PlanInput, PlanTrip } from '../types';
-import { candidateInput, candidateSlots, chooseWhole, fixDepartures, tryCandidate } from './candidates';
+import { aloneStage, candidateInput, candidateSlots, chooseWhole, fixDepartures, tryCandidate } from './candidates';
 
 const dry = (id: string, shop = 'OUT006', quantity = 1) => order(id, shop, 'fresh-dry-carton', quantity);
 const trip = (vehicleId: string, tripNo: number, orders: EngineOrder[]): PlanTrip => ({
@@ -210,5 +210,19 @@ describe('whole-order planner candidates', () => {
     const refused = tryCandidate(input, b, slot);
     expect(refused.stage).toBe('window');
     expect(refused.input.plan.trips[0]!.stops.map((s) => s.outletId)).toEqual(['OUT019', 'OUT020']);
+  });
+  it('AC-17 tells whether an order could go alone, apart from the rest of the plan', () => {
+    const cold = order('cold', 'OUT001', 'fresh-chilled-carton', 2);
+    // Alone on an empty first run of the fridge van, whatever the plan already carries.
+    const busy = day([order('other', 'OUT001', 'fresh-chilled-carton', 140)], [trip('VEH035', 1, [order('other', 'OUT001', 'fresh-chilled-carton', 140)])], [vehicle('VEH035')]);
+    expect(aloneStage(busy, cold)).toBe('fits');
+    expect(aloneStage(day([], [], [vehicle('VEH035')]), order('huge', 'OUT001', 'fresh-chilled-carton', 400))).toBe('over_capacity');
+    expect(aloneStage(day([], [], [{ ...vehicle('VEH035'), litresUsedThisWeek: vehicle('VEH035').weeklyFuelQuotaL }]), cold)).toBe('fuel');
+    expect(aloneStage(day([], [], [vehicle('VEH012')]), dry('far'))).toBe('fits');
+    expect(aloneStage(day([], [], []), dry('none'))).toBe('no_vehicle');
+    // A mall whose slot closes before the shop opens can never be reached in time.
+    const mall = day([], [], [vehicle('VEH012')]);
+    Object.assign(mall.outlets.find((s) => s.id === 'OUT017')!, { windowOpen: 600, windowClose: 620, mallOpen: 700, mallClose: 750 });
+    expect(aloneStage(mall, order('mall', 'OUT017', 'style-folded', 1))).toBe('window');
   });
 });

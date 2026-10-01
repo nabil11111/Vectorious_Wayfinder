@@ -114,28 +114,52 @@ const splitLimitWords = (detail: string | undefined, place: string, day: string)
   return null;
 };
 
+// AC-17. alone is aloneStage's answer for the order: when it could go alone (or could be divided), only this plan's other
+// goods kept it off, and the sentence says it did not fit this suggested plan and invites a try by hand, never that it
+// is impossible. Otherwise the limit that stops it even alone is a hard one, and its code and specific sentence are
+// that limit's. Without alone the code given is taken as the limit.
 export function deferralFor(
-  input: PlannerInput, order: PlannerOrder, code: PlannerDeferralCode,
-  options: { detail?: string; split?: { keptUnits: number; remainingUnits: number }; attempts?: readonly CandidateAttempt[] } = {},
+  input: PlannerInput, order: PlannerOrder, searched: PlannerDeferralCode,
+  options: {
+    detail?: string; split?: { keptUnits: number; remainingUnits: number }; attempts?: readonly CandidateAttempt[];
+    alone?: 'fits' | 'no_vehicle' | RejectionStage;
+  } = {},
 ): PlanDeferral {
   const shop = shopOf(input, order), day = weekday(input.date), vehicle = vehicleWord(input, order);
+  const divisible = order.splitFrom === null && order.lines.length <= 10 && order.lines.every((line) => line.quantity <= 999);
+  const refused = searched === 'no_reefer' || searched === 'no_van';
+  const didNotFit = !refused && (options.alone === 'fits' || (options.alone === 'over_capacity' && divisible));
+  const noVehicle = !refused && options.alone === 'no_vehicle';
+  const { alone } = options;
+  const code: PlannerDeferralCode = refused || didNotFit || alone === undefined || alone === 'fits' || alone === 'no_vehicle' ? searched : alone;
+  const tooBig = !refused && !didNotFit && options.alone === 'over_capacity';
   const otherLate = delaysOtherShops(order, options.attempts ?? []);
   const cannotDivideAgain = code === 'over_capacity' && options.detail?.includes('cannot be split again');
   const sentence = (place: string): string => {
     if (options.split) {
       const { keptUnits: kept, remainingUnits: rest } = options.split;
+      const opening = `${kept} of the ${kept + rest} ${quantityWord(input, order)} for ${place} go on ${day}; the other ${rest}`;
+      if (didNotFit) return `${opening} didn't fit this suggested plan's ${vehicle}s, so try them by hand on the board.`;
       const cause = code === 'window'
         ? otherLate ? 'carrying them would make other shops late' : `no ${vehicle} could reach the shop ${windowDeadline(shop)}`
         : code === 'fuel' ? `the ${vehicle}s did not have enough of this week's fuel left`
           : code === 'no_reefer' ? 'no fridge truck was free'
             : code === 'no_van' ? 'no van was free'
-              : cannotDivideAgain ? 'the remainder cannot be divided again' : `the ${vehicle} was full`;
-      return `${kept} of the ${kept + rest} ${quantityWord(input, order)} for ${place} go on ${day}; the other ${rest} wait for the next plan because ${cause}.`;
+              : noVehicle ? `no ${vehicle} was free`
+                : cannotDivideAgain ? 'the remainder cannot be divided again'
+                  : tooBig ? `they are more than any ${vehicle} can carry` : `the ${vehicle} was full`;
+      return `${opening} wait for the next plan because ${cause}.`;
     }
     if (code === 'no_reefer') return `No fridge truck was free for ${place} on ${day}.`;
     if (code === 'no_van') return `No van was free for ${place} on ${day}, which takes vans only.`;
+    if (code === 'over_capacity') {
+      const limit = splitLimitWords(options.detail, place, day);
+      if (limit) return limit;
+    }
+    if (didNotFit) return `The order for ${place} didn't fit this suggested plan's ${vehicle}s on ${day}; try it by hand on the board.`;
+    if (noVehicle) return `No ${vehicle} was free for ${place} on ${day}.`;
     if (code === 'fuel') return `The ${vehicle}s that could reach ${place} on ${day} did not have enough of this week's fuel left.`;
-    if (code === 'over_capacity') return splitLimitWords(options.detail, place, day) ?? `The ${vehicle}s going to ${place} on ${day} were full.`;
+    if (code === 'over_capacity') return tooBig ? `The order for ${place} is more than any ${vehicle} can carry on ${day}.` : `The ${vehicle}s going to ${place} on ${day} were full.`;
     if (shop.mallOpen !== undefined && shop.mallOpen > shop.windowClose) {
       return `The delivery window for ${place} closes at ${toClock(shop.windowClose)}, before the mall opens at ${toClock(shop.mallOpen)} on ${day}.`;
     }
@@ -152,9 +176,12 @@ export function deferralFor(
   // weekday, rather than chopping a sentence in half or losing its time.
   if (reason.length > 200 && options.split) {
     const { keptUnits: kept, remainingUnits: rest } = options.split;
-    const why = code === 'window' ? otherLate ? 'other shops would be late' : `delivery must be ${windowDeadline(shop)}`
-      : code === 'fuel' ? "this week's fuel left was not enough"
-        : cannotDivideAgain ? 'the remainder cannot be divided again' : `the ${vehicle} was full`;
+    const why = didNotFit ? `they didn't fit this plan's ${vehicle}s, so try them by hand`
+      : code === 'window' ? otherLate ? 'other shops would be late' : `delivery must be ${windowDeadline(shop)}`
+        : code === 'fuel' ? "this week's fuel left was not enough"
+          : noVehicle ? `no ${vehicle} was free`
+            : cannotDivideAgain ? 'the remainder cannot be divided again'
+              : tooBig ? `no ${vehicle} can carry them` : `the ${vehicle} was full`;
     reason = `${displayName(shop.district)}: ${kept} ${quantityWord(input, order)} go on ${day}; ${rest} wait because ${why}.`;
   }
   return { orderId: order.id, code, reason };
@@ -209,16 +236,17 @@ export function placementReason(input: PlannerInput, order: PlannerOrder, attemp
 // calls that vehicle "it" (spec 024).
 export function refusedReason(
   input: PlannerInput, order: PlannerOrder, attempts: readonly CandidateAttempt[], code: PlannerDeferralCode, wording: Wording = 'full', named?: string,
+  alone?: 'fits' | 'no_vehicle' | RejectionStage,
 ): string {
   const attempt = attempts.find((candidate) => candidate.stage === code);
-  if (!attempt) return deferralFor(input, order, code).reason;
+  if (!attempt) return deferralFor(input, order, code, alone === undefined ? {} : { alone }).reason;
   // Once the drivers' names have given way, the trial is checked again without them, so a sentence of the checker's
   // own that the reason quotes names its trucks by kind and id too.
   const checked = byDriver(wording) || !hasDrivers(attempt.input) ? attempt.check ?? checkPlan(attempt.input) : checkPlan(withoutDrivers(attempt.input));
   const problem = checked.problems.find((problem) => problem.level === 'block' && (code === 'fuel'
     ? problem.code === 'fuel_over_quota' : code === 'over_capacity'
       ? problem.code === 'over_weight' || problem.code === 'over_volume' : problem.code !== 'fuel_over_quota'));
-  if (!problem) return deferralFor(input, order, code, { attempts }).reason;
+  if (!problem) return deferralFor(input, order, code, { attempts, ...(alone === undefined ? {} : { alone }) }).reason;
   // The short forms follow the checker's rules (spec 024, spec 026): the shop first at a stop, the vehicle by its driver
   // or else its kind, and only a second trip by its number.
   if (wording !== 'full') {

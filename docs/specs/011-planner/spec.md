@@ -141,14 +141,25 @@ requires a stated override. The numbered priority above and the rules below are 
   1 to 200 characters written for the shop (010 rule 7). Use its name or district, the weekday, and the time that
   mattered when relevant. Never use an outlet ID, ISO date, "units", "tested stop order", "after earlier choices"
   or other search jargon; never promise a new date. Say cartons for Fresh, boxes for Style and items for Tech when
-  naming quantities. The sentence must be true to the actual failure and distinguish arriving late at this shop
-  from reaching it on time but making other shops late.
+  naming quantities. The sentence must be true to the actual failure and never claim more than the search proved.
+  So before writing it, try the order alone on an empty first run of each vehicle that may carry it, in AC-6's
+  order (travel and unloading do not depend on the vehicle, so a missed window ends that). If it passes, or is too big
+  only for one vehicle and could be divided, only this plan's other goods kept it off: say so plainly, without a
+  cause that sounds final, and invite a try by hand, for example "The order for Fresh Pannala didn't fit this
+  suggested plan's fridge trucks on Thursday; try it by hand on the board." For a part: "29 of the 34 boxes for
+  Kandy go on Thursday; the other 5 didn't fit this suggested plan's vans, so try them by hand on the board." The
+  code stays the search's stage. Otherwise the limit that stops it even alone is a hard one, and its code and
+  specific sentence below are that limit's: no fridge truck or van at all, no working vehicle of its kind ("No truck
+  was free for Colombo on Thursday."), an order that cannot be divided and is more than any vehicle carries ("The
+  order for Colombo is more than any truck can carry on Thursday."), a window no run reaches, distinguishing arriving
+  late at this shop from reaching it on time but making other shops late, or too little fuel on every vehicle. The
+  choice's own reason keeps the evidence of the best refused run, as the checker words it.
 
   | Stage, in order | Code if none remain | What the sentence explains |
   | --- | --- | --- |
   | Available depot reefers, for chilled | `no_reefer` | "No fridge truck was free for Gampaha on Thursday." |
   | Vans among compatible vehicles, for van-only | `no_van` | "No van was free for Fresh Wellawatte on Thursday, which takes vans only." |
-  | Trip slots in this district/brand, board and split-write limits, and room for the whole order or allowed part | `over_capacity` | "The trucks going to Kalutara on Thursday were full." Name a split limit only when some trip had room for a part. |
+  | Trip slots in this district/brand, board and split-write limits, and room for the whole order or allowed part | `over_capacity` | "The order for Kalutara is more than any truck can carry on Thursday." Name a split limit only when some trip had room for a part. |
   | On-time candidates, including AC-9 fixes | `window` | "No truck could reach Fresh Kiribathgoda before its window closed at 07:30 on Thursday." If that shop can be reached on time: "The truck that could reach Fresh Kiribathgoda in time would then have been late for its other shops on Thursday." |
   | Candidates within the remaining weekly fuel | `fuel` | "The trucks that could reach Fresh Matara on Thursday did not have enough of this week's fuel left." |
 

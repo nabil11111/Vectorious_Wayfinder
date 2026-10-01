@@ -209,7 +209,8 @@ it('AC-2 saves exactly what the planner gives for spec 011\'s seeded-day fixture
   expect(board.suggestion!.choices.map((c) => c.reason)).toEqual(named.choices.map((c) => c.reason));
   expect(board.suggestion!.decisions.map((d) => d.reason)).toEqual(named.decisions.map((d) => d.reason));
   expect(board.plan.deferrals.map((d) => [d.orderId, d.reason]).sort()).toEqual(named.input.plan.deferrals.map((d) => [d.orderId, d.reason]).sort());
-  expect(board.plan.deferrals.map((d) => d.reason)).toContain('No fridge truck could reach Fresh Pannala before its window closed at 07:45 on Thursday.');
+  // Each could go alone on an empty fridge truck, so the sentence says it did not fit this plan, not that it cannot go.
+  expect(board.plan.deferrals.map((d) => d.reason)).toContain('The order for Fresh Pannala didn\'t fit this suggested plan\'s fridge trucks on Thursday; try it by hand on the board.');
 });
 
 it('AC-3 keeps the suggestion as built on the board, through a save, a split and a join', async () => {
