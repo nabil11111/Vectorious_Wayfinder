@@ -501,4 +501,13 @@ describe('L-09 a line the loader found would not fit', () => {
     const refused = { ...trip.stops[0]!, outcome: 'refused' as const };
     expect(refusedLine(refused, tripFigures({ ...trip, stops: [refused] }).byStop[0]!)).toBe('Stop 1 · 0 delivered · 11 refused · 1 short · 4 won\'t fit');
   });
+
+  it('L-19 counts the line against the 8 loaded, not the 12 ordered, and a stock-short line still against what was ordered', () => {
+    expect(figures.byStop[0]!.byLine.map((line) => line.countTo)).toEqual([8, 4]);
+    const stop = { ...trip.stops[0]!, arrivedAt: '2026-06-24T22:17:00.000Z' };
+    const html = unload({ trip: { ...trip, stops: [stop] }, stop });
+    const card = (label: string) => textOf(html.match(new RegExp(`aria-label="${label}"[\\s\\S]*?One more: ${label}`))?.[0] ?? '');
+    expect(card('Chilled')).toContain('/8');
+    expect(card('Dry')).toContain('/4');
+  });
 });

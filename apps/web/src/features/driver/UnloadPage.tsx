@@ -48,7 +48,7 @@ export function UnloadPage({ view, trip, figures, stop }: { view: DriverView; tr
                     value={tally.countOf(line.lineId)}
                     text={tally.textOf(line.lineId)}
                     max={each.loaded}
-                    of={each.ordered}
+                    of={each.countTo}
                     invalid={fix}
                     onStep={(n) => tally.step(line.lineId, n)}
                     onType={(text) => tally.type(line.lineId, text, each.loaded)}
