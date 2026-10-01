@@ -7,7 +7,7 @@ import { issuesKeyOf } from '@/features/live/issues';
 import { operationsKey } from '@/features/live/operations';
 import { ApiRequestError } from '@/lib/api';
 import { FLEET_MAP } from '@/lib/map/fleet-map-shapes';
-import { KANDY_DAY, ON_BOTH, PELIYAGODA_DAY, RUWAN, dayOf, issueOf, listOf } from '@/test/both-days';
+import { KANDY_DAY, ON_BOTH, PELIYAGODA_DAY, RUWAN, dayOf, issueOf, listOf } from '@/features/dispatcher/both-days.test-data';
 import { DashboardPage } from './DashboardPage';
 
 // The dashboard on both depots together (spec 021, AC-5 and AC-7): the tiles add the two depots' reads up as rule 1

@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ApiRequestError } from '@/lib/api';
-import { ON_BOTH, RUWAN, dayOf, issueOf, listOf } from '@/test/both-days';
+import { ON_BOTH, RUWAN, dayOf, issueOf, listOf } from '@/features/dispatcher/both-days.test-data';
 import { issuesKeyOf } from './issues';
 import { LiveDayPage } from './LiveDayPage';
 import { operationsKey } from './operations';

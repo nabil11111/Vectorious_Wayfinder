@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PlanBoardPage } from '@/features/plan/PlanBoardPage';
 import { ViewPlanPage } from '@/features/plan/ViewPlanPage';
-import { ON_BOTH, RUWAN } from '@/test/both-days';
+import { ON_BOTH, RUWAN } from '@/features/dispatcher/both-days.test-data';
 import { PICK_A_DEPOT, PickDepot } from './PickDepot';
 
 // The plan board and View plan on both depots together (spec 021, AC-6, D-96): a plan belongs to one depot, so each

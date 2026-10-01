@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { KANDY_DAY, PELIYAGODA_DAY, dayOf, issueOf, listOf } from '@/test/both-days';
+import { KANDY_DAY, PELIYAGODA_DAY, dayOf, issueOf, listOf } from '@/features/dispatcher/both-days.test-data';
 import { agreed, openCount, openOf, percentOf, sumCounts, sumFuel, sumNextRun } from './sums';
 
 // Spec 021, rule 1: Both adds the two depots up and never mixes them. On the seeded Wednesday before any plan, the tiles

@@ -1,8 +1,9 @@
 import { Issue, IssueList, OperationsDay, type Me } from '@wayfinder/contracts';
 
-// Test support for spec 021: two depots' reads that differ in every figure, so a test can tell a sum from either
-// depot's own number and a row of one depot from a row of the other. The figures follow the seeded Wednesday: Peliyagoda
-// with its 102 orders for Thursday and 6,945 of 18,600 L of fuel, Kandy with 64 orders and none of its 10,660 L used.
+// Test data for spec 021, used only by tests: two depots' reads that differ in every figure, so a test can tell a sum
+// from either depot's own number and a row of one depot from a row of the other. The figures follow the seeded
+// Wednesday: Peliyagoda with its 102 orders for Thursday and 6,945 of 18,600 L of fuel, Kandy with 64 orders and none of
+// its 10,660 L used.
 
 export const WED = '2026-06-24';
 export const THU = '2026-06-25';

@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ON_BOTH, RUWAN, THU } from '@/test/both-days';
+import { ON_BOTH, RUWAN, THU } from '@/features/dispatcher/both-days.test-data';
 import { ViewPlanLink } from './ViewPlanLink';
 
 // View plan on a line of one depot (spec 021): on both depots together a plan belongs to one depot, so the button
