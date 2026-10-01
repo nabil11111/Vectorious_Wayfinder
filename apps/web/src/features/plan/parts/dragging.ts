@@ -16,6 +16,16 @@ import type { Pick } from './PickTruck';
 // build on its way (rule 4).
 export const movable = (screen: BoardScreen) => editable(screen.board) && !screen.acting;
 
+// A drop that lands while the board holds still, or once its plan cannot change, is cancelled: dnd-kit says it was put
+// back, and nothing changes (rule 4).
+export const dropLocked = (screen: BoardScreen) => !movable(screen);
+
+// Puts back the drag in hand, as Escape does: both of dnd-kit's sensors, the pointer's and the keyboard's, cancel on an
+// Escape keydown on the page.
+export function putBack(page: EventTarget) {
+  page.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+}
+
 // The board's change, for a part that shows a drop's Undo line without a change of its own to call: a card in Done.
 export const BoardChange = createContext<((next: DraftPlan, undo?: Undo) => void) | null>(null);
 

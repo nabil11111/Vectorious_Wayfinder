@@ -7,7 +7,7 @@ import type { BoardScreen } from '../board';
 import { placesOf, planOf } from '../draft';
 import { BuildPanel } from './BuildPanel';
 import { DoneList } from './DoneList';
-import { announcements, BoardChange, boardKeyboardCoordinates, landDrop, landingCollision } from './dragging';
+import { announcements, BoardChange, boardKeyboardCoordinates, dropLocked, landDrop, landingCollision, putBack } from './dragging';
 import type { Dragged, DropData, Landing } from './drops';
 import { indexOf } from './lookup';
 import { OrderLists } from './OrderLists';
@@ -159,6 +159,25 @@ it('spec 023 AC-6 moves a picked-up stop past a shorter one with Down, where its
   expect(moved).toEqual({ x: 0, y: 170 });
   const collisions = landingCollision({ active: tallStop, collisionRect: rect(moved!.x, moved!.y, 500, 300), droppableRects: new Map(STOPS), droppableContainers: stopContainers, pointerCoordinates: null });
   expect(collisions[0]?.id).toBe('stop:VEH035-1:OUT002');
+});
+
+it('spec 023 AC-6 cancels a drop that lands while the board holds still, and puts back a drag in hand when it starts holding', () => {
+  expect(dropLocked(screenOf(BOARD))).toBe(false);
+  expect(dropLocked(screenOf(BOARD, { acting: true }))).toBe(true);
+  const sent = boardWith(TRIPS);
+  expect(dropLocked(screenOf({ ...sent, plan: { ...sent.plan, status: 'published' } }))).toBe(true);
+  // Put back as Escape does: both of dnd-kit's sensors cancel on it, on the page's document.
+  class Key extends Event { code: string; key: string; constructor(type: string, init: KeyboardEventInit) { super(type, init); this.code = init.code ?? ''; this.key = init.key ?? ''; } }
+  vi.stubGlobal('KeyboardEvent', Key);
+  try {
+    const page = new EventTarget();
+    const heard: { code: string; bubbles: boolean }[] = [];
+    page.addEventListener('keydown', (event) => heard.push({ code: (event as Key).code, bubbles: event.bubbles }));
+    putBack(page);
+    expect(heard).toEqual([{ code: 'Escape', bubbles: true }]);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 it('spec 023 AC-5 shows the Undo line of a drop on a trip\'s card in that card', () => {

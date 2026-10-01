@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { GripVertical } from 'lucide-react';
 import type { DraftPlan } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import type { BoardScreen, Undo } from '../board';
 import {
-  announcements, BoardChange, boardKeyboardCoordinates, draggedOf, keysOf, landDrop, landingCollision, landingOf, pressOf, screenReaderInstructions,
+  announcements, BoardChange, boardKeyboardCoordinates, draggedOf, dropLocked, keysOf, landDrop, landingCollision, landingOf, pressOf, putBack, screenReaderInstructions,
 } from './dragging';
 import type { Dragged, DragData } from './drops';
 import type { Pick } from './PickTruck';
@@ -25,16 +25,24 @@ export function PlanDnd({ screen, change, onStartTrip, children }: {
     useSensor(KeyboardSensor, { coordinateGetter: boardKeyboardCoordinates }),
   );
   const [dragged, setDragged] = useState<Dragged | null>(null);
+  // A drag in hand when the board starts holding still (a split, join, send or build on its way) is put back, and a
+  // drop that lands while it holds still is cancelled, said as put back, never as dropped.
+  const locked = dropLocked(screen);
+  useEffect(() => {
+    if (locked && dragged) putBack(document);
+  }, [locked, dragged]);
   return (
     <BoardChange.Provider value={change}>
       <DndContext
         sensors={sensors}
         collisionDetection={landingCollision}
         accessibility={{ announcements, screenReaderInstructions }}
+        cancelDrop={() => dropLocked(screen)}
         onDragStart={({ active }) => setDragged(draggedOf(active) ?? null)}
         onDragCancel={() => setDragged(null)}
         onDragEnd={({ active, over }) => {
           setDragged(null);
+          if (dropLocked(screen)) return;
           landDrop(screen.draft, draggedOf(active), landingOf(over), { change, start: onStartTrip });
         }}
       >
