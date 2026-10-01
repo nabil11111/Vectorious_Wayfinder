@@ -77,7 +77,7 @@ it('AC-12 stores blocked drafts and reports the exact volume problem', async () 
   const res = await save({ ...empty(), trips: [trip(['OUT016', 'OUT017', 'OUT018', 'OUT019'], 'VEH023')] });
   expect(res.status).toBe(200);
   const b = PlanBoard.parse(res.body);
-  expect(b.check!.problems).toContainEqual(expect.objectContaining({ code: 'over_volume', message: 'VEH023 trip 1 carries 53.1 m³ and its limit is 38 m³.', fix: 'Take 15.1 m³ off this trip.' }));
+  expect(b.check!.problems).toContainEqual(expect.objectContaining({ code: 'over_volume', message: 'The dry truck VEH023 carries 53.1 m³, 15.1 m³ over its 38 m³ limit.', fix: 'Take 15.1 m³ off this trip.' }));
   expect(b.figures![0]!.m3Pct).toBe(140);
 });
 
