@@ -16,13 +16,14 @@ export const LOCK = 'wayfinder-driver';
 
 // ── The account the loop works for ───────────────────────────────────────────────────────────────────────────────
 
-interface Account { id: string; name: string }
+// The signed-in account, told apart by its id: two drivers may share a display name.
+interface Account { id: string }
 let account: Account | null = null;
 // Goes up when the account changes, so the answer to a request made for the account before is dropped.
 let generation = 0;
 
 export interface SyncState {
-  // A 401: the session is gone, and the writes wait until the same driver signs in again.
+  // A 401, or a session that belongs to another account: the writes wait until this driver signs in again.
   signedOut: boolean;
   // A day has been fetched for this account since the app opened.
   fetched: boolean;
@@ -188,9 +189,9 @@ async function fetchDay(who: Account, turn: number): Promise<boolean> {
     update({ failure: 'Wayfinder sent something this phone could not read. It tries again by itself.' });
     return false;
   }
-  // The browser's session belongs to someone else now, such as after another account signed in in another tab. That
-  // account's day is not this one's, and this account's writes must not go out under it.
-  if (day.data.driver !== who.name) {
+  // The browser's session belongs to another account now, such as after it signed in in another tab, even one with
+  // the same name. That account's day is not this one's, and this account's writes must not go out under it.
+  if (day.data.driverId !== who.id) {
     update({ signedOut: true });
     return false;
   }
@@ -201,27 +202,28 @@ async function fetchDay(who: Account, turn: number): Promise<boolean> {
   return true;
 }
 
-// Whether the browser's session is still this driver's, asked of the day itself.
-async function stillOwn(who: Account): Promise<'own' | 'other' | 'unknown'> {
+// Whether the browser's session still belongs to the account that owns the write, asked of the day itself: its
+// driverId against the write's owner and the account the phone has open.
+async function stillOwn(owner: string): Promise<'own' | 'other' | 'unknown'> {
   const outcome = await ask('/driver', {});
   if (outcome.kind === 'signed-out') return 'other';
   if (outcome.kind !== 'answer') return 'unknown';
   const day = DriverDay.safeParse(outcome.value);
   if (!day.success) return 'unknown';
-  return day.data.driver === who.name ? 'own' : 'other';
+  return day.data.driverId === owner && readKept().userId === owner ? 'own' : 'other';
 }
 
-async function sendWrite(who: Account, entry: Queued, turn: number) {
+async function sendWrite(entry: Queued, turn: number) {
   const outcome = await ask('/driver/writes', { method: 'POST', json: entry.write });
   if (turn !== generation) return;
   switch (outcome.kind) {
     // The answer is the day, but it is never shown: the loop fetches the day again at once (D-50).
     case 'answer': through(); ring(); return;
     // A refused write is never sent again, and the writes after it carry on. A refusal counts only when the session
-    // is still this driver's: one that changed under the send, such as another account signed in in another tab,
-    // must not cost the write, which waits until this driver is signed in again.
+    // still belongs to the write's owner: one that changed under the send, such as another account signed in in
+    // another tab, must not cost the write, which waits until its driver is signed in again.
     case 'refused': {
-      const session = await stillOwn(who);
+      const session = await stillOwn(entry.userId);
       if (turn !== generation) return;
       if (session === 'other') { update({ signedOut: true }); return; }
       if (session === 'unknown') { later(); return; }
@@ -254,7 +256,8 @@ async function turn() {
     settle();
     return;
   }
-  await sendWrite(who, next, now);
+  if (next.userId !== who.id) return;
+  await sendWrite(next, now);
 }
 
 // The whole loop, run inside the lock for the tab's life. It never returns, so the lock is never let go.
@@ -317,9 +320,9 @@ export function useOwner(): Owner {
 // ── What the screens call ─────────────────────────────────────────────────────────────────────────────────────
 
 // The signed-in account, from the driver's area. A new account starts over from what the phone kept for it.
-export function setAccount(me: { id: string; displayName: string }) {
+export function setAccount(me: { id: string }) {
   const same = account?.id === me.id;
-  account = { id: me.id, name: me.displayName };
+  account = { id: me.id };
   if (!same) {
     generation += 1;
     fetching?.abort();

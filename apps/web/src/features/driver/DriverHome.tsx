@@ -44,8 +44,8 @@ function OtherTab() {
 }
 
 function DriverArea({ me }: { me: Me }) {
-  const { id, displayName } = me;
-  useEffect(() => { setAccount({ id, displayName }); }, [id, displayName]);
+  const { id } = me;
+  useEffect(() => { setAccount({ id }); }, [id]);
   useEffect(() => { holdPictures(); }, []);
   // The query ['driver'] brings the live stream's messages and the minute's refetch to the sync loop.
   useDriverQuery();
