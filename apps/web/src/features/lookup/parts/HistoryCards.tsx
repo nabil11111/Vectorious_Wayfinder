@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { HistoryTrip, LookupDeferral, LookupHistory } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { CARD, Chip } from '@/features/live/parts/ui';
@@ -19,11 +20,12 @@ export function NotDelivered({ trips, onOpen }: { trips: HistoryTrip[]; onOpen: 
   const stops = trips.flatMap((trip) => trip.stops
     .filter((stop) => stop.outcome === 'closed' || (stop.stages.refused.units ?? 0) > 0 || stop.flags.returned)
     .map((stop) => ({ trip, stop })));
+  const title = useId();
   return (
-    <section aria-labelledby="not-delivered-title" className={cn(CARD, 'px-5 pt-[18px] pb-4')}>
+    <section aria-labelledby={title} className={cn(CARD, 'px-5 pt-[18px] pb-4')}>
       <div className="flex items-center gap-2.5">
         <img src={ICON.waiting} alt="" className="size-[26px] object-contain" />
-        <h2 id="not-delivered-title" className={TITLE}>Not delivered · {whole(stops.length)}</h2>
+        <h2 id={title} className={TITLE}>Not delivered · {whole(stops.length)}</h2>
       </div>
       {stops.length === 0 ? <p className="mt-2.5 text-xs leading-4 text-muted-foreground">{NOTHING_NOT_DELIVERED}</p> : (
         <ol className="mt-2">
@@ -53,11 +55,12 @@ export function Confirmations({ read, onOpen }: { read: LookupHistory; onOpen: (
   const receipts = read.trips
     .flatMap((trip) => trip.stops.flatMap((stop) => (stop.receipt ? [{ trip, stop, receipt: stop.receipt }] : [])))
     .sort((a, b) => a.receipt.confirmedAt.localeCompare(b.receipt.confirmedAt));
+  const title = useId();
   return (
-    <section aria-labelledby="confirmations-title" className={cn(CARD, 'px-5 pt-[18px] pb-4')}>
+    <section aria-labelledby={title} className={cn(CARD, 'px-5 pt-[18px] pb-4')}>
       <div className="flex items-center gap-2.5">
         <img src={ICON.proof} alt="" className="size-[26px] object-contain" />
-        <h2 id="confirmations-title" className={TITLE}>Shop confirmations · {whole(read.counts?.confirmations ?? 0)}</h2>
+        <h2 id={title} className={TITLE}>Shop confirmations · {whole(read.counts?.confirmations ?? 0)}</h2>
       </div>
       {receipts.length === 0 ? <p className="mt-2.5 text-xs leading-4 text-muted-foreground">{NO_CONFIRMATIONS}</p> : (
         <ol className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-3">
@@ -84,11 +87,12 @@ export function Confirmations({ read, onOpen }: { read: LookupHistory; onOpen: (
 // The plan's deferrals in the rail: the first few, and the whole list in place of the trips on demand.
 export function DeferredCard({ deferrals, onShowAll }: { deferrals: LookupDeferral[]; onShowAll: () => void }) {
   const first = deferrals.slice(0, 4);
+  const title = useId();
   return (
-    <section aria-labelledby="deferred-title" className={cn(CARD, 'px-5 pt-[18px] pb-4')}>
+    <section aria-labelledby={title} className={cn(CARD, 'px-5 pt-[18px] pb-4')}>
       <div className="flex items-center gap-2.5">
         <img src={ICON.waiting} alt="" className="size-[26px] object-contain" />
-        <h2 id="deferred-title" className={TITLE}>Deferred · {whole(deferrals.length)}</h2>
+        <h2 id={title} className={TITLE}>Deferred · {whole(deferrals.length)}</h2>
       </div>
       {deferrals.length === 0 ? <p className="mt-2.5 text-xs leading-4 text-muted-foreground">{NO_DEFERRALS}</p> : (
         <>

@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import type { Request, RequestHandler } from 'express';
 import { and, eq, gt } from 'drizzle-orm';
-import type { Me, Role } from '@wayfinder/contracts';
+import { BOTH_DEPOTS, DepotRead, type Me, type Role } from '@wayfinder/contracts';
 import { db } from '../db/client';
-import { sessions, users } from '../db/schema';
+import { depots, sessions, users } from '../db/schema';
 import { HttpError } from '../lib/errors';
 
 export const SESSION_COOKIE = 'wf_session';
@@ -20,26 +20,33 @@ export const loadUser: RequestHandler = async (req, _res, next) => {
   const token = req.cookies?.[SESSION_COOKIE];
   if (!token) return next();
   const [row] = await db
-    .select({ id: users.id, username: users.username, staffId: users.staffId, displayName: users.displayName, role: users.role, depotId: users.depotId, outletId: users.outletId, active: users.active, chosenDepotId: sessions.depotId })
+    .select({ id: users.id, username: users.username, staffId: users.staffId, displayName: users.displayName, role: users.role, depotId: users.depotId, outletId: users.outletId, active: users.active, chosenDepotId: sessions.depotId, allDepots: sessions.allDepots })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.id, hashToken(token)), gt(sessions.expiresAt, new Date())));
   // An account with no staff ID, which only a row seeded before staff IDs can be, is signed out: the sign-in treats
   // it as unknown too (spec 018).
   if (row?.active && row.staffId !== null) {
-    // A dispatcher works on the depot this session switched to, once it has (spec 020, D-93), so every route that reads
-    // the caller's depot follows the switch. Every other role keeps the depot of its account.
-    const depotId = row.role === 'dispatcher' && row.chosenDepotId !== null ? row.chosenDepotId : row.depotId;
-    req.user = { id: row.id, username: row.username, staffId: row.staffId, displayName: row.displayName, role: row.role, depotId, outletId: row.outletId };
+    req.user = { id: row.id, username: row.username, staffId: row.staffId, displayName: row.displayName, role: row.role, depotId: scopeOf(row), outletId: row.outletId };
   }
   next();
 };
 
-// D-95: every request a dispatcher's tab makes names the depot the tab shows. The session can have switched in another
-// tab since, and then the request is refused before any route reads or writes anything, rather than acting on the other
-// depot. Signing in and out, the switch itself, the clock with the demo control's move and reset, the live stream and
-// the health check belong to no depot and go on whatever depot is named. A request that names none passes as before,
-// as do other roles, so walk scripts and older tabs keep working.
+// A dispatcher works on the depot this session switched to, once it has (spec 020, D-93), so every route that reads the
+// caller's depot follows the switch. A session on both depots together works on BOTH_DEPOTS (spec 021, D-96), which no
+// table's depot matches, so a route that reads the caller's depot without readDepotOf finds nothing rather than one
+// depot as if it were both. Every other role keeps the depot of its account.
+function scopeOf(row: { role: Role; depotId: string | null; chosenDepotId: string | null; allDepots: boolean }): string | null {
+  if (row.role !== 'dispatcher') return row.depotId;
+  if (row.allDepots) return BOTH_DEPOTS;
+  return row.chosenDepotId ?? row.depotId;
+}
+
+// D-95: every request a dispatcher's tab makes names the depot the tab shows, or Both for a tab on both depots (spec
+// 021). The session can have switched in another tab since, and then the request is refused before any route reads or
+// writes anything, rather than acting on the other depot. Signing in and out, the switch itself, the clock with the demo
+// control's move and reset, the live stream and the health check belong to no depot and go on whatever depot is named.
+// A request that names none passes as before, as do other roles, so walk scripts and older tabs keep working.
 export const DEPOT_HEADER = 'x-wayfinder-depot';
 const ANY_DEPOT = [
   /^\/auth(\/|$)/, /^\/me\/depot\/?$/, /^\/clock(\/|$)/, /^\/demo\/clock(\/|$)/, /^\/demo\/reset\/?$/, /^\/events(\/|$)/, /^\/health(\/|$)/,
@@ -76,6 +83,29 @@ export const requireDepot: RequestHandler = (req, _res, next) => {
 };
 
 // The person asking and the depot they work on, once requireRole and requireDepot have passed: their account's, or for a
-// dispatcher the one their session switched to (loadUser).
+// dispatcher the one their session switched to (loadUser), which is BOTH_DEPOTS on both depots together.
 export interface DepotCaller { userId: string; depotId: string }
 export const depotCallerOf = (req: Request): DepotCaller => ({ userId: req.user!.id, depotId: req.user!.depotId! });
+
+// The depot a dispatcher's read is for (spec 021), once requireRole and requireDepot have passed, from the read's
+// ?depot= (DepotRead). On one depot it is that depot: the read may name it or none, and one that names another was made
+// by a tab the session left, so it is refused as D-95 refuses one (409 depot_changed). On Both it is the depot the read
+// names, which must be on the list (400 unknown_record), and a read that names none is refused (400 pick_a_depot).
+export async function readDepotOf(req: Request): Promise<string> {
+  const scope = req.user!.depotId!;
+  const { depot } = DepotRead.parse({ depot: req.query.depot });
+  if (scope !== BOTH_DEPOTS) {
+    if (depot !== undefined && depot !== scope) throw new HttpError(409, 'depot_changed', 'The depot was switched in another tab.');
+    return scope;
+  }
+  if (depot === undefined) throw new HttpError(400, 'pick_a_depot', 'This session is on both depots. Name the depot to read.');
+  const [known] = await db.select({ id: depots.id }).from(depots).where(eq(depots.id, depot));
+  if (!known) throw new HttpError(400, 'unknown_record', 'That depot is not on the list.', { id: depot });
+  return known.id;
+}
+
+// The dispatcher asking and the depot their read is for (readDepotOf), for the reads that take a DepotCaller.
+export const readerOf = async (req: Request): Promise<DepotCaller> => ({ userId: req.user!.id, depotId: await readDepotOf(req) });
+
+// A read's own query without the depot it names, for the reads whose query shapes refuse a key they do not know.
+export const pageQueryOf = (req: Request): Record<string, unknown> => Object.fromEntries(Object.entries(req.query).filter(([key]) => key !== 'depot'));

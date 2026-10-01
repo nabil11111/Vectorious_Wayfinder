@@ -203,18 +203,47 @@ it('AC-6 the board\'s queue checks the account and depot before every save, spli
   expect(fetch).toHaveBeenCalledTimes(1);
 }));
 
-it('D-95 retiring the board\'s queue says whether it held plan changes not yet saved', async () => {
+it('D-95 retiring the board\'s queue says whether it held plan changes not yet saved, and a save still out may have been kept', async () => {
   const qc = signedIn(RUWAN);
-  expect(retireBoard(qc)).toBe(false);
+  expect(retireBoard(qc)).toBeNull();
   useBoardScreen(boardOf('Peliyagoda'));
-  expect(retireBoard(qc)).toBe(false);
+  expect(retireBoard(qc)).toBeNull();
 
   const { saver } = useBoardScreen(boardOf('Peliyagoda'));
   saver.change(MIXED);
   await settled();
-  expect(retireBoard(qc)).toBe(true);
+  expect(retireBoard(qc)).toBe('unsure');
   answer(Response.json(boardOf('Peliyagoda', PLAN, 1)));
   await settled();
+});
+
+it('D-95 a change the server turned down was not kept: retiring the queue says it is dropped', async () => {
+  const qc = signedIn(RUWAN);
+  const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+  saver.change(MIXED);
+  await settled();
+  answer(Response.json({ error: { code: 'depot_changed', message: 'The depot was switched in another tab.' } }, { status: 409 }));
+  await settled();
+  expect(saver.snapshot()?.saving).toBe('refused');
+  expect(retireBoard(qc)).toBe('dropped');
+});
+
+it('D-95 a save that got no answer may have been kept, even once its retry is turned down: retiring the queue says it is unsure', async () => {
+  const qc = signedIn(RUWAN);
+  const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+  saver.change(MIXED);
+  await settled();
+  // The server saved it, but its answer was lost on the way back.
+  answer(new TypeError('Failed to fetch'));
+  await settled();
+  expect(saver.snapshot()?.saving).toBe('retrying');
+  // Another tab switched the session meanwhile, so the retry is turned down.
+  saver.retry();
+  await settled();
+  answer(Response.json({ error: { code: 'depot_changed', message: 'The depot was switched in another tab.' } }, { status: 409 }));
+  await settled();
+  expect(saver.snapshot()?.saving).toBe('refused');
+  expect(retireBoard(qc)).toBe('unsure');
 });
 
 it('D-95 a retired queue stays retired: switching back to the same account and depot neither revives it nor lets its late answers land, and it sends nothing more', async () => {

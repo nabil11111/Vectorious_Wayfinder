@@ -5,6 +5,8 @@ import type { BoardCounts, Brand, DraftTrip, PlanBoard, PlanRef } from '@wayfind
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { workingFor } from '@/features/auth/api';
+import { PickDepot } from '@/features/dispatcher/parts/PickDepot';
+import { useScope } from '@/features/dispatcher/scope';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { reasonOf } from '@/features/store/words';
 import { ApiRequestError } from '@/lib/api';
@@ -27,9 +29,14 @@ const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 // while a check blocks, orange when none does, and once sent the time it went out. "Back to edit" returns a draft
 // to the board, and a sent plan too while the board says it can go back (D-33). A suggested plan (spec 014) says when
 // it was suggested beside the title and lists the planner's decisions above the checks, and the send stays greyed
-// until each is accepted or ended by an edit (D-54).
+// until each is accepted or ended by an edit (D-54). On both depots together a plan belongs to one depot (spec 021,
+// D-96): the page reads no plan and asks which depot's to show.
 export function ViewPlanPage() {
   const { date = '' } = useParams();
+  return useScope().both ? <PickDepot title={/^\d{4}-\d{2}-\d{2}$/.test(date) ? viewPlanOf(date) : 'View plan'} /> : <OneDepotPlan date={date} />;
+}
+
+function OneDepotPlan({ date }: { date: string }) {
   const query = useDayBoard(date);
   useOrdersFollow();
 

@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Link } from 'react-router';
 import type { LookupFuel, LookupTripRef, LookupVehicle } from '@wayfinder/contracts';
 import { CARD, Chip } from '@/features/live/parts/ui';
@@ -12,17 +13,19 @@ import {
 // The selected vehicle (Dispatcher · Fleet's rail): its limits and today's recorded trips, this week's fuel ledger by
 // day, and its latest five sent trips, each opening its date in History. Fuel is litres recorded and committed, never
 // fuel measured or kilometres inferred; an archived vehicle keeps its own records here.
-export function VehicleDetail({ vehicle, today, depot, onClose }: { vehicle: LookupVehicle; today: string; depot: string; onClose: () => void }) {
+// anchor is the id the page scrolls to, one per depot's part on both depots together (spec 021).
+export function VehicleDetail({ vehicle, today, depot, anchor, onClose }: { vehicle: LookupVehicle; today: string; depot: string; anchor: string; onClose: () => void }) {
+  const ids = useId();
   const trip = vehicle.selectedTrip;
   const driverToday = trip?.driver && trip.date === today ? `${trip.driver.name} today` : trip?.driver ? `${trip.driver.name} since ${dayOfMonth(trip.date)}` : null;
   // Every trip that bears on today, so a second trip loading never hides behind a first one out.
   const trips = [...new Map([...vehicle.outTrips, ...vehicle.todayTrips].map((each) => [each.tripId, each])).values()];
   return (
     <div className="space-y-4">
-      <section id="vehicle-detail" aria-labelledby="vehicle-detail-title" className={cn(CARD, 'scroll-mt-24 px-5 pt-[18px] pb-5')}>
+      <section id={anchor} aria-labelledby={`${ids}-title`} className={cn(CARD, 'scroll-mt-24 px-5 pt-[18px] pb-5')}>
         <div className="flex items-start gap-2.5">
           <img src={vehiclePicture(vehicle)} alt="" className="mt-[-3px] size-[26px] shrink-0 object-contain" />
-          <h2 id="vehicle-detail-title" className="min-w-0 flex-1 text-[15px] leading-5 font-bold">{vehicle.id} · {kindWords(vehicle)}</h2>
+          <h2 id={`${ids}-title`} className="min-w-0 flex-1 text-[15px] leading-5 font-bold">{vehicle.id} · {kindWords(vehicle)}</h2>
           <CloseButton label={`Close ${vehicle.id}`} onClick={onClose} />
         </div>
         <p className="mt-1.5 text-[11px] leading-4 text-muted-foreground">{[depot, vehicle.fuelType, driverToday].filter(Boolean).join(' · ')}</p>
@@ -47,8 +50,8 @@ export function VehicleDetail({ vehicle, today, depot, onClose }: { vehicle: Loo
 
       <FuelWeek fuel={vehicle.fuel} today={today} />
 
-      <section aria-labelledby="recent-trips-title" className={cn(CARD, 'px-5 pt-[18px] pb-5')}>
-        <h2 id="recent-trips-title" className="text-[15px] leading-5 font-bold">Recent trips</h2>
+      <section aria-labelledby={`${ids}-recent`} className={cn(CARD, 'px-5 pt-[18px] pb-5')}>
+        <h2 id={`${ids}-recent`} className="text-[15px] leading-5 font-bold">Recent trips</h2>
         {vehicle.recentTrips.length === 0
           ? <p className="mt-2 text-xs leading-4 text-muted-foreground">{NO_SENT_TRIPS}</p>
           : <TripList trips={vehicle.recentTrips} today={today} dated />}
@@ -81,10 +84,11 @@ function TripList({ trips, today, dated = false }: { trips: LookupTripRef[]; tod
 // Fuel this week: what is left of the quota, the litres recorded and committed, and each day Monday to Saturday from
 // its ledger rows. A day with no row is zero recorded, not a day without trips.
 function FuelWeek({ fuel, today }: { fuel: LookupFuel | null; today: string }) {
+  const title = useId();
   if (!fuel) {
     return (
-      <section aria-labelledby="fuel-week-title" className={cn(CARD, 'px-5 pt-[18px] pb-5')}>
-        <h2 id="fuel-week-title" className="text-[15px] leading-5 font-bold">Fuel this week</h2>
+      <section aria-labelledby={title} className={cn(CARD, 'px-5 pt-[18px] pb-5')}>
+        <h2 id={title} className="text-[15px] leading-5 font-bold">Fuel this week</h2>
         <p className="mt-2 text-xs leading-4 text-muted-foreground">{WEEK_UNAVAILABLE}</p>
       </section>
     );
@@ -94,8 +98,8 @@ function FuelWeek({ fuel, today }: { fuel: LookupFuel | null; today: string }) {
   const highest = Math.max(0, ...fuel.days.map((day) => day.litres));
   const byDow = DAY_NAMES.map((name, dow) => ({ name, day: fuel.days.find((day) => day.dow === dow) }));
   return (
-    <section aria-labelledby="fuel-week-title" className={cn(CARD, 'px-5 pt-[18px] pb-5')}>
-      <h2 id="fuel-week-title" className="text-[15px] leading-5 font-bold">Fuel this week</h2>
+    <section aria-labelledby={title} className={cn(CARD, 'px-5 pt-[18px] pb-5')}>
+      <h2 id={title} className="text-[15px] leading-5 font-bold">Fuel this week</h2>
       <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
         <span className={cn('font-heading text-[26px] leading-8 font-bold', tone === 'bad' ? 'text-bad' : tone === 'warn' ? 'text-warn-ink' : 'text-foreground')}>{fuelLeftWords(fuel)}</span>
         <span className="text-[11px] leading-4 text-muted-foreground">{fuel.remaining < 0 ? `quota ${litres(fuel.quota)}` : `left of ${litres(fuel.quota)}`}</span>

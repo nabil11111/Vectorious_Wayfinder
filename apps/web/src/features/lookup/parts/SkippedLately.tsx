@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { LookupOrders } from '@wayfinder/contracts';
 import { CARD, Chip } from '@/features/live/parts/ui';
 import { cn } from '@/lib/utils';
@@ -8,11 +9,12 @@ import { ICON } from './icons';
 // dates ending on the chosen day, each counted once per plan, with the latest skip's date and reasons. The server
 // reads it apart from the table, so the table's search and filters never change it.
 export function SkippedLately({ skipped, className }: { skipped: NonNullable<LookupOrders['skippedLately']>; className?: string }) {
+  const title = useId();
   return (
-    <section aria-labelledby="skipped-title" className={cn(CARD, 'px-5 pt-[18px] pb-4', className)}>
+    <section aria-labelledby={title} className={cn(CARD, 'px-5 pt-[18px] pb-4', className)}>
       <div className="flex items-center gap-2.5">
         <img src={ICON.waiting} alt="" className="size-[26px] object-contain" />
-        <h2 id="skipped-title" className="text-[15px] leading-5 font-bold">Skipped lately · 4 weeks</h2>
+        <h2 id={title} className="text-[15px] leading-5 font-bold">Skipped lately · 4 weeks</h2>
       </div>
       <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">{rangeWords(skipped.from, skipped.to)}</p>
       {skipped.rows.length === 0 ? (

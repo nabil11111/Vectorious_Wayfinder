@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ADD COLUMN "all_depots" boolean DEFAULT false NOT NULL;

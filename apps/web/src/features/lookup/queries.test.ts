@@ -55,18 +55,23 @@ afterEach(() => {
 
 it('AC-29 late reads and photos cannot cross selection account or reset', async () => {
   // Keys name the page, the account, the depot and the parameters the API was sent, and each read sends only those.
-  expect(lookupKey('orders', ruwan, { date: '2026-06-25', range: 'day' })).toEqual(['lookup', 'orders', 'dispatcher-ruwan', 'Peliyagoda', { date: '2026-06-25', range: 'day' }]);
-  expect(ordersOptions({ ...ruwan, depotId: null }, { range: 'day' }).enabled).toBe(false);
-  expect(historyOptions(ruwan, {}).queryKey).toEqual(['lookup', 'history', 'dispatcher-ruwan', 'Peliyagoda', {}]);
-  expect(fleetOptions(ruwan).queryKey).toEqual(['lookup', 'fleet', 'dispatcher-ruwan', 'Peliyagoda', {}]);
+  expect(lookupKey('orders', ruwan, 'Peliyagoda', { date: '2026-06-25', range: 'day' })).toEqual(['lookup', 'orders', 'dispatcher-ruwan', 'Peliyagoda', { date: '2026-06-25', range: 'day' }]);
+  expect(ordersOptions(ruwan, null, { range: 'day' }).enabled).toBe(false);
+  expect(ordersOptions(null, 'Peliyagoda', { range: 'day' }).enabled).toBe(false);
+  expect(historyOptions(ruwan, 'Peliyagoda', {}).queryKey).toEqual(['lookup', 'history', 'dispatcher-ruwan', 'Peliyagoda', {}]);
+  expect(fleetOptions(ruwan, 'Peliyagoda').queryKey).toEqual(['lookup', 'fleet', 'dispatcher-ruwan', 'Peliyagoda', {}]);
+  // On both depots each depot is its own read, keyed by the depot it reads.
+  const onBoth = { ...ruwan, depotId: 'Both' };
+  expect(fleetOptions(onBoth, 'Kandy').queryKey).toEqual(['lookup', 'fleet', 'dispatcher-ruwan', 'Kandy', {}]);
+  expect(historyOptions(onBoth, 'Peliyagoda', { date: '2026-06-25' }).queryKey).toEqual(['lookup', 'history', 'dispatcher-ruwan', 'Peliyagoda', { date: '2026-06-25' }]);
 
   // Wednesday is asked for, then Thursday is chosen before Wednesday's answer is back.
-  const observer = new QueryObserver(client, ordersOptions(ruwan, { date: '2026-06-24', range: 'day' }));
+  const observer = new QueryObserver(client, ordersOptions(ruwan, 'Peliyagoda', { date: '2026-06-24', range: 'day' }));
   stop = observer.subscribe(() => {});
   await settle();
-  observer.setOptions(ordersOptions(ruwan, { date: '2026-06-25', range: 'day' }));
+  observer.setOptions(ordersOptions(ruwan, 'Peliyagoda', { date: '2026-06-25', range: 'day' }));
   await settle();
-  expect(requests).toEqual(['/api/v1/lookup/orders?date=2026-06-24&range=day', '/api/v1/lookup/orders?date=2026-06-25&range=day']);
+  expect(requests).toEqual(['/api/v1/lookup/orders?date=2026-06-24&range=day&depot=Peliyagoda', '/api/v1/lookup/orders?date=2026-06-25&range=day&depot=Peliyagoda']);
   // The page that left Wednesday cancelled its read, so its answer, arriving last, is never kept or shown.
   expect(signals[0]!.aborted).toBe(true);
   respond(1, orders('2026-06-25', '2026-06-24T22:05:00.000Z'));
@@ -74,11 +79,11 @@ it('AC-29 late reads and photos cannot cross selection account or reset', async 
   respond(0, orders('2026-06-24', '2026-06-24T22:06:00.000Z'));
   await settle();
   expect(observer.getCurrentResult().data?.date).toBe('2026-06-25');
-  expect(client.getQueryData(lookupKey('orders', ruwan, { date: '2026-06-24', range: 'day' }))).toBeUndefined();
+  expect(client.getQueryData(lookupKey('orders', ruwan, 'Peliyagoda', { date: '2026-06-24', range: 'day' }))).toBeUndefined();
 
   // Another account or depot starts from nothing: it never sees the read kept for the last one.
-  expect(client.getQueryData(lookupKey('orders', other, { date: '2026-06-25', range: 'day' }))).toBeUndefined();
-  expect(client.getQueryData(lookupKey('orders', { ...ruwan, depotId: 'Kandy' }, { date: '2026-06-25', range: 'day' }))).toBeUndefined();
+  expect(client.getQueryData(lookupKey('orders', other, 'Peliyagoda', { date: '2026-06-25', range: 'day' }))).toBeUndefined();
+  expect(client.getQueryData(lookupKey('orders', ruwan, 'Kandy', { date: '2026-06-25', range: 'day' }))).toBeUndefined();
 
   // A selection belongs to the account, depot, parameters and reset generation it was made in, and to a row the
   // read still holds. A reset (a new generation, even with the same ids) or another account clears it.
@@ -152,7 +157,7 @@ it('AC-29 late reads and photos cannot cross selection account or reset', async 
 });
 
 it('AC-29 a reset cancels a first read still out and asks again, and a read of another reset is never current', async () => {
-  const observer = new QueryObserver(client, ordersOptions(ruwan, { range: 'day' }));
+  const observer = new QueryObserver(client, ordersOptions(ruwan, 'Peliyagoda', { range: 'day' }));
   stop = observer.subscribe(() => {});
   await settle();
   expect(requests).toHaveLength(1);

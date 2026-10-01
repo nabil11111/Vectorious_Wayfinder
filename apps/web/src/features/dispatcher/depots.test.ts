@@ -1,12 +1,12 @@
-import { MutationObserver, QueryClient, onlineManager } from '@tanstack/react-query';
+import { MutationObserver, QueryClient, QueryObserver, notifyManager, onlineManager } from '@tanstack/react-query';
 import type { Me } from '@wayfinder/contracts';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { meKey } from '@/features/auth/api';
+import { meKey, workingFor } from '@/features/auth/api';
 import { api, DEPOT_CHANGED, DEPOT_HEADER, nameDepot } from '@/lib/api';
 import { clockKey } from '@/lib/clock';
 import { useLive } from '@/lib/live';
-import { PLAN_DROPPED, SWITCH_FAILED, followSwitch, switchDepotMutation, switchTo, useFollowSwitches } from './depots';
+import { PLAN_ANSWER_WAIT_MS, PLAN_DROPPED, SWITCH_FAILED, followSwitch, planUnsure, switchDepotMutation, switchTo, useFollowSwitches } from './depots';
 
 // The depot switch away from its buttons (spec 020, AC-6): what a switch does to the reads on screen, the account and
 // the live stream, in this tab and in another tab of the same session, and what a switch that fails does. A tab here is
@@ -202,13 +202,13 @@ it('D-95 only the newest read of the session applies: an answer a later read ove
   expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
 });
 
-it('D-95 a switch whose read of the session was overtaken leaves the depot to the newer read, and says nothing', async () => {
+it('D-95 a switch whose read of the session was overtaken reads it again and takes what it finds, and says nothing', async () => {
   const tab = tabOf();
   inTab(tab);
   useDispatcherPage();
   // The switch answers Kandy, but its read of the session is slow; meanwhile another tab switched back, and a refusal
-  // starts a newer read that finds Peliyagoda.
-  sessionReads({ session: IN_KANDY, after: 40 }, { session: RUWAN, after: 0 });
+  // starts a newer read that finds Peliyagoda. The switch then reads the session again, and finds Peliyagoda too.
+  sessionReads({ session: IN_KANDY, after: 40 }, { session: RUWAN, after: 0 }, { session: RUWAN, after: 0 });
   const switched = switching(tab, 'Kandy');
   await later(5, null);
   window.dispatchEvent(new Event(DEPOT_CHANGED));
@@ -216,6 +216,7 @@ it('D-95 a switch whose read of the session was overtaken leaves the depot to th
   await later(10, null);
   expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
   expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  // The tab that switched the session back told the other tabs itself.
   expect(Channel.sent).toEqual([]);
   expect(toast).not.toHaveBeenCalled();
 });
@@ -302,7 +303,7 @@ it('D-95 signing out retires the plan board\'s queue, and says nothing of change
   const tab = tabOf();
   inTab(tab);
   useDispatcherPage();
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   signOut(tab);
   expect(held.retired).toHaveBeenCalledWith(tab.qc);
   expect(toast).not.toHaveBeenCalled();
@@ -314,7 +315,7 @@ it('D-95 a switch made in another tab that drops plan changes not yet saved says
   inTab(there);
   useDispatcherPage();
   // The board on this tab still had changes waiting to be saved when another tab switched to Kandy.
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
   await followSwitch(there.qc, { id: 'u1' });
   expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
@@ -335,7 +336,7 @@ it('D-95 a switch that drops nothing says nothing, and this tab\'s own switch ne
   const here = tabOf();
   inTab(here);
   useDispatcherPage();
-  held.retired.mockReturnValue(true);
+  held.retired.mockReturnValue('dropped');
   await switching(here, 'Kandy');
   // Its message to the other tab lands here too, which is on Kandy already.
   await later(10, null);
@@ -643,4 +644,327 @@ it('AC-6 a press switches to the other depot only, and not while a switch is on 
   expect(switchTo('Kandy', 'Peliyagoda', false)).toBe('Kandy');
   expect(switchTo('Peliyagoda', 'Peliyagoda', false)).toBeNull();
   expect(switchTo('Peliyagoda', 'Kandy', true)).toBeNull();
+});
+
+// ── Both depots together (spec 021) ─────────────────────────────────────────────────────────────────────────────
+
+const ON_BOTH: Me = { ...RUWAN, depotId: 'Both' };
+
+it('AC-7 Both is a choice like a depot: pressed from either depot, and either depot pressed from it', () => {
+  expect(switchTo('Both', 'Peliyagoda', false)).toBe('Both');
+  expect(switchTo('Both', 'Kandy', false)).toBe('Both');
+  expect(switchTo('Kandy', 'Both', false)).toBe('Kandy');
+  expect(switchTo('Both', 'Both', false)).toBeNull();
+  expect(switchTo('Peliyagoda', 'Both', true)).toBeNull();
+});
+
+it('AC-7 a switch to Both drops every read but the account and the clock, keeps the account on Both, opens the stream again and names Both on every request', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  const [first] = tab.streams;
+  const fetch = vi.fn(async (url: string) => Response.json(String(url).endsWith('/me/depot') || String(url).endsWith('/auth/me') ? ON_BOTH : {}));
+  vi.stubGlobal('fetch', fetch);
+
+  await switching(tab, 'Both');
+
+  expect(fetch).toHaveBeenCalledWith('/api/v1/me/depot', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ depotId: 'Both' }) }));
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(tab.qc.getQueryData(meKey)).toEqual(ON_BOTH);
+  expect(held.retired).toHaveBeenCalledWith(tab.qc);
+  expect([...stored.values()].map((text) => JSON.parse(text))).toContainEqual(ON_BOTH);
+  // Another tab of the session hears of it, and every request this tab makes now names Both (D-95).
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  await api('/operations?depot=Kandy');
+  expect(lastNamed(fetch)).toBe('Both');
+  // The stream opened for Peliyagoda closes and a new one opens, which carries both depots.
+  inTab(tab);
+  useDispatcherPage();
+  expect(first.close).toHaveBeenCalled();
+  expect(tab.streams).toHaveLength(2);
+});
+
+it('AC-7 a switch from Both back to one depot takes that depot, and its requests name it', async () => {
+  const tab = tabOf(ON_BOTH);
+  inTab(tab);
+  useDispatcherPage();
+  const fetch = vi.fn(async (url: string) => Response.json(String(url).endsWith('/me/depot') || String(url).endsWith('/auth/me') ? IN_KANDY : {}));
+  vi.stubGlobal('fetch', fetch);
+  await api('/issues?depot=Peliyagoda');
+  expect(lastNamed(fetch)).toBe('Both');
+
+  await switching(tab, 'Kandy');
+
+  expect(fetch).toHaveBeenCalledWith('/api/v1/me/depot', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ depotId: 'Kandy' }) }));
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  await api('/plans');
+  expect(lastNamed(fetch)).toBe('Kandy');
+});
+
+it('AC-7 a switch to Both that fails changes nothing and says so, as any switch', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'internal', message: 'Something went wrong on our side.' } }, { status: 500 })));
+  await expect(switching(tab, 'Both')).rejects.toBeDefined();
+  expect(toast).toHaveBeenCalledWith(SWITCH_FAILED, expect.objectContaining({ id: 'depot-switch' }));
+  expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(Channel.sent).toEqual([]);
+});
+
+it('AC-7 a tab on one depot follows a switch to Both made in another tab, and the reverse', async () => {
+  const there = tabOf();
+  serverWith({ switched: lost(), session: Response.json(ON_BOTH) });
+  await followSwitch(there.qc, { id: 'u1' });
+  expect(there.qc.getQueryData(meKey)).toEqual(ON_BOTH);
+  expect(cached(there.qc)).toEqual(['["clock"]', '["me"]']);
+
+  const back = tabOf(ON_BOTH);
+  serverWith({ switched: lost(), session: Response.json(RUWAN) });
+  await followSwitch(back.qc, { id: 'u1' });
+  expect(back.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(cached(back.qc)).toEqual(['["clock"]', '["me"]']);
+});
+
+// ── The other tabs hear of a switch, whichever read takes it here (Q-12) ────────────────────────────────────────
+
+// The server as a switch meets it while requests named for the depot before are still on their way: the switch answers
+// after switchAfter ms, with Kandy or with no answer at all (it went through either way), and each read of the session
+// answers Kandy after its own delay, in turn.
+function raceServer(switchAfter: number, switched: Response | Error, ...sessionAfter: number[]) {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (String(url).endsWith('/api/v1/me/depot')) {
+      await later(switchAfter, null);
+      if (switched instanceof Error) throw switched;
+      return switched.clone();
+    }
+    if (String(url).endsWith('/api/v1/auth/me')) return later(sessionAfter.shift() ?? 0, Response.json(IN_KANDY));
+    throw new Error(`not asked for: ${url}`);
+  }));
+}
+
+// Another tab of the session on Peliyagoda, as a background tab: it hears the browser's switch messages and reads the
+// session when one comes, and it hears none of this tab's refusals.
+function backgroundTab() {
+  const there = tabOf();
+  const ear = new Channel(Channel.all[0]!.name);
+  ear.addEventListener('message', (event) => { void followSwitch(there.qc, (event as MessageEvent).data); });
+  return there;
+}
+
+it('Q-12 a switch whose own read of the session a refused request\'s read overtakes still tells the other tabs, which follow it', async () => {
+  const here = tabOf();
+  inTab(here);
+  useDispatcherPage();
+  const there = backgroundTab();
+  // The switch answers at once and its read of the session is slow. Meanwhile a request named for Peliyagoda, which the
+  // server refused as the switch landed, starts a newer read, and that read takes Kandy here.
+  raceServer(0, Response.json(IN_KANDY), 40, 0, 0);
+  const switched = switching(here, 'Kandy');
+  await later(5, null);
+  window.dispatchEvent(new Event(DEPOT_CHANGED));
+  await switched;
+  await later(60, null);
+  expect(here.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  // So no tab of the session is left on Peliyagoda, its plan and its name under the account.
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(cached(there.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(toast).not.toHaveBeenCalled();
+});
+
+it('Q-12 a switch whose new depot a refused request\'s read took before the switch answered still tells the other tabs', async () => {
+  const here = tabOf();
+  inTab(here);
+  useDispatcherPage();
+  const there = backgroundTab();
+  // The switch answers late. A request named for Peliyagoda, refused once the switch went through, answers first, and its
+  // read of the session takes Kandy here before the switch's own read finds Kandy already on show.
+  raceServer(20, Response.json(IN_KANDY), 0, 0, 0);
+  const switched = switching(here, 'Kandy');
+  await later(5, null);
+  window.dispatchEvent(new Event(DEPOT_CHANGED));
+  await later(10, null);
+  expect(here.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  await expect(switched).resolves.toEqual(IN_KANDY);
+  await later(20, null);
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).not.toHaveBeenCalled();
+});
+
+it('Q-12 a switch whose answer was lost, when a refused request\'s read took the new depot first, went through: no failure line, and the other tabs are told', async () => {
+  const here = tabOf();
+  inTab(here);
+  useDispatcherPage();
+  const there = backgroundTab();
+  raceServer(20, lost(), 0, 0, 0);
+  const switched = switching(here, 'Kandy');
+  await later(5, null);
+  window.dispatchEvent(new Event(DEPOT_CHANGED));
+  await expect(switched).resolves.toEqual(IN_KANDY);
+  await later(20, null);
+  expect(here.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).not.toHaveBeenCalled();
+  expect(Channel.sent).toEqual([{ id: 'u1' }]);
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+});
+
+it('Q-12 a switch that failed, whose read of the session the account\'s own refresh overtook, still says it could not switch', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  // The server answers the switch 500 without switching. The switch's read of the session is slow, and the account's own
+  // refresh (the minute's, or the window's focus) lands meanwhile, still on Peliyagoda.
+  const sessionAfter = [40, 0];
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('/api/v1/me/depot')
+    ? Response.json({ error: { code: 'internal', message: 'Something went wrong on our side.' } }, { status: 500 })
+    : later(sessionAfter.shift() ?? 0, Response.json(RUWAN)))));
+  const switched = switching(tab, 'Kandy');
+  await later(5, null);
+  await tab.qc.fetchQuery({ queryKey: meKey, queryFn: async () => RUWAN });
+  await expect(switched).rejects.toMatchObject({ status: 500 });
+  expect(toast).toHaveBeenCalledWith(SWITCH_FAILED, expect.objectContaining({ id: 'depot-switch' }));
+  expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  expect(Channel.sent).toEqual([]);
+});
+
+// ── A plan change on its way as another tab switches (Q-13) ─────────────────────────────────────────────────────
+
+it('Q-13 a plan change on its way when another tab switches is waited for, and once the server kept it the tab follows and says nothing', async () => {
+  const there = tabOf();
+  inTab(there);
+  useDispatcherPage();
+  // The board's save went out a moment before the other tab's switch reached the server.
+  held.planWriting = true;
+  serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+  const following = followSwitch(there.qc, { id: 'u1' });
+  await later(30, null);
+  // The tab holds its depot and its board while the save is out.
+  expect(held.retired).not.toHaveBeenCalled();
+  expect(there.qc.getQueryData(meKey)).toEqual(RUWAN);
+  // The save is answered: kept, so nothing is left unsaved.
+  held.planWriting = false;
+  held.retired.mockReturnValue(null);
+  await following;
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(held.retired).toHaveBeenCalledWith(there.qc);
+  expect(toast).not.toHaveBeenCalled();
+});
+
+it('Q-13 a plan change on its way that the server refused is said to be dropped, once its answer is in', async () => {
+  expect(PLAN_DROPPED).toBe('Plan changes that were not saved were dropped: the depot was switched in another tab.');
+  const there = tabOf();
+  inTab(there);
+  useDispatcherPage();
+  held.planWriting = true;
+  serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+  const following = followSwitch(there.qc, { id: 'u1' });
+  await later(30, null);
+  expect(toast).not.toHaveBeenCalled();
+  // Refused: the session had moved first, so the change was not kept.
+  held.planWriting = false;
+  held.retired.mockReturnValue('dropped');
+  await following;
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).toHaveBeenCalledWith(PLAN_DROPPED, expect.objectContaining({ id: 'plan-dropped' }));
+  expect(toast).toHaveBeenCalledTimes(1);
+});
+
+// Every depot the fetch was asked to name, in turn.
+const allNamed = (fetch: ReturnType<typeof vi.fn>) => fetch.mock.calls.map(([, init]) => ((init as RequestInit | undefined)?.headers as Record<string, string> | undefined)?.[DEPOT_HEADER]);
+
+it('Q-13 an account refresh that finds the session on another depot while a plan change is on its way leaves the tab all on its depot until the change is answered, then takes the new one at once', async () => {
+  const tab = tabOf();
+  inTab(tab);
+  useDispatcherPage();
+  const fetch = vi.fn(async () => Response.json({}));
+  vi.stubGlobal('fetch', fetch);
+  // What the shell draws: the account as a page's query hears of it, a turn after each change, as React does.
+  const account = new QueryObserver<Me | null>(tab.qc, { queryKey: meKey, enabled: false });
+  const drawn: (string | null | undefined)[] = [];
+  const stopDrawing = account.subscribe(notifyManager.batchCalls(() => { drawn.push(account.getCurrentResult().data?.depotId); }));
+  held.planWriting = true;
+  // The account's own refresh (the minute's, or the window's focus) finds the session on Kandy: another tab switched.
+  await tab.qc.fetchQuery({ queryKey: meKey, queryFn: async () => IN_KANDY });
+  // Reads the page sends meanwhile, still on their way when the tab takes Kandy: the board's, and the account's own with
+  // an older answer.
+  const onTheirWay = Promise.all([
+    tab.qc.fetchQuery({ queryKey: ['plans', 'board'], queryFn: () => later(150, { depot: 'Peliyagoda', answered: 'after the switch' }) }),
+    tab.qc.fetchQuery({ queryKey: meKey, queryFn: () => later(150, RUWAN), staleTime: 0 }),
+  ]);
+  await api('/plans');
+  await later(30, null);
+  // While the change is out the tab is still all Peliyagoda: the account it draws, the reads it holds, the depot every
+  // request names, and the account and depot the board's queue works for, so the change's answer is still taken.
+  expect(drawn).not.toContain('Kandy');
+  expect(tab.qc.getQueryData(meKey)).toEqual(RUWAN);
+  expect(cached(tab.qc)).toEqual(cached(tabOf().qc));
+  expect(workingFor(tab.qc)).toBe('u1 Peliyagoda');
+  expect(allNamed(fetch)).toEqual(['Peliyagoda']);
+  expect(held.retired).not.toHaveBeenCalled();
+  // The change is answered and was kept: the tab takes Kandy, every part of it together, and says nothing.
+  held.planWriting = false;
+  held.retired.mockReturnValue(null);
+  await later(100, null);
+  expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(drawn.at(-1)).toBe('Kandy');
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(held.retired).toHaveBeenCalledWith(tab.qc);
+  await api('/plans');
+  expect(allNamed(fetch)).toEqual(['Peliyagoda', 'Kandy']);
+  // Nothing older lands after it: the reads on their way were Peliyagoda's.
+  await onTheirWay;
+  await later(30, null);
+  expect(tab.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(cached(tab.qc)).toEqual(['["clock"]', '["me"]']);
+  expect(drawn.at(-1)).toBe('Kandy');
+  expect(toast).not.toHaveBeenCalled();
+  stopDrawing();
+});
+
+it('Q-13 a plan change whose save got no answer is never said to be dropped, even once its retry is turned down: the tab says it may not be kept', async () => {
+  const there = tabOf();
+  inTab(there);
+  useDispatcherPage();
+  // The save went out and the server kept it, but its answer was lost, and its retry is out as another tab switches.
+  held.planWriting = true;
+  serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+  const following = followSwitch(there.qc, { id: 'u1' });
+  await later(30, null);
+  // The retry is turned down, since the session left Peliyagoda: nothing is on its way, and the first save may stand.
+  held.planWriting = false;
+  held.retired.mockReturnValue('unsure');
+  await following;
+  expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+  expect(toast).toHaveBeenCalledWith(planUnsure('Peliyagoda'), expect.objectContaining({ id: 'plan-dropped' }));
+  expect(toast).not.toHaveBeenCalledWith(PLAN_DROPPED, expect.anything());
+});
+
+it('Q-13 a plan change still unanswered after the wait is never said to be dropped: the tab follows and says it may not be kept', async () => {
+  expect(planUnsure('Peliyagoda')).toBe('The depot was switched in another tab while a plan change was on its way. Check Peliyagoda\'s plan board for it.');
+  vi.useFakeTimers();
+  // The tab's window keeps the fake clock's timers.
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { setTimeout, clearTimeout }));
+  try {
+    const there = tabOf();
+    inTab(there);
+    useDispatcherPage();
+    held.planWriting = true;
+    held.retired.mockReturnValue('dropped');
+    serverWith({ switched: lost(), session: Response.json(IN_KANDY) });
+    const following = followSwitch(there.qc, { id: 'u1' });
+    await vi.advanceTimersByTimeAsync(PLAN_ANSWER_WAIT_MS - 100);
+    expect(there.qc.getQueryData(meKey)).toEqual(RUWAN);
+    await vi.advanceTimersByTimeAsync(200);
+    await following;
+    expect(there.qc.getQueryData(meKey)).toEqual(IN_KANDY);
+    expect(toast).toHaveBeenCalledWith(planUnsure('Peliyagoda'), expect.objectContaining({ id: 'plan-dropped' }));
+    expect(toast).not.toHaveBeenCalledWith(PLAN_DROPPED, expect.anything());
+  } finally {
+    vi.useRealTimers();
+  }
 });

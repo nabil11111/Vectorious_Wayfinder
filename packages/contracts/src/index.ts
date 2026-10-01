@@ -22,7 +22,8 @@ export type LoginRequest = z.infer<typeof LoginRequest>;
 export const AUTH_ERROR_CODES = ['bad_credentials', 'locked'] as const;
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
-// For a dispatcher, depotId is the depot their session works on: their own until they switch (spec 020).
+// For a dispatcher, depotId is the depot their session works on: their own until they switch (spec 020), and
+// BOTH_DEPOTS ('Both') while the session is on both depots together (spec 021).
 export const Me = z.object({
   id: z.string(),
   username: z.string(),
@@ -34,12 +35,24 @@ export const Me = z.object({
 });
 export type Me = z.infer<typeof Me>;
 
-// PUT /me/depot: the dispatcher's depot switch (spec 020, D-93). It answers Me with the chosen depot. Only a dispatcher
-// may switch (403 forbidden), and only to a depot on the list (400 unknown_record).
+// Both depots together (spec 021, D-96): the scope a dispatcher's Me.depotId and the D-95 header name while the session
+// is on both depots. It is no depot of the list: a read still names one depot, and a plan belongs to one.
+export const BOTH_DEPOTS = 'Both';
+
+// PUT /me/depot: the dispatcher's depot switch (spec 020, D-93). depotId is a depot on the list or BOTH_DEPOTS (spec
+// 021). It answers Me with the chosen depot, or with 'Both'. Only a dispatcher may switch (403 forbidden), and only to a
+// depot on the list or to Both, written exactly so (400 unknown_record).
 export const SwitchDepotRequest = z.object({
   depotId: z.string().min(1).max(64),
 });
 export type SwitchDepotRequest = z.infer<typeof SwitchDepotRequest>;
+
+// The query every dispatcher read takes (spec 021): ?depot= names the depot the read is for. A session on one depot
+// may name only that depot, or none (409 depot_changed for another). A session on Both must name one (400 pick_a_depot)
+// that is on the list (400 unknown_record). pick_a_depot and depot_changed are cross-cutting codes, like signed_out: a
+// plan write on Both is refused with 409 pick_a_depot too.
+export const DepotRead = z.object({ depot: z.string().min(1).max(64).optional() });
+export type DepotRead = z.infer<typeof DepotRead>;
 
 // Every error the API sends has this shape, so screens can show one message and act on one code.
 export const ApiError = z.object({
