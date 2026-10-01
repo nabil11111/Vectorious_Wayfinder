@@ -212,8 +212,9 @@ describe('a dispatcher switched to Kandy', () => {
     expect((await switchTo(ruwan, 'Kandy')).status).toBe(200);
     const start = await boardOf(ruwan);
     let board = answered(await ruwan.post(`/api/v1/plans/${THU}/suggest`).send({ planId: null, demoDay: start.demoDay }));
-    const vehicleId = board.plan.trips[0]!.vehicleId;
-    const trips = board.plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId: ashenId } : trip));
+    const { vehicleId, driverId: was } = board.plan.trips[0]!;
+    // The suggestion gives every truck a driver (spec 022), so D-037 swaps with the first truck's, as the driver menu does.
+    const trips = board.plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId: ashenId } : trip.driverId === ashenId ? { ...trip, driverId: was } : trip));
     board = answered(await ruwan.put(`/api/v1/plans/${THU}/draft`)
       .send({ planId: board.plan.id, revision: board.plan.revision, plan: { mixBrands: board.plan.mixBrands, trips, deferrals: board.plan.deferrals } }));
     const open = board.suggestion!.decisions.filter((decision) => decision.open).map((decision) => decision.key);
