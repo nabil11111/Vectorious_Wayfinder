@@ -255,9 +255,12 @@ export function tripRows(trip: DriverTrip, figures: Figures): Row[] {
 // The latest problem of a stop.
 export const problemOf = (trip: DriverTrip, stop: DriverStop) => trip.problems.filter((problem) => problem.stopId === stop.id).at(-1) ?? null;
 
-// The hand-back card: "Still on the truck" with what is on it and why, or "Nothing to hand back".
+// The hand-back card: "Still on the truck" with what is on it and why, or "Nothing to hand back"; and what did not fit
+// on the truck under a heading of its own, since it never went on (L-20).
+export const WONT_FIT_TITLE = 'Didn\'t fit on the truck';
 export function handBack(trip: DriverTrip, figures: Figures) {
   const lines: string[] = [];
+  const stayed: string[] = [];
   trip.stops.forEach((stop, i) => {
     const counts = figures.byStop[i]!;
     const brand = brandOf(trip, stop);
@@ -280,21 +283,24 @@ export function handBack(trip: DriverTrip, figures: Figures) {
     if (counts.short === 0) return;
     const brand = brandOf(trip, stop);
     const place = placeOf(stop.shopName);
-    // Short of stock never left the depot; what would not fit did not fit on the truck (L-09).
-    const said = (n: number, goods: string, why: string) => { if (n > 0) lines.push(`The ${goods} for ${place} ${why}.`); };
+    // Short of stock never left the depot (L-09); what would not fit stayed there, said under its own heading (L-20).
+    const said = (into: string[], n: number, goods: string, why: string) => { if (n > 0) into.push(`The ${goods} for ${place} ${why}.`); };
     if (brand === 'Fresh') {
       for (const temp of ['chilled', 'dry'] as const) {
         const cartons = (n: number) => (n === 1 ? `${temp} carton` : `${whole(n)} ${temp} cartons`);
-        said(counts.byTemp[temp].wontFit, cartons(counts.byTemp[temp].wontFit), 'did not fit on the truck');
-        said(stockShort(counts.byTemp[temp]), cartons(stockShort(counts.byTemp[temp])), 'never left the depot');
+        said(stayed, counts.byTemp[temp].wontFit, cartons(counts.byTemp[temp].wontFit), 'stayed at the depot');
+        said(lines, stockShort(counts.byTemp[temp]), cartons(stockShort(counts.byTemp[temp])), 'never left the depot');
       }
     } else {
       const goods = (n: number) => (n === 1 ? unitOf(brand, 1) : unitsWords(brand, n));
-      said(counts.wontFit, goods(counts.wontFit), 'did not fit on the truck');
-      said(stockShort(counts), goods(stockShort(counts)), 'never left the depot');
+      said(stayed, counts.wontFit, goods(counts.wontFit), 'stayed at the depot');
+      said(lines, stockShort(counts), goods(stockShort(counts)), 'never left the depot');
     }
   });
-  return { title: figures.onTruck > 0 ? 'Still on the truck' : 'Nothing to hand back', text: lines.join(' ') };
+  return {
+    title: figures.onTruck > 0 ? 'Still on the truck' : 'Nothing to hand back', text: lines.join(' '),
+    wontFit: stayed.length > 0 ? { title: WONT_FIT_TITLE, text: stayed.join(' ') } : null,
+  };
 }
 
 // "Trip 2", with "leaves 07:10" when the vehicle has one on the driver's day, or "none today".
