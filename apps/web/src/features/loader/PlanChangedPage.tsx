@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { orangeButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
 import {
-  NONE_KEPT, NOT_KEPT, SENT_AGAIN, changeTitle, chipsOf, closeChanges, leavesLine, markChangesOpened, planChangedLine, stopsLine, usePlanChanges,
-  type ChangeDetail, type ChangeRow, type KeptTrip,
+  JOINED_TRIP, LEFT_TRIP, NONE_KEPT, NOT_KEPT, SENT_AGAIN, WITHDRAWN, changeTitle, chipsOf, closeChanges, goodsChange, leavesLine, lineAtWords,
+  markChangesOpened, pageOf, planChangedLine, stopsLine, usePlanChanges, type ChangeDetail, type ChangeRow, type KeptTrip, type LineAt,
 } from './changes';
 import { useLoadingDay } from './loading';
 import { BackLink } from './parts/LoadCard';
@@ -20,19 +20,22 @@ import { unitsWords } from './words';
 export function PlanChangedPage() {
   const navigate = useNavigate();
   const query = useLoadingDay();
-  const { kept, failed } = usePlanChanges();
+  const changes = usePlanChanges();
+  const { kept, failed } = changes;
   const rows = kept?.changes ?? null;
   // Opening the page counts as the notice shown, so the list does not open it again by itself.
   useEffect(() => { if (rows) markChangesOpened(); }, [rows]);
   const back = () => navigate('/loader');
+  // While the plan is back in edit the page says to wait, as the list does, and never shows the old cards.
+  const page = pageOf(changes, query.data);
 
-  if (!kept || rows === null) {
+  if (page !== 'compare' || !kept || rows === null) {
     return (
       <div className="space-y-3">
         <BackLink to="/loader">Trucks</BackLink>
         {failed && <Line tone="warn">{NOT_KEPT}</Line>}
         <Card className="px-5 py-5 lg:max-w-[680px] lg:px-6 lg:py-6">
-          <p className="text-[15px] leading-5 font-semibold">{NONE_KEPT}</p>
+          <p className="text-[15px] leading-5 font-semibold">{page === 'withdrawn' ? WITHDRAWN : NONE_KEPT}</p>
           <Button className={orangeButton('mt-5 h-[52px] w-full rounded-[12px] text-[15px]')} onClick={back}>Back to trucks</Button>
         </Card>
       </div>
@@ -72,21 +75,25 @@ function Line({ tone, children }: { tone: 'warn'; children: ReactNode }) {
 function ChangeCard({ row }: { row: ChangeRow }) {
   const trip = row.after ?? row.before!;
   const changed = new Set<ChangeDetail>(row.details);
+  const goods = goodsChange(row);
   return (
     <Card ink className="px-5 pt-5 pb-5 lg:px-[26px] lg:pt-[29px] lg:pb-[26px]">
       <h2 className="text-[22px] leading-7 font-bold lg:text-2xl lg:leading-8">{changeTitle(trip)}</h2>
       <div className="mt-4 flex flex-col gap-3 lg:mt-[22px] lg:flex-row lg:items-start lg:gap-[22px]">
-        <Side label="Before" trip={row.before} changed={changed} old empty="Not on the plan before" />
+        <Side label="Before" trip={row.before} changed={changed} lines={goods.left} old empty="Not on the plan before" />
         <span aria-hidden="true" className="hidden pt-1 text-[26px] leading-8 font-semibold lg:block">→</span>
-        <Side label="Now" trip={row.after} changed={changed} empty="Taken off this plan" />
+        <Side label="Now" trip={row.after} changed={changed} lines={goods.joined} empty="Taken off this plan" />
       </div>
     </Card>
   );
 }
 
-// One side of a change: the vehicle, when it leaves, the driver, and the stops or the goods when those changed. The
-// old side strikes what changed; the new side writes it in full.
-function Side({ label, trip, changed, old = false, empty }: { label: string; trip: KeptTrip | null; changed: Set<ChangeDetail>; old?: boolean; empty: string }) {
+// One side of a change: the vehicle, when it leaves, the driver, and the stops or the goods when those changed, with
+// the order lines that left or joined the trip at their counts. The old side strikes what changed; the new side writes
+// it in full.
+function Side({ label, trip, changed, lines, old = false, empty }: {
+  label: string; trip: KeptTrip | null; changed: Set<ChangeDetail>; lines: LineAt[]; old?: boolean; empty: string;
+}) {
   const struck = (detail: ChangeDetail) => old && changed.has(detail);
   return (
     <div className="min-w-0">
@@ -104,6 +111,14 @@ function Side({ label, trip, changed, old = false, empty }: { label: string; tri
               {' · '}
               <span className={cn(struck('goods') && 'line-through')}>{unitsWords(trip.brand, trip.units)}</span>
             </p>
+          )}
+          {changed.has('goods') && lines.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[11px] leading-[14px] font-semibold text-muted-foreground">{old ? LEFT_TRIP : JOINED_TRIP}</p>
+              <ul className="mt-0.5 text-[13px] leading-[18px]">
+                {lines.map((line) => <li key={line.lineId} className={old ? 'text-muted-foreground line-through' : 'font-semibold'}>{lineAtWords(line, trip.brand)}</li>)}
+              </ul>
+            </div>
           )}
         </>
       ) : <p className="pt-1 text-[15px] leading-5 text-muted-foreground">{empty}</p>}
