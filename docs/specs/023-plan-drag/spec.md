@@ -23,8 +23,8 @@ board. The buttons and menus stay, for the keyboard and for anyone who prefers t
 - **A stop off its trip.** Drag a stop onto Unplanned orders to take it off the trip. Drag it onto another trip's card
   in Done to move it to that trip.
 - **The empty middle.** "No trip open" keeps "Build the suggested plan" in orange. In place of "Start a blank trip" it
-  shows a dashed drop area: "or drag an order or a truck here to start a trip". Dropping an order there starts its
-  trip the way its group's "Start a trip" does. Dropping a truck there starts that truck's trip.
+  shows a dashed drop area: "or drag an order here to start a trip". Dropping an order there starts its trip
+  the way its group's "Start a trip" does.
 - **While dragging.** The dragged order, stop or truck follows the pointer as a small card naming it. Every place it
   can land is outlined, and the place under it is filled with the brand's light tint. Releasing anywhere else, or
   pressing Escape, puts it back with nothing changed.
@@ -50,8 +50,8 @@ board. The buttons and menus stay, for the keyboard and for anyone who prefers t
   and the crew picker.
 - [x] AC-3 When a stop is dragged up or down in "Stops in order", the system shall reorder the stops as one change. A
   stop dropped on Unplanned orders shall come off its trip, and one dropped on another trip's card shall move there.
-- [x] AC-4 The empty middle shall show "Build the suggested plan" and the drop area "or drag an order or a truck here
-  to start a trip", in place of "Start a blank trip".
+- [x] AC-4 The empty middle shall show "Build the suggested plan" and the drop area "or drag an order here to start a
+  trip", in place of "Start a blank trip".
 - [x] AC-5 Every drop shall be checked by the plan checker like the same change made with a button. A dropped
   change shall be undone with one Undo.
 - [x] AC-6 Dragging shall work with the pointer and the keyboard, with each step announced. Nothing shall be draggable
