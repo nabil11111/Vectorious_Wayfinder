@@ -2,7 +2,7 @@ import { useState, type ReactNode, type RefObject } from 'react';
 import { reasonOf } from '@/features/store/words';
 import { useCrews, type BoardScreen } from '../board';
 import type { CrewRef } from '../draft';
-import { crewRows, pickOrders, type Pick } from './crews';
+import { crewRows, crewsFor, pickOrders, type Pick } from './crews';
 import type { BoardIndex } from './lookup';
 import { MenuItem, MenuPopup, MenuRoot, MenuTrigger } from './ui';
 
@@ -45,7 +45,9 @@ export function CrewMenu({ screen, index, pick, title, onPick, trigger, triggerC
 function CrewRows({ screen, index, pick, onPick }: { screen: BoardScreen; index: BoardIndex; pick: Pick; onPick: (crew: CrewRef) => void }) {
   const { board, draft } = screen;
   const orderIds = pickOrders(pick, draft, index).map((order) => order.id);
-  const crews = useCrews(board.day!.date, orderIds, true);
+  const crews = useCrews(board.day!.date, orderIds, board.plan.revision, true);
+  // Rows read for another draft than the one on screen are never offered: it says it is finding them meanwhile.
+  const read = crewsFor(crews.data, board, draft);
   if (crews.isError) {
     return (
       <div role="alert" className="px-2.5 py-1.5 text-xs leading-[15px]">
@@ -55,8 +57,8 @@ function CrewRows({ screen, index, pick, onPick }: { screen: BoardScreen; index:
       </div>
     );
   }
-  if (!crews.data) return <p role="status" className="px-2.5 py-2 text-xs text-muted-foreground">Finding crews…</p>;
-  return crewRows(crews.data, pick, draft, index).map((row) => (
+  if (!read) return <p role="status" className="px-2.5 py-2 text-xs text-muted-foreground">Finding crews…</p>;
+  return crewRows(read, pick, draft, index).map((row) => (
     <MenuItem key={row.vehicleId} disabled={row.disabled} className="block" onClick={() => onPick({ vehicleId: row.vehicleId, driverId: row.driverId })}>
       <span className="block text-[13px] leading-4 font-semibold">{row.title}</span>
       <span className="mt-0.5 block text-[11px] leading-[14px] text-muted-foreground">{row.line}</span>

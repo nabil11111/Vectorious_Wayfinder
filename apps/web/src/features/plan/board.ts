@@ -16,7 +16,7 @@ export const plansKey = ['plans'] as const;
 export const boardKey = ['plans', 'board'] as const;
 export const dayKey = (date: string) => ['plans', date] as const;
 export const slotsKey = (date: string, orderId: string) => ['plans', date, 'slots', orderId] as const;
-export const crewsKey = (date: string, orderIds: string[]) => ['plans', date, 'crews', orderIds.join(',')] as const;
+export const crewsKey = (date: string, orderIds: string[], revision: number) => ['plans', date, 'crews', orderIds.join(','), revision] as const;
 
 // The write that is running. Writes go one after the other, and a read waits for the one on its way, so an
 // older answer never lands on top of a newer one.
@@ -105,8 +105,9 @@ export function useSlots(date: string, orderId: string, saved: boolean) {
 }
 
 // The crew picker's list, read each time it opens, while it is open.
-export function useCrews(date: string, orderIds: string[], open: boolean) {
-  return useQuery({ queryKey: crewsKey(date, orderIds), queryFn: () => fetchCrews(date, orderIds), enabled: open, staleTime: 0, refetchInterval: false });
+// It is keyed by the saved draft's revision, so a read of another revision is never offered (review of 026).
+export function useCrews(date: string, orderIds: string[], revision: number, open: boolean) {
+  return useQuery({ queryKey: crewsKey(date, orderIds, revision), queryFn: () => fetchCrews(date, orderIds), enabled: open, staleTime: 0, refetchInterval: false });
 }
 
 // lib/live.ts refetches the queries of a message's topic, and the board's are under 'plans'. The depot's orders

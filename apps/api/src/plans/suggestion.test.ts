@@ -198,5 +198,7 @@ describe('each vehicle\'s usual driver (spec 026)', () => {
     // VEH002 drove with D-001 last time: it keeps him, and the others pair with the drivers history left.
     expect(usualPairing(['VEH001', 'VEH002', 'VEH003'], new Map([['VEH002', D001]]), [D001, D003, D004]))
       .toEqual(new Map([['VEH001', D003], ['VEH002', D001], ['VEH003', D004]]));
+    // VEH009 drove with D-001 and is archived since: it is not one of the vehicles, so D-001 is free to pair again.
+    expect(usualPairing(['VEH001', 'VEH002'], new Map([['VEH009', D001]]), [D001, D003])).toEqual(new Map([['VEH001', D001], ['VEH002', D003]]));
   });
 });

@@ -1,6 +1,6 @@
-import type { BoardOrder, Brand, Crew, CrewList, DraftPlan } from '@wayfinder/contracts';
+import type { BoardOrder, Brand, Crew, CrewList, DraftPlan, PlanBoard } from '@wayfinder/contracts';
 import type { Undo } from '../board';
-import { freeTripNo, keyOf, startTrip, swapTruck, tripOf, vehicleOfDriver, type CrewRef, type TripKey } from '../draft';
+import { freeTripNo, keyOf, planOf, sameDraft, startTrip, swapTruck, tripOf, type CrewRef, type TripKey } from '../draft';
 import { countOf, crewName, cubic, hhmm, tonnes } from '../words';
 import { movesLine } from './drivers';
 import type { BoardIndex } from './lookup';
@@ -20,6 +20,25 @@ export type Pick =
 export function pickOrders(pick: Pick, plan: DraftPlan, index: BoardIndex): BoardOrder[] {
   if (pick.kind === 'start') return pick.orders;
   return tripOf(plan, pick.key)?.stops.flatMap((stop) => stop.orderIds.flatMap((id) => index.order(id) ?? [])) ?? [];
+}
+
+// A crews read stands for the saved draft it was read from: while the draft on screen is another (a change on its way,
+// or a newer revision), the picker offers none of its rows, so a pick never puts back a driver the draft has moved
+// since (review of 026).
+export const crewsFor = (read: CrewList | undefined, board: PlanBoard, plan: DraftPlan): CrewList | null =>
+  (read && read.revision === board.plan.revision && sameDraft(plan, planOf(board)) ? read : null);
+
+// The drivers a pick displaces (rule 2): the crew's driver leaving another truck that keeps a trip, which is left with
+// none, and a driver on a truck now and on none after, such as the picked truck's own driver.
+function displaced(before: DraftPlan, after: DraftPlan, crew: CrewRef) {
+  const trucksOf = (plan: DraftPlan, driverId: string) => [...new Set(plan.trips.filter((t) => t.driverId === driverId).map((t) => t.vehicleId))];
+  const drivers = [...new Set(before.trips.flatMap((t) => (t.driverId === null ? [] : [t.driverId])))];
+  return {
+    // The trucks the crew's driver leaves, each keeping a trip with no driver.
+    left: crew.driverId === null ? [] : trucksOf(before, crew.driverId).filter((v) => v !== crew.vehicleId && after.trips.some((t) => t.vehicleId === v)),
+    // Every other driver taken off every truck, with the truck they drove.
+    off: drivers.filter((d) => d !== crew.driverId && trucksOf(after, d).length === 0).map((driverId) => ({ driverId, vehicleId: trucksOf(before, driverId)[0]! })),
+  };
 }
 
 // The draft without the trip being moved, so a truck's free trip is counted as the move would leave it.
@@ -63,9 +82,14 @@ export function crewRows(read: CrewList, pick: Pick, plan: DraftPlan, index: Boa
       ...(crew.lastDistricts.length > 0 ? [`ran ${list.format(crew.lastDistricts)} last time`] : []),
       `fuel ${crew.fuelLeftPct}% left`,
     ].join(' · ');
-    // The crew's driver drives another truck that keeps a trip after the pick: it will have none (rule 2).
-    const other = crew.driverId === null ? null : vehicleOfDriver(left, crew.driverId, crew.vehicleId);
-    return { vehicleId: crew.vehicleId, driverId: crew.driverId, title, line, warning: other && driver ? `${driver.name} ${movesLine(other)}` : null, disabled: false };
+    // Every driver the pick displaces, said before the press (rule 2).
+    const made = crewChange(pick, plan, { vehicleId: crew.vehicleId, driverId: crew.driverId }, index);
+    const moved = made ? displaced(plan, made.plan, crew) : { left: [], off: [] };
+    const warning = [
+      ...moved.left.map((vehicleId) => `${driver?.name ?? 'The driver'} ${movesLine(vehicleId)}`),
+      ...moved.off.map(({ driverId, vehicleId }) => `${index.driver(driverId)?.name ?? 'A driver'} drives ${vehicleId} now and will be taken off it`),
+    ].join('. ');
+    return { vehicleId: crew.vehicleId, driverId: crew.driverId, title, line, warning: warning || null, disabled: false };
   });
 }
 
@@ -80,7 +104,8 @@ export function crewChange(pick: Pick, plan: DraftPlan, crew: CrewRef, index: Bo
   let line = pick.kind === 'swap' ? `Trip moved to ${truck}${trip.tripNo === 2 ? ', as its second trip' : ''}`
     : pick.dropped !== undefined ? `${pick.dropped} added to ${index.called(trip)}`
       : `${trip.tripNo === 2 ? 'Second trip' : 'Trip'} started on ${truck}`;
-  const left = crew.driverId === null ? null : vehicleOfDriver(withoutMoved(pick, plan), crew.driverId, crew.vehicleId);
-  if (left !== null) line += `. ${left} has no driver now.`;
+  const moved = displaced(plan, made.plan, crew);
+  for (const vehicleId of moved.left) line += `. ${vehicleId} has no driver now.`;
+  for (const { driverId, vehicleId } of moved.off) line += `${line.endsWith('.') ? '' : '.'} ${index.driver(driverId)?.name ?? 'A driver'} is off ${vehicleId} now.`;
   return { ...made, undo: { before: plan, line, tripKey: made.key } };
 }

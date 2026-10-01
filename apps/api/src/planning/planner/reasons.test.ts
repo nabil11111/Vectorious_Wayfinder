@@ -331,31 +331,60 @@ describe('the planner\'s own sentences in plain words', () => {
   });
 });
 
-// The planner's 200 characters hold for the whole reason (spec 011, spec 026): drivers' names give way to kind and id
-// first, and only then is the reason tightened, never by cutting a word or leaving out a fact.
+// The planner's 200 characters hold for the whole reason (spec 011, spec 026): the reason is tightened first with the
+// drivers' names kept, and only when no tight form fits do the names give way to kind and id (review of 026), never by
+// cutting a word or leaving out a fact.
 describe('every reason within 200 characters', () => {
-  it('takes the fullest wording that fits: whole sentences, the short forms, kind and id, tight, without the deciding rule, and last the limit before the load', () => {
+  it('takes the fullest wording that fits: whole sentences, the short forms, the tight forms by driver, then kind and id', () => {
     const rendered: Wording[] = [];
     const sized = (lengths: Record<Wording, number>) => (wording: Wording) => {
       rendered.push(wording);
       return 'x'.repeat(lengths[wording]);
     };
-    expect(fittedReason(sized({ full: 200, short: 150, plain: 150, tight: 120, tightest: 100, shortest: 96 }))).toHaveLength(200);
+    const lengths = (named: [number, number, number, number, number], plain: [number, number, number, number]): Record<Wording, number> => ({
+      full: named[0], short: named[1], 'named tight': named[2], 'named tightest': named[3], 'named shortest': named[4],
+      plain: plain[0], tight: plain[1], tightest: plain[2], shortest: plain[3],
+    });
+    expect(fittedReason(sized(lengths([200, 150, 140, 130, 126], [150, 120, 100, 96])))).toHaveLength(200);
     expect(rendered).toEqual(['full']);
     rendered.length = 0;
-    expect(fittedReason(sized({ full: 260, short: 206, plain: 165, tight: 150, tightest: 130, shortest: 126 }))).toHaveLength(165);
-    expect(rendered).toEqual(['full', 'short', 'plain']);
+    // A tight form with the names fits, so the kind-and-id forms, shorter still, are never tried.
+    expect(fittedReason(sized(lengths([260, 206, 199, 180, 176], [165, 150, 130, 126])))).toHaveLength(199);
+    expect(rendered).toEqual(['full', 'short', 'named tight']);
     rendered.length = 0;
-    expect(fittedReason(sized({ full: 260, short: 230, plain: 207, tight: 183, tightest: 165, shortest: 161 }))).toHaveLength(183);
-    expect(rendered).toEqual(['full', 'short', 'plain', 'tight']);
+    expect(fittedReason(sized(lengths([260, 230, 210, 200, 196], [207, 183, 165, 161])))).toHaveLength(200);
+    expect(rendered).toEqual(['full', 'short', 'named tight', 'named tightest']);
     rendered.length = 0;
-    expect(fittedReason(sized({ full: 260, short: 240, plain: 220, tight: 203, tightest: 185, shortest: 181 }))).toHaveLength(185);
-    expect(rendered).toEqual(['full', 'short', 'plain', 'tight', 'tightest']);
+    expect(fittedReason(sized(lengths([260, 240, 220, 204, 199], [207, 183, 165, 161])))).toHaveLength(199);
+    expect(rendered).toEqual(['full', 'short', 'named tight', 'named tightest', 'named shortest']);
     rendered.length = 0;
-    expect(fittedReason(sized({ full: 260, short: 250, plain: 240, tight: 220, tightest: 201, shortest: 197 }))).toHaveLength(197);
-    expect(rendered).toEqual(['full', 'short', 'plain', 'tight', 'tightest', 'shortest']);
+    // Only when no form with the names fits do they give way to kind and id, short then tight.
+    expect(fittedReason(sized(lengths([260, 250, 230, 215, 211], [207, 183, 165, 161])))).toHaveLength(183);
+    expect(rendered).toEqual(['full', 'short', 'named tight', 'named tightest', 'named shortest', 'plain', 'tight']);
+    rendered.length = 0;
+    expect(fittedReason(sized(lengths([260, 250, 240, 230, 220], [240, 220, 201, 197])))).toHaveLength(197);
+    expect(rendered).toEqual(['full', 'short', 'named tight', 'named tightest', 'named shortest', 'plain', 'tight', 'tightest', 'shortest']);
     // Longer even then, it keeps its length rather than be cut.
-    expect(fittedReason(sized({ full: 260, short: 250, plain: 240, tight: 230, tightest: 210, shortest: 206 }))).toHaveLength(206);
+    expect(fittedReason(sized(lengths([260, 250, 240, 230, 220], [240, 230, 210, 206])))).toHaveLength(206);
+  });
+
+  it('keeps the drivers\' names in the tight forms: "joined Chaminda\'s dry truck"', () => {
+    const chaminda = { ...vehicle('VEH012'), driverName: 'Chaminda' };
+    const order = plannerOrder('dry', 'OUT030');
+    const day = plannerInput([order], { vehicles: [chaminda] });
+    const attempt = tryCandidate(planInput(day), order, { vehicleId: 'VEH012', tripNo: 1, existing: false });
+    const placed = (existing: boolean, tripNo: number, wording: Wording) =>
+      placementReason(day, order, { ...attempt, slot: { ...attempt.slot, existing, tripNo }, selectionReason: existing ? 'fills an existing run' : 'vehicle ID breaks the tie' }, wording);
+    expect(placed(false, 2, 'named tight')).toBe('on Chaminda\'s dry truck\'s second trip (vehicle ID tie)');
+    expect(placed(true, 1, 'named tightest')).toBe('joined Chaminda\'s dry truck');
+    // A truck with no driver goes by its kind and id in the tight forms with names too.
+    const plain = plannerInput([order], { vehicles: [vehicle('VEH012')] });
+    expect(placementReason(plain, order, { ...attempt, selectionReason: 'vehicle ID breaks the tie' }, 'named tight')).toBe('on dry truck VEH012 (vehicle ID tie)');
+    const waiting = plannerOrder('waiting', 'OUT001', 'fresh-chilled-carton', 400, { deliveryDate: '2026-06-24', timesDeferred: 1 });
+    const vanDay = plannerInput([waiting], { vehicles: [{ ...vehicle('VEH035'), driverName: 'Dilshan' }] });
+    const full = tryCandidate(planInput(vanDay), waiting, { vehicleId: 'VEH035', tripNo: 1, existing: false });
+    expect(refusedReason(vanDay, waiting, [full], 'over_capacity', 'named tight')).toBe('Dilshan\'s reefer van carries 2,760 kg, over its 1,040 kg limit.');
+    expect(refusedReason(vanDay, waiting, [full], 'over_capacity', 'named shortest')).toBe('Dilshan\'s reefer van over its 1,040 kg limit with 2,760 kg.');
   });
 
   it('names trucks by kind and id once the drivers\' names do not fit, and words them tightly only after that', () => {
