@@ -6,7 +6,7 @@ import { capital, itsTrip, orderCalled, tripCalled, vehicleCalled } from '../wor
 
 // Every order accounted for (spec 007, AC-24 to AC-28 and AC-48): each of the day's orders is on one stop or
 // deferred once with a reason and sits at its own shop, and no trip is empty or stops at a shop twice. The
-// sentences follow spec 024: the order or the shop first, and the vehicle by its kind.
+// sentences follow specs 024 and 026: the order or the shop first, and the vehicle by its driver or else its kind.
 
 type About = Pick<Problem, 'vehicleId' | 'tripNo' | 'stopSeq' | 'outletId' | 'orderId'>;
 

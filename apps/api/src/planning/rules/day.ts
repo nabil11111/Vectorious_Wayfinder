@@ -6,7 +6,7 @@ import type { DayProblems } from '../types';
 import { capital, driverOf, itsTrip, litres, vehicleCalled } from '../words';
 
 // Fuel and the day (spec 007, AC-34 to AC-36): the weekly fuel quota, the operating day and whether each
-// vehicle is available. The sentences follow spec 024: the vehicle by its kind.
+// vehicle is available. The sentences follow specs 024 and 026: the vehicle by its driver or else its kind.
 
 type About = Pick<Problem, 'vehicleId' | 'tripNo' | 'stopSeq' | 'outletId' | 'orderId'>;
 

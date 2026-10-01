@@ -8,7 +8,7 @@ import { capital, driverOf, itsTrip, toClock, tripCalled, vehicleCalled } from '
 // Time (spec 007, AC-29 to AC-33, AC-37 to AC-39, AC-47 and AC-49): a trip stays in one district the data has
 // a drive to, a vehicle runs at most two trips and the second after the first, every shop is reached inside
 // its window and its mall's slot, and the day's budgets, leaving early and long waits are pointed out. The
-// sentences follow spec 024: the shop first at a stop, and the vehicle by its kind.
+// sentences follow specs 024 and 026: the shop first at a stop, and the vehicle by its driver or else its kind.
 
 type About = Pick<Problem, 'vehicleId' | 'tripNo' | 'stopSeq' | 'outletId' | 'orderId'>;
 

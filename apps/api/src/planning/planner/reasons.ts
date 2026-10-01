@@ -119,8 +119,9 @@ export function priorityReason(input: PlannerInput, order: PlannerOrder, rank: n
   return `Rank ${rank}: ${waiting}; ${load.needsReefer ? 'chilled' : 'dry'}; ${readableName(shop)} ${freshDeadline ? 'due' : 'closes'} ${toClock(effectiveWindow(shop).close)}${restrictions.length ? `; ${restrictions.join(', ')}` : ''}`;
 }
 
-// The run an order joins or starts, by the vehicle's kind and only a second trip by its number (spec 024): "new run on
-// the dry truck VEH012 to Gampaha", "joined the dry truck VEH012 on its second trip to Gampaha".
+// The run an order joins or starts, the vehicle by the driver the planner's input gives it (spec 026) or else by its
+// kind and id, and only a second trip by its number (spec 024): "new run on Chaminda's dry truck to Gampaha", "joined
+// the dry truck VEH012 on its second trip to Gampaha".
 export function placementReason(input: PlannerInput, order: PlannerOrder, attempt: CandidateAttempt, compact = false): string {
   const district = displayName(shopOf(input, order).district);
   const { vehicleId, tripNo, existing } = attempt.slot;
@@ -159,8 +160,8 @@ export function refusedReason(
     ? problem.code === 'fuel_over_quota' : code === 'over_capacity'
       ? problem.code === 'over_weight' || problem.code === 'over_volume' : problem.code !== 'fuel_over_quota'));
   if (!problem) return deferralFor(input, order, code, { attempts }).reason;
-  // The short forms follow the checker's rules (spec 024): the shop first at a stop, the vehicle by its kind, and only a
-  // second trip by its number.
+  // The short forms follow the checker's rules (spec 024, spec 026): the shop first at a stop, the vehicle by its driver
+  // or else its kind, and only a second trip by its number.
   if (compact) {
     const vehicle = lookup(attempt.input.vehicles, 'vehicle')(problem.vehicleId ?? attempt.slot.vehicleId);
     const tripNo = problem.tripNo ?? attempt.slot.tripNo;
@@ -192,7 +193,8 @@ export function refusedReason(
 }
 
 // The early departure the planner asks the dispatcher to accept, the order that forced it first and the vehicle by its
-// kind (spec 024): "The rank 4 order for Badulla makes the dry truck VEH044 leave at 02:59 instead of 03:30."
+// driver or else its kind (spec 024, spec 026): "The rank 4 order for Badulla makes the dry truck VEH044 leave at 02:59
+// instead of 03:30."
 export function earlyLeaveReason(
   input: PlannerInput, trip: { vehicleId: string; tripNo: number; leaveAt: number; usual: number }, rank: number, order: PlannerOrder,
 ): string {

@@ -6,7 +6,8 @@ import type { CargoProblems } from '../types';
 import { capital, itsTrip, kg, m3, onItsTrip, orderCalled, tripCalled, vehicleCalled } from '../words';
 
 // What each vehicle carries (spec 007, AC-17 to AC-23): weight, volume, chilled goods, van-only shops, depots,
-// tail-lift items and mixed brands. The sentences follow spec 024: what is wrong first, the vehicle by its kind.
+// tail-lift items and mixed brands. The sentences follow specs 024 and 026: what is wrong first, the vehicle by its
+// driver or else its kind.
 
 type About = Pick<Problem, 'vehicleId' | 'tripNo' | 'stopSeq' | 'outletId' | 'orderId'>;
 
