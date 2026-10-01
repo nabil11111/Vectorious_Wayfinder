@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { DraftTrip, Problem } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import { deferredOn, entranceAndWindow, figure, hhmm } from '../words';
@@ -31,8 +32,9 @@ export function VehicleRow({ vehicleId, trips, driverName, index }: { vehicleId:
       <div className={cn('grid grid-cols-[22px_minmax(0,1fr)_22px] items-center gap-x-3 gap-y-1 rounded-lg px-2 py-[3px] xl:grid-cols-[22px_166px_206px_150px_116px_minmax(0,1fr)_22px]', blocked ? 'bg-bad-tint' : first ? 'bg-warn-tint' : '')}>
         {vehicle && <img src={vehicleIcon(vehicle)} alt="" className="size-[22px] object-contain" />}
         <p className="min-w-0 truncate text-xs leading-[15px]"><span className="font-mono font-bold">{vehicleId}</span>{driverName && <span className="ml-2 font-semibold">{driverName}</span>}</p>
-        <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${label}` : `Show the stops of ${label}`} onClick={() => setOpen(!open)} className="col-start-3 row-start-1 flex size-[22px] items-center justify-center rounded-md text-sm font-bold text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 xl:col-start-7">
-          {open ? '⌃' : '⌄'}
+        {/* One chevron for both states, turned while the stops are open, as Done's cards draw it. */}
+        <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${label}` : `Show the stops of ${label}`} onClick={() => setOpen(!open)} className="group col-start-3 row-start-1 flex size-[22px] items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 xl:col-start-7">
+          <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-aria-expanded:rotate-180" />
         </button>
         <p className="col-span-2 col-start-2 font-mono text-[11px] leading-[14px] whitespace-nowrap xl:col-span-1 xl:col-start-auto">
           {checked.map((c) => (c.check?.times ? `${hhmm(c.check.times.leaveAt)} to ${hhmm(c.check.times.backAt)}` : `trip ${c.trip.tripNo}`)).join(' · ')}

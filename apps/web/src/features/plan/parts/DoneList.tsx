@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { Brand, DraftTrip, TripTimes } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
@@ -6,6 +6,8 @@ import type { BoardScreen } from '../board';
 import { keyOf, planOf, sameTrip, tripOf, type TripKey } from '../draft';
 import { countOf, figure, hhmm, whole } from '../words';
 import { DepotRow } from './DepotRow';
+import { BoardChange, useLanding } from './dragging';
+import { tripLabel } from './drops';
 import { ICON } from './icons';
 import type { BoardIndex } from './lookup';
 import { toneOf } from './look';
@@ -49,12 +51,16 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
   const shop = trip.stops[0] ? index.shop(trip.stops[0].outletId) : null;
   // Two lines, as the frame has them: the vehicle and its driver, or "no driver" in the warning colour (spec 022), then
   // the brand and district.
-  const name = trip.tripNo === 2 ? `${trip.vehicleId} trip 2` : trip.vehicleId;
+  const name = tripLabel(trip);
   const where = [shop?.brand, shop?.district, vehicle?.type === 'van' && 'van'].filter(Boolean).join(' · ');
   const title = [name, driver?.name ?? 'no driver', where].filter(Boolean).join(' · ');
+  // An order or a stop dropped on the card joins this trip at the end, and the drop's Undo line shows here (spec 023).
+  const { setNodeRef: landingRef, look: landingLook } = useLanding(`card:${key}`, { kind: 'card', tripKey: key }, `${name}'s card`);
+  const change = useContext(BoardChange);
+  const undo = screen.undo?.tripKey === key ? screen.undo : null;
 
   return (
-    <li className="border-t py-2.5">
+    <li ref={landingRef} className={cn('border-t py-2.5', landingLook)}>
       <div className="flex items-start gap-2">
         <button type="button" onClick={() => onOpen(key)} className="mr-auto min-w-0 rounded-sm text-left text-xs leading-[17px] font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
           <span className="block">{name} · {driver ? driver.name : <span className="text-warn-ink">no driver</span>}{where && ' ·'}</span>
@@ -73,6 +79,12 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
           <Figure small label="time" value={`${figure(figures.timePct)}%`} tone={toneOf(figures.timePct, false, has('over_time_budget'))} />
           <Figure small label="kg" value={`${figure(figures.kgPct)}%`} tone={toneOf(figures.kgPct, has('over_weight'))} />
           <Figure small label="m³" value={`${figure(figures.m3Pct)}%`} tone={toneOf(figures.m3Pct, has('over_volume'))} />
+        </div>
+      )}
+      {undo && change && (
+        <div role="status" className="mt-2 flex items-center gap-2 rounded-[10px] bg-good-tint px-2.5 py-1.5">
+          <p className="flex-1 text-[11px] leading-[14px] font-semibold text-good">{undo.line}</p>
+          <button type="button" className="text-[11px] leading-[14px] font-semibold underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50" onClick={() => change(undo.before)}>Undo</button>
         </div>
       )}
       {open && <CardStops trip={trip} times={times} depot={screen.board.depot} index={index} />}

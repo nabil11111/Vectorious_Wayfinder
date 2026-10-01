@@ -16,6 +16,7 @@ import { ICON } from './parts/icons';
 import { groupKey, indexOf } from './parts/lookup';
 import { OrderLists } from './parts/OrderLists';
 import { PickTruck, type Pick } from './parts/PickTruck';
+import { PlanDnd } from './parts/PlanDnd';
 import { TripPanel } from './parts/TripPanel';
 import { TruckList } from './parts/TruckList';
 import { plainButton } from './parts/look';
@@ -173,7 +174,6 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
       <BuildPanel
         screen={screen}
         act={saver.act}
-        onBlank={() => show({ kind: 'pick', pick: { kind: 'start', group: null, orders: [], startWith: [] } })}
         onBuilding={() => setTab('planning')}
       />
     );
@@ -199,6 +199,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         onRefresh={onRefresh}
         refreshing={refreshing}
       />
+      <PlanDnd screen={screen} change={change} onStartTrip={(pick) => show({ kind: 'pick', pick })}>
       <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[300px_minmax(0,1fr)_270px] xl:grid-cols-[360px_minmax(0,1fr)_330px]">
         <div className={cn('min-h-0 flex-col gap-4', tab === 'unplanned' ? 'flex' : 'hidden lg:flex')}>
           <OrderLists
@@ -219,6 +220,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
           <DoneList screen={screen} index={index} openKey={open ? keyOf(open) : null} onOpen={openTrip} />
         </Column>
       </div>
+      </PlanDnd>
     </div>
   );
 }

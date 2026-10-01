@@ -466,8 +466,9 @@ class PlanSaver {
 
   // A split, join, send or back to edit (rule 8, rule 11), and spec 014's build and accept. Each waits until the draft
   // is saved and any other of them has answered, and the board holds still until this one answers. It says why when
-  // it was refused, or null.
-  act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>): Promise<string | null> => {
+  // it was refused, or null. done gets the board it answered once the board has taken it, and only then: a build that
+  // went through opens View plan from there (spec 023).
+  act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>, done?: (board: PlanBoard) => void): Promise<string | null> => {
     // A queue for an account or depot no longer on show sends nothing (spec 020), here and below before the send.
     if (!this.stillMine()) {
       this.dropAll();
@@ -492,6 +493,7 @@ class PlanSaver {
       if (!this.stillMine()) return null;
       this.answered(answer, true);
       this.show({ saving: 'saved', refused: null, undo: null });
+      done?.(answer);
       return null;
     } catch (error) {
       if (!this.stillMine()) return null;

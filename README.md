@@ -207,9 +207,12 @@ Press **Reset the demo day** first if you walked the one above.
 2. **The empty board.** As Ruwan (`P-001`), the Plan board shows "Unplanned · 102" with "Carried over · 4" (Fresh Dickwella,
    deferred twice, first), "0 / 35 trucks", "0 / 102 orders", "37% fuel this week" and "0 / 140.7 m³ fridge space".
    In the middle, "Build the suggested plan" in orange.
-3. **Build it.** Press it: "Building the plan · 102 orders · 35 trucks", then "Unplanned · 0", "Done · 27 trips" with
-   each truck's driver on its card, given in staff ID order ("VEH004 · Lasantha · Fresh · Matara"), "26 / 35 trucks",
-   "96 / 102 orders", "41% fuel this week" and "57.02 / 140.7 m³ fridge space". "Deferred · 6" holds
+3. **Build it.** Press it: "Building the plan · 102 orders · 35 trucks", then View plan opens for the day with
+   "Suggested plan · 16:00", "96 / 102 orders placed", "6 deferred", "26 / 35 trucks · 27 trips", "96 / 96 windows
+   met", the trucks by brand and district, "Decisions · 6" and a greyed "Send plan · 6 decisions open". Press **← Back
+   to edit**: "Unplanned · 0", "Done · 27 trips" with each truck's driver on its card, given in staff ID order
+   ("VEH004 · Lasantha · Fresh · Matara"), "26 / 35 trucks", "96 / 102 orders", "41% fuel this week" and
+   "57.02 / 140.7 m³ fridge space". "Deferred · 6" holds
    the chilled orders of four Kurunegala shops (Pannala, Polgahawela, Wariyapola, Mawathagama) and two Puttalam shops
    (Wennappuwa, Puttalam), each with the sentence the shop will read, such as "No fridge truck could reach Fresh
    Pannala before its window closed at 07:45 on Thursday." The middle says "Suggested plan · 16:00 · 6 decisions to
@@ -263,6 +266,12 @@ Anything we built differently from our Designathon submission, and why.
   "Open in edit" (D-54). The design draws none.
 - **No "Changes · N" and no "Back to the suggestion"** in the board's header. View plan says when the plan was
   suggested, with no switch between the suggested and the edited plan.
+- **A build opens View plan,** where the suggested plan's trips, decisions and checks are laid out. The design stays
+  on the board.
+- **The empty middle takes a drop** in place of "Start a blank trip": "or drag an order here to start a trip" picks a
+  truck for the order's group and starts the trip with it. Orders, shops and whole groups also drag onto the open
+  trip's stops or a trip's card in Done, and stops drag along their list, back to Unplanned orders or onto another
+  trip's card, by pointer or keyboard (D-98). Every button and menu stays, so the walkthrough runs on them alone.
 - **Orders are named by shop, amount and wanted day.** The design's order numbers (WF-2402) do not exist here.
 - **The depot switch** works between Peliyagoda and Kandy (D-93) and shows from 1280 wide. Only Both is greyed: it says
   both depots together come later.

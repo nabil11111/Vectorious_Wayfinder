@@ -6,6 +6,7 @@ import { planOf } from '../draft';
 import { CardStops, DoneList } from './DoneList';
 import { indexOf } from './lookup';
 import { TripPanel } from './TripPanel';
+import { VehicleRow } from './VehicleRow';
 
 // Spec 022's stop lists, drawn as the page draws them: Done's card opening to its stops with one chevron for both
 // states, and the depot at both ends of a trip's stops, in the card and in the middle's "Stops in order", from the
@@ -96,4 +97,12 @@ it('spec 022 "Stops in order" puts the depot before stop 1 and the return after 
   expect(veh004.match(/<ol\b[^>]*>(.*)<\/ol>/)![1]).not.toContain('data-depot');
   // VEH002's trip has no times yet, so neither row.
   expect(rowsOf(stops(panel('VEH002'))).filter((row) => row.includes('Peliyagoda'))).toEqual([]);
+});
+
+it('spec 023 View plan\'s vehicle row draws the same single chevron, turned while its stops are open', () => {
+  const markup = renderToStaticMarkup(<VehicleRow vehicleId="VEH004" trips={[tripOf('VEH004')]} driverName="Lasantha" index={INDEX} />);
+  const [button, inside] = markup.match(/<button type="button" aria-expanded="false"[^>]*>(.*?)<\/button>/)!;
+  expect(button).toMatch(/class="group [^"]*"/);
+  expect(inside).toMatch(/^<svg [^>]*class="lucide lucide-chevron-down size-3\.5 transition-transform group-aria-expanded:rotate-180"[^>]*>/);
+  expect(markup).not.toMatch(/[⌄⌃]/);
 });
