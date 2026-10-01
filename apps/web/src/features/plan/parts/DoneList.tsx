@@ -45,16 +45,17 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
   const vehicle = index.vehicle(trip.vehicleId);
   const driver = index.driver(trip.driverId);
   const shop = trip.stops[0] ? index.shop(trip.stops[0].outletId) : null;
-  // Two lines, as the frame has them: the vehicle and its driver, then the brand and district.
-  const who = [trip.tripNo === 2 ? `${trip.vehicleId} trip 2` : trip.vehicleId, driver?.name].filter(Boolean).join(' · ');
+  // Two lines, as the frame has them: the vehicle and its driver, or "no driver" in the warning colour (spec 022), then
+  // the brand and district.
+  const name = trip.tripNo === 2 ? `${trip.vehicleId} trip 2` : trip.vehicleId;
   const where = [shop?.brand, shop?.district, vehicle?.type === 'van' && 'van'].filter(Boolean).join(' · ');
-  const title = [who, where].filter(Boolean).join(' · ');
+  const title = [name, driver?.name ?? 'no driver', where].filter(Boolean).join(' · ');
 
   return (
     <li className="border-t py-2.5">
       <div className="flex items-start gap-2">
         <button type="button" onClick={() => onOpen(key)} className="mr-auto min-w-0 rounded-sm text-left text-xs leading-[17px] font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
-          <span className="block">{who}{where && ' ·'}</span>
+          <span className="block">{name} · {driver ? driver.name : <span className="text-warn-ink">no driver</span>}{where && ' ·'}</span>
           {where && <span className="block">{where}</span>}
         </button>
         <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${title}` : `Show the stops of ${title}`} onClick={() => setOpen(!open)} className="-mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-sm font-bold text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
