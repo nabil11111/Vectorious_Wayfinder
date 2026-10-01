@@ -13,7 +13,7 @@ import { clockTime, shortDay, whole } from '@/features/loader/words';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
 import { NeedsYou } from './NeedsYou';
-import { issuesKey, issuesKeyOf, useAnswer, useIssueLists, type Answering } from './issues';
+import { answeringIn, issuesKey, issuesKeyOf, useAnswer, useIssueLists, type Answering, type SentFrom } from './issues';
 import { isLive, useOnline, useOperations } from './operations';
 import { Events } from './parts/Events';
 import { focusIssue, focusOpener, showTrip } from './parts/focus';
@@ -45,8 +45,8 @@ export function LiveDayPage() {
   const issues = useIssueLists(depots);
   const parts: Part[] = depots.map((depot, i) => ({ depot, ops: ops[i]!, issues: issues[i]! }));
   const answering = useAnswer();
-  // The depot of the answer sent last: its part shows the green line, or the server's refusal.
-  const [answeredIn, setAnsweredIn] = useState<string | null>(null);
+  // The depot each answer was sent from, so its green line or its refusal shows only in that depot's part.
+  const [sentFrom, setSentFrom] = useState<SentFrom>({ byIssue: {}, latest: null });
   const { at } = useAppClock();
   const online = useOnline();
   const [params, setParams] = useSearchParams();
@@ -119,16 +119,14 @@ export function LiveDayPage() {
       if (!focusIssue(issueId)) { asked.current = null; setParam('issue', issueId); }
     },
   };
-  // On both depots together each part's column shows only the answer sent from it.
-  const answeringIn = (depot: string): Answering => (both ? {
-    ...answering,
-    sent: answeredIn === depot ? answering.sent : null,
-    refused: answeredIn === depot ? answering.refused : null,
-    decide: (issue, decision) => { setAnsweredIn(depot); answering.decide(issue, decision); },
-  } : answering);
+  // On both depots together each part's column shows only the answers sent from it.
+  const answeringOf = (depot: string): Answering => (both ? answeringIn(answering, depot, sentFrom, (issue, decision) => {
+    setSentFrom((held) => ({ byIssue: { ...held.byIssue, [issue.id]: depot }, latest: depot }));
+    answering.decide(issue, decision);
+  }) : answering);
   const pending = parts.some((part) => part.ops.isPending);
   const body = (part: Part, className: string, partNotice: string | null) => (
-    <LiveBody part={part} notice={partNotice} filter={filter} actions={actions} at={at} answering={answeringIn(part.depot)} className={className} />
+    <LiveBody part={part} notice={partNotice} filter={filter} actions={actions} at={at} answering={answeringOf(part.depot)} className={className} />
   );
 
   return (

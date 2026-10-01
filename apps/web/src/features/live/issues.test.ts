@@ -3,7 +3,7 @@ import type { Issue, Me } from '@wayfinder/contracts';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { meKey } from '@/features/auth/api';
 import { DEPOT_CHANGED, DEPOT_HEADER, nameDepot } from '@/lib/api';
-import { PHOTO_TAB_BLOCKED, answerOnItsWay, issuesKeyOf, issuesOptions, openIssuePhoto, sendAnswer } from './issues';
+import { PHOTO_TAB_BLOCKED, answerOnItsWay, answeringIn, issuesKeyOf, issuesOptions, openIssuePhoto, sendAnswer, type Answering } from './issues';
 
 // A problem's answer across a dispatcher's depot switch (spec 020, AC-6): it holds a switch while it is on its way, and
 // an answer that lands after the depot changed is not this screen's to show.
@@ -154,4 +154,31 @@ it('AC-6 on both depots each depot\'s problems are a read of its own, and an ans
   expect(await sending).toEqual({ decided: DECIDED });
   expect(vi.mocked(fetch).mock.calls.map(([url]) => url).sort()).toEqual(['/api/v1/issues/7c000000-0000-4000-8000-000000000001/decide', '/api/v1/issues?depot=Kandy', '/api/v1/issues?depot=Peliyagoda']);
   watching.forEach((stop) => stop());
+});
+
+it('AC-6 on both depots an answer stays with its own depot: sending or failing another depot\'s answer never shows it there', () => {
+  const atPeliyagoda = { ...DECIDED, id: '7c000000-0000-4000-8000-0000000000a1' } as Issue;
+  const atKandy = { ...FLAG, id: '7c000000-0000-4000-8000-0000000000b2' } as Issue;
+  const decide = vi.fn();
+  const view = (answering: Omit<Answering, 'decide'>, from: { byIssue: Record<string, string>; latest: string | null }, depot: string) =>
+    answeringIn({ ...answering, decide }, depot, from, decide);
+  // Peliyagoda's answer went out ("Bring them back") and its green line shows under Peliyagoda.
+  const sentFromPeliyagoda = { byIssue: { [atPeliyagoda.id]: 'Peliyagoda' }, latest: 'Peliyagoda' };
+  const sent = { sending: null, failed: null, refused: null, sent: atPeliyagoda };
+  expect(view(sent, sentFromPeliyagoda, 'Peliyagoda').sent).toBe(atPeliyagoda);
+  expect(view(sent, sentFromPeliyagoda, 'Kandy').sent).toBeNull();
+  // A Kandy answer goes out, then fails: the earlier answer stays Peliyagoda's and never shows under Kandy.
+  const both = { byIssue: { ...sentFromPeliyagoda.byIssue, [atKandy.id]: 'Kandy' }, latest: 'Kandy' };
+  for (const now of [{ ...sent, sending: atKandy.id }, { ...sent, failed: atKandy.id }]) {
+    expect(view(now, both, 'Kandy').sent).toBeNull();
+    expect(view(now, both, 'Peliyagoda').sent).toBe(atPeliyagoda);
+  }
+  // The server's refusal of the latest answer shows only under the depot it was sent from.
+  const refused = { sending: null, failed: null, refused: 'This problem changed.', sent: atPeliyagoda };
+  expect(view(refused, both, 'Kandy').refused).toBe('This problem changed.');
+  expect(view(refused, both, 'Peliyagoda').refused).toBeNull();
+  // Sending from a part remembers that part as the answer's depot.
+  const remember = vi.fn();
+  answeringIn({ ...refused, decide }, 'Kandy', both, remember).decide(atKandy, 'go_short');
+  expect(remember).toHaveBeenCalledWith(atKandy, 'go_short');
 });
