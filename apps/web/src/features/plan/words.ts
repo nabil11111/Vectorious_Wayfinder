@@ -127,7 +127,9 @@ export const toMake = (n: number) => (n === 0 ? 'no decisions to make' : `${coun
 export const REPLACE_TITLE = 'Replace the draft with a suggested plan?';
 export function replaceLine(orders: number, trips: number, deferred: number) {
   const yours = [trips > 0 && countOf(trips, 'trip'), deferred > 0 && countOf(deferred, 'deferred order')].filter(Boolean).join(' and ');
-  return `The planner plans all ${countOf(orders, 'order')} again. Your ${yours} ${trips + deferred === 1 ? 'is' : 'are'} replaced, and orders split on this draft are joined back first. Vehicles keep their drivers.`;
+  // "is" for one trip or one deferred order alone, "are" for anything more.
+  const one = (trips === 1 && deferred === 0) || (trips === 0 && deferred === 1);
+  return `The planner plans all ${countOf(orders, 'order')} again. Your ${yours} ${one ? 'is' : 'are'} replaced, and orders split on this draft are joined back first. Vehicles keep their drivers.`;
 }
 export const KEEP_DRAFT = 'Keep the draft';
 

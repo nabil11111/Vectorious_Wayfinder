@@ -73,6 +73,7 @@ export function BuildPanel({ screen, act, onBlank, onBuilding }: { screen: Board
         <AlertDialogContent className="gap-3.5 rounded-lg p-5 sm:max-w-sm">
           <AlertDialogHeader className="gap-2">
             <AlertDialogTitle className="text-base leading-5 font-bold">{REPLACE_TITLE}</AlertDialogTitle>
+            {/* The board's orders, the Done column's trips and the Deferred list's rows: rows the board lists. */}
             <AlertDialogDescription className="text-[13px] leading-[18px] text-muted-foreground">
               {replaceLine(board.orders.length, draft.trips.length, draft.deferrals.length)}
             </AlertDialogDescription>
