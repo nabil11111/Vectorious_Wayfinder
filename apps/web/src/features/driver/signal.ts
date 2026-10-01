@@ -21,12 +21,13 @@ let probing = false;
 let started = false;
 const listeners = new Set<() => void>();
 const onBack = new Set<() => void>();
+const onLost = new Set<() => void>();
 
 function set(next: boolean) {
   if (signal === next) return;
   signal = next;
   for (const listener of listeners) listener();
-  if (next) for (const back of onBack) back();
+  for (const change of next ? onBack : onLost) change();
 }
 
 export const hasSignal = () => signal;
@@ -101,9 +102,13 @@ export function startSignal() {
   }
 }
 
-// The sync loop is told when the signal comes back, so it sends what waits at once.
+// The sync loop is told when the signal comes back, so it sends what waits at once, and when it is lost, so the green
+// "Back online" can later name what waited meanwhile.
 export function whenBack(listener: () => void) {
   onBack.add(listener);
+}
+export function whenLost(listener: () => void) {
+  onLost.add(listener);
 }
 
 function subscribe(listener: () => void) {

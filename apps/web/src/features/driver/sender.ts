@@ -1,8 +1,8 @@
 import { useRef, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DriverDay, phoneView, type DriverWrite } from '@wayfinder/contracts';
+import { DriverDay, DriverWrite, phoneView } from '@wayfinder/contracts';
 import { api, ApiRequestError } from '@/lib/api';
-import { answered, hasSignal, noAnswer, probeNow, retryDelay, startSignal, whenBack, within } from './signal';
+import { answered, hasSignal, noAnswer, probeNow, retryDelay, startSignal, whenBack, whenLost, within } from './signal';
 import { addWrite, keepDay, openAccount, readKept, refuseWrite, type Queued } from './store';
 
 // The driver's sync loop (spec 013, rule 10, D-45, D-50, plan.md "The phone"). One tab owns the driver's app: the tab
@@ -257,8 +257,9 @@ function setOwner(next: Owner) {
 
 async function own(): Promise<never> {
   setOwner('owner');
-  startSignal();
   whenBack(signalBack);
+  whenLost(hold);
+  startSignal();
   return run();
 }
 
@@ -327,7 +328,9 @@ export function retrySync() {
 // and throws when it could not be saved, so nothing is sent.
 export async function saveAction(write: DriverWrite, about: string) {
   if (!account) throw new Error('No signed-in driver to save for.');
-  await addWrite(account.id, write, about, write.at);
+  // Kept as the contracts' shape reads it, the exact request the server will parse, trimmed note and all.
+  const request = DriverWrite.parse(write);
+  await addWrite(account.id, request, about, request.at);
   // A stop done on the road ends the green "Back online" line.
   if (write.kind === 'deliver' || write.kind === 'refuse' || write.kind === 'closed') update({ backOnline: null });
   hold();
