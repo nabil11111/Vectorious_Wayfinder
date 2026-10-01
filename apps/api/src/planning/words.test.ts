@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kg, litres, m3, orderCalled, toClock, toMinutes } from './words';
+import { capital, driverOf, itsTrip, kg, litres, m3, orderCalled, toClock, toMinutes, tripCalled, vehicleCalled } from './words';
 
 describe('how the checker writes times and amounts', () => {
   it('reads a time of day as minutes after midnight and back', () => {
@@ -30,5 +30,53 @@ describe('how the checker writes times and amounts', () => {
     expect(orderCalled(331.2, false, 'Fresh Nugegoda')).toBe('331.2 kg dry order for Fresh Nugegoda');
     // It has no "a" or "an" in front, because 800 kg would need the other one. A sentence says "the".
     expect(orderCalled(800, false, 'Tech Galle')).toBe('800 kg dry order for Tech Galle');
+  });
+
+  it('spec 024 calls a vehicle by its kind, in the board\'s own words, and its id', () => {
+    expect(vehicleCalled({ id: 'VEH001', type: 'truck', temp: 'reefer' })).toBe('the reefer truck VEH001');
+    expect(vehicleCalled({ id: 'VEH044', type: 'truck', temp: 'ambient' })).toBe('the dry truck VEH044');
+    expect(vehicleCalled({ id: 'VEH035', type: 'van', temp: 'reefer' })).toBe('the reefer van VEH035');
+    expect(vehicleCalled({ id: 'VEH037', type: 'van', temp: 'ambient' })).toBe('the van VEH037');
+  });
+
+  it('spec 024 numbers a trip only to tell a vehicle\'s second trip from its first', () => {
+    const truck = { id: 'VEH001', type: 'truck', temp: 'reefer' } as const;
+    expect(tripCalled(truck, 2)).toBe('the second trip of the reefer truck VEH001');
+    // A first or only trip gets no number: it is the vehicle.
+    expect(tripCalled(truck, 1)).toBe('the reefer truck VEH001');
+    // After a sentence has named the vehicle.
+    expect(itsTrip(2)).toBe('its second trip');
+    expect(itsTrip(1)).toBeNull();
+  });
+
+  it('spec 026 calls a truck by its driver when the trip has one, and by kind and id when it has none', () => {
+    const truck = { id: 'VEH044', type: 'truck', temp: 'ambient' } as const;
+    expect(vehicleCalled(truck, 'Chaminda')).toBe('Chaminda\'s dry truck');
+    expect(vehicleCalled({ id: 'VEH035', type: 'van', temp: 'reefer' }, 'Dilshan')).toBe('Dilshan\'s reefer van');
+    expect(tripCalled({ id: 'VEH001', type: 'truck', temp: 'reefer' }, 2, 'Chaminda')).toBe('the second trip of Chaminda\'s reefer truck');
+    expect(tripCalled(truck, 1, 'Chaminda')).toBe('Chaminda\'s dry truck');
+    expect(vehicleCalled(truck)).toBe('the dry truck VEH044');
+    expect(vehicleCalled(truck, '')).toBe('the dry truck VEH044');
+    // A sentence about a whole vehicle takes the driver its trips carry.
+    const trips = [{ vehicleId: 'VEH044', tripNo: 1, stops: [] }, { vehicleId: 'VEH044', tripNo: 2, stops: [], driverName: 'Chaminda' }, { vehicleId: 'VEH012', tripNo: 1, stops: [] }];
+    expect(driverOf(trips, 'VEH044')).toBe('Chaminda');
+    expect(driverOf(trips, 'VEH012')).toBeUndefined();
+  });
+
+  it('spec 026 treats a blank or whitespace driver name as no name, and trims one with spaces around it', () => {
+    const truck = { id: 'VEH044', type: 'truck', temp: 'ambient' } as const;
+    expect(vehicleCalled(truck, '   ')).toBe('the dry truck VEH044');
+    expect(vehicleCalled(truck, '\t\n')).toBe('the dry truck VEH044');
+    expect(tripCalled(truck, 2, '  ')).toBe('the second trip of the dry truck VEH044');
+    expect(vehicleCalled(truck, '  Chaminda ')).toBe('Chaminda\'s dry truck');
+    // A blank name on one trip gives way to the name on the vehicle's other trip, and all blank is no name.
+    const trips = [{ vehicleId: 'VEH044', tripNo: 1, stops: [], driverName: ' ' }, { vehicleId: 'VEH044', tripNo: 2, stops: [], driverName: 'Chaminda' }];
+    expect(driverOf(trips, 'VEH044')).toBe('Chaminda');
+    expect(driverOf([{ vehicleId: 'VEH044', tripNo: 1, stops: [], driverName: '  ' }], 'VEH044')).toBeUndefined();
+  });
+
+  it('starts a sentence that leads with a vehicle with a capital', () => {
+    expect(capital('the dry truck VEH044 carries 7,450 kg.')).toBe('The dry truck VEH044 carries 7,450 kg.');
+    expect(capital('Tech Kadugannawa only takes vans.')).toBe('Tech Kadugannawa only takes vans.');
   });
 });

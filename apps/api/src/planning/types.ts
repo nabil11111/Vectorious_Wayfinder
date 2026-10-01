@@ -32,12 +32,17 @@ export interface EngineVehicle {
   weightCapKg: number; volumeCapM3: number; kmPerL: number; weeklyFuelQuotaL: number; depotId: string;
   // From vehicle_days_off and fuel_log (spec 008). The caller works them out for the plan date.
   available: boolean; litresUsedThisWeek: number;
+  // The planner's input only (spec 026): the name of the vehicle's usual driver, which the planner gives every trip it
+  // builds on the vehicle. The checker never reads it, as it names a truck by its trip's own driver.
+  driverName?: string;
 }
 export interface TravelRow { district: string; depotId: string; outMin: number; outKm: number; betweenMin: number; betweenKm: number }
 export interface AllowanceRow { brand: Brand; dockType: DockType; minutes: number }
 
 export interface PlanStop { outletId: string; orderIds: string[] }
-export interface PlanTrip { vehicleId: string; tripNo: number; leaveAt?: Minutes; stops: PlanStop[] }
+// driverName is the trip's driver, by name, so the checker's sentences call the truck "Chaminda's dry truck" (spec
+// 026). A trip with no driver is called by its vehicle's kind and id.
+export interface PlanTrip { vehicleId: string; tripNo: number; leaveAt?: Minutes; driverName?: string; stops: PlanStop[] }
 export interface PlanDeferral { orderId: string; code: string; reason: string }
 
 export interface PlanInput {

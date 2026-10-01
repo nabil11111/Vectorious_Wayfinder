@@ -3,13 +3,48 @@ import { checkPlan } from '../check';
 import { computeLoad } from '../load';
 import { lookup } from '../lookup';
 import { FRESH_DEADLINE } from '../timeline';
-import type { EngineOutlet, PlanDeferral, PlannerDecision, PlannerInput, PlannerOrder } from '../types';
-import { kg, litres, m3, toClock } from '../words';
+import type { EngineOutlet, EngineVehicle, PlanDeferral, PlanInput, PlannerDecision, PlannerInput, PlannerOrder } from '../types';
+import { capital, driverNameOf, isSecondTrip, itsTrip, kg, kindAndId, litreFigure, litres, m3, onItsTrip, toClock, tripCalled, vehicleCalled } from '../words';
 import type { CandidateAttempt } from './candidates';
 import { effectiveWindow, isWaiting } from './priority';
 
 export type PlannerDeferralCode = Exclude<DeferralCode, 'dispatcher_choice'>;
 export type RejectionStage = 'over_capacity' | 'window' | 'fuel';
+
+// How fully a reason is worded, from the fullest to the shortest. The planner keeps every reason within 200 characters
+// (spec 011) by taking the first wording that fits: whole sentences, then the short forms, both naming trucks by their
+// drivers (spec 026); then the short forms with every truck by its kind and id; and only then the tight form, which
+// leaves out words that carry no fact, such as the "the" before a truck and a shop the reason has named already, but
+// never a fact or part of a word.
+export type Wording = 'full' | 'short' | 'plain' | 'tight';
+const WORDINGS: readonly Wording[] = ['full', 'short', 'plain', 'tight'];
+
+// The whole reason in the fullest wording that fits. A tight reason still longer keeps its length rather than lose a
+// fact; on days like the demo's it never comes to that (demo-fixture.test.ts).
+export function fittedReason(render: (wording: Wording) => string): string {
+  let reason = '';
+  for (const wording of WORDINGS) {
+    reason = render(wording);
+    if (reason.length <= 200) return reason;
+  }
+  return reason;
+}
+
+// A truck, and one of its trips, as a wording names them: by the driver the planner's input gives the vehicle until the
+// wording falls back to kind and id, and in the tight form without "the" and with a second trip after the truck.
+const byDriver = (wording: Wording) => wording === 'full' || wording === 'short';
+const truckIn = (vehicle: EngineVehicle, wording: Wording) =>
+  (wording === 'tight' ? kindAndId(vehicle) : vehicleCalled(vehicle, byDriver(wording) ? vehicle.driverName : undefined));
+const tripIn = (vehicle: EngineVehicle, tripNo: number, wording: Wording) => (wording === 'tight'
+  ? `${kindAndId(vehicle)}${isSecondTrip(tripNo) ? '\'s second trip' : ''}`
+  : tripCalled(vehicle, tripNo, byDriver(wording) ? vehicle.driverName : undefined));
+// A trial with no driver's name on its trucks or trips, so the checker's own sentence it gives names none either.
+const hasDrivers = (input: PlanInput) => input.plan.trips.some((trip) => driverNameOf(trip.driverName) !== undefined);
+const withoutDrivers = (input: PlanInput): PlanInput => ({
+  ...input,
+  vehicles: input.vehicles.map(({ driverName: _driverName, ...vehicle }) => vehicle),
+  plan: { ...input.plan, trips: input.plan.trips.map(({ driverName: _driverName, ...trip }) => trip) },
+});
 
 // A candidate reaching a later stage proves the preceding stage still had a survivor. This deliberately
 // ignores the order in which vehicles were tried and the order in which the checker displays problems.
@@ -109,7 +144,8 @@ export function deferralFor(
   return { orderId: order.id, code, reason };
 }
 
-export function priorityReason(input: PlannerInput, order: PlannerOrder, rank: number, compact = false): string {
+export function priorityReason(input: PlannerInput, order: PlannerOrder, rank: number, wording: Wording = 'full'): string {
+  const compact = wording !== 'full';
   const shop = shopOf(input, order), load = computeLoad(order.lines, input.products);
   const wantedDay = weekday(order.deliveryDate);
   const waiting = isWaiting(order, input.date) ? `waited since ${compact ? wantedDay.slice(0, 3) : wantedDay}` : 'new order';
@@ -119,9 +155,14 @@ export function priorityReason(input: PlannerInput, order: PlannerOrder, rank: n
   return `Rank ${rank}: ${waiting}; ${load.needsReefer ? 'chilled' : 'dry'}; ${readableName(shop)} ${freshDeadline ? 'due' : 'closes'} ${toClock(effectiveWindow(shop).close)}${restrictions.length ? `; ${restrictions.join(', ')}` : ''}`;
 }
 
-export function placementReason(input: PlannerInput, order: PlannerOrder, attempt: CandidateAttempt, compact = false): string {
+// The run an order joins or starts, the vehicle by the driver the planner's input gives it (spec 026) or else by its
+// kind and id, and only a second trip by its number (spec 024): "new run on Chaminda's dry truck to Gampaha", "joined
+// the dry truck VEH012 on its second trip to Gampaha".
+export function placementReason(input: PlannerInput, order: PlannerOrder, attempt: CandidateAttempt, wording: Wording = 'full'): string {
   const district = displayName(shopOf(input, order).district);
-  if (compact) {
+  const { vehicleId, tripNo, existing } = attempt.slot;
+  const vehicle = lookup(input.vehicles, 'vehicle')(vehicleId);
+  if (wording !== 'full') {
     const shorter: Record<string, string> = {
       'the only run that could carry these goods': 'only usable run',
       'keeps the usual leaving times': 'usual leaving times',
@@ -135,46 +176,81 @@ export function placementReason(input: PlannerInput, order: PlannerOrder, attemp
       'vehicle ID breaks the tie': 'vehicle ID tie',
     };
     const why = attempt.selectionReason ? shorter[attempt.selectionReason] ?? attempt.selectionReason : 'fits delivery limits';
-    return `${attempt.slot.existing ? 'joined' : 'on'} ${attempt.slot.vehicleId} trip ${attempt.slot.tripNo} (${why})`;
+    return `${existing ? 'joined' : 'on'} ${tripIn(vehicle, tripNo, wording)} (${why})`;
   }
-  const placed = attempt.slot.existing
-    ? `joined ${attempt.slot.vehicleId}'s run to ${district} (trip ${attempt.slot.tripNo})`
-    : `new run on ${attempt.slot.vehicleId} to ${district} (trip ${attempt.slot.tripNo})`;
+  const placed = existing
+    ? `joined ${truckIn(vehicle, wording)} on ${itsTrip(tripNo) ?? 'its run'} to ${district}`
+    : `new ${isSecondTrip(tripNo) ? 'second trip' : 'run'} on ${truckIn(vehicle, wording)} to ${district}`;
   return `${placed}, ${attempt.selectionReason ?? 'within its capacity, receiving hours and fuel'}`;
 }
 
-export function refusedReason(input: PlannerInput, order: PlannerOrder, attempts: readonly CandidateAttempt[], code: PlannerDeferralCode, compact = false): string {
+// named is a vehicle the explanation has already named, as a split's does for the part that went: its short form then
+// calls that vehicle "it" (spec 024).
+export function refusedReason(
+  input: PlannerInput, order: PlannerOrder, attempts: readonly CandidateAttempt[], code: PlannerDeferralCode, wording: Wording = 'full', named?: string,
+): string {
   const attempt = attempts.find((candidate) => candidate.stage === code);
   if (!attempt) return deferralFor(input, order, code).reason;
-  const checked = attempt.check ?? checkPlan(attempt.input);
+  // Once the drivers' names have given way, the trial is checked again without them, so a sentence of the checker's
+  // own that the reason quotes names its trucks by kind and id too.
+  const checked = byDriver(wording) || !hasDrivers(attempt.input) ? attempt.check ?? checkPlan(attempt.input) : checkPlan(withoutDrivers(attempt.input));
   const problem = checked.problems.find((problem) => problem.level === 'block' && (code === 'fuel'
     ? problem.code === 'fuel_over_quota' : code === 'over_capacity'
       ? problem.code === 'over_weight' || problem.code === 'over_volume' : problem.code !== 'fuel_over_quota'));
   if (!problem) return deferralFor(input, order, code, { attempts }).reason;
-  if (compact) {
+  // The short forms follow the checker's rules (spec 024, spec 026): the shop first at a stop, the vehicle by its driver
+  // or else its kind, and only a second trip by its number.
+  if (wording !== 'full') {
     const vehicle = lookup(attempt.input.vehicles, 'vehicle')(problem.vehicleId ?? attempt.slot.vehicleId);
-    const trip = checked.trips.find((trip) => trip.vehicleId === vehicle.id && trip.tripNo === (problem.tripNo ?? attempt.slot.tripNo));
-    const called = `${vehicle.id}${problem.tripNo === undefined ? '' : ` trip ${problem.tripNo}`}`;
-    if (problem.code === 'over_weight' && trip) return `${called}: ${kg(trip.load.kg)} exceeds ${kg(vehicle.weightCapKg)}.`;
-    if (problem.code === 'over_volume' && trip) return `${called}: ${m3(trip.load.m3)} exceeds ${m3(vehicle.volumeCapM3)}.`;
+    const tripNo = problem.tripNo ?? attempt.slot.tripNo;
+    const trip = checked.trips.find((trip) => trip.vehicleId === vehicle.id && trip.tripNo === tripNo);
+    const again = vehicle.id === named;
+    const theVehicle = again ? 'It' : capital(truckIn(vehicle, wording));
+    const onTrip = again ? itsTrip(tripNo) ?? 'it' : tripIn(vehicle, tripNo, wording);
+    const never = again ? 'it can never be reached in time' : `${onTrip} can never reach it in time`;
+    if (problem.code === 'over_weight' && trip) return `${theVehicle} carries ${kg(trip.load.kg)}${onItsTrip(tripNo)}, over its ${kg(vehicle.weightCapKg)} limit.`;
+    if (problem.code === 'over_volume' && trip) return `${theVehicle} carries ${m3(trip.load.m3)}${onItsTrip(tripNo)}, over its ${m3(vehicle.volumeCapM3)} limit.`;
     if (problem.code === 'fuel_over_quota') {
       const fuel = checked.vehicles.find((fuel) => fuel.vehicleId === vehicle.id)!;
-      return `${called} exceeds its fuel quota before rounding: ${litres(fuel.litresPlan)} needed, ${litres(fuel.quotaL - fuel.litresBefore)} left.`;
+      const left = fuel.quotaL - fuel.litresBefore;
+      // In the tight form the litres it needs and has left say it is over, unless rounding them hides that.
+      if (wording === 'tight') {
+        return Math.round(fuel.litresPlan * 10) > Math.round(left * 10)
+          ? `${theVehicle} needs ${litres(fuel.litresPlan)}, with ${litreFigure(left)} left of its quota.`
+          : `${theVehicle} exceeds its quota before rounding: ${litres(fuel.litresPlan)} needed, ${litreFigure(left)} left.`;
+      }
+      return `${theVehicle} exceeds its fuel quota before rounding: ${litres(fuel.litresPlan)} needed, ${litres(left)} left.`;
     }
     const stop = trip?.times?.stops.find((stop) => stop.outletId === problem.outletId && stop.seq === problem.stopSeq);
     if (stop && (problem.code === 'window_missed' || problem.code === 'mall_slot_missed')) {
       const shop = lookup(input.outlets, 'shop')(stop.outletId);
       const place = displayName(shop.district);
       if (stop.windowOpen > stop.windowClose) return shop.mallOpen !== undefined && shop.mallOpen > shop.windowClose
-        ? `${called}: ${place} closes ${toClock(shop.windowClose)}; mall opens ${toClock(shop.mallOpen)}.`
-        : `${called}: ${place} opens ${toClock(shop.windowOpen)}; mall closes ${toClock(shop.mallClose!)}.`;
+        ? `${place} closes at ${toClock(shop.windowClose)}, before its mall opens at ${toClock(shop.mallOpen)}, so ${never}.`
+        : `${place} opens at ${toClock(shop.windowOpen)}, after its mall closes at ${toClock(shop.mallClose!)}, so ${never}.`;
       const deadline = shop.brand === 'Fresh' && stop.windowClose >= FRESH_DEADLINE ? FRESH_DEADLINE : stop.windowClose;
-      return `${called} reaches ${place} at ${toClock(stop.arriveAt)}, missing the ${toClock(deadline)} deadline.`;
+      // The tight form leaves out the order's own shop, which its rank has named already, though another shop it would
+      // make late keeps its name; and it leaves out "is" and "the deadline", keeping the times.
+      if (wording === 'tight') {
+        return `${stop.outletId === order.outletId ? '' : `${place} `}reached at ${toClock(stop.arriveAt)} by ${onTrip}, after ${toClock(deadline)}.`;
+      }
+      return `${place} is reached at ${toClock(stop.arriveAt)} by ${onTrip}, after the ${toClock(deadline)} deadline.`;
     }
   }
   let reason = problem.message;
   for (const shop of input.outlets) reason = reason.split(shop.id).join(readableName(shop));
   return reason;
+}
+
+// The early departure the planner asks the dispatcher to accept, the order that forced it first and the vehicle by its
+// driver or else its kind (spec 024, spec 026): "The rank 4 order for Badulla makes the dry truck VEH044 leave at 02:59
+// instead of 03:30."
+export function earlyLeaveReason(
+  input: PlannerInput, trip: { vehicleId: string; tripNo: number; leaveAt: number; usual: number }, rank: number, order: PlannerOrder,
+  wording: Wording = 'full',
+): string {
+  const vehicle = lookup(input.vehicles, 'vehicle')(trip.vehicleId);
+  return `The rank ${rank} order for ${shopName(input, order)} makes ${tripIn(vehicle, trip.tripNo, wording)} leave at ${toClock(trip.leaveAt)} instead of ${toClock(trip.usual)}.`;
 }
 
 export function deferralDecisions(input: PlannerInput, order: PlannerOrder, deferral: PlanDeferral): PlannerDecision[] {

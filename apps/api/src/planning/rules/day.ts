@@ -3,10 +3,10 @@ import { PlanInputError } from '../errors';
 import { tripLitres } from '../fuel';
 import { lookup } from '../lookup';
 import type { DayProblems } from '../types';
-import { litres } from '../words';
+import { capital, driverOf, itsTrip, litres, vehicleCalled } from '../words';
 
 // Fuel and the day (spec 007, AC-34 to AC-36): the weekly fuel quota, the operating day and whether each
-// vehicle is available.
+// vehicle is available. The sentences follow specs 024 and 026: the vehicle by its driver or else its kind.
 
 type About = Pick<Problem, 'vehicleId' | 'tripNo' | 'stopSeq' | 'outletId' | 'orderId'>;
 
@@ -23,7 +23,8 @@ export const dayProblems: DayProblems = (input, vehicleFuel) => {
     // The quota is checked from the fuel figures handed in, so a vehicle without them would pass unchecked.
     if (!withFuel.has(vehicle.id)) throw new PlanInputError(`No fuel figures were given for ${vehicle.id}`);
     if (!vehicle.available) {
-      report('vehicle_off', { vehicleId: vehicle.id, tripNo: trip.tripNo }, `${vehicle.id} trip ${trip.tripNo} is planned on a day when ${vehicle.id} is not available.`);
+      report('vehicle_off', { vehicleId: vehicle.id, tripNo: trip.tripNo },
+        `${capital(vehicleCalled(vehicle, trip.driverName))} has ${itsTrip(trip.tripNo) ?? 'a trip'} on a day it is not available.`, 'Move this trip to another vehicle.');
     }
   }
 
@@ -44,8 +45,8 @@ export const dayProblems: DayProblems = (input, vehicleFuel) => {
     const by = overTenths > 0 ? litres(overTenths / 10) : 'less than 0.1 litres';
     report(
       'fuel_over_quota', { vehicleId: vehicle.id },
-      `${vehicle.id} has used ${litres(fuel.litresBefore)} this week and this plan needs ${litres(needs)} more, which is ${by} over its weekly quota of ${litres(fuel.quotaL)}.`,
-      `Take ${by} of driving off ${vehicle.id}.`,
+      `${capital(vehicleCalled(vehicle, driverOf(input.plan.trips, vehicle.id)))} has used ${litres(fuel.litresBefore)} this week and this plan needs ${litres(needs)} more, ${by} over its weekly quota of ${litres(fuel.quotaL)}.`,
+      `Take ${by} of driving off this vehicle.`,
     );
   }
 

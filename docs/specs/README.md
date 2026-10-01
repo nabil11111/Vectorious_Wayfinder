@@ -76,3 +76,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [020](020-depots/spec.md) | Every shop and both depots: accounts, Kandy's day and the depot switch | Done |
 | [022](022-trip-times-and-drivers/spec.md) | The trip's depot times, each stop's times on hover, and every trip's driver | Done |
 | [023](023-plan-drag/spec.md) | Planning by drag and drop | Done |
+| [024](024-checker-words/spec.md) | The plan checker in plain words | Done |

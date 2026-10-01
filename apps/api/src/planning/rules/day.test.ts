@@ -27,10 +27,12 @@ const check = (trips: PlanTrip[], parts: { vehicles?: EngineVehicle[]; operating
 
 describe('rules for fuel and the day', () => {
   it('AC-34 reports fuel_over_quota, with the litres over, when the litres used this week plus this plan\'s pass the weekly quota', () => {
+    // VEH006 is a reefer truck, and VEH010 and VEH012 are dry trucks.
+    const called: Record<string, string> = { VEH006: 'The reefer truck VEH006', VEH010: 'The dry truck VEH010', VEH012: 'The dry truck VEH012' };
     const over = (vehicleId: string, used: string, plan: string, by: string, quota: string) => [{
       code: 'fuel_over_quota', level: 'block', vehicleId,
-      message: `${vehicleId} has used ${used} litres this week and this plan needs ${plan} litres more, which is ${by} over its weekly quota of ${quota} litres.`,
-      fix: `Take ${by} of driving off ${vehicleId}.`,
+      message: `${called[vehicleId]} has used ${used} litres this week and this plan needs ${plan} litres more, ${by} over its weekly quota of ${quota} litres.`,
+      fix: `Take ${by} of driving off this vehicle.`,
     }];
     const galleOn = (vehicleId: string, litresUsedThisWeek: number) => check([galle(vehicleId)], { vehicles: fleet(vehicleId, { litresUsedThisWeek }) });
 
@@ -88,7 +90,7 @@ describe('rules for fuel and the day', () => {
   it('AC-36 reports vehicle_off for a trip whose vehicle is unavailable that day', () => {
     const off = (tripNo: number) => ({
       code: 'vehicle_off', level: 'block', vehicleId: 'VEH012', tripNo,
-      message: `VEH012 trip ${tripNo} is planned on a day when VEH012 is not available.`,
+      message: `The dry truck VEH012 has ${tripNo === 2 ? 'its second trip' : 'a trip'} on a day it is not available.`, fix: 'Move this trip to another vehicle.',
     });
     const other = trip('VEH008', 1, ['OUT005']);
     // Both trips of the vehicle are reported, and the other vehicle's trip is not.
