@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import { DriverDay, type DriverWrite } from '@wayfinder/contracts';
+import { DriverDay, DriverWrite } from '@wayfinder/contracts';
 
 // What the driver's phone keeps (spec 013, D-45, D-49, plan.md "What it keeps"): per signed-in account, the last day
 // the server sent and the writes not yet applied or refused, in the order they were saved, in the browser's database
@@ -77,23 +77,37 @@ export function useKept() {
 
 const bySeq = (a: Queued, b: Queued) => a.seq - b.seq;
 
-// Reads an account's day and writes from the database, so the screens can open at once with no signal.
+const OLDER_SHAPE: Refusal = { code: 'invalid_input', message: 'This record was kept by an older version of Wayfinder and cannot be sent.' };
+
+async function readAccount(userId: string) {
+  const db = await database();
+  const tx = db.transaction(['days', 'writes'], 'readonly');
+  const [stored, writes] = await Promise.all([tx.objectStore('days').get(userId), tx.objectStore('writes').index('byUser').getAll(userId), tx.done]);
+  // A day kept by an older version of the app that no longer fits the shape is dropped; the next fetch brings one.
+  const day = DriverDay.safeParse(stored?.day);
+  // A write that no longer fits the shape could not be sent or shown, so it waits under "Not accepted" instead.
+  const queue = (writes as Queued[]).sort(bySeq).map((entry): Queued => {
+    const write = DriverWrite.safeParse(entry.write);
+    return write.success ? { ...entry, write: write.data } : { ...entry, state: 'refused', refusal: entry.refusal ?? OLDER_SHAPE };
+  });
+  return { day: day.success ? day.data : null, queue };
+}
+
+// Reads an account's day and writes from the database, so the screens can open at once with no signal. A read that
+// fails is tried twice more before the screens open without it, so waiting writes are not hidden by one bad read.
 export async function openAccount(userId: string) {
   set({ userId, ready: false, day: null, queue: [] });
-  let day: DriverDay | null = null;
-  let queue: Queued[] = [];
-  try {
-    const db = await database();
-    const tx = db.transaction(['days', 'writes'], 'readonly');
-    const [stored, writes] = await Promise.all([tx.objectStore('days').get(userId), tx.objectStore('writes').index('byUser').getAll(userId), tx.done]);
-    // A day kept by an older version of the app that no longer fits the shape is dropped; the next fetch brings one.
-    const parsed = DriverDay.safeParse(stored?.day);
-    day = parsed.success ? parsed.data : null;
-    queue = (writes as Queued[]).sort(bySeq);
-  } catch (error) {
-    console.warn('Could not read what this phone kept.', error);
+  let found: Awaited<ReturnType<typeof readAccount>> = { day: null, queue: [] };
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      found = await readAccount(userId);
+      break;
+    } catch (error) {
+      console.warn('Could not read what this phone kept.', error);
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+    }
   }
-  if (kept.userId === userId) set({ userId, ready: true, day, queue });
+  if (kept.userId === userId) set({ userId, ready: true, ...found });
 }
 
 let askedToPersist = false;
@@ -147,11 +161,12 @@ export async function refuseWrite(entry: Queued, refusal: Refusal) {
   if (kept.userId === entry.userId) set({ ...kept, queue: kept.queue.map((held) => (held.seq === entry.seq ? next : held)) });
 }
 
-// "Clear" on the waiting sheet: the refused writes of this account go.
+// "Clear" on the waiting sheet: the refused writes of this account go, the ones the sheet showed. One refused while
+// it cleared stays for the next Clear.
 export async function clearRefused(userId: string) {
-  const refused = kept.queue.filter((entry) => entry.userId === userId && entry.state === 'refused');
+  const refused = new Set(kept.queue.filter((entry) => entry.userId === userId && entry.state === 'refused').map((entry) => entry.seq));
   const db = await database();
   const tx = db.transaction('writes', 'readwrite');
-  await Promise.all([...refused.map((entry) => tx.store.delete(entry.seq)), tx.done]);
-  if (kept.userId === userId) set({ ...kept, queue: kept.queue.filter((entry) => entry.state !== 'refused') });
+  await Promise.all([...[...refused].map((seq) => tx.store.delete(seq)), tx.done]);
+  if (kept.userId === userId) set({ ...kept, queue: kept.queue.filter((entry) => !refused.has(entry.seq)) });
 }
