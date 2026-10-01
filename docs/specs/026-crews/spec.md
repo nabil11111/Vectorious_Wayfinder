@@ -34,10 +34,14 @@ Nabil, 1 Oct:
   and the row says why it may not fit.
 - **No trucks panel.** "Unassigned trucks" leaves the left column, and Unplanned orders takes its whole height. The
   header keeps "26 / 35 trucks". The empty middle's drop area reads "or drag an order here to start a trip".
-- **Trucks named by their drivers in words.** Every sentence names a truck by its driver: "Chaminda's dry truck", or
-  "the second trip of Chaminda's dry truck". That covers the checker's lines (spec 024), the planner's "why?" and
-  notifications. A truck with no driver falls back to "the dry truck VEH044". Cards and headers keep the frame's
-  "VEH044 · Chaminda", so the number is there to find in Fleet.
+- **Trucks named by their drivers, everywhere a dispatcher plans.**
+  - Every sentence names a truck by its driver: "Chaminda's dry truck", or "the second trip of Chaminda's dry truck".
+    That covers the checker's lines (spec 024), the planner's "why?" and notifications.
+  - The plan board's and View plan's cards and headers read the same way: "Chaminda · dry truck", and "Chaminda · dry
+    truck · trip 2" for a second trip. The vehicle number is not shown there (Nabil, 1 Oct: "We won't be showing by
+    vehicle ID").
+  - A truck with no driver reads "dry truck VEH044" until it has one.
+  - The number stays where a person must find the actual truck: the loader's and driver's screens, and Fleet.
 
 ## Rules, with worked examples
 1. **One pick sets both.** Ruwan presses "Start a trip" on Fresh · Galle · 4 and picks "Chaminda · reefer truck · 6.8 t
@@ -57,7 +61,8 @@ Nabil, 1 Oct:
 - [ ] AC-2 The plan board shall show no "Unassigned trucks" panel. Unplanned orders shall take the left column's full
   height, and the header shall keep the trucks count.
 - [ ] AC-3 Every sentence the checker, the planner's "why?" and the notifications write shall name a truck by its
-  driver ("Chaminda's dry truck"), or by kind and number when it has no driver.
+  driver ("Chaminda's dry truck"), or by kind and number when it has no driver. The plan board's and View plan's
+  cards and headers shall read "Chaminda · dry truck" with no vehicle number.
 - [ ] AC-4 The usual driver shall come from the latest sent plan, or else the suggestion's choice, pinned by tests on
   the seeded day.
 - [ ] AC-5 The README's departures shall say the trucks panel is gone and why, and the walkthrough's plan board steps
