@@ -77,7 +77,7 @@ export async function driverDayOf(tx: Tx, caller: DepotCaller, at: Date): Promis
   const earlier = (id: string) => rows.find(row => row.trip.id === id)!.plan.date !== day ? 0 : 1;
   shown.sort((a, b) => earlier(a.tripId) - earlier(b.tripId) || a.leavesAt.localeCompare(b.leavesAt) || a.vehicleId.localeCompare(b.vehicleId) || a.tripNo - b.tripNo);
   const applied = await tx.select({ id: driverWrites.id }).from(driverWrites)
-    .where(and(eq(driverWrites.driverId, caller.userId), gte(driverWrites.answeredAt, sql`now() - interval '48 hours'`))).orderBy(driverWrites.answeredAt, driverWrites.id);
+    .where(and(eq(driverWrites.driverId, caller.userId), gte(driverWrites.answeredAt, sql`now() - interval '48 hours'`))).orderBy(driverWrites.id);
   return { depot: depot.name, driver: driver.displayName, day, planSent: Boolean(plan), appliedWriteIds: applied.map(row => row.id), trips: shown };
 }
 

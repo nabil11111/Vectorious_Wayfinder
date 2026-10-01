@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto';
 import { nextStop, type DriverDay, type DriverWrite } from '@wayfinder/contracts';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client';
-import { auditLog, issueLines, issues, orderLines, orders, photos, plans, stops, trips } from '../db/schema';
+import { auditLog, driverWrites, issueLines, issues, orderLines, orders, photos, plans, stops, trips } from '../db/schema';
 import { lockDay, lockDepotDay } from '../lib/day-lock';
 import { HttpError } from '../lib/errors';
 import { announce, type Announcement } from '../lib/live';
@@ -12,6 +13,13 @@ import { jpegOf } from './photo';
 
 const unknown = (id: string, message: string) => new HttpError(400, 'unknown_record', message, { id });
 const inWords = (numbers: number[]) => numbers.length === 1 ? `${numbers[0]}` : `${numbers.slice(0, -1).join(', ')} and ${numbers.at(-1)}`;
+
+// Object key order is immaterial, while array order and every parsed value (including the photo) are kept.
+function ordered(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(ordered);
+  if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, value]) => [key, ordered(value)]));
+  return value;
+}
 
 // The day, depot (starts only), then trip are locked in that order. All six writes use the same clock and
 // answer from inside their transaction; nobody hears an announcement until that transaction commits.
@@ -30,6 +38,19 @@ export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promi
     if ('stopId' in write && !stop) throw unknown(write.stopId, 'That stop is not on this trip.');
     if (write.kind === 'refuse') for (const line of write.lines) {
       if (!stop!.lines.some(own => own.lineId === line.lineId)) throw unknown(line.lineId, 'That line is not on this stop.');
+    }
+    const bodyHash = createHash('sha256').update(JSON.stringify(ordered(write))).digest('hex');
+    // Reserving the id also protects different trips racing for the same global id. A failed write rolls the
+    // reservation back. After a conflict, a separate read sees the committed winner at READ COMMITTED.
+    const [saved] = await tx.insert(driverWrites).values({ id: write.writeId, driverId: caller.userId, tripId: trip.id, kind: write.kind, bodyHash })
+      .onConflictDoNothing({ target: driverWrites.id }).returning({ id: driverWrites.id });
+    if (!saved) {
+      const [previous] = await tx.select().from(driverWrites).where(eq(driverWrites.id, write.writeId));
+      if (!previous || previous.driverId !== caller.userId || previous.tripId !== trip.id || previous.kind !== write.kind || previous.bodyHash !== bodyHash) {
+        throw new HttpError(409, 'write_reused', 'This record was already sent with other details.', { writeId: write.writeId });
+      }
+      await tx.update(driverWrites).set({ answeredAt: sql`now()` }).where(eq(driverWrites.id, write.writeId));
+      return { day: await driverDayOf(tx, caller, moment.at), told: [] };
     }
     if (write.revision !== (stop ? stop.revision : trip.revision)) {
       throw new HttpError(409, 'stale', `${stop ? stop.shopName : trip.vehicleId} was changed on another phone.`);

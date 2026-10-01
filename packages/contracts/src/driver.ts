@@ -64,16 +64,19 @@ export function applyDriverWrite(day: DriverDay, write: DriverWrite): DriverDay 
   const result = structuredClone(day);
   const trip = result.trips.find(trip => trip.tripId === write.tripId)!;
   result.appliedWriteIds.push(write.writeId);
+  result.appliedWriteIds.sort();
+  // The API stores instants to millisecond precision. Keep the phone's projection in that same ISO form.
+  const at = new Date(write.at).toISOString();
   if (write.kind === 'start' || write.kind === 'finish') {
     trip.revision += 1;
-    if (write.kind === 'start') { trip.status = 'out'; trip.leftAt = write.at; }
-    else { trip.status = 'done'; trip.backAt = write.at; }
+    if (write.kind === 'start') { trip.status = 'out'; trip.leftAt = at; }
+    else { trip.status = 'done'; trip.backAt = at; }
     return result;
   }
   const stop = trip.stops.find(stop => stop.id === write.stopId)!;
   stop.revision += 1;
-  if (write.kind === 'arrive') { stop.arrivedAt = write.at; return result; }
-  stop.doneAt = write.at;
+  if (write.kind === 'arrive') { stop.arrivedAt = at; return result; }
+  stop.doneAt = at;
   stop.outcome = write.kind === 'deliver' ? 'delivered' : write.kind === 'refuse' ? 'refused' : 'closed';
   for (const line of stop.lines) {
     const refused = write.kind === 'refuse' ? write.lines.find(named => named.lineId === line.lineId)?.refused ?? 0 : 0;
@@ -81,9 +84,13 @@ export function applyDriverWrite(day: DriverDay, write: DriverWrite): DriverDay 
   }
   if (write.kind === 'refuse' || write.kind === 'closed') {
     trip.problems.push({ id: write.writeId, kind: write.kind === 'refuse' ? 'refused' : 'closed', stopId: stop.id,
-      reason: write.kind === 'refuse' ? write.reason : 'nobody_there', note: write.note || null, raisedAt: write.at, hasPhoto: write.photo !== undefined,
-      lines: write.kind === 'refuse' ? write.lines.map(line => ({ lineId: line.lineId, counted: line.refused })) : stop.lines.map(line => ({ lineId: line.lineId, counted: line.loaded ?? 0 })),
+      reason: write.kind === 'refuse' ? write.reason : 'nobody_there', note: write.note || null, raisedAt: at, hasPhoto: write.photo !== undefined,
+      lines: write.kind === 'refuse' ? stop.lines.flatMap(line => {
+        const named = write.lines.find(named => named.lineId === line.lineId);
+        return named ? [{ lineId: line.lineId, counted: named.refused }] : [];
+      }) : stop.lines.map(line => ({ lineId: line.lineId, counted: line.loaded ?? 0 })),
       decision: null, decidedBy: null, decidedAt: null });
+    trip.problems.sort((a, b) => a.raisedAt.localeCompare(b.raisedAt) || a.id.localeCompare(b.id));
   }
   return result;
 }
