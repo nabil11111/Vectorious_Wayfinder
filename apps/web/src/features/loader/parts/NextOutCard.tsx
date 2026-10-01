@@ -3,6 +3,7 @@ import type { LoadingStop, LoadingTruck } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { orangeButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
+import { CHANGED } from '../changes';
 import { leaves, onOfUnits, stopGoingOf, stopUnits, truckName, tripLine, untilLeaving, vehicleWords } from '../words';
 import { truckIcon } from './icons';
 import { Card, Label, LoadBar, StopChip, Tag } from './ui';
@@ -27,16 +28,17 @@ function GoesIn({ truck, stop }: { truck: LoadingTruck; stop: LoadingStop }) {
 const BIG_BUTTON = 'mt-7 h-16 w-full rounded-[12px] text-lg';
 
 // Next out (Loader · Today's trucks): the first truck of the day that is not ready, what goes in first, and the one
-// orange button. "Start loading" starts the truck and opens it; "Continue loading" opens it.
-export function NextOutCard({ truck, at, busy, starting, onStart }: {
-  truck: LoadingTruck; at: number | null; busy: boolean; starting: boolean; onStart: () => void;
+// orange button. "Start loading" starts the truck and opens it; "Continue loading" opens it. "changed" marks a truck
+// the last publication changed (spec 016).
+export function NextOutCard({ truck, at, busy, starting, onStart, changed = false }: {
+  truck: LoadingTruck; at: number | null; busy: boolean; starting: boolean; onStart: () => void; changed?: boolean;
 }) {
   const sub = [untilLeaving(truck.leavesAt, at), vehicleWords(truck)].filter(Boolean).join(' · ');
   return (
     <Card ink className="px-[18px] pt-[18px] pb-[18px] lg:p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Label>Next out</Label>
+          <div className="flex items-center gap-2"><Label>Next out</Label>{changed && <Tag tone="warn">{CHANGED}</Tag>}</div>
           <h2 className="mt-[7px] text-[22px] leading-7 font-bold lg:mt-[9px] lg:text-[30px] lg:leading-9">{truckName(truck)} · {leaves(truck)}</h2>
           <p className="mt-[5px] text-[15px] leading-5 text-muted-foreground lg:mt-[7px]">{sub}</p>
         </div>

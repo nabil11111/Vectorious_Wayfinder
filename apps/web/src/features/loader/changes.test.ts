@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { LoadingDay, LoadingTruck } from '@wayfinder/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { changedKeys, comparePublications, createChangeStore, noticeOf, publicationOf, truckKey, type Scope } from './changes';
@@ -16,17 +15,17 @@ function truck(spec: TripSpec): LoadingTruck {
       lineId, orderId, temp, productId: `fresh-${temp}-carton`, name: temp === 'chilled' ? 'Chilled carton' : 'Dry carton', unit: 'carton', quantity, going: quantity, short: 0,
     }));
     const units = out.reduce((sum, line) => sum + line.quantity, 0);
-    return { id: randomUUID(), seq: i + 1, outletId, shopName, loaded: false, units, going: units, short: 0, lines: out };
+    return { id: crypto.randomUUID(), seq: i + 1, outletId, shopName, loaded: false, units, going: units, short: 0, lines: out };
   });
   const units = stops.reduce((sum, stop) => sum + stop.units, 0);
   return {
-    tripId: randomUUID(), revision: 0, vehicleId: spec.vehicleId, vehicleType: 'truck', vehicleTemp: 'reefer', tripNo: spec.tripNo ?? 1, brand: 'Fresh', district: spec.district,
+    tripId: crypto.randomUUID(), revision: 0, vehicleId: spec.vehicleId, vehicleType: 'truck', vehicleTemp: 'reefer', tripNo: spec.tripNo ?? 1, brand: 'Fresh', district: spec.district,
     status: 'planned', leavesAt: spec.leavesAt, readyAt: null, driver: spec.driver, weightCapKg: 3990, volumeCapM3: 21.1, units, on: { units: 0, kg: 0, m3: 0 }, short: 0,
     // The loader's list carries its stops last stop first.
     stops: [...stops].reverse(), issues: [],
   };
 }
-const PLAN = randomUUID();
+const PLAN = crypto.randomUUID();
 function published(revision: number, trips: TripSpec[], at = '2026-06-24T21:01:00.000Z'): LoadingDay {
   return { depot: 'Peliyagoda', demoDay: 1, day: '2026-06-25', plan: { id: PLAN, revision, publishedAt: at, publishedBy: 'Ruwan' }, trucks: trips.map(truck) };
 }

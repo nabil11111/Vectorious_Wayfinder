@@ -8,6 +8,7 @@ import { orangeButton, plainButton } from '@/features/plan/parts/look';
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
+import { SEE_CHANGES, usePlanChanges } from './changes';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites, type WriteKind } from './loading';
 import { DISPATCHER_ICON } from './parts/icons';
 import { BackLink, LoadCard, StopList } from './parts/LoadCard';
@@ -38,7 +39,8 @@ function TruckScreen({ tripId }: { tripId: string }) {
   }
   const stale = query.isError ? <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : null;
   const truck = query.data.trucks.find((t) => t.tripId === tripId);
-  if (!truck) return <NotOnList />;
+  // A truck gone because the plan was sent again (spec 016): the list's sentence, and the way to what changed.
+  if (!truck) return <><ChangesLink className="mb-3" /><NotOnList /></>;
   if (truck.status === 'ready') return <ReadyTruck day={query.data} truck={truck} stale={stale} />;
   return <LoadTruck day={query.data} truck={truck} writes={writes} stale={stale} />;
 }
@@ -91,6 +93,8 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
       <BackLink to="/loader">Trucks</BackLink>
       <div className="mt-2.5 lg:mt-3.5">
         {writes.refused && <Refused>{writes.refused}</Refused>}
+        {/* A start refused because the plan changed (012's refusal) offers the comparison when there is one. */}
+        {writes.refused && <ChangesLink className="mb-3" />}
         {writes.phase === 'unsaved' && <NotSaved onRetry={writes.retry} />}
         {stale && <div className="mb-3">{stale}</div>}
       </div>
@@ -229,5 +233,14 @@ function TruckSkeleton() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// "See what changed", when this tablet holds a comparison that Got it has not closed.
+function ChangesLink({ className }: { className?: string }) {
+  const { kept } = usePlanChanges();
+  if (!kept?.changes || kept.closed) return null;
+  return (
+    <Link to="/loader/changes" className={plainButton(cn('h-10 w-fit rounded-[12px] px-4 text-[13px]', className))}>{SEE_CHANGES}</Link>
   );
 }
