@@ -35,10 +35,17 @@ export const orderCalled = (kilos: number, chilled: boolean, shop: string) => `$
 // reefer van VEH035" or "the van VEH037" (spec 024).
 type Vehicle = Pick<EngineVehicle, 'id' | 'type' | 'temp'>;
 const kindOf = ({ type, temp }: Vehicle) => (type === 'van' ? (temp === 'reefer' ? 'reefer van' : 'van') : temp === 'reefer' ? 'reefer truck' : 'dry truck');
-export const vehicleCalled = (vehicle: Vehicle, driverName?: string) => (driverName ? `${driverName}'s ${kindOf(vehicle)}` : `the ${kindOf(vehicle)} ${vehicle.id}`);
+// The name a sentence calls a driver by: trimmed, and none at all when it is blank, so an optional name never spoils a
+// sentence or stops a plan (spec 026).
+export const driverNameOf = (name: unknown): string | undefined => (typeof name === 'string' && name.trim() !== '' ? name.trim() : undefined);
+export const vehicleCalled = (vehicle: Vehicle, driverName?: string) => {
+  const name = driverNameOf(driverName);
+  return name ? `${name}'s ${kindOf(vehicle)}` : `the ${kindOf(vehicle)} ${vehicle.id}`;
+};
 // The driver a sentence about a whole vehicle names: the one its trips carry. A vehicle has one driver for both its
 // trips (D-31), so the first trip that names one is enough.
-export const driverOf = (trips: readonly PlanTrip[], vehicleId: string) => trips.find((trip) => trip.vehicleId === vehicleId && trip.driverName)?.driverName;
+export const driverOf = (trips: readonly PlanTrip[], vehicleId: string) =>
+  trips.map((trip) => (trip.vehicleId === vehicleId ? driverNameOf(trip.driverName) : undefined)).find((name) => name !== undefined);
 
 // A trip is numbered only where that tells it from the vehicle's other trip (spec 024). A vehicle's second trip is
 // "the second trip of the reefer truck VEH001", or "its second trip" once the sentence has named the vehicle. Its

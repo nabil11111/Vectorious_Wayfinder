@@ -63,6 +63,18 @@ describe('how the checker writes times and amounts', () => {
     expect(driverOf(trips, 'VEH012')).toBeUndefined();
   });
 
+  it('spec 026 treats a blank or whitespace driver name as no name, and trims one with spaces around it', () => {
+    const truck = { id: 'VEH044', type: 'truck', temp: 'ambient' } as const;
+    expect(vehicleCalled(truck, '   ')).toBe('the dry truck VEH044');
+    expect(vehicleCalled(truck, '\t\n')).toBe('the dry truck VEH044');
+    expect(tripCalled(truck, 2, '  ')).toBe('the second trip of the dry truck VEH044');
+    expect(vehicleCalled(truck, '  Chaminda ')).toBe('Chaminda\'s dry truck');
+    // A blank name on one trip gives way to the name on the vehicle's other trip, and all blank is no name.
+    const trips = [{ vehicleId: 'VEH044', tripNo: 1, stops: [], driverName: ' ' }, { vehicleId: 'VEH044', tripNo: 2, stops: [], driverName: 'Chaminda' }];
+    expect(driverOf(trips, 'VEH044')).toBe('Chaminda');
+    expect(driverOf([{ vehicleId: 'VEH044', tripNo: 1, stops: [], driverName: '  ' }], 'VEH044')).toBeUndefined();
+  });
+
   it('starts a sentence that leads with a vehicle with a capital', () => {
     expect(capital('the dry truck VEH044 carries 7,450 kg.')).toBe('The dry truck VEH044 carries 7,450 kg.');
     expect(capital('Tech Kadugannawa only takes vans.')).toBe('Tech Kadugannawa only takes vans.');
