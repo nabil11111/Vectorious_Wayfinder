@@ -383,6 +383,9 @@ Anything we built differently from our Designathon submission, and why.
   to read it, and it shows on Trip done when the stop that waited was the last one. Its lines wrap where the frame cuts
   them, and beyond three stops it names three and how many more, so the driver can always read which stops went. It
   belongs to its trip and goes when that trip is checked in, so it never shows on a second trip.
+- **Between trips,** the second trip's Today's trip opens with "✓ Trip 1 closed · 4 of 4 stops · all records sent ·
+  checked in 03:56" and trip 1's hand-back card until it starts. The frames draw no state between two trips, and the
+  driver must know trip 1 went and what to hand in before the truck is loaded again.
 - **States the design lacks:** not loaded yet, no trip, could not load, the waiting sheet, not accepted, sign in again,
   could not save on this phone, the unusable photo, the answer on the phone, a stop to try again, and Day done with
   records waiting.

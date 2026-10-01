@@ -73,6 +73,7 @@ alone below 640 wide beside a status chip), the avatar and the plain bell. Words
 | Today's trip `/driver` | Loading | Loading · skeleton | Grey blocks for the day line, the card and two rows, on the first load with nothing kept on the phone. |
 |  | Ready | Driver · Today's trip | "Thu 25 Jun · trip 1". The card: the design's van, "VEH035", "leaves 04:36 · in 1 h 5 min", "Fresh · Colombo · back by 06:10" and the green chip "✓ Loaded · 117 of 118 · 1 dry short for Nugegoda". "2 stops", then a row per stop in plan order: "1", "Fresh Nugegoda", "05:00 to 07:30", "23 of 24 cartons"; "2", "Fresh Wellawatte", "05:30 to 08:00", "94 cartons". The orange "Start trip". |
 |  | Not loaded yet | No frame | The same card with the grey chip "Not loaded yet", or "Being loaded" while the loader works, "Start trip" greyed and "Start trip works once VEH035 is loaded." |
+|  | Between trips | No frame | A trip that follows one checked in, such as VEH057's trip 2 at Kandy, opens with the closed trip on top: green "✓ Trip 1 closed · 4 of 4 stops · all records sent · checked in 03:56", or yellow "Trip 1 closed · 1 waiting to send · checked in 03:56" while its records wait. Under it, trip 1's hand-back card as Trip done showed it: "Still on the truck", "39 cartons for Mulgampola, nobody at the shop. Hand them in; they go on the next run. The 4 chilled cartons for Mahaiyawa never left the depot." Then trip 2's own day line, card and stops. Both stay until trip 2 starts. |
 |  | No trip | No frame | "No trip for Thu 25 Jun yet. It shows here once the dispatcher sends the plan." With the plan sent and no trip for this driver: "You have no trip on Thu 25 Jun." With no day: "No delivery day is left." |
 |  | Could not load | No frame | "Could not load your trip." and "Try again", only when nothing is kept on the phone. |
 | Next stop `/driver` | A stop to go to | Driver · Next stop | The top line (below). "Stop 2 of 2". The brand's shop picture and "Fresh Wellawatte", "Colombo · street", "05:30 to 08:00" as the biggest thing, "window · on time" in green, or "window · late" in red once the app clock is past the window's close. The chips "Unload 94 cartons", "48 chilled" in blue and "46 dry". The note card, with the store manager's picture, "Note" and the shop's words, when it left one: Nugegoda's is "Ring the bell at the side door." The trip bar, a dot per stop, filled when done and ringed for this one, "Left Peliyagoda 03:31" and "back by 06:10". The orange "I've arrived". |
@@ -106,8 +107,11 @@ cartons and 3 of 4 dry, window 05:00 to 07:30, street) and stop 2 Fresh Wellawat
    Thu 25 Jun. At Thu 25 Jun 16:00 it is Fri 26 Jun, and VEH035 is still his if it is out.*
 2. **The trips.** The day's sent plan's trips whose driver is the caller, in leaving order, with a trip still out from an
    earlier day first. A trip's stops come in plan order and their lines in spec 012's order. The phone opens on the first
-   trip that is not done: its Today's trip until it is out, then its stops, then Trip done. With every trip done it shows
-   Day done. *Dilshan has one trip, VEH035 trip 1.*
+   trip that is not done: its Today's trip until it is out, then its stops, then Trip done. A trip that follows one
+   checked in opens with that trip's close and its hand-back card on its Today's trip, until it starts. With every trip
+   done it shows Day done. *Dilshan has one trip, VEH035 trip 1. At Kandy, Asitha's VEH057 has two: checking in trip 1
+   at 03:56 opens trip 2's Today's trip under "✓ Trip 1 closed · 4 of 4 stops · all records sent · checked in 03:56",
+   with the 39 cartons for Mulgampola still to hand in.*
 3. **Starting.** "Start trip" makes a `ready` trip `out` at the time kept. It is offered only on a ready trip, and a
    vehicle's two trips are never out at once: a start takes the depot's lock, so two starts of one vehicle's trips go one
    after the other and the second finds the first out. The leaving time is the plan's, not a gate (open question 1).
@@ -501,6 +505,8 @@ Friday's plan while Thursday's stop 2 stays closed.
 11. States the design lacks: not loaded yet, no trip, could not load, the waiting sheet, not accepted, sign in again, could
     not save on this phone, the unusable photo, the answer on the phone, a stop to try again, and Day done with records
     waiting.
+12. Between trips, the next trip's Today's trip opens with the closed trip's line and hand-back card. The frames draw one
+    trip only, and the driver must know trip 1 went and what to hand in before the truck is loaded again.
 
 ## Known limits
 1. **The server checks a photo's structure and never decodes the picture.** It takes a file that starts `FF D8`, ends `FF

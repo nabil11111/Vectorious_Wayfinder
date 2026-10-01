@@ -9,8 +9,9 @@ import { Counter } from './parts/Counter';
 import { NO_PAIR, readBox, refusalPair, tallyFor } from './tally';
 import { TripDone } from './DonePage';
 import { NextStopPage } from './NextStopPage';
+import { TodaysTrip } from './TripPage';
 import { UnloadPage } from './UnloadPage';
-import type { DriverView } from './view';
+import { tripsOf, type DriverView } from './view';
 import { backOnlineLines, overLoadedLine, wholeCountsLine } from './words';
 
 // The driver's screens as the live QA run found them (phase 4, Q-25 to Q-32). The pages are drawn as the phone would
@@ -58,15 +59,8 @@ const dayOf = (...trips: DriverTrip[]): DriverDay => ({
   depot: 'Kandy', driver: 'Asitha', driverId: id(5, 54), day: '2026-06-25', planSent: true, appliedWriteIds: [], trips,
 });
 
-// What the phone shows for a day with nothing waiting: the first trip that is not done, or the last once all are.
-function viewOf(day: DriverDay): DriverView {
-  const open = day.trips.find((trip) => trip.status !== 'done') ?? null;
-  const trip = open ?? day.trips.at(-1) ?? null;
-  return {
-    ready: true, day, waiting: [], refused: [], waitingRecords: 0, refusedRecords: 0,
-    trip, figures: trip ? tripFigures(trip) : null, allDone: open === null && trip !== null,
-  };
-}
+// What the phone shows for a day with nothing waiting, its trips picked as the phone picks them.
+const viewOf = (day: DriverDay, waitingRecords = 0): DriverView => ({ ready: true, day, waiting: [], refused: [], waitingRecords, refusedRecords: 0, ...tripsOf(day) });
 
 // Thu 25 Jun at the depot, "03:47" as an instant.
 const at = (time: string) => {
@@ -305,5 +299,41 @@ describe('Q-30 the green bar belongs to its trip', () => {
   it('shows a bar whose records are this trip\'s', () => {
     const html = tripTwoFirstStop({ backOnline: { names: ['the start of the trip'], belongsTo: [veh057trip2().tripId] } });
     expect(textOf(barOf(html))).toContain('Back online · 1 record sent The start of the trip reached the depot');
+  });
+});
+
+// ── Q-29 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// Trip 2's Today's trip, with trip 1 checked in at 03:56.
+const tripTwoToday = (trip2: DriverTrip, waitingRecords = 0) => {
+  const view = viewOf(dayOf(veh057trip1(), trip2), waitingRecords);
+  return textOf(draw(<TodaysTrip view={view} trip={view.trip!} figures={view.figures!} />));
+};
+
+describe('Q-29 checking in trip 1 when trip 2 is to come', () => {
+  it('opens trip 2\'s Today\'s trip with trip 1\'s close on top and trip 1\'s hand-back card under it', () => {
+    const text = tripTwoToday(veh057trip2());
+    expect(text).toContain('Trip 1 closed · 4 of 4 stops · all records sent · checked in 03:56');
+    expect(text).toContain('Still on the truck 39 cartons for Mulgampola, nobody at the shop. Hand them in; they go on the next run. The 4 chilled cartons for Mahaiyawa never left the depot.');
+    expect(text.indexOf('Trip 1 closed')).toBeLessThan(text.indexOf('Still on the truck'));
+    expect(text.indexOf('Still on the truck')).toBeLessThan(text.indexOf('Thu 25 Jun · trip 2'));
+    expect(text).toContain('Not loaded yet');
+  });
+
+  it('says so while trip 1\'s records still wait to send', () => {
+    expect(tripTwoToday(veh057trip2(), 1)).toContain('Trip 1 closed · 1 waiting to send · checked in 03:56');
+  });
+
+  it('keeps trip 1\'s close and hand-back while trip 2 is loaded and ready, and lets them go once trip 2 starts', () => {
+    expect(tripTwoToday(veh057trip2('ready'))).toMatch(/Trip 1 closed[\s\S]*Still on the truck[\s\S]*Loaded · 122 of 122/);
+    expect(tripsOf(dayOf(veh057trip1(), veh057trip2('loading'))).closed?.trip.tripNo).toBe(1);
+    expect(tripsOf(dayOf(veh057trip1(), veh057trip2('out'))).closed).toBeNull();
+  });
+
+  it('shows no close before a day\'s first trip, or while trip 1 is still out', () => {
+    expect(tripsOf(dayOf(veh057trip2())).closed).toBeNull();
+    expect(tripsOf(dayOf(veh057trip1('out'), veh057trip2())).closed).toBeNull();
+    const first = viewOf(dayOf(veh057trip2('planned', { tripNo: 1 })));
+    expect(textOf(draw(<TodaysTrip view={first} trip={first.trip!} figures={first.figures!} />))).not.toMatch(/closed|Still on the truck|Nothing to hand back/);
   });
 });

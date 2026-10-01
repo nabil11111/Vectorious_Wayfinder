@@ -278,8 +278,17 @@ export function nextTripLine(day: DriverDay, trip: DriverTrip) {
   return { label: `Trip ${trip.tripNo + 1}`, value: next ? leaves(next) : 'none today' };
 }
 
-export const tripClosedLine = (figures: Figures, waiting: number) =>
-  (waiting > 0 ? `Trip closed · ${waitingLine(waiting)}` : `Trip closed · ${whole(figures.stopsDone)} of ${countOf(figures.stops, 'stop')} · all records sent`);
+// "Trip closed · 2 of 2 stops · all records sent", or "Trip closed · 1 waiting to send" while records wait. Named by its
+// number where the day has more than one trip: "Trip 1 closed · …".
+export function tripClosedLine(figures: Figures, waiting: number, tripNo?: number) {
+  const closed = tripNo === undefined ? 'Trip closed' : `Trip ${tripNo} closed`;
+  return waiting > 0 ? `${closed} · ${waitingLine(waiting)}` : `${closed} · ${whole(figures.stopsDone)} of ${countOf(figures.stops, 'stop')} · all records sent`;
+}
+
+// On the next trip's Today's trip, until it starts (Q-29): "Trip 1 closed · 4 of 4 stops · all records sent · checked
+// in 03:56".
+export const betweenTripsLine = (trip: DriverTrip, figures: Figures, waiting: number) =>
+  [tripClosedLine(figures, waiting, trip.tripNo), trip.backAt && `checked in ${clockTime(trip.backAt)}`].filter(Boolean).join(' · ');
 export const backAtLine = (day: DriverDay) => `Back at ${day.depot}`;
 export const checkedInLine = (trip: DriverTrip) => (trip.backAt ? `Checked in at the depot ${clockTime(trip.backAt)}` : 'Checked in at the depot');
 export const SIGN_OUT_WAITS = 'Sign out once everything is sent.';
