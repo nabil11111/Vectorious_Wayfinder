@@ -27,7 +27,7 @@ export function ProofPage({ me }: { me: Me }) {
 function Proof({ me, stopId }: { me: Me; stopId: string }) {
   const view = useDriverView(me.id);
   const navigate = useNavigate();
-  const { at } = useAppClock();
+  const { at, readNow } = useAppClock();
   const { save, saving, failed } = useSave();
   const { photo, unusable, reading, take, inputRef, pick } = usePhoto();
   // Set while the delivery saves, so the stop being done does not send the screen back before it moves on.
@@ -39,11 +39,13 @@ function Proof({ me, stopId }: { me: Me; stopId: string }) {
   if (!trip || !stop || !figures) return <Navigate to="/driver" replace />;
   if (!leaving && (trip.status !== 'out' || stop.arrivedAt === null || stop.outcome !== null)) return <Navigate to="/driver" replace />;
 
-  // Every line as loaded, with the photo, at the app clock's time (rule 4). Not while a retaken photo is being read.
+  // Every line as loaded, with the photo, at the app clock's time at the press (rule 4). Not while a retaken photo is
+  // being read.
   const deliver = async () => {
-    if (!photo || reading || at === null) return;
+    const now = readNow();
+    if (!photo || reading || now === null) return;
     setLeaving(true);
-    const saved = await save({ kind: 'deliver', writeId: newWriteId(), tripId: trip.tripId, stopId: stop.id, at: new Date(at).toISOString(), revision: stop.revision, photo }, aboutStop(stop));
+    const saved = await save({ kind: 'deliver', writeId: newWriteId(), tripId: trip.tripId, stopId: stop.id, at: new Date(now).toISOString(), revision: stop.revision, photo }, aboutStop(stop));
     if (!saved) {
       setLeaving(false);
       return;

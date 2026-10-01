@@ -103,6 +103,9 @@ export interface AppClock {
   // The first read of the clock failed, so there is no time to show yet, and retry asks again.
   failed: boolean;
   retry: () => void;
+  // The app clock read at the moment it is asked, or null until the clock has arrived. A write takes its time from
+  // here at the press: `at` is the drawing's, which turns only with the minute.
+  readNow: () => number | null;
 }
 
 // The time on screen. It comes from GET /clock and runs on by itself. It is drawn again the moment its minute
@@ -130,10 +133,11 @@ export function useAppClock(): AppClock {
   }, [state, reading]);
 
   // A later read that fails leaves the clock it had running on, so only a first read that failed is shown.
-  if (!state) return { state, at: null, time: '--:--', waiting: false, failed: query.isError, retry };
+  if (!state) return { state, at: null, time: '--:--', waiting: false, failed: query.isError, retry, readNow: () => null };
   // A clock that arrived after the last drawing shows the time it arrived with.
   const at = shownAt(state, Math.max(reading, state.heldAt));
-  return { state, at, time: inDepot(at).time, waiting: state.holdsAt !== null && at >= Date.parse(state.holdsAt), failed: false, retry };
+  const readNow = () => shownAt(state, Math.max(performance.now(), state.heldAt));
+  return { state, at, time: inDepot(at).time, waiting: state.holdsAt !== null && at >= Date.parse(state.holdsAt), failed: false, retry, readNow };
 }
 
 // Takes the clock a move or a reset answered with. "Today" changed with it, so every list is fetched again.
