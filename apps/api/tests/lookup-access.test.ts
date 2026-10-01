@@ -75,9 +75,14 @@ it('AC-2 lists inline details and proof stay inside the depot, with absent and d
 it('AC-3 lookup validates dates ranges proof ids and every unknown or repeated query without writes', async () => {
   const before = await heldDriverRows();
   for (const path of ['orders?date=bad', 'orders?date=2026-02-30', 'orders?range=week', 'orders?date=2026-06-25&date=2026-06-26',
-    'orders?depot=Kandy', 'history?date=2026-02-30', 'history?date=2026-06-25&date=2026-06-26', 'history?planId=' + randomUUID(),
-    'history?depotId=Kandy', 'fleet?depotId=Kandy', 'fleet?date=2026-06-25', 'stops/not-a-uuid/photo', 'stops/' + randomUUID() + '/photo?depot=Kandy']) {
+    'orders?depot=Peliyagoda&depot=Peliyagoda', 'history?date=2026-02-30', 'history?date=2026-06-25&date=2026-06-26', 'history?planId=' + randomUUID(),
+    'history?depotId=Kandy', 'fleet?depotId=Kandy', 'fleet?date=2026-06-25', 'stops/not-a-uuid/photo', 'stops/' + randomUUID() + '/photo?size=big']) {
     expect(code(await h.ruwan.get('/api/v1/lookup/' + path))).toEqual([400, 'invalid_input']);
+  }
+  // A read names its depot in ?depot= (spec 021). Ruwan's session is on Peliyagoda, so one that names Kandy came from a
+  // tab the session left.
+  for (const path of ['orders?depot=Kandy', 'stops/' + randomUUID() + '/photo?depot=Kandy']) {
+    expect(code(await h.ruwan.get('/api/v1/lookup/' + path))).toEqual([409, 'depot_changed']);
   }
   expect(await h.history('?date=2025-02-28')).toMatchObject({ publication: null, counts: null, trips: [] });
   expect((await h.orders('?date=2025-02-28')).rows).toEqual([]);

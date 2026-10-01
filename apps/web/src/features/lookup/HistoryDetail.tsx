@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type {
   Brand, HistoryClosedAttempt, HistoryMeasure, HistoryProblem, HistoryReceipt, HistoryStages, HistoryStop, HistoryTrip, LookupPhoto,
@@ -19,7 +19,9 @@ import {
 // of its lines, and each stop with its lines ordered, loaded, handed over and received, its proof, its shop
 // confirmation, its problems (answered ones too) and each closed attempt with its own times, counts, photo and answer.
 // Every figure is the read's; one never recorded says so and is never a zero.
-export function HistoryDetail({ trip, brand, viewer, onClose }: { trip: HistoryTrip; brand: Brand | 'all'; viewer: Viewer; onClose: () => void }) {
+// anchor is the id the page scrolls to, one per depot's part on both depots together (spec 021).
+export function HistoryDetail({ trip, brand, viewer, anchor, onClose }: { trip: HistoryTrip; brand: Brand | 'all'; viewer: Viewer; anchor: string; onClose: () => void }) {
+  const title = useId();
   const recorded: [string, string][] = [
     ['Planned leave', clockTime(trip.schedule.leavesAt)],
     ['Planned back', clockTime(trip.schedule.backAt)],
@@ -30,10 +32,10 @@ export function HistoryDetail({ trip, brand, viewer, onClose }: { trip: HistoryT
     ['Back', trip.backAt ? clockTime(trip.backAt) : 'not recorded'],
   ];
   return (
-    <section id="history-detail" aria-labelledby="history-detail-title" className={cn(CARD, 'scroll-mt-24 px-5 pt-[18px] pb-5')}>
+    <section id={anchor} aria-labelledby={title} className={cn(CARD, 'scroll-mt-24 px-5 pt-[18px] pb-5')}>
       <div className="flex items-start gap-2.5">
         <img src={vehiclePicture({ type: trip.vehicleType, temp: trip.vehicleTemp })} alt="" className="mt-[-3px] size-[26px] shrink-0 object-contain" />
-        <h2 id="history-detail-title" className="min-w-0 flex-1 text-[15px] leading-5 font-bold">{tripName(trip)}</h2>
+        <h2 id={title} className="min-w-0 flex-1 text-[15px] leading-5 font-bold">{tripName(trip)}</h2>
         <CloseButton label={`Close ${tripName(trip)}`} onClick={onClose} />
       </div>
       <p className="mt-1.5 text-[11px] leading-4 text-muted-foreground">{tripPlace(trip)} · sent plan {shortDay(trip.date)}</p>

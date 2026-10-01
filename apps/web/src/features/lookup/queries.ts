@@ -10,28 +10,34 @@ import { reasonOf } from './words';
 // The look-up pages' reads and what may stay on screen (spec 017, rule 12; plan.md "Live updates, selection and
 // screens"). Each read is keyed ['lookup', page, user, depot, parameters], so the live stream's lookup fan-out fetches
 // it again and another account or date never starts from it, and it carries the query's signal, so a page that moved
-// on cancels the older read. A selection and an open photo belong to the scope they were made in.
+// on cancels the older read. The depot is the one the read is for, which it names (spec 021): on both depots together
+// each depot's records are a read of their own. A selection and an open photo belong to the scope they were made in.
 
 export type LookupPage = 'orders' | 'history' | 'fleet';
-type Account = Pick<Me, 'id' | 'depotId'> | null | undefined;
+type Account = Pick<Me, 'id'> | null | undefined;
 
-export const lookupKey = (page: LookupPage, me: Account, params: object) => ['lookup', page, me?.id ?? null, me?.depotId ?? null, params] as const;
-const signedIn = (me: Account) => Boolean(me?.id && me.depotId);
+export const lookupKey = (page: LookupPage, me: Account, depot: string | null, params: object) => ['lookup', page, me?.id ?? null, depot, params] as const;
+const readable = (me: Account, depot: string | null) => Boolean(me?.id && depot);
+// The depot of a read that is enabled only with one.
+const named = (depot: string | null) => {
+  if (depot === null) throw new Error('No depot to look up.');
+  return depot;
+};
 
-export const ordersOptions = (me: Account, params: OrdersParams) => queryOptions({
-  queryKey: lookupKey('orders', me, params),
-  queryFn: ({ signal }) => readOrders(params, signal),
-  enabled: signedIn(me),
+export const ordersOptions = (me: Account, depot: string | null, params: OrdersParams) => queryOptions({
+  queryKey: lookupKey('orders', me, depot, params),
+  queryFn: ({ signal }) => readOrders(named(depot), params, signal),
+  enabled: readable(me, depot),
 });
-export const historyOptions = (me: Account, params: HistoryParams) => queryOptions({
-  queryKey: lookupKey('history', me, params),
-  queryFn: ({ signal }) => readHistory(params, signal),
-  enabled: signedIn(me),
+export const historyOptions = (me: Account, depot: string | null, params: HistoryParams) => queryOptions({
+  queryKey: lookupKey('history', me, depot, params),
+  queryFn: ({ signal }) => readHistory(named(depot), params, signal),
+  enabled: readable(me, depot),
 });
-export const fleetOptions = (me: Account) => queryOptions({
-  queryKey: lookupKey('fleet', me, {}),
-  queryFn: ({ signal }) => readFleet(signal),
-  enabled: signedIn(me),
+export const fleetOptions = (me: Account, depot: string | null) => queryOptions({
+  queryKey: lookupKey('fleet', me, depot, {}),
+  queryFn: ({ signal }) => readFleet(named(depot), signal),
+  enabled: readable(me, depot),
 });
 
 // A live message while a page's first read is out would be lost: TanStack hands it the read already on its way, whose
@@ -208,13 +214,16 @@ export function photoLoader(deps: PhotoDeps, onChange: (view: PhotoView) => void
   };
 }
 
-const browserPhotos: PhotoDeps = { read: readPhoto, toUrl: (jpeg) => URL.createObjectURL(jpeg), revoke: (url) => URL.revokeObjectURL(url) };
+// The browser's own photos, read for the depot whose records hold them.
+const browserPhotos = (depot: string): PhotoDeps => ({
+  read: (photo, signal) => readPhoto(photo, depot, signal), toUrl: (jpeg) => URL.createObjectURL(jpeg), revoke: (url) => URL.revokeObjectURL(url),
+});
 
-// The page's viewer. A change of scope (account, depot, date, selection or reset generation) closes it and gives its
-// image back before the page draws the new records; leaving the page does the same.
-export function usePhotoViewer(scope: string) {
+// The page's viewer, one per depot's part of the page. A change of scope (account, depot, date, selection or reset
+// generation) closes it and gives its image back before the page draws the new records; leaving the page does the same.
+export function usePhotoViewer(scope: string, depot: string) {
   const [view, setView] = useState<PhotoView>(CLOSED);
-  const [loader] = useState(() => photoLoader(browserPhotos, setView));
+  const [loader] = useState(() => photoLoader(browserPhotos(depot), setView));
   const [openedIn, setOpenedIn] = useState<string | null>(null);
   // Drawn closed at once under a new scope; this releases the request and the image behind it.
   useEffect(() => {

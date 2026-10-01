@@ -9,17 +9,20 @@ import { api, ApiRequestError, DEPOT_CHANGED, nameDepot } from '@/lib/api';
 import { clockKey } from '@/lib/clock';
 
 // The dispatcher's depot switch (spec 020, D-93): the top bar's and the dashboard map card's. The server keeps the
-// chosen depot on the session, so every read and write after a switch is for it, and answers Me with it.
+// chosen depot on the session, so every read and write after a switch is for it, and answers Me with it. Both is a
+// choice like a depot (spec 021, D-96): the session then works on both depots together, and Me says 'Both'.
 
-// The booklet's two depots (outlets.csv, vehicles.csv), as the frames' switches list them.
-export const DEPOTS = ['Peliyagoda', 'Kandy'] as const;
-
-// What Both says when pointed at or pressed: a dispatcher works on one depot at a time for now.
-export const BOTH_LATER = 'Both depots together come later.';
 // What a switch that did not go through says. The switch shows the depot before again.
 export const SWITCH_FAILED = 'Could not switch depots. Try again.';
 // What a tab says when a switch made elsewhere retired a plan board that still held changes the server had not saved.
 export const PLAN_DROPPED = 'Plan changes that were not saved were dropped: the depot was switched in another tab.';
+// What it says instead when a plan change it sent got no answer before it took the switch: the server may have kept it,
+// so it is never said to be dropped (Q-13). It names the depot the change was for.
+export const planUnsure = (depot: string) => `The depot was switched in another tab while a plan change was on its way. Check ${depot}'s plan board for it.`;
+// How long a tab that hears of a switch made elsewhere waits for its own plan changes on their way to be answered, and
+// how often it looks.
+export const PLAN_ANSWER_WAIT_MS = 5000;
+const PLAN_ANSWER_LOOK_MS = 50;
 
 // A switch on its way is filed under this key, so both switches show the pressed depot at once.
 export const depotSwitchKey = ['depot-switch'] as const;
@@ -27,16 +30,18 @@ export const depotSwitchKey = ['depot-switch'] as const;
 // What a press does: it switches to a depot other than the one on show, and not while a switch is on its way.
 export const switchTo = (pressed: string, chosen: string, switching: boolean) => (switching || pressed === chosen ? null : pressed);
 
-// A switch on this screen, whichever tab made it. Every read on screen was for the depot before, and some keys (the
-// plan board's, the problems') do not name it, so no read stays or lands: each is cancelled, the account's too, so an
-// older answer cannot land on the new one, and all but the account and the clock (the same for both depots) are
-// dropped. Each page then shows its loading state until the new depot's read arrives, and the new account opens the
-// live stream again (lib/live.ts), since a stream carries the depot it opened with.
-// It answers whether the plan board held changes the server had not saved, which went with it.
+// A switch on this screen, whichever tab made it. Every read on screen was for the depot before, some keys (the plan
+// board's) do not name it, and a depot read on Both is read again under the new session, so no read stays or lands:
+// each is cancelled, the account's too, so an older answer cannot land on the new one, and all but the account and the
+// clock (the same for both depots) are dropped. Each page then shows its loading state until the new depot's read
+// arrives, and the new account opens the live stream again (lib/live.ts), since a stream carries the depot it opened
+// with.
+// It answers whether the plan board held changes the server had not saved, which went with it: 'dropped', or 'unsure'
+// when a save of them was sent and never answered (retireBoard).
 export async function takeSwitch(qc: QueryClient, me: Me) {
   await qc.cancelQueries({ predicate: (query) => query.queryKey[0] !== clockKey[0] });
   // Signed out, or someone else signed in, meanwhile: nothing is put back, in the cache or in storage.
-  if (!signedInAs(qc, me.id)) return false;
+  if (!signedInAs(qc, me.id)) return null;
   commit(qc, me);
   qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] && query.queryKey[0] !== clockKey[0] });
   // The board's queue holds changes outside the cache, so it goes too, whatever page is on show.
@@ -61,9 +66,9 @@ function channelOf(qc: QueryClient) {
 // (D-95), so the server refuses one whose depot the session has left. The session decides it: an account read that
 // finds the session on another depot (useMe's own refetch, say once the network is back), or such a refusal, is a
 // switch made without this tab, and the tab takes it as one, so no tab stays on a depot the session left.
-const committed = new WeakMap<QueryClient, { id: string; depotId: string | null }>();
+const committed = new WeakMap<QueryClient, Me>();
 function commit(qc: QueryClient, me: Me | null | undefined) {
-  if (me) committed.set(qc, { id: me.id, depotId: me.depotId });
+  if (me) committed.set(qc, me);
   else committed.delete(qc);
   nameDepot(me?.role === 'dispatcher' ? me.depotId : null);
 }
@@ -72,13 +77,31 @@ function commit(qc: QueryClient, me: Me | null | undefined) {
 // again, so a read that lands after a sign-out, or after someone else signed in, takes nothing.
 const signedInAs = (qc: QueryClient, id: string) => qc.getQueryData<Me | null>(meKey)?.id === id;
 
+// Waits for the plan changes this tab has on their way to be answered, at most PLAN_ANSWER_WAIT_MS: true once they are.
+async function planChangesAnswered(qc: QueryClient) {
+  for (let waited = 0; planWriteOnItsWay(qc); waited += PLAN_ANSWER_LOOK_MS) {
+    if (waited >= PLAN_ANSWER_WAIT_MS) return false;
+    await new Promise((resolve) => window.setTimeout(resolve, PLAN_ANSWER_LOOK_MS));
+  }
+  return true;
+}
+
 // The session's account as the server holds it: a depot other than the one on show is a switch made without this tab,
-// taken as one. Plan changes it dropped are not dropped without a word.
-async function takeSession(qc: QueryClient, session: Me) {
-  if (!signedInAs(qc, session.id)) return;
-  const shown = committed.get(qc) ?? qc.getQueryData<Me | null>(meKey);
-  if (!shown || shown.depotId === session.depotId) return;
-  if (await takeSwitch(qc, session)) toast(PLAN_DROPPED, { id: 'plan-dropped', duration: 6000, classNames: { title: 'text-pretty' } });
+// taken as one. Plan changes it dropped are not dropped without a word. A plan change this tab sent just before the
+// session moved can still have been kept, so the tab first waits for its answer (Q-13): the board is retired and the line
+// chosen only then, and it says the changes were dropped only when they were. newest says whether the read that found
+// the session is still the newest one.
+async function takeSession(qc: QueryClient, session: Me, newest: () => boolean) {
+  const shownDepot = () => (signedInAs(qc, session.id) ? (committed.get(qc) ?? qc.getQueryData<Me | null>(meKey))?.depotId ?? null : null);
+  const before = shownDepot();
+  if (before === null || before === session.depotId) return;
+  const answered = await planChangesAnswered(qc);
+  // Meanwhile a newer read may have taken over, someone else signed in, or the tab took this depot already.
+  if (!newest() || shownDepot() !== before) return;
+  // Dropped only when every save was answered and the changes were turned down: a save the server never answered, such
+  // as one whose answer was lost before its retry was turned down, may have been kept.
+  const dropped = await takeSwitch(qc, session);
+  if (dropped) toast(answered && dropped === 'dropped' ? PLAN_DROPPED : planUnsure(before), { id: 'plan-dropped', duration: 6000, classNames: { title: 'text-pretty' } });
 }
 
 // Every read of the session takes the next number, and only the newest may apply: an answer a later read overtook is
@@ -128,7 +151,7 @@ async function readSession(qc: QueryClient) {
     console.warn('Could not read the session to see which depot it works on.', read.error);
     return;
   }
-  await takeSession(qc, read.session);
+  await takeSession(qc, read.session, read.newest);
 }
 
 // Another tab of the session switched. Its message names the account only, since an answer can come late and another
@@ -165,8 +188,13 @@ export function useFollowSwitches() {
       if (committed.get(qc)?.id !== me.id) forgetAccount(qc);
       // An account set by hand (this tab taking a switch, or a sign-in) is no read of the session.
       if (event.action.manual) return;
-      nextRead(qc);
-      void takeSession(qc, me);
+      const read = nextRead(qc);
+      // The session this read found is kept apart from the account on screen until the tab takes it as a switch, which
+      // can first wait for a plan change on its way: the account on show goes back before anything draws the one found,
+      // so the page, its reads, the depot every request names and the board's queue stay on it until then (Q-13).
+      const shown = committed.get(qc);
+      if (shown?.id === me.id && shown.depotId !== me.depotId) qc.setQueryData(meKey, shown);
+      void takeSession(qc, me, () => reads.get(qc)?.generation === read.generation);
     });
     return () => {
       channel.removeEventListener('message', follow);
@@ -208,10 +236,12 @@ export const switchDepotMutation = (qc: QueryClient): UseMutationOptions<Me, Err
     // again, and a switch whose answer was lost can still have gone through, so the tab reads the session and takes it.
     // With no word on the session, a switch that answered takes its answer (should it be stale, the server refuses the
     // tab's next request and the tab reads again), and one that did not changes nothing.
-    const read = await readOnce(qc);
+    // A newer read that overtook this one (a request refused as the switch landed, another tab's message, the account's
+    // own refresh) says nothing of whether the switch went through, so being overtaken is never success: the switch
+    // reads the session again until its own read is the newest, and decides on that (Q-12).
+    let read = await readOnce(qc);
+    while (signedInAs(qc, asker.id) && !read.newest()) read = await readOnce(qc);
     if (!signedInAs(qc, asker.id)) return asker;
-    // A newer read overtook this one, and that read decides.
-    if (!read.newest()) return asker;
     let session = read.session;
     if (session === null) {
       if (answer === null) throw noAnswer;
@@ -222,11 +252,15 @@ export const switchDepotMutation = (qc: QueryClient): UseMutationOptions<Me, Err
     const shown = committed.get(qc) ?? asker;
     if (session.depotId !== shown.depotId) {
       await takeSwitch(qc, session);
-      if (signedInAs(qc, session.id)) channelOf(qc).postMessage({ id: session.id });
-    } else if (noAnswer !== null) {
-      // The session is still on the depot on show: the switch did not go through.
-      throw noAnswer;
+    } else if (session.depotId === asker.depotId) {
+      // The session is still on the depot the switch was pressed on: the switch did not go through, or another tab
+      // switched back since, which told the other tabs itself.
+      if (noAnswer !== null) throw noAnswer;
+      return session;
     }
+    // Every other tab of the session is told, also when a refused request's read took the switch here before this read
+    // did (Q-12): this tab then has nothing left to take, and a switch whose answer was lost went through.
+    if (signedInAs(qc, session.id)) channelOf(qc).postMessage({ id: session.id });
     return session;
   },
   onError: () => { toast(SWITCH_FAILED, { id: 'depot-switch', duration: 6000, classNames: { title: 'text-pretty' } }); },

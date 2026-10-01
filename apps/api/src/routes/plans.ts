@@ -1,6 +1,7 @@
-import { Router, type Request } from 'express';
+import { Router, type Request, type RequestHandler } from 'express';
 import { depotCallerOf, requireDepot, requireRole, type DepotCaller } from '../middleware/auth';
-import { AcceptDecisionsRequest, JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, SuggestPlanRequest, UnsendPlanRequest } from '@wayfinder/contracts';
+import { AcceptDecisionsRequest, BOTH_DEPOTS, JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, SuggestPlanRequest, UnsendPlanRequest } from '@wayfinder/contracts';
+import { HttpError } from '../lib/errors';
 import { getBoard } from '../plans/board';
 import { saveDraft } from '../plans/draft';
 import { joinOrder, splitOrder } from '../plans/split';
@@ -14,9 +15,16 @@ import { acceptDecisions, suggestPlan } from '../plans/suggest';
 // so there is no way to plan another depot's day.
 export const plansRouter = Router();
 
-plansRouter.use(requireRole('dispatcher'), requireDepot);
+// A plan, its send and its checks belong to one depot (D-96). A session on both depots together plans neither, so every
+// plan route refuses it before it reads or writes anything, and the board asks which depot to plan (spec 021, rule 2).
+const requireOneDepot: RequestHandler = (req, _res, next) => {
+  if (req.user!.depotId === BOTH_DEPOTS) return next(new HttpError(409, 'pick_a_depot', 'A plan belongs to one depot. Pick the depot to plan.'));
+  next();
+};
 
-// The dispatcher asking and their depot. Both checks above have passed.
+plansRouter.use(requireRole('dispatcher'), requireDepot, requireOneDepot);
+
+// The dispatcher asking and their depot. The checks above have passed, so it is one depot.
 export type Planner = DepotCaller;
 export const plannerOf = depotCallerOf;
 

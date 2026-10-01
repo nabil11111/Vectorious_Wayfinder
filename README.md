@@ -273,8 +273,10 @@ Anything we built differently from our Designathon submission, and why.
   trip's stops or a trip's card in Done, and stops drag along their list, back to Unplanned orders or onto another
   trip's card, by pointer or keyboard (D-98). Every button and menu stays, so the walkthrough runs on them alone.
 - **Orders are named by shop, amount and wanted day.** The design's order numbers (WF-2402) do not exist here.
-- **The depot switch** works between Peliyagoda and Kandy (D-93) and shows from 1280 wide. Only Both is greyed: it says
-  both depots together come later.
+- **The depot switch** works for Peliyagoda, Kandy and Both (D-93, D-96) and shows from 1280 wide. Both shows the two
+  depots together: the dashboard adds them up and marks each row with its depot, and Live day, Orders, History and
+  Fleet show Peliyagoda's part and then Kandy's. No frame draws a Both screen, so each page keeps its own layout. A plan
+  belongs to one depot, so on Both the plan board and View plan ask which depot to plan and switch to it.
 - **Drivers** are picked from the depot's driver accounts, and a vehicle may have none (D-31).
 - **Moving stops** shows no "12 km shorter" or "35 min earlier", and a late stop says "late": the checker's
   kilometres depend only on the number of stops, and its sentence under the timeline gives the minutes.
@@ -329,8 +331,9 @@ Anything we built differently from our Designathon submission, and why.
 **The dashboard and Live day**
 - **No waves:** Live day has no "Wave 2", and the next run's button is "View plan" with no draft line.
 - **The district map** says "Live · 07:30" where the frame says "Replay · 07:30": it shows the day as it is, where the
-  design drew a replay, so every number on it comes from the live read (D-92). Its Map view switch works between
-  Peliyagoda and Kandy as the top bar's does, with only Both greyed (D-93); districts and trucks have no hover details,
+  design drew a replay, so every number on it comes from the live read (D-92). Its Map view switch works for
+  Peliyagoda, Kandy and Both as the top bar's does (D-93, D-96), and Both draws both depots' districts and trucks from
+  the two depots' reads added up; districts and trucks have no hover details,
   the active chip carries the design's lorry picture, and the card credits OpenStreetMap for the district outlines.
   Below 1280 wide it sits under Needs you, and below 640 its Stores delivered list goes under the map.
 - **One answer per problem:** "Decide" opens its card, where the design also draws Warn, Skip, Credit and Resend, and an
