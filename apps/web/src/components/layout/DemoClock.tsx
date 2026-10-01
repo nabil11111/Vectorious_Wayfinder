@@ -4,9 +4,11 @@ import { DEMO_DAY } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useMe } from '@/features/auth/api';
 import { ApiRequestError } from '@/lib/api';
 import { inDepot, partAt, useNextPart, useResetDay, type AppClock, type HeldClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
+import { SampleOrders } from './SampleOrders';
 
 // The demo chip beside the time and the control it opens (spec 008). It is the judges' tool for walking a whole
 // delivery day in a few minutes, so it has no frame of its own and is built from the style guide: the chip, a
@@ -71,7 +73,8 @@ const TITLE = 'font-heading text-lg font-bold text-foreground';
 const BUTTON = 'h-12 w-full rounded-[10px] text-base font-semibold';
 const PLAIN = 'bg-card dark:border-border dark:bg-card dark:hover:bg-muted';
 
-function Control({ state, at, waiting, Title }: {
+// The control itself. Exported so its states can be drawn in a test.
+export function Control({ state, at, waiting, Title }: {
   state: HeldClock;
   at: number;
   waiting: boolean;
@@ -79,9 +82,18 @@ function Control({ state, at, waiting, Title }: {
 }) {
   const next = useNextPart();
   const resetDay = useResetDay();
-  const [asking, setAsking] = useState(false);
+  const { data: me } = useMe();
+  // The control, the question before a reset, or the sample shop orders (spec 028).
+  const [showing, setShowing] = useState<'control' | 'reset' | 'sample'>('control');
+  const asking = showing === 'reset';
+  const setAsking = (on: boolean) => setShowing(on ? 'reset' : 'control');
   const now = inDepot(at);
   const current = DEMO_DAY.parts.findIndex((part) => part.key === state.part);
+  // While orders are open, the dispatcher can have shops place sample orders. Every other role and part has no such
+  // button.
+  const canAddOrders = state.part === 'ordering' && me?.role === 'dispatcher' && Boolean(me.depotId);
+
+  if (showing === 'sample' && canAddOrders) return <SampleOrders Title={Title} depot={me.depotId!} onBack={() => setShowing('control')} />;
 
   if (asking) {
     const problem = failure(resetDay.error);
@@ -143,6 +155,11 @@ function Control({ state, at, waiting, Title }: {
           </Button>
         ) : (
           <p className="py-1 text-sm font-semibold">The demo day is over. Reset to start again.</p>
+        )}
+        {canAddOrders && (
+          <Button variant="outline" className={cn(BUTTON, PLAIN)} onClick={() => { next.reset(); setShowing('sample'); }}>
+            Add sample shop orders
+          </Button>
         )}
         <Button variant="outline" className={cn(BUTTON, PLAIN)} onClick={() => { next.reset(); setAsking(true); }}>
           Reset the demo day

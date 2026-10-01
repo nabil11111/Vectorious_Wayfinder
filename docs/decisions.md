@@ -445,3 +445,12 @@ vehicle's free run. Nothing accepted waits, every move is checked with its vehic
 search is bounded (each vehicle's last run, the first that works), so the planner stays within its time limits. The
 pass runs after every order has had its turn rather than at each refusal: freeing a run at once for an earlier-ranked
 order took room later orders needed and left more waiting on Peliyagoda's seeded day (Nabil, 2 Oct, spec 011, AC-23).
+
+**D-103 · 2 Oct · The demo control can place sample shop orders.** While orders are open, the dispatcher's demo control
+places orders for 10, 25 or every shop of the depot on show (both on Both) that has no draft and no order for the open
+day, and once those run out 10 and 25 go on with small top-ups from shops that ordered, a real thing shops do before
+16:00 (never a shop with a draft or twice in a press). Each goes through the shop's own save and Place, as its store manager, so it meets every rule a shop's order meets
+and reaches the screens the same way. Contents follow the seeded day's rules for that shop with some shops ordering
+more or less and a few leaving a note, from a seed made of the delivery day, so a rehearsal gives the same orders.
+Times are spaced back from the press, never ahead of the clock. A presenter fills the day without signing in as each
+shop (Nabil, 2 Oct, spec 028).

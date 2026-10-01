@@ -57,7 +57,7 @@ export async function readShop(on: Reader, outletId: string): Promise<Shop> {
 }
 
 // What the shop can order: the active items of its brand.
-const orderable = (shop: Shop) => shop.items.filter((item) => item.brand === shop.outlet.brand && !item.archived);
+export const orderable = (shop: Shop) => shop.items.filter((item) => item.brand === shop.outlet.brand && !item.archived);
 // The refusal for a line whose item is not one of those. It names the item when there is such an item at all.
 const notOnTheList = (shop: Shop, productId: string) => {
   const name = shop.items.find((item) => item.id === productId)?.name ?? productId;
@@ -248,8 +248,12 @@ export function getNextOrder(caller: Caller): Promise<StoreNextOrder> {
   return snapshot(async (tx) => nextOrder(tx, await readShop(tx, caller.outletId), await openDayAt(tx, now())));
 }
 
+// The demo control's sample orders (spec 028) go through the shop's own save and place, and give each order the time
+// its shop placed it, a little before the press. The cut-off is still judged on the app clock now.
+export interface Written { writtenAt?: Date }
+
 // Saves the whole draft, so it replaces what was there, and answers as the GET does.
-export function saveDraft(caller: Caller, body: SaveDraftRequest): Promise<StoreNextOrder> {
+export function saveDraft(caller: Caller, body: SaveDraftRequest, { writtenAt }: Written = {}): Promise<StoreNextOrder> {
   return db.transaction(async (tx) => {
     await lockShop(tx, caller.outletId);
     // The cut-off is judged now, with the shop's lock held, not when the request arrived.
@@ -279,7 +283,7 @@ export function saveDraft(caller: Caller, body: SaveDraftRequest): Promise<Store
         if (draft) await tx.delete(orders).where(eq(orders.id, draft.id));
         continue;
       }
-      const saved = { deliveryDate: open.deliveryDate, driverNote: body.driverNote || null, savedAt: at };
+      const saved = { deliveryDate: open.deliveryDate, driverNote: body.driverNote || null, savedAt: writtenAt ?? at };
       let orderId = draft?.id;
       if (orderId) {
         await tx.update(orders).set({ ...saved, revision: sql`${orders.revision} + 1`, updatedAt: sql`now()` }).where(eq(orders.id, orderId));
@@ -295,7 +299,7 @@ export function saveDraft(caller: Caller, body: SaveDraftRequest): Promise<Store
 }
 
 // Places the drafts the request names, and answers with the next order as it is now and the orders placed.
-export async function placeOrders(caller: Caller, body: PlaceOrdersRequest): Promise<PlaceOrdersResponse> {
+export async function placeOrders(caller: Caller, body: PlaceOrdersRequest, { writtenAt }: Written = {}): Promise<PlaceOrdersResponse> {
   const done = await db.transaction(async (tx) => {
     // Planning holds this depot for no key update. Place takes a share first, so a send sees either the
     // whole placement or none of it, and both paths take the depot before any shop row (spec 010).
@@ -325,7 +329,7 @@ export async function placeOrders(caller: Caller, body: PlaceOrdersRequest): Pro
 
     const ids = drafts.map((draft) => draft.id);
     await tx.update(orders)
-      .set({ status: 'placed', deliveryDate: day.deliveryDate, placedAt: at, placedBy: caller.userId, revision: sql`${orders.revision} + 1`, updatedAt: sql`now()` })
+      .set({ status: 'placed', deliveryDate: day.deliveryDate, placedAt: writtenAt ?? at, placedBy: caller.userId, revision: sql`${orders.revision} + 1`, updatedAt: sql`now()` })
       .where(inArray(orders.id, ids));
     return { answer: { ...(await nextOrder(tx, shop, open)), placedOrders: await readOrders(tx, shop, inArray(orders.id, ids)) }, placedNow: true, shop };
   });
