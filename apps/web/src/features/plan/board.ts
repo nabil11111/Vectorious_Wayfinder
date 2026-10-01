@@ -2,9 +2,9 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type {
-  AcceptDecisionsRequest, DraftPlan, JoinOrderRequest, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
+  AcceptDecisionsRequest, DraftPlan, JoinOrderRequest, Me, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
 } from '@wayfinder/contracts';
-import { workingFor } from '@/features/auth/api';
+import { meKey, workingFor } from '@/features/auth/api';
 import { reasonOf } from '@/features/store/words';
 import { api, ApiRequestError } from '@/lib/api';
 import { planOf, sameDraft } from './draft';
@@ -23,9 +23,30 @@ let writing: Promise<unknown> = Promise.resolve();
 // The writes queued or sent and not answered yet, from the board's queue and View plan alike. A dispatcher's depot
 // switch waits for none of them (spec 020).
 let unanswered = 0;
-function write<T>(request: () => Promise<T>): Promise<T> {
+
+// Who a write is made for: the depot it names when its turn comes, so the server refuses it should the session have
+// moved since (D-95), and whether its maker still wants it sent then. A board's queue makes its own writes, and View
+// plan its writes outside the queue. A maker is set only while its write is queued, which happens at once.
+interface Maker { depot: string | null; stillWanted: () => boolean }
+let making: Maker | null = null;
+function madeBy<T>(maker: Maker, queue: () => Promise<T>): Promise<T> {
+  making = maker;
+  try {
+    return queue();
+  } finally {
+    making = null;
+  }
+}
+
+function write<T>(request: (depot: string | null | undefined) => Promise<T>): Promise<T> {
+  const maker = making;
   unanswered += 1;
-  const run = writing.then(request).finally(() => { unanswered -= 1; });
+  const run = writing.then(() => {
+    // Right before it goes: a write whose maker was retired, or no longer works for the account and depot it was made
+    // for, is dropped. It names the depot it was made for, whatever the tab names by then.
+    if (maker && !maker.stillWanted()) throw new Error('A plan change was dropped: its board is no longer on show.');
+    return request(maker?.depot);
+  }).finally(() => { unanswered -= 1; });
   // The chain itself never rejects, or one refused write would fail every write after it.
   writing = run.catch(() => undefined);
   return run;
@@ -46,14 +67,14 @@ export const fetchSlots = async (date: string, orderId: string) => {
 };
 
 // Every write answers with the whole board, as the GET does.
-export const saveDraft = (date: string, body: SavePlanRequest) => write(() => api<PlanBoard>(`/plans/${date}/draft`, { method: 'PUT', json: body }));
-export const splitOrder = (date: string, body: SplitOrderRequest) => write(() => api<PlanBoard>(`/plans/${date}/split`, { method: 'POST', json: body }));
-export const joinOrder = (date: string, body: JoinOrderRequest) => write(() => api<PlanBoard>(`/plans/${date}/join`, { method: 'POST', json: body }));
-export const sendPlan = (date: string, body: PlanRef) => write(() => api<PlanBoard>(`/plans/${date}/send`, { method: 'POST', json: body }));
-export const unsendPlan = (date: string, body: PlanRef) => write(() => api<PlanBoard>(`/plans/${date}/unsend`, { method: 'POST', json: body }));
+export const saveDraft = (date: string, body: SavePlanRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/draft`, { method: 'PUT', json: body, depot }));
+export const splitOrder = (date: string, body: SplitOrderRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/split`, { method: 'POST', json: body, depot }));
+export const joinOrder = (date: string, body: JoinOrderRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/join`, { method: 'POST', json: body, depot }));
+export const sendPlan = (date: string, body: PlanRef) => write((depot) => api<PlanBoard>(`/plans/${date}/send`, { method: 'POST', json: body, depot }));
+export const unsendPlan = (date: string, body: PlanRef) => write((depot) => api<PlanBoard>(`/plans/${date}/unsend`, { method: 'POST', json: body, depot }));
 // The suggested plan (spec 014): building it, which replaces the whole draft, and accepting the planner's decisions.
-export const suggestPlan = (date: string, body: SuggestPlanRequest) => write(() => api<PlanBoard>(`/plans/${date}/suggest`, { method: 'POST', json: body }));
-export const acceptDecisions = (date: string, body: AcceptDecisionsRequest) => write(() => api<PlanBoard>(`/plans/${date}/decisions`, { method: 'POST', json: body }));
+export const suggestPlan = (date: string, body: SuggestPlanRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/suggest`, { method: 'POST', json: body, depot }));
+export const acceptDecisions = (date: string, body: AcceptDecisionsRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/decisions`, { method: 'POST', json: body, depot }));
 
 // A write names the plan by its id and revision, or before the first save by the demo day the board was read
 // under, so a request from before a reset never lands on the new day (rule 3).
@@ -152,6 +173,8 @@ function refusedLine(code: string, error: unknown, before: PlanBoard, latest: Pl
 // made it: the board and View plan share it.
 class PlanSaver {
   readonly owner: string | null;
+  // Stopped for good by a depot switch or a sign-out (D-95).
+  retired = false;
   private qc: QueryClient;
   private screen: BoardScreen | null = null;
   private listeners = new Set<() => void>();
@@ -168,10 +191,18 @@ class PlanSaver {
   private waiters: ((saved: boolean) => void)[] = [];
   private droppedShown = '';
 
-  constructor(qc: QueryClient, owner: string | null) {
+  // The depot the queue's board is for, which every write it makes names.
+  readonly depot: string | null;
+
+  constructor(qc: QueryClient, owner: string | null, depot: string | null) {
     this.qc = qc;
     this.owner = owner;
+    this.depot = depot;
   }
+
+  // A write this queue made may still go when its turn comes: the queue is not retired and the screen still works for
+  // its account and depot.
+  stillWanted = () => this.stillMine();
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -185,9 +216,10 @@ class PlanSaver {
   }
 
   // An answer can arrive after its person signed out and someone else signed in on this browser, or after the
-  // dispatcher switched depots (spec 020). Either way it is for a board no longer on show.
+  // dispatcher switched depots (spec 020). Either way it is for a board no longer on show. A queue a switch retired stays
+  // retired, even once the dispatcher switches back to the depot it was for.
   private stillMine() {
-    return this.owner !== null && workingFor(this.qc) === this.owner;
+    return !this.retired && this.owner !== null && workingFor(this.qc) === this.owner;
   }
 
   private show(patch: Partial<BoardScreen>) {
@@ -204,6 +236,11 @@ class PlanSaver {
   // Changes the server turned down wait for Try again, so they are not on their way.
   onItsWay() {
     return this.pending() && this.screen?.saving !== 'refused';
+  }
+
+  // Changes on the board the server has not said it saved: waiting, on their way, trying again, or turned down.
+  unsaved() {
+    return this.seq !== this.savedSeq;
   }
 
   // Shows a board: its numbers always, and its draft too when nothing on screen is waiting to be saved. An
@@ -317,13 +354,13 @@ class PlanSaver {
       // A read that started before this save would answer with the draft as it was.
       await this.cancelReads(date);
       // A queue for an account or depot no longer on show sends nothing (spec 020): the session may now work on the
-      // other depot. Whatever waited for the changes goes on without them.
+      // other depot, or nobody is signed in. Its changes are dropped, and whatever waited for them goes on without them.
       if (!this.stillMine()) {
         this.running = false;
-        this.settle(false);
+        this.dropAll();
         return;
       }
-      const answer = await saveDraft(date, { ...refOf(before), plan: sent });
+      const answer = await madeBy(this, () => saveDraft(date, { ...refOf(before), plan: sent }));
       this.running = false;
       if (!this.stillMine()) return;
       this.tries = 0;
@@ -432,7 +469,10 @@ class PlanSaver {
   // it was refused, or null.
   act = async (run: (date: string, ref: PlanRef) => Promise<PlanBoard>): Promise<string | null> => {
     // A queue for an account or depot no longer on show sends nothing (spec 020), here and below before the send.
-    if (!this.stillMine()) return null;
+    if (!this.stillMine()) {
+      this.dropAll();
+      return null;
+    }
     do {
       if (!(await this.idle())) return 'The plan has changes that are not saved yet. Save them first.';
     } while (this.acting || this.running);
@@ -444,8 +484,11 @@ class PlanSaver {
     this.show({ acting: true });
     try {
       await this.cancelReads(date);
-      if (!this.stillMine()) return null;
-      const answer = await run(date, refOf(before));
+      if (!this.stillMine()) {
+        this.dropAll();
+        return null;
+      }
+      const answer = await madeBy(this, () => run(date, refOf(before)));
       if (!this.stillMine()) return null;
       this.answered(answer, true);
       this.show({ saving: 'saved', refused: null, undo: null });
@@ -472,8 +515,19 @@ class PlanSaver {
     if (this.screen && board.day?.date === this.date) this.incoming(board);
   };
 
-  // The queue's end: no retry is left to fire, and whatever waited for its changes goes on without them.
+  // A queue that finds itself no longer the screen's (a sign-out, another account, another depot) drops its changes
+  // rather than stay at "saving" with nothing to come, and stops for good, so it holds no depot switch (D-95).
+  private dropAll() {
+    this.unanswered = [];
+    this.savedSeq = this.sentSeq = this.seq;
+    if (this.screen) this.screen = { ...this.screen, saving: 'saved', refused: null, undo: null };
+    this.stop();
+  }
+
+  // The queue's end, for good: no retry is left to fire, it sends nothing more and takes no answer, and whatever waited
+  // for its changes goes on without them.
   stop() {
+    this.retired = true;
     window.clearTimeout(this.retryTimer);
     this.listeners.clear();
     this.settle(false);
@@ -489,9 +543,9 @@ const savers = new WeakMap<QueryClient, PlanSaver>();
 function saverOf(qc: QueryClient) {
   const owner = workingFor(qc);
   let saver = savers.get(qc);
-  if (!saver || saver.owner !== owner) {
+  if (!saver || saver.owner !== owner || saver.retired) {
     saver?.stop();
-    saver = new PlanSaver(qc, owner);
+    saver = new PlanSaver(qc, owner, qc.getQueryData<Me | null>(meKey)?.depotId ?? null);
     savers.set(qc, saver);
   }
   return saver;
@@ -502,10 +556,15 @@ export function usePlanSaver() {
 }
 
 // A depot switch retires the board's queue whatever page is on show (spec 020): no save waiting to try again, and no
-// change held for the depot before, is sent once the session works on the other depot.
+// change held for the depot before, is sent once the session works on the other depot. It says whether the queue held
+// changes the server had not saved, so a switch made in another tab can say they were dropped.
 export function retireBoard(qc: QueryClient) {
-  savers.get(qc)?.stop();
+  const saver = savers.get(qc);
   savers.delete(qc);
+  if (!saver) return false;
+  const unsaved = saver.unsaved();
+  saver.stop();
+  return unsaved;
 }
 
 // A plan change is still on its way to the server: a write queued or sent, from the board or View plan, or a change on
@@ -513,7 +572,7 @@ export function retireBoard(qc: QueryClient) {
 // change is dropped without a word and no answer lands after the switch.
 export function planWriteOnItsWay(qc: QueryClient) {
   const saver = savers.get(qc);
-  return unanswered > 0 || (saver !== undefined && saver.owner === workingFor(qc) && saver.onItsWay());
+  return unanswered > 0 || (saver !== undefined && !saver.retired && saver.owner === workingFor(qc) && saver.onItsWay());
 }
 
 // View plan's send, back to edit or accept for a day the board's queue does not hold, such as after a reload: it names
@@ -521,9 +580,10 @@ export function planWriteOnItsWay(qc: QueryClient) {
 // depot it went out for. It answers null otherwise, and throws what the server refused.
 export async function writeOutsideBoard(qc: QueryClient, date: string, board: PlanBoard, call: (day: string, ref: PlanRef) => Promise<PlanBoard>) {
   const sentFor = workingFor(qc);
+  const depot = qc.getQueryData<Me | null>(meKey)?.depotId ?? null;
   // A read of this day already on its way would land after the answer and bring back the plan before it.
   await qc.cancelQueries({ queryKey: dayKey(date) });
-  const answer = await call(date, refOf(board));
+  const answer = await madeBy({ depot, stillWanted: () => workingFor(qc) === sentFor }, () => call(date, refOf(board)));
   if (workingFor(qc) !== sentFor) return null;
   qc.setQueryData(dayKey(date), answer);
   return answer;

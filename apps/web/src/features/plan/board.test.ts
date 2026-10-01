@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { PlanBoard, type DraftPlan, type Me } from '@wayfinder/contracts';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { meKey } from '@/features/auth/api';
+import { DEPOT_HEADER, nameDepot } from '@/lib/api';
 import { boardKey, dayKey, planWriteOnItsWay, retireBoard, sendPlan, useBoardScreen, writeOutsideBoard } from './board';
 
 // The board's saver across a dispatcher's depot switch (spec 020, AC-6). It keeps the board and its draft outside the
@@ -199,3 +200,108 @@ it('AC-6 the board\'s queue checks the account and depot before every save, spli
   expect(await kept.act(sendPlan)).toBeNull();
   expect(fetch).toHaveBeenCalledTimes(1);
 }));
+
+it('D-95 retiring the board\'s queue says whether it held plan changes not yet saved', async () => {
+  const qc = signedIn(RUWAN);
+  expect(retireBoard(qc)).toBe(false);
+  useBoardScreen(boardOf('Peliyagoda'));
+  expect(retireBoard(qc)).toBe(false);
+
+  const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+  saver.change(MIXED);
+  await settled();
+  expect(retireBoard(qc)).toBe(true);
+  answer(Response.json(boardOf('Peliyagoda', PLAN, 1)));
+  await settled();
+});
+
+it('D-95 a retired queue stays retired: switching back to the same account and depot neither revives it nor lets its late answers land, and it sends nothing more', async () => {
+  const qc = signedIn(RUWAN);
+  const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+  saver.change(MIXED);
+  await settled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+
+  // A switch to Kandy retired the queue while its save was out, and a switch back to Peliyagoda followed.
+  retireBoard(qc);
+  qc.setQueryData(meKey, IN_KANDY);
+  qc.setQueryData(meKey, RUWAN);
+  answer(Response.json(boardOf('Peliyagoda', PLAN, 1)));
+  await settled();
+  expect(qc.getQueryData(boardKey)).toBeUndefined();
+  expect(qc.getQueryData(dayKey('2026-06-25'))).toBeUndefined();
+
+  // The board drawn now has a queue of its own, and the old one sends nothing more.
+  expect(useBoardScreen(undefined).saver).not.toBe(saver);
+  saver.change({ ...MIXED, mixBrands: false });
+  await settled();
+  expect(await saver.act(sendPlan)).toBeNull();
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it('D-95 a queue that finds itself no longer the screen\'s drops its waiting changes, so it holds no switch after the same dispatcher signs in again', () => withRetries(async () => {
+  const qc = signedIn(RUWAN);
+  const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+  saver.change(MIXED);
+  await vi.advanceTimersByTimeAsync(0);
+  answer(new TypeError('Failed to fetch'));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(saver.snapshot()?.saving).toBe('retrying');
+
+  // Ruwan signs out while the save waits to try again, and its next try finds the board is no longer on show.
+  qc.setQueryData(meKey, null);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(saver.snapshot()?.saving).toBe('saved');
+
+  // He signs in again, on Peliyagoda as before: nothing of the queue before holds a switch.
+  qc.setQueryData(meKey, RUWAN);
+  expect(planWriteOnItsWay(qc)).toBe(false);
+}));
+
+// The depot each request named, in order.
+const namedOn = () => vi.mocked(fetch).mock.calls.map(([, init]) => ((init as RequestInit).headers as Record<string, string>)[DEPOT_HEADER]);
+
+it('D-95 a save waiting its turn behind another write does not go once a switch retired its queue, even after switching back', async () => {
+  const qc = signedIn(RUWAN);
+  const board = boardOf('Peliyagoda', PLAN, 1);
+  // View plan's send after a reload goes first and is slow to answer, and the board's save waits behind it.
+  const sending = writeOutsideBoard(qc, '2026-06-25', board, sendPlan);
+  await settled();
+  const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+  saver.change(MIXED);
+  await settled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+
+  // Another tab switched to Kandy and back while the save waited, and this tab followed both, retiring the queue.
+  retireBoard(qc);
+  qc.setQueryData(meKey, IN_KANDY);
+  qc.setQueryData(meKey, RUWAN);
+  answer(Response.json({ ...board, plan: { ...board.plan, revision: 2 } }));
+  await sending;
+  await settled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it('D-95 a write waiting its turn names the depot it was made for, not the one the tab names when it goes', async () => {
+  const qc = signedIn(RUWAN);
+  nameDepot('Peliyagoda');
+  try {
+    const sending = writeOutsideBoard(qc, '2026-06-25', boardOf('Peliyagoda', PLAN, 1), sendPlan);
+    await settled();
+    const { saver } = useBoardScreen(boardOf('Peliyagoda'));
+    saver.change(MIXED);
+    await settled();
+    // The tab names Kandy by the time the save's turn comes, as it does the moment it takes a switch.
+    nameDepot('Kandy');
+    answer(Response.json(boardOf('Peliyagoda', PLAN, 2)));
+    await sending;
+    await settled();
+    expect(namedOn()).toEqual(['Peliyagoda', 'Peliyagoda']);
+    answer(Response.json(boardOf('Peliyagoda', PLAN, 3)));
+    await settled();
+    saver.stop();
+  } finally {
+    nameDepot(null);
+  }
+});

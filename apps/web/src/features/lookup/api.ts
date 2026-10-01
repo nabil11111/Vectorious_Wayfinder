@@ -1,5 +1,5 @@
-import { ApiError, LookupFleet, LookupHistory, LookupOrders, type LookupPhoto } from '@wayfinder/contracts';
-import { api, ApiRequestError } from '@/lib/api';
+import { LookupFleet, LookupHistory, LookupOrders, type LookupPhoto } from '@wayfinder/contracts';
+import { api, apiBytes } from '@/lib/api';
 
 // The dispatcher's three look-up reads (spec 017, plan.md "Contracts"). Each sends only the parameters its contract
 // names and checks the answer against that contract, so a read the page cannot trust shows the error state rather than
@@ -25,19 +25,7 @@ export const photoPath = (photo: LookupPhoto) => (photo.kind === 'proof'
   ? `/lookup/stops/${encodeURIComponent(photo.stopId)}/photo`
   : `/issues/${encodeURIComponent(photo.issueId)}/photo`);
 
-// The JPEG itself, as a blob the viewer turns into an address of its own. Errors arrive as the API's, as every other
-// read's do: not_found is an authorized stop or problem with no photo. A 401 signs out as everywhere else.
-export async function readPhoto(photo: LookupPhoto, signal: AbortSignal): Promise<Blob> {
-  const res = await fetch(`/api/v1${photoPath(photo)}`, { credentials: 'same-origin', signal });
-  signal.throwIfAborted();
-  if (res.status === 401) window.dispatchEvent(new Event('wayfinder-signed-out'));
-  if (!res.ok) {
-    const parsed = ApiError.safeParse(await res.json().catch(() => null));
-    signal.throwIfAborted();
-    if (parsed.success) throw new ApiRequestError(res.status, parsed.data.error.code, parsed.data.error.message, parsed.data.error.details);
-    throw new ApiRequestError(res.status, 'network', 'Could not reach Wayfinder. Check the connection and try again.');
-  }
-  const jpeg = await res.blob();
-  signal.throwIfAborted();
-  return jpeg;
-}
+// The JPEG itself, as a blob the viewer turns into an address of its own. It comes the shared way, so it names the depot
+// the tab shows (D-95), and errors arrive as the API's, as every other read's do: not_found is an authorized stop or
+// problem with no photo. A 401 signs out as everywhere else.
+export const readPhoto = (photo: LookupPhoto, signal: AbortSignal): Promise<Blob> => apiBytes(photoPath(photo), { signal });

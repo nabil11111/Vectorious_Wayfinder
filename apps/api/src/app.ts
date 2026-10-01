@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { config } from './lib/config';
 import { logger } from './lib/logger';
-import { jsonOnlyWrites, loadUser } from './middleware/auth';
+import { jsonOnlyWrites, loadUser, requireShownDepot } from './middleware/auth';
 import { errorHandler, notFound } from './middleware/errors';
 import { adminRouter } from './routes/admin';
 import { authRouter } from './routes/auth';
@@ -54,6 +54,7 @@ export function createApp() {
     message: { error: { code: 'rate_limited', message: 'Too many requests. Slow down a little.' } } }));
   api.use(jsonOnlyWrites);
   api.use(loadUser);
+  api.use(requireShownDepot);
   api.use('/health', healthRouter);
   api.use('/auth', authRouter);
   api.use('/me', meRouter);

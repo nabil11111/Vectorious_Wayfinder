@@ -55,6 +55,9 @@ depot. This replaces D-32's "own depot only" (D-93).
 ## Failure paths
 - The switch request fails: the switch goes back and says so (above); nothing else changes.
 - A page open in another tab of the same session reads the newly chosen depot on its next read or live message.
+- A tab that fell behind a switch made elsewhere (another tab, or a switch whose answer never arrived) never acts on
+  the other depot: every dispatcher request names the depot its tab shows, the server refuses a mismatch with 409
+  `depot_changed`, and the tab reads the session and takes its depot (D-95, added after the first merge).
 - An install seeded before this spec: the seed adds the missing accounts and Kandy's orders on its next start, without
   touching existing accounts or Peliyagoda's records; "Reset the demo day" brings back both depots' day.
 
@@ -64,6 +67,8 @@ depot. This replaces D-32's "own depot only" (D-93).
 - `sessions.depot_id` (nullable: the user's own depot until switched), migration `0010_depot_switch`.
 - The session middleware gives a dispatcher's requests the session's depot; every existing route keeps reading the
   caller's depot as it does today.
+- Every dispatcher request from the web app carries `x-wayfinder-depot`, the depot its tab shows; a mismatch with the
+  session's depot is answered 409 `depot_changed` before the route runs (D-95).
 
 ## Acceptance criteria
 - [x] AC-1 When the seed runs, the system shall give every one of the 120 shops exactly one store manager with the
