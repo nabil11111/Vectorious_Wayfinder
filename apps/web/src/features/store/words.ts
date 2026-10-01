@@ -1,4 +1,8 @@
-import { DEPOT_TIME_ZONE, type Brand, type DockType, type OrderLine, type StoreOrder, type StoreOutlet, type StoreProduct, type Temp } from '@wayfinder/contracts';
+import {
+  DEPOT_TIME_ZONE, type Brand, type DeliveryFigures, type DockType, type OrderDelivery, type OrderLine, type OrderProblem, type OrderReceipt,
+  type RefusalReason, type ShortReason, type StoreDelivery, type StoreDeliveryLine, type StoreOrder, type StoreOutlet, type StoreProduct,
+  type StoreReceipt, type Temp,
+} from '@wayfinder/contracts';
 import { ApiRequestError } from '@/lib/api';
 
 // The words and formats of the shop's screens (spec 009, plan.md): days, times, numbers, unit words and chip
@@ -135,3 +139,186 @@ export function statusChip(order: Pick<StoreOrder, 'status' | 'deliveryDate' | '
 // What to tell the manager when a request fails: the API's own sentence when it sent one.
 export const reasonOf = (error: unknown) =>
   error instanceof ApiRequestError ? error.message : 'Could not reach Wayfinder. Check the connection and try again.';
+
+// ── The shop's receipt (spec 015, plan.md "Words") ──────────────────────────────────────────────────────────
+// Every number here comes from deliveryFigures, the form's own counters or the facts the API sent with a card.
+// These only write them down.
+
+const DEPOT_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: DEPOT_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+// The day a moment falls on at the depot: "2026-06-25".
+export const depotDayOf = (moment: string | number) => DEPOT_DAY.format(new Date(moment));
+
+// "03:34", with the day before it when that is not today: "Wed 24 Jun 06:58".
+const whenOf = (moment: string, today: string) => {
+  const day = depotDayOf(moment);
+  return day === today ? clockTime(moment) : `${shortDay(day)} ${clockTime(moment)}`;
+};
+
+const unitOf = (brand: Brand, n: number) => (n === 1 ? BRAND_UNIT[brand] : plural(BRAND_UNIT[brand]));
+
+// "Arrived 03:34 · VEH035 · Dilshan", and "Arrived Wed 24 Jun 06:58 · …" for a delivery of another day.
+export const arrivedLine = (delivery: Pick<StoreDelivery, 'arrivedAt' | 'vehicleId' | 'driver'>, today: string) =>
+  [`Arrived ${whenOf(delivery.arrivedAt, today)}`, delivery.vehicleId, delivery.driver].filter(Boolean).join(' · ');
+
+// A line's name on the form: "Chilled cartons" or "Dry cartons" for Fresh, the item's name for Style and Tech.
+export const receiptLineName = (brand: Brand, line: Pick<StoreDeliveryLine, 'temp' | 'unit' | 'name'>) =>
+  (brand === 'Fresh' ? `${TEMP_NAME[line.temp]} ${plural(line.unit)}` : line.name);
+
+// "12 expected"
+export const expectedWords = (expected: number) => `${WHOLE.format(expected)} expected`;
+// Under a line counted lower: "1 carton missing", "2 cartons damaged".
+export const shortChip = (short: number, unit: string, reason: ShortReason) => `${countOf(short, unit)} ${reason}`;
+// Under a line the depot sent short, and one the shop refused some of at the door.
+export const shortFromDepotLine = (units: number) => `${WHOLE.format(units)} short from the depot`;
+export const refusedAtDoorLine = (units: number) => `${WHOLE.format(units)} refused at the door`;
+
+export const SHORT_REASON_WORDS: Record<ShortReason, string> = { missing: 'Missing', damaged: 'Damaged' };
+
+export const RECEIPT_TITLE = 'Confirm delivery';
+export const NOT_SAVED_ON_PHONE = 'Could not save on this phone. Try again.';
+export const ADD_PHOTO = 'Add a photo (optional)';
+export const SIGN_IN_AGAIN = 'Sign in again to send this receipt.';
+export const NOTHING_TO_CONFIRM = 'No delivery is waiting for you to confirm.';
+export const NOT_ON_LIST = 'This delivery is not on your list.';
+export const COULD_NOT_LOAD_DELIVERIES = 'Could not load your deliveries.';
+export const COULD_NOT_READ_PHONE = 'Could not read what this phone kept.';
+export const NOTHING_SENT_UNTIL_READ = 'Nothing is sent or saved until it is read.';
+export const COULD_NOT_CLEAR = 'Could not clear on this phone. Try again.';
+
+// A line of the saved and sent screens, in spec 012's line words: "12 chilled cartons", "10 boxes · Folded clothing".
+export const lineGoods = (brand: Brand, line: Pick<StoreDeliveryLine, 'temp' | 'unit' | 'name'>, units: number) =>
+  (brand === 'Fresh' ? `${WHOLE.format(units)} ${line.temp} ${units === 1 ? line.unit : plural(line.unit)}` : `${countOf(units, line.unit)} · ${line.name}`);
+
+// Saved on this phone (Shop · Short delivery · receipt pending sync).
+export const SAVED_TITLE = 'Receipt saved on this phone';
+export const NO_SIGNAL = 'There is no signal right now.';
+export const DROPPED = 'The connection dropped while sending.';
+export const NOT_SENT_YET = 'Not sent to the depot yet';
+export const keptSentences = (reports: boolean) => (reports
+  ? ['Your receipt and report are kept together.', 'They will retry when the connection returns.', 'You do not need to confirm this delivery again.']
+  : ['Your receipt is kept on this phone.', 'It will retry when the connection returns.', 'You do not need to confirm this delivery again.']);
+export const savedFoot = (savedAt: string, today: string) => `Saved at ${whenOf(savedAt, today)} · waiting to sync`;
+export const NOT_ACCEPTED = 'The depot did not accept this receipt.';
+export const notAcceptedFoot = (savedAt: string, today: string) => `Saved at ${whenOf(savedAt, today)} · not accepted`;
+
+// Sent (Shop · Receipt sent): "Confirmed at 08:31 · Fresh · Nugegoda", with the day for a receipt of another day.
+export const SENT_TITLE = 'Receipt sent to the depot';
+export const confirmedLine = (receipt: Pick<StoreReceipt, 'at'>, outlet: StoreOutlet, today: string) => `Confirmed at ${whenOf(receipt.at, today)} · ${brandAndPlace(outlet)}`;
+
+// "1 chilled carton" when the goods are of one temperature at a Fresh shop, the brand's units otherwise.
+const goodsOf = (brand: Brand, temps: Temp[], units: number) => {
+  const temp = brand === 'Fresh' && new Set(temps).size === 1 ? `${temps[0]} ` : '';
+  return `${WHOLE.format(units)} ${temp}${unitOf(brand, units)}`;
+};
+
+export interface SentStatus { chip: { label: string; tone: ChipTone }; sentences: string[]; foot: string }
+
+// The sent screen's chip, its words and its foot, from the receipt and the depot's answer (the screen states' Sent
+// rows). short is the units the receipt is short, from deliveryFigures; temps are the temperatures of the lines the
+// report counts a unit on, for the replacement's words.
+export function sentStatus(receipt: StoreReceipt, brand: Brand, short: number, temps: Temp[]): SentStatus {
+  const sent = receipt.sentAt ? `Sent at ${clockTime(receipt.sentAt)}` : '';
+  const foot = (rest?: string) => [sent, rest].filter(Boolean).join(' · ');
+  const { report } = receipt;
+  if (!report) return { chip: { label: 'All received', tone: 'good' }, sentences: ['The depot has your receipt.'], foot: foot() };
+  const one = short === 1;
+  const goods = report.reason === 'not_cold' ? 'the chilled goods' : `the ${one ? '' : `${WHOLE.format(short)} `}${report.reason} ${unitOf(brand, short)}`;
+  if (report.decision === 'send_replacements' && report.replacement) {
+    const day = shortDay(report.replacement.day);
+    return {
+      chip: { label: `Replacement on ${day}`, tone: 'good' },
+      sentences: [`The depot is sending ${goodsOf(brand, temps, report.replacement.units)} on ${day}.`, 'It shows in your open orders.'],
+      foot: foot(`replacement on ${day}`),
+    };
+  }
+  if (report.decision === 'no_replacement') {
+    return {
+      chip: { label: 'No replacement', tone: 'quiet' },
+      sentences: [`The depot will not replace ${goods}.`, `Place another order if you need ${one && report.reason !== 'not_cold' ? 'it' : 'them'}.`],
+      foot: foot('no replacement'),
+    };
+  }
+  if (report.reason === 'not_cold') {
+    return {
+      chip: { label: 'Awaiting depot review', tone: 'good' },
+      sentences: ['The depot has your receipt and your report that the chilled goods were not cold.', 'The report still needs a resolution.'],
+      foot: foot('report unresolved'),
+    };
+  }
+  const which = report.reason === 'missing' ? 'shortage' : 'damage';
+  const Goods = goods.charAt(0).toUpperCase() + goods.slice(1);
+  return {
+    chip: { label: 'Awaiting depot review', tone: 'good' },
+    sentences: [
+      `The depot has your receipt and ${which} report.`,
+      `${Goods} still ${one ? 'needs' : 'need'} a resolution.`,
+      `Reporting ${one ? 'it does not mark it' : 'them does not mark them'} as replaced.`,
+    ],
+    foot: foot(`${which} unresolved`),
+  };
+}
+
+// The units the receipt is short, and the temperatures of the lines its report counts a unit on.
+export function reportFacts(delivery: StoreDelivery, figures: DeliveryFigures) {
+  const counted = new Set(delivery.receipt?.report?.lines.filter((line) => line.counted > 0).map((line) => line.lineId));
+  return { short: figures.short, temps: delivery.lines.filter((line) => counted.has(line.lineId)).map((line) => line.temp) };
+}
+
+// What a saved receipt is about, kept with it on the phone: "Fresh Nugegoda · VEH035 · Thu 25 Jun".
+export const aboutDelivery = (delivery: Pick<StoreDelivery, 'vehicleId' | 'day'>, outlet: StoreOutlet) => `${outlet.name} · ${delivery.vehicleId} · ${shortDay(delivery.day)}`;
+
+// ── The shop's cards (spec 015, rule 11) ──────────────────────────────────────────────────────────────────────
+
+const REFUSAL_WORDS: Record<RefusalReason, string> = { damaged: 'damaged', expired: 'expired', not_ordered: 'not ordered' };
+
+// "Delivered 03:38 · VEH035 · Dilshan"
+export const deliveredLine = (delivery: OrderDelivery) => [`Delivered ${clockTime(delivery.doneAt)}`, delivery.vehicleId, delivery.driver].filter(Boolean).join(' · ');
+
+// "1 short from the depot", "2 refused, damaged"
+const shortParts = (delivery: OrderDelivery) => [
+  delivery.shortFromDepot > 0 && shortFromDepotLine(delivery.shortFromDepot),
+  delivery.refused > 0 && `${WHOLE.format(delivery.refused)} refused${delivery.refusalReason ? `, ${REFUSAL_WORDS[delivery.refusalReason]}` : ''}`,
+].filter((part): part is string => Boolean(part));
+
+// "3 of 4 delivered · 1 short from the depot", when less came than was ordered.
+export const lessLine = (order: Pick<StoreOrder, 'units'>, delivery: OrderDelivery) =>
+  (delivery.delivered !== null && delivery.delivered < order.units ? [`${WHOLE.format(delivery.delivered)} of ${WHOLE.format(order.units)} delivered`, ...shortParts(delivery)].join(' · ') : null);
+
+// What stays on a received card: "1 short from the depot", "2 refused, damaged".
+export const shortLine = (delivery: OrderDelivery) => (shortParts(delivery).length > 0 ? shortParts(delivery).join(' · ') : null);
+
+// "All 8 received", "11 received · 1 short"
+export const receivedWords = (receipt: OrderReceipt) =>
+  (receipt.short === 0 ? `All ${WHOLE.format(receipt.units)} received` : `${WHOLE.format(receipt.units)} received · ${WHOLE.format(receipt.short)} short`);
+
+// The chip of a received order: "Received 08:31" on Today, and in Orders "All 8 received" in green or "11 received · 1
+// short" in yellow.
+export const receivedChip = (receipt: OrderReceipt, today: boolean): { label: string; tone: ChipTone } =>
+  (today ? { label: `Received ${clockTime(receipt.at)}`, tone: 'good' } : { label: receivedWords(receipt), tone: receipt.short === 0 ? 'good' : 'warn' });
+export const receivedAtLine = (receipt: OrderReceipt) => `Received ${clockTime(receipt.at)}`;
+export const lateLine = (delivery: OrderDelivery) => `Arrived ${clockTime(delivery.arrivedAt)}, after your window`;
+export const nobodyLine = (delivery: OrderDelivery) => `Nobody at the shop at ${clockTime(delivery.arrivedAt)} · ${delivery.vehicleId}`;
+export const replacementForLine = (day: string) => `Replacement for ${shortDay(day)}`;
+
+// One line per problem of the order's stop that counts it.
+export function problemLine(problem: OrderProblem, brand: Brand) {
+  const n = problem.units;
+  const day = problem.replacementDay ? shortDay(problem.replacementDay) : null;
+  const replacements = (count: number) => (count > 0 ? `${WHOLE.format(count)} ${count === 1 ? 'replacement comes' : 'replacements come'}` : 'Replacements come');
+  switch (problem.kind) {
+    case 'refused': {
+      const them = n === 1 ? `refused ${unitOf(brand, 1)}` : `${WHOLE.format(n)} refused ${unitOf(brand, n)}`;
+      if (problem.decision === 'send_replacements' && day) return `${replacements(n)} on ${day}.`;
+      if (problem.decision === 'bring_back') return `The ${them} ${n === 1 ? 'goes' : 'go'} back to the depot.`;
+      return `The depot decides what happens to the ${them}.`;
+    }
+    case 'closed':
+      if (problem.decision === 'try_again') return 'The driver comes back after the other stops.';
+      if (problem.decision === 'bring_back') return 'It goes on the next plan.';
+      return 'The depot decides: today or another day.';
+    case 'receipt':
+      if (problem.decision === 'send_replacements' && day) return `${replacements(n)} on ${day}.`;
+      if (problem.decision === 'no_replacement') return 'No replacement is coming.';
+      return 'The depot is reviewing your report.';
+  }
+}

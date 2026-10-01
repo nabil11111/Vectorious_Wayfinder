@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import type { StoreOrder } from '@wayfinder/contracts';
 import { Segmented, SegmentedItem, SegmentedList, SegmentedPanel } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,10 +25,13 @@ const watchWide = (notify: () => void) => {
 const heading = 'mb-3 text-lg leading-[25px] font-bold';
 
 // Orders (Shop · Orders, Shop · Orders · Past and the desktop frame): the shop's open orders and its past
-// ones. A phone shows one list at a time behind the Open and Past switch. A desktop shows both and no switch.
+// ones. A phone shows one list at a time behind the Open and Past switch, and opens on Past from ?list=past, as a
+// receipt's "View past orders" asks (spec 015). A desktop shows both and no switch.
 export function OrdersPage() {
   const wide = useSyncExternalStore(watchWide, () => window.matchMedia(WIDE).matches);
-  const [list, setList] = useState<'open' | 'past'>('open');
+  const [params, setParams] = useSearchParams();
+  const list = params.get('list') === 'past' ? 'past' : 'open';
+  const setList = (next: 'open' | 'past') => setParams(next === 'past' ? { list: 'past' } : {}, { replace: true });
   const open = useOpenOrders();
   // The past list is only read once it is on the screen.
   const past = usePastOrders(wide || list === 'past');

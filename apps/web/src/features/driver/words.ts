@@ -159,12 +159,14 @@ function goodsWords(brand: Brand | null, counts: Pick<StopFigures, 'byTemp'>, ke
 }
 
 // The dispatcher's answer as the driver reads it: "Ruwan, dispatcher · 03:52 · Bring the 2 chilled cartons back to
-// Peliyagoda."
+// Peliyagoda.", and with replacements (spec 015, D-59) "… back to Peliyagoda. The shop gets 2 replacements on the next
+// run."
 export function answerLine(problem: DriverProblem, stop: DriverStop, brand: Brand | null, counts: StopFigures, depot: string) {
   let what = '';
   if (problem.decision === 'try_again') what = `Try ${stop.shopName} again after the other stops.`;
   else if (problem.kind === 'refused') what = `Bring the ${goodsWords(brand, counts, 'refused', counts.refused)} back to ${depot}.`;
   else what = `Bring the ${unitsWords(brand, counts.notDelivered)} back to ${depot}.`;
+  if (problem.decision === 'send_replacements') what += ` The shop gets ${whole(counts.refused)} ${counts.refused === 1 ? 'replacement' : 'replacements'} on the next run.`;
   return `${answeredBy(problem)} · ${what}`;
 }
 
@@ -186,7 +188,6 @@ export const NOT_SAVED = 'Could not save on this phone. Try again.';
 export const NOT_SAVED_BAND = 'Could not save on this phone.';
 export const COULD_NOT_READ = 'Could not read what this phone kept.';
 export const NOTHING_SENT_UNTIL_READ = 'Nothing is sent or saved until it is read.';
-export const OTHER_TAB = 'Wayfinder is open in another tab.';
 
 // ── Trip done and Day done ──────────────────────────────────────────────────────────────────────────────────
 

@@ -1,14 +1,10 @@
 import { z } from 'zod';
-import { Brand, Temp } from './basics';
-import { CLOSED_REASONS, IssueDecision, RefusalReason } from './issues';
+import { Brand, CLOSED_REASONS, IssueDecision, PhotoDataUrl, RefusalReason, StopOutcome, Temp } from './basics';
 import { DockType } from './store';
 import { TripStatus } from './plans';
 
 const Moment = z.iso.datetime();
 const Count = z.number().int().min(0);
-export const STOP_OUTCOMES = ['delivered', 'refused', 'closed'] as const;
-export const StopOutcome = z.enum(STOP_OUTCOMES);
-export type StopOutcome = z.infer<typeof StopOutcome>;
 export const DRIVER_WRITE_KINDS = ['start', 'arrive', 'deliver', 'refuse', 'closed', 'finish'] as const;
 export const DriverWriteKind = z.enum(DRIVER_WRITE_KINDS);
 export type DriverWriteKind = z.infer<typeof DriverWriteKind>;
@@ -33,7 +29,7 @@ export type DriverTrip = z.infer<typeof DriverTrip>;
 // the two share a display name.
 export const DriverDay = z.object({ depot: z.string(), driver: z.string(), driverId: z.uuid(), day: z.iso.date().nullable(), planSent: z.boolean(), appliedWriteIds: z.array(z.uuid()), trips: z.array(DriverTrip) });
 export type DriverDay = z.infer<typeof DriverDay>;
-const Photo = z.string().max(700_000).regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/);
+const Photo = PhotoDataUrl;
 const BaseWrite = z.object({ writeId: z.uuid().transform(id => id.toLowerCase()), tripId: z.uuid().transform(id => id.toLowerCase()), at: Moment, revision: Count });
 const StopWrite = BaseWrite.extend({ stopId: z.uuid().transform(id => id.toLowerCase()) });
 const Note = z.string().trim().max(200);

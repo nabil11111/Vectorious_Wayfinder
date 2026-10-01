@@ -8,7 +8,7 @@ import { truckIcon } from '@/features/loader/parts/icons';
 import { useAppClock } from '@/lib/clock';
 import { TopArea } from './parts/TopArea';
 import { ActionBar, BIG, Card, PLAIN, Problem } from './parts/ui';
-import { readAgain, retrySync, useSave, useSync } from './sender';
+import { readAgain, retrySync, useSave, useSync } from './queue';
 import type { DriverView } from './view';
 import {
   aboutTrip, brandOf, COULD_NOT_READ, leavingLine, loadedLine, noTripLine, NOT_SAVED, notReadyChip, NOTHING_SENT_UNTIL_READ, placeLine, startWhenLoaded,

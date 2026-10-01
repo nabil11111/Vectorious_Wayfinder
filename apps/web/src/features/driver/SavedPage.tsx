@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ICON } from './parts/icons';
 import { TopArea } from './parts/TopArea';
 import { ActionBar, BIG, PLAIN } from './parts/ui';
-import { retrySync } from './sender';
+import { retrySync } from './queue';
 import { useDriverView } from './view';
 import { savedLine } from './words';
 

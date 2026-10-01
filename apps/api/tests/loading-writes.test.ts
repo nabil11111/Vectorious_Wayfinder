@@ -123,10 +123,10 @@ it("AC-16 flags VEH035's dry line short at 3 of 4 with a note: an open problem, 
   expect(dryLine(flagged)).toMatchObject({ quantity: 4, going: 3, short: 1 });
   expect(flagged.issues).toEqual([{
     id: problem!.id, revision: 0, kind: 'loading', reason: 'short', status: 'open', raisedBy: 'Kasun', raisedAt: depotInstant(THU, 2 * 60 + 33).toISOString(),
-    note: 'Only 3 dry cartons in the store', hasPhoto: false, decision: null, decidedBy: null, decidedAt: null, short: 1,
+    note: 'Only 3 dry cartons in the store', hasPhoto: false, decision: null, decidedBy: null, decidedAt: null, short: 1, cold: null, replacement: null,
     trip: { id: truck.tripId, vehicleId: 'VEH035', tripNo: 1, status: 'loading', driver: 'Dilshan', stopsLeft: 2, leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString() },
     stop: { id: stopOf(truck, 1).id, seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda', arrivedAt: null, doneAt: null, loadedAt: null, flaggedAtDock: true },
-    lines: [{ lineId: line.lineId, orderId: line.orderId, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', quantity: 4, counted: 3, loaded: null, delivered: null }],
+    lines: [{ lineId: line.lineId, orderId: line.orderId, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', quantity: 4, counted: 3, loaded: null, delivered: null, received: null }],
   }]);
 });
 

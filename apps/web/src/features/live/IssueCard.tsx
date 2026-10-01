@@ -1,11 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import { LOADING_DECISIONS, type Issue, type IssueDecision, type LoadingDecision } from '@wayfinder/contracts';
+import storeManager from '@/assets/icons/icon-person-store-manager.png';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { orangeButton } from '@/features/plan/parts/look';
-import { brandOfShop, clockTime, countedLine, issuePlace, issueTitle, raisedLine } from '@/features/loader/words';
+import {
+  brandOfShop, clockTime, coldWords, countedLine, driverSentLine, issuePlace, issueTitle, NO_REPLACEMENT, raisedLine, receivedOf, refusalReplacementLine,
+  REPORT_QUESTION, reportPlace, reportReplacementLine, reportSentLine, reportTitle, sendReplacementsTitle,
+} from '@/features/loader/words';
 import { cn } from '@/lib/utils';
-import type { Answering } from './issues';
+import { useReplaceOn, type Answering } from './issues';
 import {
   answeredLine, atTheDock, driverAnswers, driverIssuePlace, driverIssueTitle, driverQuestion, driverRaised, stillOnLabel, stillOnValue,
 } from './words';
@@ -22,18 +26,21 @@ export function RaisedAt({ issue }: { issue: Issue }) {
   return <span className="shrink-0 rounded-full bg-muted px-2.5 py-[5px] text-[10px] leading-3 font-semibold tabular-nums">{clockTime(issue.raisedAt)}</span>;
 }
 
-// The line of the green card once an answer is sent, which names the depot the cartons go back to.
+// The line of the green card once an answer is sent, which names the depot the cartons go back to. A driver's problem
+// and a shop's report tell the shop too (spec 015).
 export function AnsweredLine({ issue }: { issue: Issue }) {
   const { data: me } = useMe();
-  return <>{answeredLine(issue, me?.depotId ?? 'the depot')}</>;
+  const depot = me?.depotId ?? 'the depot';
+  if (issue.kind === 'loading') return <>{answeredLine(issue, depot)}</>;
+  return <>{issue.kind === 'receipt' ? reportSentLine(issue) : driverSentLine(issue, depot)}</>;
 }
 
 // One open problem in full (Dispatcher · Live day · issue open): what is wrong, where, who raised it and when, the
 // facts that bear on it, then the answers and the orange button that sends the chosen one.
 export function IssueCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
-  return issue.kind === 'loading'
-    ? <FlagCard issue={issue} answering={answering} time={time} className={className} />
-    : <DriverCard issue={issue} answering={answering} time={time} className={className} />;
+  if (issue.kind === 'loading') return <FlagCard issue={issue} answering={answering} time={time} className={className} />;
+  if (issue.kind === 'receipt') return <ReportCard issue={issue} answering={answering} time={time} className={className} />;
+  return <DriverCard issue={issue} answering={answering} time={time} className={className} />;
 }
 
 // A loader's flag (spec 012): the count at the dock and the note, then "Go short" or "Load it all", and "Send to loader".
@@ -57,22 +64,35 @@ function FlagCard({ issue, answering, time, className }: { issue: Issue; answeri
   );
 }
 
+// The photo of a driver's problem or a shop's report, opened in a tab of its own.
+const photoLink = (issue: Issue) => (
+  <a href={`/api/v1/issues/${encodeURIComponent(issue.id)}/photo`} target="_blank" rel="noreferrer" className="font-semibold text-foreground underline underline-offset-2">Open</a>
+);
+
+// The first answer is chosen until the dispatcher picks another; one no longer offered falls back to it.
+function useChoice(options: { decision: IssueDecision }[]) {
+  const [picked, setPicked] = useState<IssueDecision | null>(null);
+  return [options.find((option) => option.decision === picked)?.decision ?? options[0]!.decision, setPicked] as const;
+}
+
 // A driver's problem (spec 013): a shop that refused some, with what it took, the driver, the note, the photo, the
-// dock and what is still on the truck; or a shop that was closed. "Bring them back", and for a closed shop "Try again
-// on this trip" while the trip is out, then "Send to driver".
+// dock and what is still on the truck; or a shop that was closed. "Bring them back", for a refusal "Send N
+// replacements" as well while a day is open (spec 015, D-59), and for a closed shop "Try again on this trip" while the
+// trip is out. The shop sees the answer too, so the button sends it to both.
 function DriverCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
   const { data: me } = useMe();
-  const options = driverAnswers(issue, me?.depotId ?? 'the depot');
-  const [picked, setPicked] = useState<IssueDecision | null>(null);
-  // The first answer is chosen until the dispatcher picks another; one no longer offered falls back to it.
-  const choice = options.find((option) => option.decision === picked)?.decision ?? options[0]!.decision;
+  const replaceOn = useReplaceOn();
+  const options = [
+    ...driverAnswers(issue, me?.depotId ?? 'the depot'),
+    ...(issue.kind === 'refused' && replaceOn && issue.short > 0
+      ? [{ decision: 'send_replacements' as const, title: sendReplacementsTitle(issue.short, replaceOn), line: refusalReplacementLine(issue.short) }]
+      : []),
+  ];
+  const [choice, setPicked] = useChoice(options);
   const rows: { label: string; value: ReactNode }[] = [
     ...(issue.kind === 'refused' ? [{ label: 'Driver', value: driverRaised(issue) }] : []),
     ...(issue.note ? [{ label: 'Note', value: issue.note }] : []),
-    ...(issue.hasPhoto ? [{
-      label: 'Photo',
-      value: <a href={`/api/v1/issues/${encodeURIComponent(issue.id)}/photo`} target="_blank" rel="noreferrer" className="font-semibold text-foreground underline underline-offset-2">Open</a>,
-    }] : []),
+    ...(issue.hasPhoto ? [{ label: 'Photo', value: photoLink(issue) }] : []),
     ...(issue.kind === 'refused' ? [{ label: 'At the dock', value: atTheDock(issue) }] : []),
     { label: stillOnLabel(issue), value: stillOnValue(issue) },
   ];
@@ -86,7 +106,45 @@ function DriverCard({ issue, answering, time, className }: { issue: Issue; answe
       </dl>
 
       <Answers issue={issue} question={driverQuestion(issue)} options={options} choice={choice} onChoose={setPicked} busy={answering.sending !== null} />
-      <Send issue={issue} answering={answering} choice={choice} label="Send to driver" />
+      <Send issue={issue} answering={answering} choice={choice} label="Send to driver and shop" />
+    </article>
+  );
+}
+
+// A shop's report on its receipt (spec 015, rule 12, D-58): what is missing, damaged or not cold, the delivery it is
+// on, who confirmed it and when, each counted line as received of handed over, the cold check, the photo, then "Send N
+// replacements" for the day an order placed now is for, or "No replacement", and "Send to shop". A report of the cold
+// alone counts nothing short, so it only takes "No replacement", as does any report while no day is open.
+function ReportCard({ issue, answering, time, className }: { issue: Issue; answering: Answering; time: boolean; className?: string }) {
+  const replaceOn = useReplaceOn();
+  const options = [
+    ...(replaceOn && issue.short > 0
+      ? [{ decision: 'send_replacements' as const, title: sendReplacementsTitle(issue.short, replaceOn), line: reportReplacementLine(issue.short) }]
+      : []),
+    { decision: 'no_replacement' as const, ...NO_REPLACEMENT },
+  ];
+  const [choice, setPicked] = useChoice(options);
+  const rows: { label: ReactNode; key: string; value: ReactNode }[] = [
+    {
+      key: 'shop',
+      label: <span className="inline-flex items-center gap-1.5"><img src={storeManager} alt="" className="size-3.5 object-contain" />Shop</span>,
+      value: raisedLine(issue),
+    },
+    { key: 'received', label: 'Received', value: receivedOf(issue) },
+    ...(issue.cold !== null ? [{ key: 'cold', label: 'Cold on arrival', value: coldWords(issue.cold) }] : []),
+    ...(issue.hasPhoto ? [{ key: 'photo', label: 'Photo', value: photoLink(issue) }] : []),
+  ];
+  return (
+    <article aria-label={reportTitle(issue)} className={className}>
+      <Heading title={reportTitle(issue)} issue={issue} time={time} />
+      <p className="mt-2 text-[11px] leading-[15px] text-muted-foreground">{reportPlace(issue)}</p>
+
+      <dl className="mt-[9px] space-y-1 text-[11px] leading-[14px]">
+        {rows.map((row, i) => <Row key={row.key} label={row.label} value={row.value} first={i === 0} />)}
+      </dl>
+
+      <Answers issue={issue} question={REPORT_QUESTION} options={options} choice={choice} onChoose={setPicked} busy={answering.sending !== null} />
+      <Send issue={issue} answering={answering} choice={choice} label="Send to shop" />
     </article>
   );
 }
@@ -146,7 +204,7 @@ function Send({ issue, answering, choice, label }: { issue: Issue; answering: An
 }
 
 // A row of the problem's facts: what on the left, the detail on the right, as the design's report rows.
-function Row({ label, value, first = false }: { label: string; value: ReactNode; first?: boolean }) {
+function Row({ label, value, first = false }: { label: ReactNode; value: ReactNode; first?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <dt className={cn('shrink-0', first && 'font-semibold')}>{label}</dt>

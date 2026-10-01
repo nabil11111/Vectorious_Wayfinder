@@ -206,6 +206,8 @@ one sentence (`plan.md`, Contracts), which the phone keeps under "Not accepted".
   another tab." and does nothing.
 - **An id reused.** The same id with other content is refused, `write_reused`, "This record was already sent with other
   details."
+- **Another account's session (spec 015).** A write sent while another account holds the browser's session, signed in in
+  another tab, is answered `other_account`, and waits as after a 401 until its own driver signs in again.
 - **Two phones on one trip.** The later write names an old revision: `stale`, "Fresh Wellawatte was changed on another
   phone."
 - **The dispatcher answered while the phone had no signal.** After "Try again", an end of the trip saved with no signal is
@@ -489,9 +491,8 @@ Friday's plan while Thursday's stop 2 stays closed.
    the data has no address.
 5. A stop lists its lines, so Nugegoda's two chilled orders are two counters, as the loader's screens do (spec 012). Style
    and Tech lines name the item.
-6. A refusal has one answer, "Bring them back", and the button says "Send to driver". There is no "Write off on the road"
-   and no "Send 2 replacements" (D-48), and no "shop credited, claim opened": the cartons are on the truck, and a
-   write-off or a replacement is a record the depot adds later.
+6. A refusal is answered "Bring them back", and since spec 015 also "Send replacements", with "Send to driver" (and shop).
+   There is no "Write off on the road" and no "shop credited, claim opened": a write-off is a record the depot adds later.
 7. A closed shop is answered with "Try again on this trip" or "Bring them back"; no frame draws them.
 8. "Nothing to hand back" says the short carton never left the depot, without "It goes on Monday's run": nothing here
    makes a new order for it, as in spec 012's departure 8.

@@ -1,9 +1,10 @@
 import { PlanCheck, type DriverDay, type DriverProblem, type DriverTrip } from '@wayfinder/contracts';
-import { and, eq, gte, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import type { Tx } from '../db/client';
-import { depots, driverWrites, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicles } from '../db/schema';
+import { depots, issues, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicles } from '../db/schema';
 import { issuesOf } from '../issues/read';
 import { depotDate, depotInstant, depotMinutes } from '../lib/clock';
+import { appliedWriteIdsOf } from '../lib/phone-writes';
 import { byLoadOrder, loaderDay } from '../loading/loader-day';
 import type { DepotCaller } from '../middleware/auth';
 import { snapshot } from '../orders/store-orders';
@@ -24,7 +25,8 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[]): Promise<DriverTri
     quantity: orderLines.quantity, loaded: orderLines.loadedQty, delivered: orderLines.deliveredQty })
     .from(stopOrders).innerJoin(orders, eq(orders.id, stopOrders.orderId)).innerJoin(orderLines, eq(orderLines.orderId, orders.id))
     .innerJoin(products, eq(products.id, orderLines.productId)).where(inArray(stopOrders.stopId, stopRows.map(row => row.stop.id))) : [];
-  const problems = (await issuesOf(tx, inArray(trips.id, tripIds))).filter(problem => problem.kind !== 'loading');
+  // The driver's own problems only: a loader's flag stays at the dock, and a shop's report is the dispatcher's to answer.
+  const problems = await issuesOf(tx, and(inArray(trips.id, tripIds), inArray(issues.kind, ['refused', 'closed'])));
   return rows.map(({ trip, plan }) => {
     const vehicle = fleet.find(vehicle => vehicle.id === trip.vehicleId);
     if (!vehicle) throw new Error(`No vehicle ${trip.vehicleId}.`);
@@ -76,9 +78,7 @@ export async function driverDayOf(tx: Tx, caller: DepotCaller, at: Date): Promis
   const shown = await driverTripsOf(tx, rows);
   const earlier = (id: string) => rows.find(row => row.trip.id === id)!.plan.date !== day ? 0 : 1;
   shown.sort((a, b) => earlier(a.tripId) - earlier(b.tripId) || a.leavesAt.localeCompare(b.leavesAt) || a.vehicleId.localeCompare(b.vehicleId) || a.tripNo - b.tripNo);
-  const applied = await tx.select({ id: driverWrites.id }).from(driverWrites)
-    .where(and(eq(driverWrites.driverId, caller.userId), gte(driverWrites.answeredAt, sql`now() - interval '48 hours'`))).orderBy(driverWrites.id);
-  return { depot: depot.name, driver: driver.displayName, driverId: caller.userId, day, planSent: Boolean(plan), appliedWriteIds: applied.map(row => row.id), trips: shown };
+  return { depot: depot.name, driver: driver.displayName, driverId: caller.userId, day, planSent: Boolean(plan), appliedWriteIds: await appliedWriteIdsOf(tx, caller.userId), trips: shown };
 }
 
 export function getDriverDay(caller: DepotCaller): Promise<DriverDay> {

@@ -1,5 +1,5 @@
 import { DEPOT_TIME_ZONE, type Brand, type Issue, type IssueDecision, type IssueKind, type OperationsCounts, type OperationsDay, type OperationsEvent, type OperationsStatus } from '@wayfinder/contracts';
-import { brandOfShop, clockTime, issueTitle, sentLine as loaderSentLine, shortDay, truckName, unitsWords, whole } from '@/features/loader/words';
+import { brandOfShop, clockTime, issueTitle, reportTitle, sentLine as loaderSentLine, shortDay, truckName, unitsWords, whole } from '@/features/loader/words';
 import { countOf } from '@/features/plan/words';
 import { inDepot } from '@/lib/clock';
 
@@ -173,16 +173,23 @@ export function statusSentence(status: OperationsStatus, problem: string | null)
 }
 
 // The short word in a row's status column.
-const PROBLEM_WORD: Record<IssueKind, string> = { loading: 'short at the dock', refused: 'refused', closed: 'nobody there' };
+const PROBLEM_WORD: Record<IssueKind, string> = { loading: 'short at the dock', refused: 'refused', closed: 'nobody there', receipt: 'reported by the shop' };
 export function problemWord(kind: IssueKind, issue: Issue | undefined) {
   if (issue?.kind === 'refused') return `${whole(issue.short)} refused`;
   if (issue?.kind === 'loading') return `${whole(issue.short)} short`;
   return PROBLEM_WORD[kind];
 }
-export const problemLine = (issue: Issue) => (issue.kind === 'loading' ? `${issue.stop.shopName} · ${issueTitle(issue)}` : `${issue.stop.shopName} · ${driverIssueTitle(issue)}`);
+export function problemLine(issue: Issue) {
+  if (issue.kind === 'loading') return `${issue.stop.shopName} · ${issueTitle(issue)}`;
+  if (issue.kind === 'receipt') return `${issue.stop.shopName} · ${reportTitle(issue)}`;
+  return `${issue.stop.shopName} · ${driverIssueTitle(issue)}`;
+}
 
 // The dispatcher's answers, as Drops and events names them.
-export const DECISION_WORDS: Record<IssueDecision, string> = { go_short: 'Go short', load_all: 'Load it all', bring_back: 'Bring them back', try_again: 'Try again on this trip' };
+export const DECISION_WORDS: Record<IssueDecision, string> = {
+  go_short: 'Go short', load_all: 'Load it all', bring_back: 'Bring them back', try_again: 'Try again on this trip',
+  send_replacements: 'Send replacements', no_replacement: 'No replacement',
+};
 
 // One event of Drops and events, as short as the frame's: "VEH035 · Nugegoda · 23 delivered". A stop's delivered or
 // refused units come from that stop's own figures in the read, never from adding the event's lines up.
@@ -201,6 +208,7 @@ export function eventLine(event: OperationsEvent, figures: { delivered: number; 
     case 'problem_raised': {
       if (event.issueKind === 'closed') return `${where} · nobody there`;
       if (event.issueKind === 'refused') return figures ? `${where} · ${whole(figures.refused)} refused` : `${where} · refused some`;
+      if (event.issueKind === 'receipt') return `${where} · reported by the shop`;
       const counted = event.lines.filter((line) => line.counted !== null).map((line) => `${whole(line.counted!)} of ${whole(line.quantity)} ${fresh ? line.temp : line.name}`);
       return counted.length ? `${where} · flagged ${counted.join(', ')}` : `${where} · flagged at the dock`;
     }

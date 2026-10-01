@@ -141,12 +141,12 @@ it('AC-30 lists the refusal with its photo, people, stop times and the loaded, d
   expect(list.issues).toEqual([{
     id: trip.problems[0]!.id, revision: 0, kind: 'refused', reason: 'damaged', status: 'open',
     raisedBy: 'Dilshan', raisedAt: at(3 * 60 + 48).toISOString(), note: '2 chilled cartons crushed', hasPhoto: true,
-    decision: null, decidedBy: null, decidedAt: null, short: 2,
+    decision: null, decidedBy: null, decidedAt: null, short: 2, cold: null, replacement: null,
     trip: { id: trip.tripId, vehicleId: 'VEH035', tripNo: 1, status: 'out', driver: 'Dilshan', stopsLeft: 0, leavesAt: at(4 * 60 + 36).toISOString() },
     stop: { id: driverStop(trip, 2).id, seq: 2, outletId: 'OUT002', shopName: 'Fresh Wellawatte', arrivedAt: at(3 * 60 + 45).toISOString(),
       doneAt: at(3 * 60 + 48).toISOString(), loadedAt: at(2 * 60 + 31).toISOString(), flaggedAtDock: false },
     lines: [{ lineId: chilled.lineId, orderId: chilled.orderId, temp: 'chilled', productId: 'fresh-chilled-carton', name: 'Chilled carton',
-      unit: 'carton', quantity: 48, counted: 2, loaded: 48, delivered: 46 }],
+      unit: 'carton', quantity: 48, counted: 2, loaded: 48, delivered: 46, received: null }],
   }]);
   expect(await heldDriverRows()).toEqual(before);
 });
@@ -160,13 +160,13 @@ it('AC-31 brings refused goods back without changing the completed delivery and 
   const res = await afterCommit(open.id, open.revision, 'bring_back');
   expect(res.status).toBe(200);
   const result = DecideIssueResponse.parse(res.body);
-  expect(result).toEqual({ day: THU, issues: [], decided: { ...open, revision: 1, status: 'decided', decision: 'bring_back',
+  expect(result).toEqual({ day: THU, replaceOn: FRI, issues: [], decided: { ...open, revision: 1, status: 'decided', decision: 'bring_back',
     decidedBy: 'Ruwan', decidedAt: at(3 * 60 + 52).toISOString() } });
   expect((await db.select().from(issues).where(eq(issues.id, open.id)))[0]).toMatchObject({ status: 'decided', revision: 1, decision: 'bring_back', decidedBy: ruwanId, decidedAt: at(3 * 60 + 52) });
   const audit = await auditsOf(open.id);
   expect(audit).toHaveLength(1);
   expect(audit[0]).toMatchObject({ actorId: ruwanId, entity: 'issue', before: { status: 'open', revision: 0 }, after: { status: 'decided', revision: 1, decision: 'bring_back' } });
-  expect(told()).toEqual([{ topic: 'issues', depotId: 'Peliyagoda' }, { topic: 'driver', depotId: 'Peliyagoda' }]);
+  expect(told()).toEqual([{ topic: 'issues', depotId: 'Peliyagoda' }, { topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT002', depotId: 'Peliyagoda' }]);
   const after = await heldDriverRows();
   for (const key of ['trips', 'stops', 'orders', 'lines', 'writes', 'photos'] as const) expect(after[key]).toEqual(before[key]);
   const seen = driverTrip(await driver.read());
@@ -184,7 +184,7 @@ it('AC-26/32 reopens a closed stop, preserves last event and loaded orders, and 
   expect(res.status).toBe(200);
   const result = DecideIssueResponse.parse(res.body);
   expect(result.decided).toMatchObject({ status: 'decided', revision: 1, decision: 'try_again', decidedBy: 'Ruwan', decidedAt: at(3 * 60 + 52).toISOString() });
-  expect(told()).toEqual([{ topic: 'issues', depotId: 'Peliyagoda' }, { topic: 'driver', depotId: 'Peliyagoda' }]);
+  expect(told()).toEqual([{ topic: 'issues', depotId: 'Peliyagoda' }, { topic: 'driver', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT002', depotId: 'Peliyagoda' }]);
   const seen = driverTrip(await driver.read());
   expect(driverStop(seen, 2)).toEqual({ ...oldStop, revision: oldStop.revision + 1, arrivedAt: null, doneAt: null, outcome: null, retriedAt: at(3 * 60 + 52).toISOString() });
   expect((await db.select().from(trips).where(eq(trips.id, closed.tripId)))[0]).toMatchObject({ lastEventAt: at(3 * 60 + 48) });

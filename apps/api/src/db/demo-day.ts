@@ -104,10 +104,10 @@ const FUEL_NOTE = 'Seeded history';
 
 // ── Spec 009 · shop orders ──────────────────────────────────────────────────────────────────────────────
 // What Nadeesha's own screens need on top of her draft: a history for her shop. Wednesday's dry order has
-// arrived and she has not confirmed it yet, so it shows on Today. The orders of the twelve operating days
-// before Wednesday, a chilled and a dry one for each, are all received: 24 of them, which is a page of the
-// Past list and four more to load. She placed each one at 08:05, her shop's time in the rule for placedAt
-// above, on the operating day before it was wanted. None is on a plan, so each counts for the day she wanted.
+// arrived, and spec 015's block below makes it received. The orders of the twelve operating days before
+// Wednesday, a chilled and a dry one for each, are all received: 24 of them, which is a page of the Past list
+// and four more to load. She placed each one at 08:05, her shop's time in the rule for placedAt above, on the
+// operating day before it was wanted. None is on a plan, so each counts for the day she wanted.
 const OWN_HISTORY = { outletId: DRAFT.outletId, by: DRAFT.by, wednesdayDryCartons: 6, daysBefore: 12 };
 // d is the day of the month. Tue 23 Jun: 8 + (23 mod 6) = 13 chilled cartons and 4 + (23 mod 5) = 7 dry ones.
 const pastChilledCartons = (d: number) => 8 + (d % 6);
@@ -115,6 +115,13 @@ const pastDryCartons = (d: number) => 4 + (d % 5);
 // The form shows when the draft was last saved and its note for the driver. It was saved on Wednesday at
 // 14:40, before the clock starts.
 const DRAFT_SAVED = { atMinutes: 14 * 60 + 40, driverNote: 'Ring the bell at the side door.' };
+
+// ── Spec 015 · the shop's receipt ───────────────────────────────────────────────────────────────────────────
+// The shop's history arrives received (D-62), as the design's Today and Past draw it: every line in full, at 07:00
+// plus 3 minutes × (the day of the month mod 10) on the day the order was for, and a chilled order cold. Tue 23 Jun's
+// came at 07:09. Wednesday's 6 dry cartons came at 07:42, the design's "Received 07:42". None has a time sent, because
+// the history never travelled through the app.
+const receivedAt = (wantedFor: string) => (wantedFor === WED ? depotInstant(WED, 7 * 60 + 42) : depotInstant(wantedFor, 7 * 60 + 3 * (Number(wantedFor.slice(8)) % 10)));
 
 // The same id for the same seeded row on every machine and after every reset, so a test or a later seed can
 // point at "OUT002's chilled order for Thursday": demoId('order', '2026-06-25:OUT002:chilled'). It is a
@@ -283,6 +290,14 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
     await tx.update(orders)
       .set({ savedAt: depotInstant(WED, DRAFT_SAVED.atMinutes), driverNote: DRAFT_SAVED.driverNote })
       .where(inArray(orders.id, DRAFT_ORDERS.map(orderId)));
+
+    // ── Spec 015 · the shop's receipt ───────────────────────────────────────────────────────────────────────
+    // The shop's history, written above, received: each order at its time, chilled ones cold, and every line in full.
+    for (const { order } of ownOrders) {
+      await tx.update(orders).set({ status: 'received', receivedAt: receivedAt(order.wantedFor), arrivedCold: order.temp === 'chilled' ? true : null })
+        .where(eq(orders.id, orderId(order)));
+    }
+    await tx.update(orderLines).set({ receivedQty: sql`${orderLines.quantity}` }).where(inArray(orderLines.orderId, ownOrders.map(({ order }) => orderId(order))));
 
     await tx.update(demoDay).set({ seededAt: realNow() });
     return true;

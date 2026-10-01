@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { HttpError } from '../lib/errors';
-import { jpegOf } from './photo';
+import { HttpError } from './errors';
+import { jpegOf } from './jpeg';
 
 const start = Buffer.from([0xff, 0xd8]);
 const end = Buffer.from([0xff, 0xd9]);

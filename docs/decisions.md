@@ -209,6 +209,46 @@ consent (spec 011). An edit that changes the planner's choice ends its decision.
 dispatcher must be able to ask why an order went where it did. The design's chips that ask why the dispatcher changed
 the suggestion are not built, because a deferral already carries its reason (spec 010, rule 7).
 
+**D-56 · 1 Oct · The shop confirms each delivery whole, one stop's orders at once, and counts against what the driver
+handed over** (our pick, until Nabil answers). The orders of a stop arrive together, and a carton short from the depot
+or refused at the door was reported where it was found, so the receipt shows those and asks only what the shop counts.
+
+**D-57 · 1 Oct · A receipt is saved on the shop's phone first and sent once, through the driver's queue: one table of
+applied phone writes, one store, sender and signal on the phone, the same time rule with the handover as its lower bound,
+and a view function of its own in the contracts. A receipt waiting or refused on the phone shows from the phone's own copy
+of it, and in the shop's area only Deliveries waits for the tab that owns the queue** (our pick for the tabs, until Nabil
+answers). One way to keep a write safe without a signal is easier to get right than two, a receipt the depot turned down
+must stay where the shop can read and clear it even after its delivery is gone, and the shop's other screens keep working
+online in any tab, as spec 009 built them.
+
+**D-58 · 1 Oct · A receipt with anything missing, damaged or not cold is a problem of kind `receipt`, answered once from
+Live day's "Needs you" with "Send N replacements" or "No replacement"** (our pick for the second answer, until Nabil
+answers). The dispatcher decides every problem in one place (D-36), reporting a carton does not replace it, and the depot
+may have none to send.
+
+**D-59 · 1 Oct · "Send N replacements" places a new order for the shop, one per temperature, and another for each 999
+units of one product beyond the first, for the day an order placed at that moment is for, pointing at the problem it
+answers. It answers a shop's report and, beside "Bring them back", a driver's refusal. Neither it nor a part of it, when
+the plan splits it, counts as the shop's own next order.** An order of its own is planned, checked, loaded and confirmed
+like any other, so a replacement needs no new path, and the shop never sees the depot's order counted as one it placed.
+No line of it holds more than the 999 a receipt counts on a line, though two of the shop's orders can hold more of one
+product between them, so the shop can confirm everything it is sent. A part of a split replacement is still a
+replacement, through the link every part keeps to its original (D-30). This takes over the replacements half of D-48's
+last sentence. Writing cartons off is still not built.
+
+**D-60 · 1 Oct · "Still cold on arrival? No" is a report even when every carton is there** (our pick, until Nabil
+answers). Warm chilled goods are the depot's to know about, and an answer that reaches nobody would make the question
+decoration.
+
+**D-61 · 1 Oct · A receipt is kept on the orders it covers: each line's received count, and on each order when the shop
+confirmed, when the receipt reached the depot and, for a chilled order, whether it arrived cold.** Every shop card reads
+its own order, also history that never travelled on a planned trip.
+
+**D-62 · 1 Oct · The seeded shop history arrives received, with its counts and times, and Wednesday's 6 dry cartons were
+received at 07:42.** A delivered order that the seed puts on no trip could never be confirmed, and the design's Today and
+Past draw the shop's history as received. This changes spec 009's seed, where Wednesday's order waited to be confirmed.
+An existing install takes it through a demo reset, since the seed writes nothing on a day already seeded.
+
 D-56 to D-65 are reserved for spec 015. Spec 016 starts at D-66 so those records can join without renumbering.
 
 **D-66 · 1 Oct · Dashboard and Live day watch the loader's day, with older trips still out listed separately**

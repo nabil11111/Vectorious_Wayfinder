@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { Brand, Temp } from './basics';
-import { DriverStop, DriverTrip, StopOutcome } from './driver';
-import { IssueDecision, IssueKind } from './issues';
+import { Brand, IssueDecision, IssueKind, StopOutcome, Temp } from './basics';
+import { DriverStop, DriverTrip } from './driver';
 import { TripStatus } from './plans';
 
 // Spec 016: one read supplies both dispatcher pages. Values are recorded facts, not presence or predictions.

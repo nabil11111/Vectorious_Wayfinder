@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
-  DecideIssueResponse, IssueList, LoadingDay, PlanBoard, type DraftPlan, type DraftTrip, type LoadingDecision, type LoadingStop, type LoadingTruck,
+  DecideIssueResponse, IssueList, LoadingDay, PHONE_ACCOUNT_HEADER, PlanBoard, type DraftPlan, type DraftTrip, type LoadingDecision, type LoadingStop, type LoadingTruck,
 } from '@wayfinder/contracts';
 import { eq } from 'drizzle-orm';
 import type request from 'supertest';
@@ -30,9 +30,11 @@ export interface Walkthrough {
 // The seeded day again, as spec 008's reset writes it.
 export const resetDay = () => db.transaction(async (tx) => { await clearDemoDay(tx); await seedDemoDay(tx); });
 
+// Signs the agent in and, as a phone does, names its own account on every write it saves first (spec 015).
 export async function signIn(agent: Agent, username: string): Promise<void> {
   const res = await agent.post('/api/v1/auth/login').send({ username, password: username === 'admin' ? ADMIN_PASSWORD : PASSWORD });
   expect(res.status).toBe(200);
+  agent.set(PHONE_ACCOUNT_HEADER, res.body.id);
 }
 
 export const code = (res: request.Response) => [res.status, res.body.error?.code];

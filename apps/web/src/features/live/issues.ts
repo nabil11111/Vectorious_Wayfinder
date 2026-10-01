@@ -9,8 +9,17 @@ import { api } from '@/lib/api';
 // ['issues'], so the live stream's issues message fetches it again on every dispatcher page (spec 008).
 export const issuesKey = ['issues'] as const;
 
+const fetchIssues = () => api<IssueList>('/issues');
+
 export function useIssues() {
-  return useQuery({ queryKey: issuesKey, queryFn: () => api<IssueList>('/issues') });
+  return useQuery({ queryKey: issuesKey, queryFn: fetchIssues });
+}
+
+// The day a replacement placed now would be for (spec 015, rule 12), or null with no day open, from the list the
+// column already holds. It never fetches by itself: the column's own read keeps it current.
+export function useReplaceOn(): string | null {
+  const { data } = useQuery({ queryKey: issuesKey, queryFn: fetchIssues, enabled: false, select: (list) => list.replaceOn });
+  return data ?? null;
 }
 
 export interface Answering {
@@ -22,7 +31,8 @@ export interface Answering {
   refused: string | null;
   // The problem answered last, for the green line. It stays until the next answer or a reload.
   sent: Issue | null;
-  // A loader's flag takes "Go short" or "Load it all", a driver's problem "Bring them back" or "Try again" (D-48).
+  // A loader's flag takes "Go short" or "Load it all", a driver's problem "Bring them back" or "Try again" (D-48), a
+  // refusal "Send N replacements" too, and a shop's report "Send N replacements" or "No replacement" (D-58, D-59).
   decide: (issue: Issue, decision: IssueDecision) => void;
 }
 

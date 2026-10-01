@@ -10,6 +10,7 @@ import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { driverStop, driverTrip, driverWrite } from './driver-plan';
 import { resetDay, signIn, THU, WED } from './loading-plan';
 import { decide, journey, operations, photo } from './operations-plan';
+import { receiptOf, shopScreen } from './receipt-plan';
 import { serve, stop } from './serve';
 const clock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async original => {
@@ -62,6 +63,11 @@ it('AC-17 every joined problem kind and recorded source appears once', async () 
   trip = await road.write(trip, 'arrive', 230, 1);
   trip = await road.write(trip, 'deliver', 233, 1, { photo });
   await road.write(trip, 'finish', 235);
+  // The shop's report on its receipt (spec 015) is the fourth kind: Nadeesha counts one chilled carton missing.
+  freeze(THU, 8 * 60 + 31);
+  const shop = shopScreen(nadeesha);
+  const nugegoda = (await shop.read()).deliveries.find(delivery => delivery.stopId === driverStop(trip, 1).id)!;
+  expect((await shop.send(receiptOf(nugegoda, [11, 8, 3], { reason: 'missing' }))).status).toBe(200);
   const day = await read();
   expect(new Set(day.events.map(event => event.kind))).toEqual(new Set(OPERATIONS_EVENT_KINDS));
   // This fails at the join if a new issue kind lacks its integration scenario.

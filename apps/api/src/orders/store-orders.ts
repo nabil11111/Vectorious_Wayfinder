@@ -2,8 +2,8 @@ import {
   TEMPS, type Brand, type CutoffPassedDetails, type DraftRefs, type OrderLine, type PlaceOrdersRequest, type PlaceOrdersResponse,
   type SaveDraftRequest, type StoreNextOrder, type StoreOrder, type StoreOutlet, type StoreProduct,
 } from '@wayfinder/contracts';
-import { and, desc, eq, gte, inArray, max, ne, notInArray, sql, type SQL } from 'drizzle-orm';
-import type { PgColumn } from 'drizzle-orm/pg-core';
+import { and, desc, eq, gte, inArray, isNotNull, isNull, max, ne, notExists, notInArray, sql, type SQL } from 'drizzle-orm';
+import { alias, type PgColumn } from 'drizzle-orm/pg-core';
 import { db, type Db, type Tx } from '../db/client';
 import { PRODUCTS } from '../db/fixtures';
 import { calendarDays, deferrals, depots, orderLines, orders, outlets, plans, products, stopOrders, stops, trips } from '../db/schema';
@@ -11,6 +11,7 @@ import { depotDate, depotInstant, depotMinutes, now } from '../lib/clock';
 import { HttpError } from '../lib/errors';
 import { announce } from '../lib/live';
 import { computeLoad } from '../planning/load';
+import { factsOf } from './order-facts';
 import { CUTOFF_MINUTES, orderableDay } from './orderable-day';
 
 // The store manager's next order (spec 009): what the shop can order and for which day, the draft its form
@@ -78,10 +79,11 @@ export const snapshot = <T>(read: (tx: Tx) => Promise<T>) => db.transaction(asyn
   return read(tx);
 }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 
-interface OpenDay { deliveryDate: string; cutoffAt: Date; cutoffIsToday: boolean }
+export interface OpenDay { deliveryDate: string; cutoffAt: Date; cutoffIsToday: boolean }
 
-// The day an order placed at this instant is for, or null when no delivery day is open.
-async function openDayAt(on: Reader, at: Date): Promise<OpenDay | null> {
+// The day an order placed at this instant is for, or null when no delivery day is open. A replacement is placed for
+// it too (spec 015, rule 10).
+export async function openDayAt(on: Reader, at: Date): Promise<OpenDay | null> {
   const today = depotDate(at);
   // The rule looks no further than the third operating day from today.
   const days = await on.select({ date: calendarDays.date }).from(calendarDays)
@@ -135,6 +137,11 @@ const lastDeferral = db.selectDistinctOn([deferrals.orderId], { orderId: deferra
 // The day an order counts for: the day of the sent plan it is on, and until then the day the shop wanted.
 export const countsFor = sql<string>`coalesce(${scheduled.date}, ${orders.deliveryDate})`;
 
+// An order the shop placed itself: neither a replacement the depot placed (D-59) nor a part of one the plan split.
+const original = alias(orders, 'original');
+const placedByTheShop = and(isNull(orders.replacesIssueId), notExists(db.select({ id: original.id }).from(original)
+  .where(and(eq(original.id, orders.splitFrom), isNotNull(original.replacesIssueId)))));
+
 // The shop's orders that match, as its screens show them. Unless told otherwise they come chilled before dry,
 // then the one placed first. It reads the given shop's orders and no others, whatever the condition asks for.
 export async function readOrders(
@@ -151,6 +158,7 @@ export async function readOrders(
     .orderBy(...orderBy);
   const rows = await (limit ? matching.limit(limit) : matching);
   const lines = await linesOf(on, rows.map((row) => row.id));
+  const facts = await factsOf(on, shop.outlet.id, rows.map((row) => row.id));
   return rows.map((row) => {
     const own = shownLines(lines.filter((line) => line.orderId === row.id), shop.items);
     return {
@@ -163,6 +171,8 @@ export async function readOrders(
       units: own.reduce((sum, line) => sum + line.quantity, 0),
       placedAt: row.placedAt?.toISOString() ?? null,
       deferralReason: row.status === 'deferred' ? row.deferralReason : null,
+      // What its card says about its delivery, receipt, problems and replacement (spec 015, rule 11).
+      ...facts.get(row.id)!,
     };
   });
 }
@@ -198,8 +208,9 @@ function latest(moments: (string | null)[], what: string): string {
 // What GET /store/next-order answers, and a save and a place after their change.
 async function nextOrder(on: Reader, shop: Shop, open: OpenDay | null): Promise<StoreNextOrder> {
   const drafts = await readDrafts(on, shop.outlet.id);
+  // A replacement is the depot's order, so the shop's next order never counts it, or a part of one, as placed.
   const placed = open
-    ? await readOrders(on, shop, and(eq(orders.deliveryDate, open.deliveryDate), notInArray(orders.status, ['draft', 'cancelled'])))
+    ? await readOrders(on, shop, and(eq(orders.deliveryDate, open.deliveryDate), notInArray(orders.status, ['draft', 'cancelled']), placedByTheShop))
     : [];
   const draftLines = shownLines(drafts.flatMap((draft) => draft.lines), shop.items);
   const placedLines = shownLines(placed.flatMap((order) => order.lines), shop.items);

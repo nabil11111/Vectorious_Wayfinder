@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Brand, Temp } from './basics';
+import { Brand, MAX_STOP_ORDERS, Temp } from './basics';
 import { DeferralCode, Load, PlanCheck, Problem } from './planning';
 import { DockType, OrderLine } from './store';
 
@@ -26,7 +26,7 @@ export type Parking = z.infer<typeof Parking>;
 // A stop takes every order of its shop that the plan puts there, so its cap is the plan's own order bound (the 300
 // of deferrals below): a guard against absurd input that no real day reaches, and never lower than what Find a slot
 // may offer.
-export const DraftStop = z.object({ outletId: z.string().min(1).max(16), orderIds: z.array(z.uuid()).min(1).max(300) });
+export const DraftStop = z.object({ outletId: z.string().min(1).max(16), orderIds: z.array(z.uuid()).min(1).max(MAX_STOP_ORDERS) });
 export type DraftStop = z.infer<typeof DraftStop>;
 
 export const DraftTrip = z.object({

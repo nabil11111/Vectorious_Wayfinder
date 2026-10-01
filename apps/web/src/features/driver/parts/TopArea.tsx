@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { meKey } from '@/features/auth/api';
-import { retrySync, useSync } from '../sender';
+import { retrySync, useSync } from '../queue';
 import { NOT_SAVED_BAND, signInLine } from '../words';
 
 const ACTION = '-my-2 shrink-0 rounded-md px-1 py-2 text-[13px] leading-4 font-bold text-foreground underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50';

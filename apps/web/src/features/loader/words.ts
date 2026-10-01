@@ -135,6 +135,68 @@ export function sentLine(issue: Issue) {
 // "Waiting for the dispatcher · flagged 02:33"
 export const waitingLine = (issue: Pick<Issue, 'raisedAt'>) => `Waiting for the dispatcher · flagged ${clockTime(issue.raisedAt)}`;
 
+// ── A shop's report and the replacements (spec 015, rule 12) ───────────────────────────────────────────────────
+
+// "1 replacement", "2 replacements"
+const replacementsWords = (units: number) => `${whole(units)} ${units === 1 ? 'replacement' : 'replacements'}`;
+
+// A report's title by its reason: "1 chilled carton missing", "1 chilled carton damaged", "Chilled goods not cold". The
+// goods are those of the lines it counts a unit on, as the API counted them.
+export function reportTitle(issue: IssueWords & Pick<Issue, 'reason'>) {
+  if (issue.reason === 'not_cold') return 'Chilled goods not cold';
+  return `${shortGoods({ ...issue, lines: issue.lines.filter((line) => line.counted > 0) })} ${issue.reason}`;
+}
+
+// "Fresh Nugegoda · stop 1 · VEH035 · Dilshan · delivered 03:38"
+export const reportPlace = (issue: Pick<Issue, 'stop' | 'trip'>) =>
+  [issue.stop.shopName, `stop ${issue.stop.seq}`, truckName(issue.trip), issue.trip.driver, issue.stop.doneAt && `delivered ${clockTime(issue.stop.doneAt)}`].filter(Boolean).join(' · ');
+
+// Each line the report counts, as the shop received it of what was handed over: "11 of 12 chilled cartons", and "8 of
+// 10 boxes · Folded clothing" for Style and Tech.
+export function receivedOf(issue: Pick<Issue, 'lines' | 'stop'>) {
+  const brand = brandOfShop(issue.stop.shopName);
+  return issue.lines.map((line) => {
+    const handed = line.delivered ?? 0;
+    const of = `${whole(line.received ?? 0)} of`;
+    return brand === 'Fresh' ? `${of} ${whole(handed)} ${line.temp} ${handed === 1 ? line.unit : plural(line.unit)}` : `${of} ${amountOf(handed, line.unit)} · ${line.name}`;
+  }).join(', ');
+}
+
+// "yes", "no"
+export const coldWords = (cold: boolean) => (cold ? 'yes' : 'no');
+
+export const REPORT_QUESTION = 'What should the depot do?';
+
+// "Send 1 replacement on Fri 26 Jun": the units the problem counts, for the day an order placed now is for.
+export const sendReplacementsTitle = (units: number, day: string) => `Send ${replacementsWords(units)} on ${shortDay(day)}`;
+// What it means for a shop's report, and for a refusal beside "Bring them back".
+export const reportReplacementLine = (units: number) => `The shop gets ${units === 1 ? 'it' : 'them'} on the next run.`;
+export const refusalReplacementLine = (units: number) => `The driver brings them back, and the shop gets ${whole(units)} on the next run.`;
+export const NO_REPLACEMENT = { title: 'No replacement', line: 'Nothing more is sent. The shop is told.' } as const;
+
+// The dispatcher's line once an answer to a shop's report is sent: "Fresh Nugegoda · 1 replacement on Fri 26 Jun,
+// Nadeesha told", "Fresh Nugegoda · no replacement, Nadeesha told".
+export function reportSentLine(issue: Issue) {
+  const what = issue.decision === 'send_replacements' && issue.replacement
+    ? `${replacementsWords(issue.replacement.units)} on ${shortDay(issue.replacement.day)}`
+    : 'no replacement';
+  return `${issue.stop.shopName} · ${what}, ${issue.raisedBy} told`;
+}
+
+// A driver's problem once answered, now that the shop's card shows the answer too: "VEH035 · 2 cartons back to
+// Peliyagoda, Dilshan and the shop told", "VEH035 · 2 cartons back, 2 replacements on Fri 26 Jun, Dilshan and the shop
+// told", "VEH035 · tries Fresh Wellawatte again, Dilshan and the shop told".
+export function driverSentLine(issue: Issue, depot: string) {
+  const truck = truckName(issue.trip);
+  const told = `${issue.trip.driver ?? issue.raisedBy} and the shop told`;
+  if (issue.decision === 'try_again') return `${truck} · tries ${issue.stop.shopName} again, ${told}`;
+  const back = unitsWords(brandOfShop(issue.stop.shopName), issue.short);
+  if (issue.decision === 'send_replacements' && issue.replacement) {
+    return `${truck} · ${back} back, ${replacementsWords(issue.replacement.units)} on ${shortDay(issue.replacement.day)}, ${told}`;
+  }
+  return `${truck} · ${back} back to ${depot}, ${told}`;
+}
+
 // ── A ready truck ──────────────────────────────────────────────────────────────────────────────────────────────
 
 // "117 of 118 on · 1 short, dispatcher told 02:35 · leaves 04:36", or "118 of 118 on · leaves 04:36" with nothing

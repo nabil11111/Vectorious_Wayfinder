@@ -1,11 +1,11 @@
-import type { DriverDay, DriverWrite } from '@wayfinder/contracts';
+import { PHONE_ACCOUNT_HEADER, type DriverDay, type DriverWrite } from '@wayfinder/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The driver's phone (spec 013, rule 10, D-45, AC-45): what it keeps and the loop that sends it. The browser's
 // database is a stand-in that can fail on cue, the server is a stubbed fetch, the signal is always there and the
 // retry schedule is cut to milliseconds.
 
-type Row = Record<string, unknown> & { seq: number; userId: string; state: string };
+type Row = Record<string, unknown> & { seq: number; queue: string; userId: string; state: string };
 
 class FakeDatabase {
   readonly days = new Map<string, unknown>();
@@ -18,18 +18,18 @@ class FakeDatabase {
   private store(name: string) {
     if (name === 'days') {
       return {
-        get: async (key: string) => structuredClone(this.days.get(key)),
-        put: async (value: { userId: string }) => { this.days.set(value.userId, structuredClone(value)); },
+        get: async ([queue, userId]: [string, string]) => structuredClone(this.days.get(`${queue}:${userId}`)),
+        put: async (value: { queue: string; userId: string }) => { this.days.set(`${value.queue}:${value.userId}`, structuredClone(value)); },
       };
     }
     return {
       index: () => ({
-        getAll: async (userId: string) => {
+        getAll: async ([queue, userId]: [string, string]) => {
           if (this.failReads > 0) {
             this.failReads -= 1;
             throw new DOMException('The read failed.', 'UnknownError');
           }
-          return [...this.writes.values()].filter((row) => row.userId === userId).map((row) => structuredClone(row));
+          return [...this.writes.values()].filter((row) => row.queue === queue && row.userId === userId).map((row) => structuredClone(row));
         },
       }),
       put: async (value: Row) => this.put('writes', value),
@@ -65,7 +65,7 @@ vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
 }));
-vi.mock('../src/features/driver/signal', () => ({
+vi.mock('../src/lib/phone/signal', () => ({
   ANSWER_WITHIN_MS: 15_000,
   retryDelay: () => 20,
   hasSignal: () => true,
@@ -113,8 +113,10 @@ function dayFor(account: Account, applied: string[]): DriverDay {
 const arrive = (): DriverWrite => ({ kind: 'arrive', writeId: crypto.randomUUID(), tripId: TRIP, stopId: STOP, at: '2026-06-24T22:04:00.000Z', revision: 0 });
 const closed = (): DriverWrite => ({ kind: 'closed', writeId: crypto.randomUUID(), tripId: TRIP, stopId: STOP, at: '2026-06-24T22:07:00.000Z', revision: 1, note: '' });
 
-// The server: whose session the cookie holds, the writes it applied, the ones it refuses, and every write posted.
-interface Server { session: Account | null; applied: string[]; refuse: Set<string>; posted: string[] }
+// The server: whose session the cookie holds, the writes it applied, the ones it refuses, every write posted and the
+// account each send named. With sendAs set, the next send carries that account's session instead, as when it signed in
+// in another tab just as the write went.
+interface Server { session: Account | null; applied: string[]; refuse: Set<string>; posted: string[]; named: (string | null)[]; sendAs?: Account }
 
 function serve(server: Server) {
   const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -123,12 +125,20 @@ function serve(server: Server) {
     if (url === '/api/v1/driver/writes') {
       const write = JSON.parse(String(init.body)) as DriverWrite;
       server.posted.push(write.writeId);
+      const named = new Headers(init.headers).get(PHONE_ACCOUNT_HEADER);
+      server.named.push(named);
+      const session = server.sendAs ?? server.session;
+      server.sendAs = undefined;
+      // As the API does: a write is taken only under the session of the account the phone names with it.
+      if (named !== session.id) {
+        return reply({ error: { code: 'other_account', message: 'This record was saved by another account. Sign in as that account to send it.' } }, 409);
+      }
       // Dilshan's trip is not on another driver's list, whatever their name.
-      if (server.session.id !== DILSHAN.id || server.refuse.has(write.writeId)) {
+      if (session.id !== DILSHAN.id || server.refuse.has(write.writeId)) {
         return reply({ error: { code: 'unknown_record', message: 'That trip is not on your list.' } }, 404);
       }
       if (!server.applied.includes(write.writeId)) server.applied.push(write.writeId);
-      return reply(dayFor(server.session, server.applied));
+      return reply(dayFor(session, server.applied));
     }
     if (url === '/api/v1/driver') return reply(dayFor(server.session, server.applied));
     return reply({ error: { code: 'not_found', message: 'Not found.' } }, 404);
@@ -137,7 +147,7 @@ function serve(server: Server) {
 
 // A write kept by an earlier session of the app, waiting to send.
 function keptBefore(db: FakeDatabase, account: Account, write: DriverWrite) {
-  void db.add('writes', { userId: account.id, write, about: 'Stop 1 · Fresh Nugegoda', savedAt: write.at, state: 'waiting', refusal: null });
+  void db.add('writes', { queue: 'driver', userId: account.id, write, about: 'Stop 1 · Fresh Nugegoda', savedAt: write.at, state: 'waiting', refusal: null, shown: null });
 }
 
 async function until(done: () => boolean, ms = 4000) {
@@ -148,13 +158,12 @@ async function until(done: () => boolean, ms = 4000) {
   }
 }
 
-// Opens the driver's app for an account: this tab owns it, and the loop starts.
+// Opens the driver's app for an account: this tab owns the driver's queue, and the loop starts.
 async function open(account: Account) {
-  const sender = await import('../src/features/driver/sender');
-  const store = await import('../src/features/driver/store');
+  const sender = await import('../src/features/driver/queue');
   sender.useOwner();
   sender.setAccount(account);
-  return { sender, store, sync: () => sender.useSync(), queue: () => store.readKept().queue.map((entry) => [entry.write.writeId, entry.state]) };
+  return { sender, store: sender, sync: () => sender.useSync(), queue: () => sender.readKept().queue.map((entry) => [entry.write.writeId, entry.state]) };
 }
 
 let db: FakeDatabase;
@@ -173,7 +182,7 @@ describe('the driver\'s phone', () => {
   it('sends nothing under another account with the same name, refuses nothing for it, and sends once the session is the driver\'s own', async () => {
     const waiting = arrive();
     keptBefore(db, DILSHAN, waiting);
-    const server: Server = { session: OTHER_DILSHAN, applied: [], refuse: new Set(), posted: [] };
+    const server: Server = { session: OTHER_DILSHAN, applied: [], refuse: new Set(), posted: [], named: [] };
     serve(server);
     const phone = await open(DILSHAN);
 
@@ -187,6 +196,33 @@ describe('the driver\'s phone', () => {
     phone.sender.retrySync();
     await until(() => phone.queue().length === 0);
     expect(server.posted).toEqual([waiting.writeId]);
+    expect(server.named).toEqual([DILSHAN.id]);
+    expect(phone.sync().signedOut).toBe(false);
+  });
+
+  it('keeps a write waiting when the server finds another driver\'s session under its send, asks to sign in again, and sends it as Dilshan\'s once he is back', async () => {
+    const waiting = arrive();
+    keptBefore(db, DILSHAN, waiting);
+    // Another driver signs in in another tab after the phone read Dilshan's day, so the send carries their session;
+    // Dilshan signs in there again straight after, so the session is his when the phone next asks.
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [], named: [], sendAs: OTHER_DILSHAN };
+    serve(server);
+    const phone = await open(DILSHAN);
+
+    await until(() => phone.sync().signedOut);
+    // Not refused: the write waits on the phone for Dilshan, and nothing sends it again meanwhile.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(server.posted).toEqual([waiting.writeId]);
+    expect(server.named).toEqual([DILSHAN.id]);
+    expect(phone.queue()).toEqual([[waiting.writeId, 'waiting']]);
+    expect(db.states()).toEqual(['waiting']);
+
+    // Dilshan signs in again on this phone, and the write goes under his session as his.
+    phone.sender.setAccount(DILSHAN);
+    await until(() => phone.queue().length === 0);
+    expect(server.posted).toEqual([waiting.writeId, waiting.writeId]);
+    expect(server.named).toEqual([DILSHAN.id, DILSHAN.id]);
+    expect(server.applied).toEqual([waiting.writeId]);
     expect(phone.sync().signedOut).toBe(false);
   });
 
@@ -194,7 +230,7 @@ describe('the driver\'s phone', () => {
     const older = arrive();
     keptBefore(db, DILSHAN, older);
     db.failReads = 1000;
-    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [] };
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [], named: [] };
     serve(server);
     const phone = await open(DILSHAN);
 
@@ -215,7 +251,7 @@ describe('the driver\'s phone', () => {
     const older = arrive();
     keptBefore(db, DILSHAN, older);
     db.failReads = 1000;
-    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [] };
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [], named: [] };
     serve(server);
     const phone = await open(DILSHAN);
 
@@ -233,7 +269,7 @@ describe('the driver\'s phone', () => {
     const doomed = arrive();
     keptBefore(db, DILSHAN, doomed);
     db.failRefusals = true;
-    const server: Server = { session: DILSHAN, applied: [], refuse: new Set([doomed.writeId]), posted: [] };
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set([doomed.writeId]), posted: [], named: [] };
     serve(server);
     const phone = await open(DILSHAN);
 

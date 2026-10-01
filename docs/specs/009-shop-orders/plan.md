@@ -11,9 +11,10 @@ No new table. One migration, written by the lead after spec 008's.
 | `orders` | Index `orders_outlet_date` on `(outlet_id, delivery_date)`. | Every list reads one shop's orders by day. |
 | `order_lines` | Unique `order_lines_order_product` on `(order_id, product_id)`. | One line per item in an order. |
 
-**The seed** gains OUT001's dry order due Wed 24 Jun (6 cartons, delivered), at least 21 received orders for
-OUT001 on earlier operating days, and store managers at OUT017 (Style) and OUT064 (Tech) (D-27). The draft,
-the chilled order that waited and the rest come from spec 008. A reset brings it all back.
+**The seed** gains OUT001's dry order due Wed 24 Jun (6 cartons, received at 07:42 since spec 015's D-62, so it is in
+Past, not Open), at least 21 received orders for OUT001 on earlier operating days, and store managers at OUT017 (Style)
+and OUT064 (Tech) (D-27). The draft, the chilled order that waited and the rest come from spec 008. A reset brings it
+all back.
 
 ## Contracts
 The lead writes these into `packages/contracts/src/store.ts`. Dates are `YYYY-MM-DD`, moments ISO strings.

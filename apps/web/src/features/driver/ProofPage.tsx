@@ -4,13 +4,13 @@ import type { Me } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { newWriteId } from '@/features/loader/loading';
 import { useAppClock } from '@/lib/clock';
+import { UNUSABLE, usePhoto } from '@/lib/phone/photo';
+import { PhotoInput } from '@/lib/phone/PhotoTile';
+import { hasSignal } from '@/lib/phone/signal';
 import { ICON } from './parts/icons';
-import { PhotoInput } from './parts/PhotoInput';
 import { TopArea } from './parts/TopArea';
 import { ActionBar, BIG, PLAIN, Problem, StopHead } from './parts/ui';
-import { UNUSABLE, usePhoto } from './photo';
-import { useSave } from './sender';
-import { hasSignal } from './signal';
+import { useSave } from './queue';
 import { useDriverView } from './view';
 import { aboutStop, brandOf, NOT_SAVED, stopOfLine } from './words';
 

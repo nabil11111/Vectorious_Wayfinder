@@ -9,7 +9,7 @@ import { ICON } from './parts/icons';
 import { TopArea } from './parts/TopArea';
 import { TopLines } from './parts/TopLine';
 import { ActionBar, Band, BIG, Card, Problem } from './parts/ui';
-import { useSave } from './sender';
+import { useSave } from './queue';
 import type { DriverView } from './view';
 import {
   aboutTrip, backAtLine, checkedInLine, handBack, headBackLine, nextTripLine, NOT_SAVED, SIGN_OUT_WAITS, tripClosedLine, tripRows, type Figures,

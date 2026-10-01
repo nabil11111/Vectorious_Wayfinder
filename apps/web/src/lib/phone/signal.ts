@@ -1,11 +1,11 @@
 import { useSyncExternalStore } from 'react';
 
-// The signal on the driver's phone (spec 013, rule 12, plan.md "The signal"). There is no signal while the browser
-// says it is offline, or from a request that got no answer within 15 seconds, until a request gets any answer. With
-// no signal a probe asks GET /api/v1/health on the retry schedule, whatever navigator.onLine says, and at once when
-// the browser says it is back, the app comes back to the front, the app opens, or the driver taps Retry sync. Any
-// answer brings the signal back, and the sync loop carries on. navigator.onLine can be wrong both ways, so the
-// requests themselves have the last word.
+// The signal on a phone (spec 013, rule 12, plan.md "The signal"), one per tab, whichever queue it owns. There is no
+// signal while the browser says it is offline, or from a request that got no answer within 15 seconds, until a request
+// gets any answer. With no signal a probe asks GET /api/v1/health on the retry schedule, whatever navigator.onLine says,
+// and at once when the browser says it is back, the app comes back to the front, the app opens, or Retry sync is
+// tapped. Any answer brings the signal back, and the sync loop carries on. navigator.onLine can be wrong both ways, so
+// the requests themselves have the last word.
 
 // Every send, fetch and probe gives up after this long without an answer.
 export const ANSWER_WITHIN_MS = 15_000;

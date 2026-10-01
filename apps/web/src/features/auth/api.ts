@@ -76,7 +76,12 @@ export function useLogin() {
   return useMutation({
     onMutate: () => qc.cancelQueries({ queryKey: meKey }),
     mutationFn: (body: LoginRequest) => api<Me>('/auth/login', { method: 'POST', json: body }),
-    onSuccess: async (me) => { await qc.cancelQueries({ queryKey: meKey }); qc.setQueryData(meKey, keepAccount(me)); },
+    // A sign-in starts the screens afresh: nothing another account read stays in the cache to be shown again.
+    onSuccess: async (me) => {
+      await qc.cancelQueries({ queryKey: meKey });
+      qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] });
+      qc.setQueryData(meKey, keepAccount(me));
+    },
   });
 }
 

@@ -35,6 +35,7 @@ The app runs on its own clock, the same for every screen, starting on Wednesday 
 open. The demo control in the top bar moves the whole app to the next part of the day (orders close at 16:00,
 loading at 02:30, trucks leave at 03:30, delivered by 08:30) and can reset the day to the seed. Every open
 screen follows at once. `DEMO_MODE=false` runs on the real clock with no seeded day.
+An install seeded before the shop's receipt keeps its old shop history until **Reset the demo day** is pressed once.
 
 ### Working on the code
 
@@ -147,7 +148,24 @@ are what the demo clock shows.
     delivered · photo" in its events, and after the refusal the Dashboard's **Decide** opens the problem's card on Live
     day, where "Send to driver" turns the truck's row to "Decided".
 
-The shop's receipt comes with the next piece.
+19. **The shop confirms.** Move the demo clock on to "Delivered by 08:30". As `nadeesha` on a phone, Today shows her three
+    Thursday orders "Delivered", the dry one "3 of 4 delivered · 1 short from the depot". Open **Deliveries**: "Confirm
+    delivery", each line against what the driver handed over (12 and 8 chilled, 3 dry with "1 short from the depot"), and
+    "Still cold on arrival?" with Yes. On the first card press − once: "1 carton missing", and "What's wrong?" with
+    Missing.
+20. **A receipt with no signal.** Turn the network off and press **Confirm delivery**: "Receipt saved on this phone",
+    "Received 11 cartons · Missing 1 carton", "Saved at 08:30 · waiting to sync". Reload with the network still off: the
+    same screen opens. Turn it back on: "Receipt sent to the depot" and "Sent at 08:31 · shortage unresolved".
+21. **The depot replaces it.** As `ruwan`, the bell shows 1. Live day: "1 chilled carton missing", "Shop · Nadeesha",
+    "Received · 11 of 12 chilled cartons", "Cold on arrival · yes", with **Send 1 replacement on Fri 26 Jun** chosen.
+    Press **Send to shop**: "✓ Sent · Fresh Nugegoda · 1 replacement on Fri 26 Jun, Nadeesha told".
+22. **The shop sees it.** On Nadeesha's phone, without a reload, the receipt says "replacement on Fri 26 Jun". Orders,
+    Past: "12 chilled cartons · 11 received · 1 short" with "1 replacement comes on Fri 26 Jun.", "8 chilled cartons ·
+    All 8 received" and "4 dry cartons · 3 received · 1 short". Open: "1 chilled carton · Waiting for the delivery plan ·
+    Replacement for Thu 25 Jun".
+
+At step 16 Ruwan can also answer Wellawatte's refusal with **Send 2 replacements on Fri 26 Jun**: Dilshan still brings the
+2 cartons back, and Wellawatte gets a placed order of 2 chilled cartons for Friday's plan.
 
 **A closed shop.** At step 14 choose "Shop closed" instead and press **Save attempt and move on**: Ruwan's card reads
 "Nobody at Fresh Wellawatte". **Try again on this trip** makes Wellawatte Dilshan's next stop again, and delivering it ends
@@ -251,6 +269,23 @@ Anything we built differently from our Designathon submission, and why.
 - **States the design lacks:** no plan out, nothing to load, every truck loaded, no day left, a truck no longer on the
   list, waiting for the answer, saving, not saved, refused, and nothing needs you.
 
+**The shop's receipt**
+- **Confirm delivery lists every line of the drop,** so Nugegoda's three orders are three cards, as the driver's Unload
+  does; the frame shows one order. A line expects what the driver handed over, and says when the depot sent it short or
+  the shop refused some at the door, with the design's damaged picture.
+- **"What's wrong?" shows once a count is lower,** with "Missing" and "Damaged", and "Add a photo (optional)" only on a
+  receipt that reports something.
+- **The saved screen** says "There is no signal right now." when the phone knew it had none, and "The connection dropped
+  while sending." after a send that got no answer.
+- **No "and signed":** there is no signature; the shop's receipt is the confirmation.
+- **The sent receipt follows the depot's answer,** and one with nothing wrong says "All received"; a record the depot did
+  not accept says so at its foot. No frame draws these.
+- **A shop's report on Live day** uses the issue-open card with "Send N replacements on <day>", "No replacement" and
+  "Send to shop"; the design draws only the "Next" line for it.
+- **States the design lacks:** something wrong, a photo, sending, sent and all received, sent and answered, nothing to
+  confirm, not accepted, sign in again, could not save, could not load, another tab, not on your list, and the shop's
+  cards for a delivery not yet confirmed, nobody at the shop, the depot's answers and a replacement.
+
 **The dashboard and Live day**
 - **No district map and no waves:** Needs you and the next run take the full width, Live day has no "Wave 2", and the
   next run's button is "View plan" with no draft line.
@@ -274,8 +309,9 @@ Anything we built differently from our Designathon submission, and why.
   entrance, "Colombo · street".
 - **A stop lists its lines,** so Nugegoda's two chilled orders are two counters, as the loader's screens do. Style and Tech
   lines name the item.
-- **A refusal has one answer, "Bring them back",** with "Send to driver". No "Write off on the road", no "Send 2
-  replacements" (D-48) and no "shop credited, claim opened": a write-off or a replacement is a record the depot adds later.
+- **A refusal has two answers,** "Bring them back to Peliyagoda" and "Send 2 replacements on Fri 26 Jun", with "Send to
+  driver and shop". No "Write off on the road" and no "shop credited, claim opened": a write-off is a record the depot adds
+  later.
 - **A closed shop is answered with "Try again on this trip" or "Bring them back";** no frame draws them.
 - **"Nothing to hand back"** says the short carton never left the depot, without "It goes on Monday's run".
 - **"Done unloading" stays grey until every line is counted,** where the frame draws it orange at 2 of 6: a stop that

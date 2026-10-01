@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { Brand, Temp } from './basics';
-import { FlagReason, Issue, LoadingDecision } from './issues';
+import { Brand, FlagReason, LoadingDecision, Temp } from './basics';
+import { Issue } from './issues';
 
 // The loader's day (spec 012): the day's sent trucks, each loaded last stop first, its flags, and the truck marked
 // ready. Every count, kilo and cubic metre is worked out by the API; the screen formats them. Times are ISO

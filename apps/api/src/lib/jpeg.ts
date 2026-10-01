@@ -1,4 +1,8 @@
-import { HttpError } from '../lib/errors';
+import { HttpError } from './errors';
+
+// The photo check (D-47), for the driver's proof and problems and the shop's report alike: a phone's photo rides inside
+// its write as a data URL, and the server takes only a whole JPEG of at most 500 KB and 2000 px a side. It reads the
+// file's structure and never decodes the picture (spec 013, known limit 1).
 
 const prefix = 'data:image/jpeg;base64,';
 const maxBytes = 512_000;

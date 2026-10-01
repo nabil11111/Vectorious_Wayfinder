@@ -9,6 +9,7 @@ vi.mock('@/features/auth/api', () => ({ useMe: () => ({ data: { id: 'ruwan' } })
 vi.mock('sonner', () => ({ toast: vi.fn() }));
 
 class Stream {
+  static OPEN = 1;
   static CLOSED = 2;
   static current: Stream;
   readyState = 1;
@@ -27,7 +28,7 @@ it('AC-24 existing topics invalidate operations and keep normal invalidations', 
   const client = new QueryClient();
   held.client = client;
   vi.stubGlobal('EventSource', Stream);
-  vi.stubGlobal('window', { clearTimeout, setTimeout });
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { clearTimeout, setTimeout }));
   const invalidate = vi.spyOn(client, 'invalidateQueries');
   useLive();
   cleanup = held.effect!();
@@ -52,4 +53,21 @@ it('AC-24 existing topics invalidate operations and keep normal invalidations', 
   Stream.current.onopen();
   expect(client.getQueryState(['operations', 'ruwan', 'Peliyagoda'])?.isInvalidated).toBe(true);
   client.clear();
+});
+
+it('tries the stream again as soon as the browser is back online', () => {
+  held.client = new QueryClient();
+  vi.stubGlobal('EventSource', Stream);
+  const browser = Object.assign(new EventTarget(), { clearTimeout, setTimeout });
+  vi.stubGlobal('window', browser);
+  useLive();
+  cleanup = held.effect!();
+  const first = Stream.current;
+  browser.dispatchEvent(new Event('online'));
+  expect(Stream.current).toBe(first);
+  first.readyState = Stream.CLOSED;
+  browser.dispatchEvent(new Event('online'));
+  expect(first.close).toHaveBeenCalled();
+  expect(Stream.current).not.toBe(first);
+  expect(Stream.current.url).toBe('/api/v1/events');
 });

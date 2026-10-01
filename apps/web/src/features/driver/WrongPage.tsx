@@ -4,15 +4,15 @@ import { REFUSAL_REASONS, type DriverLine, type Me, type RefusalReason } from '@
 import { Button } from '@/components/ui/button';
 import { newWriteId } from '@/features/loader/loading';
 import { useAppClock } from '@/lib/clock';
+import { UNUSABLE, usePhoto } from '@/lib/phone/photo';
+import { PhotoInput, PhotoTile } from '@/lib/phone/PhotoTile';
+import { hasSignal } from '@/lib/phone/signal';
 import { cn } from '@/lib/utils';
 import { Counter } from './parts/Counter';
 import { GOODS, ICON } from './parts/icons';
-import { PhotoInput } from './parts/PhotoInput';
 import { TopArea } from './parts/TopArea';
 import { ActionBar, BIG, Card, PLAIN, Problem, StopHead } from './parts/ui';
-import { UNUSABLE, usePhoto } from './photo';
-import { useSave } from './sender';
-import { hasSignal } from './signal';
+import { useSave } from './queue';
 import { useDriverView } from './view';
 import {
   aboutStop, brandOf, clockTime, entranceOf, lineKindLine, NOT_SAVED, pickLine, REASON_WORDS, stayLine, stopOfLine, waitedLine,
@@ -144,16 +144,7 @@ function Wrong({ me, stopId }: { me: Me; stopId: string }) {
       )}
 
       <div className="mt-2.5 flex gap-2.5">
-        <button
-          type="button"
-          onClick={take}
-          disabled={saving || reading}
-          className="flex h-[52px] w-[130px] shrink-0 items-center justify-center gap-2.5 overflow-hidden rounded-[10px] border-[1.5px] border-dashed border-border bg-card/60 text-[13px] leading-none font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          {photo
-            ? <img src={photo} alt="The photo taken" className="h-full w-full object-cover" />
-            : <><img src={ICON.proofPhoto} alt="" className="size-6 object-contain" />{reading ? 'Reading…' : 'Photo'}</>}
-        </button>
+        <PhotoTile photo={photo} reading={reading} disabled={saving || reading} onTake={take} />
         <label className="min-w-0 flex-1">
           <span className="sr-only">What happened?</span>
           <textarea

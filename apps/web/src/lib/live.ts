@@ -70,8 +70,20 @@ export function useLive() {
       };
     };
 
+    // Back online, the stream is tried at once rather than when the browser's own retry comes round, so an answer
+    // waiting for this screen arrives with the signal.
+    const onOnline = () => {
+      if (stream.readyState === EventSource.OPEN) return;
+      window.clearTimeout(reopen);
+      stream.close();
+      broken = true;
+      open();
+    };
+
     open();
+    window.addEventListener('online', onOnline);
     return () => {
+      window.removeEventListener('online', onOnline);
       window.clearTimeout(reopen);
       stream.close();
     };

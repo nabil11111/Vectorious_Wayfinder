@@ -1,9 +1,8 @@
 import type { DriverDay, DriverProblem, DriverStop, DriverTrip } from '@wayfinder/contracts';
 import { Check } from 'lucide-react';
+import { useSignal } from '@/lib/phone/signal';
 import { cn } from '@/lib/utils';
-import { closeBackOnline, useSync } from '../sender';
-import { useSignal } from '../signal';
-import type { Queued } from '../store';
+import { closeBackOnline, useSync, type Queued } from '../queue';
 import {
   answerLine, backOnlineLines, brandOf, closedLine, DEPOT_DECIDES, deliveredLine, keepLine, noSignalLine, refusedLine, whole,
   type Figures,

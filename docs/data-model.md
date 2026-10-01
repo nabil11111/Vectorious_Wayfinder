@@ -33,6 +33,7 @@ erDiagram
     trips ||--o{ driver_writes : applies
     stops ||--o{ photos : proves
     issues ||--o| photos : shows
+    issues ||--o{ orders : "replaced by"
 ```
 
 ## Groups
@@ -45,9 +46,11 @@ erDiagram
 | Demand | `orders`, `order_lines` | One order per temperature, because chilled and dry go on different trucks. An order starts as a draft, and a shop has one draft per temperature at most. Lines store only a quantity, one line per item. |
 | Planning | `plans`, `trips`, `stops`, `stop_orders`, `deferrals` | One plan per depot per day. At most two trips per vehicle. Every order is on a stop or deferred with a reason. A sent plan keeps the checker's result it was sent with (`sent_check`). Once the planner has built it, a plan keeps its suggestion (`suggestion`): when it was built, the draft the build saved, the planner's reason for every order and the decisions the dispatcher accepts before sending. Hand edits leave it as built, and the next build replaces it (spec 014). |
 | Loading and problems | `issues`, `issue_lines`, and on `trips`, `stops` and `order_lines` | A problem is one record whoever raises it: a loader's flag now, a driver's and a shop's later. Its lines hold the counts it found, and the dispatcher decides it once. A trip carries a revision, its ready time and the id of its last loader write; a stop its loaded time; an order line its loaded count (spec 012). |
-| Driver | `driver_writes`, `photos`, and on `trips`, `stops` and `order_lines` | Applied writes bind their UUID to the driver, trip, kind and body hash. Photos commit with their delivery or problem. Trips keep departure, return and last event times; stops keep revisions, retries, arrival, outcome and completion; lines keep delivered counts (spec 013). |
+| Driver | `driver_writes`, `photos`, and on `trips`, `stops` and `order_lines` | Photos commit with their delivery or problem. Trips keep departure, return and last event times; stops keep revisions, retries, arrival, outcome and completion; lines keep delivered counts (spec 013). |
+| Phone writes | `driver_writes` | Every write a phone saved first and the server applied, the driver's and the shop's receipts alike (D-45, D-57): its UUID bound to the account, trip, kind and body hash, and when it was last answered, on the real clock. The SQL table and its account column keep spec 013's names, `driver_writes` and `driver_id`; the schema calls them `phoneWrites` and `userId`, so no migration renamed them. |
+| Shop receipts | on `orders` and `order_lines`, and `issues` of kind `receipt` | A receipt is kept on the orders it covers (D-61): `received_at`, when the shop confirmed as the time rule keeps it, `receipt_sent_at`, when it reached the server, and `arrived_cold` on a chilled order; each line keeps its `received_qty` beside its loaded and delivered counts. A receipt that reports something short, damaged or not cold is a problem of kind `receipt` with the receipt's id, its photo in `photos`. A replacement is an order whose `replaces_issue_id` points at the problem its answer placed it for; a part of a split replacement reaches it through `split_from` (spec 015). |
 | Fleet days | `vehicle_days_off`, `fuel_log` | A vehicle that cannot be used on a date, with the reason. Litres a vehicle used on a date: one history row a day, and one row for each sent trip. The plan checker reads both. |
 | The demo day | `demo_day` | One row: the app's clock, stored as the app's time and the real time it was set, and whether the seeded day has been written. |
 | History | `audit_log` | Who changed what and when, with before and after. |
 
-Shop receipts are added with A5. Driver problems keep each closed attempt’s counts even when its orders go on another trip.
+Driver problems keep each closed attempt’s counts even when its orders go on another trip.

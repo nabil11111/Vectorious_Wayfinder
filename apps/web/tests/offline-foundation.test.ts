@@ -152,6 +152,17 @@ describe('the account kept for offline startup', () => {
     expect(seen.at(-1)).toBeNull();
   });
 
+  it('signing in drops everything the last account read', async () => {
+    storage.setItem(ACCOUNT_KEY, JSON.stringify(dilshan));
+    const auth = await import('../src/features/auth/api');
+    client.setQueryData(['me'], dilshan);
+    client.setQueryData(['orders', 'deliveries', 'stop-1'], { stopId: 'stop-1' });
+    auth.useLogin();
+    await mutation().onSuccess?.(chaminda, { username: 'chaminda', password: 'irrelevant-test-password' }, undefined, { client });
+    expect(client.getQueryData(['orders', 'deliveries', 'stop-1'])).toBeUndefined();
+    expect(client.getQueryData(['me'])).toEqual(chaminda);
+  });
+
   it.each(['logout', 'login'] as const)('a cancelled account read cannot restore old identity after %s', async action => {
     storage.setItem(ACCOUNT_KEY, JSON.stringify(dilshan));
     const pending = deferredFetch();

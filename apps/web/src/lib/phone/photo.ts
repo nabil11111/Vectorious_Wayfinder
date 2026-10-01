@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 
-// The proof photo (spec 013, D-47, plan.md "The photo"). The picture is turned upright, drawn at most 1280 px on its
-// long side and made a JPEG at quality 0.7, then at 0.5 and 960 px if it is still over 500 KB. It is kept as a data
-// URL, which rides inside the write and is also the preview: the app's content policy allows data: images and not
-// blob: ones. The server takes only a whole JPEG of at most 500 KB and 2000 px a side.
+// A phone's photo (spec 013, D-47, plan.md "The photo"): the driver's proof and problems and the shop's report. The
+// picture is turned upright, drawn at most 1280 px on its long side and made a JPEG at quality 0.7, then at 0.5 and
+// 960 px if it is still over 500 KB. It is kept as a data URL, which rides inside the write and is also the preview: the
+// app's content policy allows data: images and not blob: ones. The server takes only a whole JPEG of at most 500 KB and
+// 2000 px a side.
 
 export const PHOTO_MAX_BYTES = 512_000;
 

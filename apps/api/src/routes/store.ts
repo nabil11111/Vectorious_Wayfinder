@@ -1,7 +1,10 @@
-import { PlaceOrdersRequest, SaveDraftRequest, StoreOrdersQuery } from '@wayfinder/contracts';
+import { PlaceOrdersRequest, ReceiptWrite, SaveDraftRequest, StoreDelivery, StoreOrdersQuery } from '@wayfinder/contracts';
 import { Router, type Request, type RequestHandler } from 'express';
 import { HttpError } from '../lib/errors';
+import { requireWriteOwner } from '../lib/phone-writes';
 import { requireRole } from '../middleware/auth';
+import { getDeliveries, getDelivery } from '../orders/deliveries';
+import { confirmDelivery } from '../orders/receipt';
 import { listOrders } from '../orders/store-lists';
 import { getNextOrder, placeOrders, saveDraft, type Caller } from '../orders/store-orders';
 
@@ -40,4 +43,26 @@ storeRouter.post('/next-order/place', async (req, res) => {
 // GET /store/orders?list=today|open|past&cursor=: the shop's orders (StoreOrdersQuery, StoreOrderList).
 storeRouter.get('/orders', async (req, res) => {
   res.json(await listOrders(callerOf(req), StoreOrdersQuery.parse(req.query)));
+});
+
+// GET /store/deliveries: the deliveries the shop confirms and those it confirmed today, with the phone writes the
+// account had applied (StoreDeliveries, spec 015).
+storeRouter.get('/deliveries', async (req, res) => {
+  res.json(await getDeliveries(callerOf(req)));
+});
+
+// GET /store/deliveries/:stopId: one delivery of the shop, whatever its day (StoreDelivery).
+storeRouter.get('/deliveries/:stopId', async (req, res) => {
+  res.json(await getDelivery(callerOf(req), StoreDelivery.shape.stopId.parse(req.params.stopId)));
+});
+
+// POST /store/receipts: one receipt (ReceiptWrite), saved on the shop's phone first and sent once. It answers the
+// deliveries as GET /store/deliveries reads them (StoreDeliveries). Its route alone takes a 2 MB body (app.ts).
+storeRouter.post('/receipts', requireWriteOwner, async (req, res) => {
+  const parsed = ReceiptWrite.safeParse(req.body);
+  if (!parsed.success) {
+    if (parsed.error.issues.some((issue) => issue.path[0] === 'photo')) throw new HttpError(400, 'invalid_input', 'The photo must be a whole JPEG of at most 500 KB.');
+    throw parsed.error;
+  }
+  res.json(await confirmDelivery(callerOf(req), parsed.data));
 });

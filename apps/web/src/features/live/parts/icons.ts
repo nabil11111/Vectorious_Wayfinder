@@ -31,9 +31,10 @@ export const ICON = {
 const BRAND: Record<Brand, string> = { Fresh: brandFresh, Style: brandStyle, Tech: brandTech };
 export const brandIcon = (brand: Brand | null) => (brand ? BRAND[brand] : route);
 
-// A problem by its kind: the loader's short count, damaged goods the shop refused, and the shop itself when closed.
+// A problem by its kind: the loader's short count, damaged goods the shop refused, the shop itself when closed, and
+// a shop's report on its receipt, short like the loader's.
 const SHOP: Record<Brand, string> = { Fresh: shopFresh, Style: shopStyle, Tech: shopTech };
-const PROBLEM: Record<Exclude<IssueKind, 'closed'>, string> = { loading: shortfall, refused: damaged };
+const PROBLEM: Record<Exclude<IssueKind, 'closed'>, string> = { loading: shortfall, refused: damaged, receipt: shortfall };
 export const problemIcon = (kind: IssueKind, shopName: string) => (kind === 'closed' ? SHOP[brandOfShop(shopName) ?? 'Fresh'] : PROBLEM[kind]);
 
 export const truckIcon = (trip: { vehicleType: 'truck' | 'van'; vehicleTemp: 'reefer' | 'ambient' }) => vehicleIcon({ type: trip.vehicleType, temp: trip.vehicleTemp });

@@ -5,9 +5,9 @@ import { users } from './identity';
 import { orderLines } from './orders';
 import { stops } from './planning';
 
-// A problem is one record whoever raises it (D-36): a loader's flag now, a driver's and a shop's later, each a new
-// kind. The dispatcher decides it once. reason and decision are text checked against their lists in the contracts,
-// as deferrals.code is, because each kind brings its own.
+// A problem is one record whoever raises it (D-36): a loader's flag, a driver's refusal or closed shop, and a shop's
+// report on its receipt, each a kind. The dispatcher decides it once. reason and decision are text checked against
+// their lists in the contracts, as deferrals.code is, because each kind brings its own.
 export const issues = pgTable('issues', {
   id: uuid('id').primaryKey().defaultRandom(),
   kind: issueKindEnum('kind').notNull(),

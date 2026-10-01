@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { phoneView, tripFigures, type DriverDay, type DriverTrip } from '@wayfinder/contracts';
-import { recordOf } from './sender';
-import { useKept, type Queued } from './store';
+import { recordOf, useKept, type Queued } from './queue';
 import type { Figures } from './words';
 
 // What the driver's screens show (spec 013, rule 13, D-50): the day the server last sent with the still-waiting writes

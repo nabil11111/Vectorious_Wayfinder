@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Brand, Temp } from './basics';
+import { Brand, IssueDecision, MAX_LINE_UNITS, MAX_ORDER_LINES, RefusalReason, StopOutcome, Temp } from './basics';
 import { Load } from './planning';
 
 // The store manager's screens (spec 009): the next order with its draft, placing it, and the lists of orders.
@@ -44,7 +44,7 @@ export const StoreProduct = z.object({
 export type StoreProduct = z.infer<typeof StoreProduct>;
 
 // A line to save. A quantity of 0 takes the item out of the draft.
-export const OrderLineInput = z.object({ productId: z.string().min(1).max(64), quantity: z.number().int().min(0).max(999) });
+export const OrderLineInput = z.object({ productId: z.string().min(1).max(64), quantity: z.number().int().min(0).max(MAX_LINE_UNITS) });
 export type OrderLineInput = z.infer<typeof OrderLineInput>;
 
 // A line as a screen shows it.
@@ -64,7 +64,7 @@ export type DraftRefs = z.infer<typeof DraftRefs>;
 export const SaveDraftRequest = z.object({
   // The day the screen is showing. The server refuses when that day has closed in the meantime.
   deliveryDate: Day,
-  lines: z.array(OrderLineInput).max(20),
+  lines: z.array(OrderLineInput).max(MAX_ORDER_LINES),
   driverNote: z.string().trim().max(200),
   refs: DraftRefs,
 });
@@ -74,6 +74,46 @@ export type SaveDraftRequest = z.infer<typeof SaveDraftRequest>;
 // safe retry: the answer is those orders and nothing new is made.
 export const PlaceOrdersRequest = z.object({ deliveryDate: Day, refs: DraftRefs });
 export type PlaceOrdersRequest = z.infer<typeof PlaceOrdersRequest>;
+
+const Count = z.number().int().min(0);
+
+// What happened at an order's latest stop on a sent plan (spec 015, rule 11), once the driver saved it.
+export const OrderDelivery = z.object({
+  stopId: z.uuid(),
+  vehicleId: z.string(),
+  // The driver's name, or null when the trip had none.
+  driver: z.string().nullable(),
+  arrivedAt: Moment,
+  doneAt: Moment,
+  outcome: StopOutcome,
+  // The truck arrived after the shop's window closed, its mall slot as spec 007 times it.
+  late: z.boolean(),
+  // This order's units handed over, null when nobody was at the shop.
+  delivered: Count.nullable(),
+  // This order's units the depot sent short (ordered less loaded) and the shop refused at the door (loaded less
+  // handed over). A closed stop's are its attempt's, as the driver's day reads them.
+  shortFromDepot: Count,
+  refused: Count,
+  // The driver's reason for a refusal, else null.
+  refusalReason: RefusalReason.nullable(),
+});
+export type OrderDelivery = z.infer<typeof OrderDelivery>;
+
+// The shop's receipt on an order (D-61): when the shop confirmed, when the receipt reached the depot (null for the
+// seeded history, which never travelled), the units received and the units short of what was ordered.
+export const OrderReceipt = z.object({ at: Moment, sentAt: Moment.nullable(), units: Count, short: Count });
+export type OrderReceipt = z.infer<typeof OrderReceipt>;
+
+// A problem at the order's latest stop that counts it: a refusal, a closed shop or the shop's own report, the units it
+// counts on this order, the answer (null while open) and the day of the replacements an answer placed.
+export const OrderProblem = z.object({
+  id: z.uuid(),
+  kind: z.enum(['refused', 'closed', 'receipt']),
+  units: Count,
+  decision: IssueDecision.nullable(),
+  replacementDay: Day.nullable(),
+});
+export type OrderProblem = z.infer<typeof OrderProblem>;
 
 export const StoreOrder = z.object({
   id: z.string(),
@@ -88,6 +128,15 @@ export const StoreOrder = z.object({
   placedAt: Moment.nullable(),
   // The reason of the latest deferral. Set only on a deferred order.
   deferralReason: z.string().nullable(),
+  // What happened at the order's latest stop on a sent plan: null until that stop is done.
+  delivery: OrderDelivery.nullable(),
+  // null unless the order is received with its counts.
+  receipt: OrderReceipt.nullable(),
+  // The problems of that stop that count the order, oldest first.
+  problems: z.array(OrderProblem),
+  // For a replacement, and for either part of one the plan split, the day of the delivery it replaces (D-59). null
+  // for an order the shop placed.
+  replacementFor: Day.nullable(),
 });
 export type StoreOrder = z.infer<typeof StoreOrder>;
 

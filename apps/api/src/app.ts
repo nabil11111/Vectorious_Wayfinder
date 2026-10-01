@@ -38,6 +38,10 @@ export function createApp() {
     autoLogging: { ignore: (req) => req.url === '/api/v1/health' || req.url === '/api/v1/events' },
     serializers: { req: (req) => ({ method: req.method, url: req.url }), res: (res) => ({ statusCode: res.statusCode }) },
   }));
+  // A receipt can name every line a stop can hold, 6,000 lines of about 390 KB, and carry a photo of up to 700,000
+  // characters, so its route alone takes 2 MB (spec 015). The parser that reads a body first is the one that counts, and
+  // every other route keeps 1 MB.
+  app.use('/api/v1/store/receipts', express.json({ limit: '2mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 

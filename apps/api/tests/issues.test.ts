@@ -91,10 +91,10 @@ it("AC-18 lists the depot's open problems oldest first, each with its truck and 
   const dry = dryLine(truck);
   expect(list.issues[0]).toEqual({
     id: truck.issues[0]!.id, revision: 0, kind: 'loading', reason: 'short', status: 'open', raisedBy: 'Kasun', raisedAt: depotInstant(THU, 2 * 60 + 33).toISOString(),
-    note: 'Only 3 dry cartons in the store', hasPhoto: false, decision: null, decidedBy: null, decidedAt: null, short: 1,
+    note: 'Only 3 dry cartons in the store', hasPhoto: false, decision: null, decidedBy: null, decidedAt: null, short: 1, cold: null, replacement: null,
     trip: { id: truck.tripId, vehicleId: 'VEH035', tripNo: 1, status: 'loading', driver: 'Dilshan', stopsLeft: 2, leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString() },
     stop: { id: stopOf(truck, 1).id, seq: 1, outletId: 'OUT001', shopName: 'Fresh Nugegoda', arrivedAt: null, doneAt: null, loadedAt: null, flaggedAtDock: true },
-    lines: [{ lineId: dry.lineId, orderId: dry.orderId, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', quantity: 4, counted: 3, loaded: null, delivered: null }],
+    lines: [{ lineId: dry.lineId, orderId: dry.orderId, temp: 'dry', productId: 'fresh-dry-carton', name: 'Dry carton', unit: 'carton', quantity: 4, counted: 3, loaded: null, delivered: null, received: null }],
   });
   expect(list.issues[1]).toMatchObject({
     reason: 'damaged', status: 'open', raisedBy: 'Kasun', raisedAt: depotInstant(THU, 2 * 60 + 34).toISOString(), note: null, short: 2,
@@ -121,7 +121,7 @@ it('AC-19 answers "Go short": decided by Ruwan at the clock, its revision up, th
   expect(res!.status).toBe(200);
   const answer = DecideIssueResponse.parse(res!.body);
   const decidedAt = depotInstant(THU, 2 * 60 + 35);
-  expect(answer).toEqual({ day: THU, issues: [], decided: { ...open, status: 'decided', revision: 1, decision: 'go_short', decidedBy: 'Ruwan', decidedAt: decidedAt.toISOString() } });
+  expect(answer).toEqual({ day: THU, replaceOn: '2026-06-26', issues: [], decided: { ...open, status: 'decided', revision: 1, decision: 'go_short', decidedBy: 'Ruwan', decidedAt: decidedAt.toISOString() } });
   expect((await db.select().from(issues).where(eq(issues.id, open!.id)))[0]).toMatchObject({ status: 'decided', revision: 1, decision: 'go_short', decidedBy: ruwanId, decidedAt });
   const audits = await db.select().from(auditLog).where(and(eq(auditLog.entityId, open!.id), eq(auditLog.action, 'issue.decided')));
   expect(audits).toHaveLength(1);

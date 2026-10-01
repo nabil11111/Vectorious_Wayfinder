@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router';
 import { nextStop, type Me } from '@wayfinder/contracts';
 import { AppShell } from '@/components/layout/AppShell';
 import { keepAccountThroughSignOut, useMe } from '@/features/auth/api';
+import { OtherTab } from '@/lib/phone/OtherTab';
+import { useSignal } from '@/lib/phone/signal';
 import { DayDone, TripDone } from './DonePage';
 import { NextStopPage } from './NextStopPage';
 import { ProofPage } from './ProofPage';
@@ -12,12 +14,8 @@ import { UnloadPage } from './UnloadPage';
 import { WrongPage } from './WrongPage';
 import { holdPictures } from './parts/icons';
 import { StatusChip } from './parts/StatusChip';
-import { Card } from './parts/ui';
-import { setAccount, useDriverQuery, useOwner, useSync } from './sender';
-import { useSignal } from './signal';
-import { useKept } from './store';
+import { setAccount, useDriverQuery, useKept, useOwner, useSync } from './queue';
 import { useDriverView } from './view';
-import { OTHER_TAB } from './words';
 
 // The driver's area (spec 013). The router hands over everything under /driver, so the area's own routes live here:
 // /driver shows the screen the trip is at, and /driver/proof, /driver/wrong and /driver/saved the steps of a stop. The
@@ -35,14 +33,6 @@ export function DriverHome() {
         {owner === 'owner' && me && <DriverArea me={me} />}
       </div>
     </AppShell>
-  );
-}
-
-function OtherTab() {
-  return (
-    <Card role="status" className="px-5 py-5">
-      <p className="text-[15px] leading-5 font-semibold">{OTHER_TAB}</p>
-    </Card>
   );
 }
 

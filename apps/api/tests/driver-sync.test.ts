@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool, type Tx } from '../src/db/client';
 import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
-import { auditLog, demoDay, driverWrites, issueLines, issues, orderLines, orders, photos, plans, stopOrders, stops, trips, users } from '../src/db/schema';
+import { auditLog, demoDay, phoneWrites, issueLines, issues, orderLines, orders, photos, plans, stopOrders, stops, trips, users } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { answeredDay, answeredTrip, driverScreen, driverStop, driverTrip, driverWrite, heldDriverRows, readyWalkthrough } from './driver-plan';
@@ -204,7 +204,7 @@ it.each(['new', 'replayed'] as const)('AC-22 answers a %s write from one snapsho
   expect(driverStop(driverTrip(result), 1).arrivedAt).toBe(at(214));
   expect(result.appliedWriteIds.filter(id => id === arrival.writeId)).toEqual([arrival.writeId]);
   expect(await auditsOf(driverStop(trip, 1).id, 'stop.arrived')).toHaveLength(1);
-  expect(await db.select().from(driverWrites).where(eq(driverWrites.id, arrival.writeId))).toHaveLength(1);
+  expect(await db.select().from(phoneWrites).where(eq(phoneWrites.id, arrival.writeId))).toHaveLength(1);
   // This answer consistently predates the concurrent retry; the next read sees it committed.
   const beforeRetry = driverTrip(result, 'VEH004');
   expect(driverStop(beforeRetry, 1).outcome).toBe('closed');
@@ -268,7 +268,7 @@ it('AC-23 reserves an id once when different trips receive it concurrently', asy
   const responses = await Promise.all(named.map(trip => driver.send(driverWrite(trip, 'start', at(211), undefined, { writeId }))));
   expect(responses.map(res => res.status).sort()).toEqual([200, 409]);
   expect(responses.find(res => res.status === 409)!.body.error.code).toBe('write_reused');
-  const stored = (await db.select().from(driverWrites).where(eq(driverWrites.id, writeId)))[0]!;
+  const stored = (await db.select().from(phoneWrites).where(eq(phoneWrites.id, writeId)))[0]!;
   const winner = named.find(trip => trip.tripId === stored.tripId)!;
   const loser = named.find(trip => trip.tripId !== stored.tripId)!;
   expect((await db.select().from(trips).where(eq(trips.id, winner.tripId)))[0]!.status).toBe('out');
@@ -302,7 +302,7 @@ it('AC-24 accepts one of two phones arriving with the same revision', async () =
   expect(responses.find(res => res.status === 409)!.body.error.code).toBe('stale');
   expect(await auditsOf(driverStop(driverTrip(day), 1).id, 'stop.arrived')).toHaveLength(1);
   const refusedWrite = writes[responses.findIndex(res => res.status === 409)]!;
-  expect(await db.select().from(driverWrites).where(eq(driverWrites.id, refusedWrite.writeId))).toEqual([]);
+  expect(await db.select().from(phoneWrites).where(eq(phoneWrites.id, refusedWrite.writeId))).toEqual([]);
 });
 
 it('AC-25 drops a lost arrival from the phone queue before building the delivery revision', async () => {
@@ -332,7 +332,7 @@ it('AC-25 lists the lost finish after 16:00 and refreshes a repeat last answered
   expect(fetched.trips).toEqual([]);
   expect(fetched.appliedWriteIds).toContain(finish.writeId);
   expect(phoneView(fetched, [finish]).writes).toEqual([]);
-  await db.update(driverWrites).set({ answeredAt: sql`now() - interval '49 hours'` }).where(eq(driverWrites.id, finish.writeId));
+  await db.update(phoneWrites).set({ answeredAt: sql`now() - interval '49 hours'` }).where(eq(phoneWrites.id, finish.writeId));
   expect((await driver.read()).appliedWriteIds).not.toContain(finish.writeId);
   const before = await durableRows();
   vi.mocked(announce).mockClear();
@@ -458,7 +458,7 @@ async function rowsWithin(tx: Tx) {
     stops: await tx.select().from(stops).orderBy(stops.id), orders: await tx.select().from(orders).orderBy(orders.id),
     lines: await tx.select().from(orderLines).orderBy(orderLines.id), issues: await tx.select().from(issues).orderBy(issues.id),
     issueLines: await tx.select().from(issueLines).orderBy(issueLines.issueId, issueLines.orderLineId),
-    audits: await tx.select().from(auditLog).orderBy(auditLog.id), writes: await tx.select().from(driverWrites).orderBy(driverWrites.id),
+    audits: await tx.select().from(auditLog).orderBy(auditLog.id), writes: await tx.select().from(phoneWrites).orderBy(phoneWrites.id),
     photos: await tx.select().from(photos).orderBy(photos.id),
   };
 }
@@ -522,5 +522,5 @@ it('AC-29 lets a driver write commit before a waiting reset', async () => {
   expect(reset.status).toBe(200);
   expect(await auditsOf(entityOf(write), 'stop.arrived')).toHaveLength(1);
   expect(await db.select().from(trips).where(eq(trips.id, write.tripId))).toEqual([]);
-  expect(await db.select().from(driverWrites).where(eq(driverWrites.id, write.writeId))).toEqual([]);
+  expect(await db.select().from(phoneWrites).where(eq(phoneWrites.id, write.writeId))).toEqual([]);
 });

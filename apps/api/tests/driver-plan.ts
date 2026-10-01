@@ -3,7 +3,7 @@ import { DriverDay, DriverWrite, type DriverTrip, type DriverStop, type DriverWr
 import type request from 'supertest';
 import { expect } from 'vitest';
 import { db } from '../src/db/client';
-import { driverWrites, photos } from '../src/db/schema';
+import { phoneWrites, photos } from '../src/db/schema';
 import {
   answeredTruck, answerFlag, dryLine, heldRows, loaderScreen, sendWalkthroughPlan, THU, truckOf,
   type Agent, type Walkthrough,
@@ -60,5 +60,5 @@ export function driverWrite(trip: DriverTrip, kind: DriverWriteKind, at: string,
     ...(stop ? { stopId: stop.id } : {}), ...more });
 }
 export async function heldDriverRows() {
-  return { ...await heldRows(), writes: await db.select().from(driverWrites).orderBy(driverWrites.id), photos: await db.select().from(photos).orderBy(photos.id) };
+  return { ...await heldRows(), writes: await db.select().from(phoneWrites).orderBy(phoneWrites.id), photos: await db.select().from(photos).orderBy(photos.id) };
 }

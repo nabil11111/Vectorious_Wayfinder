@@ -8,7 +8,7 @@ import { TopArea } from './parts/TopArea';
 import { TopLines } from './parts/TopLine';
 import { TripBar } from './parts/TripBar';
 import { ActionBar, BIG, Card, Problem } from './parts/ui';
-import { useSave } from './sender';
+import { useSave } from './queue';
 import type { DriverView } from './view';
 import { aboutStop, backByLine, brandOf, isLate, leftLine, NOT_SAVED, shopLine, stopOfLine, unloadLine, whole, windowLine, type Figures } from './words';
 

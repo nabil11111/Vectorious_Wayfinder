@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
-import { check, date, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
+import { boolean, check, date, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { orderStatusEnum, tempEnum } from './enums';
 import { users } from './identity';
+import { issues } from './issues';
 import { outlets, products } from './reference';
 
 // One order per temperature: chilled and dry travel on different trucks, which is why the shop's button says
@@ -23,6 +24,15 @@ export const orders = pgTable('orders', {
   revision: integer('revision').notNull().default(0),
   // A part of a split order points at its original, whose status is then split (D-17, spec 010).
   splitFrom: uuid('split_from').references((): AnyPgColumn => orders.id),
+  // The shop's receipt, kept on every order it covers (D-61), all three empty until it: when the shop confirmed, as
+  // the time rule keeps it, and when the receipt reached the server, both from the app clock (D-18); and for a chilled
+  // order whether it arrived cold, empty for a dry one. The seeded history has no time sent: it never travelled.
+  receivedAt: timestamp('received_at', { withTimezone: true }),
+  receiptSentAt: timestamp('receipt_sent_at', { withTimezone: true }),
+  arrivedCold: boolean('arrived_cold'),
+  // A replacement points at the problem whose answer placed it (D-59). A part of a split replacement does not: it
+  // reaches the problem through its original.
+  replacesIssueId: uuid('replaces_issue_id').references((): AnyPgColumn => issues.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
@@ -32,6 +42,8 @@ export const orders = pgTable('orders', {
   index('orders_outlet_date').on(t.outletId, t.deliveryDate),
   // An original's parts are found by it.
   index('orders_split_from').on(t.splitFrom),
+  // A problem's replacements are found by it.
+  index('orders_replaces').on(t.replacesIssueId),
 ]);
 
 export const orderLines = pgTable('order_lines', {
@@ -43,9 +55,12 @@ export const orderLines = pgTable('order_lines', {
   // and the shop add theirs beside it (A4, A5).
   loadedQty: integer('loaded_qty'),
   deliveredQty: integer('delivered_qty'),
+  // What the shop counted on its receipt (spec 015), empty until then.
+  receivedQty: integer('received_qty'),
 }, (t) => [
   check('order_lines_quantity_positive', sql`${t.quantity} > 0`),
   check('order_lines_delivered_qty', sql`${t.deliveredQty} between 0 and ${t.loadedQty}`),
+  check('order_lines_received_qty', sql`${t.receivedQty} between 0 and ${t.deliveredQty}`),
   check('order_lines_loaded_qty', sql`${t.loadedQty} between 0 and ${t.quantity}`),
   // One line per item in an order.
   unique('order_lines_order_product').on(t.orderId, t.productId),

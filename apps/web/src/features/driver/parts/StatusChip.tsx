@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useMe } from '@/features/auth/api';
+import { useSignal } from '@/lib/phone/signal';
 import { cn } from '@/lib/utils';
-import { recordOf, retrySync } from '../sender';
-import { useSignal } from '../signal';
-import { clearRefused, type Queued } from '../store';
+import { clearRefused, recordOf, retrySync, type Queued } from '../queue';
 import { useDriverView } from '../view';
 import { clockTime, whole } from '../words';
 import { ICON } from './icons';
@@ -57,7 +56,7 @@ export function StatusChip() {
         )}
       </SheetTrigger>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[480px] rounded-t-xl border-t-0 px-4 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-        <WaitingSheet waiting={view.waiting} refused={view.refused} userId={me?.id ?? ''} />
+        <WaitingSheet waiting={view.waiting} refused={view.refused} />
       </SheetContent>
     </Sheet>
   );
@@ -83,7 +82,7 @@ function refusedRows(entries: Queued[]): Row[] {
 
 // The waiting sheet (no frame): what waits to send and what the server did not accept, with "Clear" and, while
 // something waits, "Retry sync".
-function WaitingSheet({ waiting, refused, userId }: { waiting: Queued[]; refused: Queued[]; userId: string }) {
+function WaitingSheet({ waiting, refused }: { waiting: Queued[]; refused: Queued[] }) {
   const [clearing, setClearing] = useState(false);
   const [clearFailed, setClearFailed] = useState(false);
   const waitingList = waitingRows(waiting);
@@ -95,7 +94,7 @@ function WaitingSheet({ waiting, refused, userId }: { waiting: Queued[]; refused
     setClearing(true);
     setClearFailed(false);
     try {
-      await clearRefused(userId);
+      await clearRefused();
     } catch (error) {
       console.warn('Could not clear the records that were not accepted.', error);
       setClearFailed(true);

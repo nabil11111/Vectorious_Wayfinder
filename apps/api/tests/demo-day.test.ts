@@ -513,44 +513,62 @@ describe('the seeded day on an empty database', () => {
   });
 });
 
-// What spec 009 adds for the shop's own screens: a history for OUT001, and what the draft's form shows.
+// What spec 009 adds for the shop's own screens: a history for OUT001, and what the draft's form shows. Spec 015's
+// block makes that history received, with its counts and times (D-62).
 describe('the seeded day of a shop with an account', () => {
-  it('gives OUT001 a dry order for Wednesday that has arrived: 6 cartons, delivered, placed by nadeesha and on no plan', async () => {
+  it('AC-33 (spec 015) gives OUT001 a dry order for Wednesday received at 07:42: 6 cartons, all 6 received, placed by nadeesha and on no plan', async () => {
     await seeded(async (tx) => {
       const nadeesha = await userId(tx, 'nadeesha');
       // Beside the chilled order that waited, which is the one from spec 008.
       const wednesday = (await ordersWithLoads(tx)).filter((o) => o.outletId === 'OUT001' && o.date === WED);
-      expect(wednesday.map((o) => [o.temp, o.status, o.units])).toEqual([['chilled', 'deferred', 12], ['dry', 'delivered', 6]]);
+      expect(wednesday.map((o) => [o.temp, o.status, o.units])).toEqual([['chilled', 'deferred', 12], ['dry', 'received', 6]]);
 
       const [dry] = await tx.select().from(orders).where(eq(orders.id, demoId('order', `${WED}:OUT001:dry`)));
       expect(dry).toMatchObject({
-        outletId: 'OUT001', deliveryDate: WED, temp: 'dry', status: 'delivered', revision: 0, savedAt: null,
+        outletId: 'OUT001', deliveryDate: WED, temp: 'dry', status: 'received', revision: 0, savedAt: null,
         createdBy: nadeesha, placedBy: nadeesha, placedAt: depotInstant(TUE, 8 * 60 + 5),
+        // The design's Today: "6 dry cartons · Received 07:42 · All 6 received". It never travelled, so it has no time sent.
+        receivedAt: depotInstant(WED, 7 * 60 + 42), receiptSentAt: null, arrivedCold: null, replacesIssueId: null,
       });
       expect(await linesOf(tx, dry!.id)).toEqual({ 'fresh-dry-carton': 6 });
-      // No plan of the seed has a trip, so the order counts for the day the shop wanted: today.
+      expect((await tx.select().from(orderLines).where(eq(orderLines.orderId, dry!.id))).map((l) => [l.loadedQty, l.deliveredQty, l.receivedQty])).toEqual([[null, null, 6]]);
+      // No plan of the seed has a trip, so the order has no delivery and counts for the day the shop wanted.
       expect(await tx.select().from(stopOrders)).toEqual([]);
     });
   });
 
-  it('gives OUT001 24 received orders, a chilled and a dry one for each of the twelve operating days before Wednesday', async () => {
+  it('AC-33 (spec 015) gives OUT001 25 received orders, the 24 of the twelve operating days before Wednesday received in full with a time on their day', async () => {
     await seeded(async (tx) => {
       const nadeesha = await userId(tx, 'nadeesha');
       const received = (await ordersWithLoads(tx)).filter((o) => o.status === 'received');
       expect([...new Set(received.map((o) => o.outletId))]).toEqual(['OUT001']);
       // A page of the Past list is 20, so there is a second one to load.
-      expect(total(received)).toEqual({ orders: 24, units: 199, kg: 1373.1, m3: 7.363 });
+      expect(total(received)).toEqual({ orders: 25, units: 205, kg: 1414.5, m3: 7.585 });
       expect(received.filter((o) => o.strays > 0 || o.createdBy !== nadeesha || o.revision !== 0)).toEqual([]);
 
       // Each day with its chilled and its dry cartons: 8 + (d mod 6) and 4 + (d mod 5), d being the day of the
-      // month. Tue 23 Jun: 8 + 5 = 13 chilled and 4 + 3 = 7 dry. No Sunday is among them.
+      // month. Tue 23 Jun: 8 + 5 = 13 chilled and 4 + 3 = 7 dry. No Sunday is among them. Wednesday has its dry order.
       const cartons = (date: string, temp: string) => received.filter((o) => o.date === date && o.temp === temp).map((o) => o.units);
       const days = [...new Set(received.map((o) => o.date))].sort().reverse();
       expect(days.map((date) => [date, cartons(date, 'chilled'), cartons(date, 'dry')])).toEqual([
+        ['2026-06-24', [], [6]],
         ['2026-06-23', [13], [7]], ['2026-06-22', [12], [6]], ['2026-06-20', [10], [4]], ['2026-06-19', [9], [8]],
         ['2026-06-18', [8], [7]], ['2026-06-17', [13], [6]], ['2026-06-16', [12], [5]], ['2026-06-15', [11], [4]],
         ['2026-06-13', [9], [7]], ['2026-06-12', [8], [6]], ['2026-06-11', [13], [5]], ['2026-06-10', [12], [4]],
       ]);
+
+      // Received in full, at 07:00 plus 3 minutes for each day of the month mod 10 on the day it was for, cold when
+      // chilled, and never sent through the app. Tue 23 Jun: 07:09.
+      const rows = await tx.select().from(orders).where(eq(orders.status, 'received'));
+      const lines = await tx.select().from(orderLines);
+      for (const o of rows.filter((row) => row.deliveryDate !== WED)) {
+        const d = Number(o.deliveryDate.slice(8));
+        expect([o.deliveryDate, o.temp, o.receivedAt, o.receiptSentAt, o.arrivedCold]).toEqual([o.deliveryDate, o.temp, depotInstant(o.deliveryDate, 7 * 60 + 3 * (d % 10)), null, o.temp === 'chilled' ? true : null]);
+        expect(lines.filter((l) => l.orderId === o.id).map((l) => [l.receivedQty, l.quantity, l.deliveredQty])).toEqual(lines.filter((l) => l.orderId === o.id).map((l) => [l.quantity, l.quantity, null]));
+      }
+      expect(rows.find((o) => o.deliveryDate === '2026-06-23' && o.temp === 'dry')!.receivedAt).toEqual(depotInstant('2026-06-23', 7 * 60 + 9));
+      // Nothing else of the day is received or counted.
+      expect(lines.filter((l) => l.receivedQty !== null && !rows.some((o) => o.id === l.orderId))).toEqual([]);
 
       // Every one was placed by nadeesha at 08:05 on the operating day before it was wanted, which is the last
       // day its orders were open. So Monday's were placed on Saturday, not on the Sunday in between.
