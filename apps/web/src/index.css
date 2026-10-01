@@ -8,6 +8,11 @@
 /* Wayfinder tokens, taken from the Figma style guide ("High-vis", chosen 26 Sep). Change colours here, never in
    components, so every screen stays on the same palette. */
 
+/* 1320 px: from here the top bar has room for the user's name beside the dispatcher's six tabs. */
+@theme {
+  --breakpoint-wide: 82.5rem;
+}
+
 @theme inline {
   --font-sans: 'Inter Variable', system-ui, sans-serif;
   --font-heading: 'Manrope Variable', 'Inter Variable', sans-serif;

@@ -196,7 +196,7 @@ Anything we built differently from our Designathon submission, and why.
   desktop Style and Tech forms, confirmation and Help have no frames, so they follow the desktop Fresh form.
 - **Today after placing** keeps the date and the shop's name as its header, where the frame has the title "Today".
 - **OUT001** has a street entrance and van-only parking in the booklet's data, where the design shows a rear dock.
-- **Below 1024 wide the nav is bottom tabs** for every role, and the name beside the avatar waits until 1280, so
+- **Below 1024 wide the nav is bottom tabs** for every role, and the name beside the avatar waits until 1320, so
   the dispatcher's six tabs fit the top bar.
 
 **The plan board and View plan**
