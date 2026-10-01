@@ -15,7 +15,8 @@ import { BuildPanel } from './parts/BuildPanel';
 import { crewChange, type Pick } from './parts/crews';
 import { DoneList } from './parts/DoneList';
 import { FindSlot } from './parts/FindSlot';
-import { historyKey, pressOf } from './parts/history-keys';
+import { startOverChange } from './parts/changes';
+import { historyKey, openAfter, pressOf } from './parts/history-keys';
 import { ICON } from './parts/icons';
 import { groupKey, indexOf } from './parts/lookup';
 import { OrderLists } from './parts/OrderLists';
@@ -112,7 +113,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
   // rule 1). The trip opens.
   const chooseCrew = (pick: Pick, crew: CrewRef) => {
     setDropped(null);
-    const made = crewChange(pick, draft, crew, index);
+    const made = crewChange(pick, draft, crew, index, open ? keyOf(open) : null);
     if (!made) return;
     change(made.plan, made.undo);
     const group = pick.kind === 'swap' ? startedFrom[pick.key] : pick.group;
@@ -120,15 +121,22 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
     openTrip(made.key);
   };
 
-  // The history (spec 027): Undo and Redo, from the header, a green line or the keys. A step that moved the open trip to
-  // another key, such as Swap truck, opens it again where it was, and Redo where it went (L-10).
-  const undo = () => {
-    const step = saver.undo();
-    if (step?.from !== undefined) openTrip(step.from);
+  // The history (spec 027): Undo and Redo, from the header, a green line or the keys. A step that changed which trip is
+  // open opens on Undo what was open before it, and on Redo what was open after it (L-10, L-16); a trip the draft no
+  // longer has is never left open.
+  const follow = (which: 'undo' | 'redo', step: ReturnType<Saver['undo']>) => {
+    const now = saver.snapshot();
+    const next = now ? openAfter(which, step, now.draft, open ? keyOf(open) : null) : undefined;
+    if (next !== undefined) openTrip(next);
   };
-  const redo = () => {
-    const step = saver.redo();
-    if (step?.from !== undefined && step.tripKey !== null) openTrip(step.tripKey);
+  const undo = () => follow('undo', saver.undo());
+  const redo = () => follow('redo', saver.redo());
+
+  // Start over empties the draft, so the open trip closes; Undo opens it again (L-16).
+  const startOver = () => {
+    const over = startOverChange(draft, open ? keyOf(open) : null);
+    change(over.plan, over.said);
+    if (open) openTrip(null);
   };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -228,6 +236,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         onRefresh={onRefresh}
         onUndo={undo}
         onRedo={redo}
+        onStartOver={startOver}
         refreshing={refreshing}
       />
       <PlanDnd screen={screen} index={index} change={change} undo={undo} onStartTrip={setDropped}>

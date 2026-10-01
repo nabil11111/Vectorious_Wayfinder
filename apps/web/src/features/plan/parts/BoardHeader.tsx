@@ -11,8 +11,7 @@ import { cn } from '@/lib/utils';
 import { editable, type BoardScreen, type Undo } from '../board';
 import { setMixBrands } from '../draft';
 import { clockTime, figure, planFor, space, whole } from '../words';
-import { startOverChange } from './changes';
-import { START_OVER_LINE } from './history-keys';
+import { historyTip, START_OVER_LINE } from './history-keys';
 import { inkButton, plainButton } from './look';
 import { Tag } from './ui';
 
@@ -21,7 +20,7 @@ export type Tab = 'unplanned' | 'planning' | 'done';
 // The top of the board (Edit plan's header): the day, the three columns as tabs, whether the draft is saved,
 // the counts of rule 12, "Mix brands" and "View plan". Below 1024 px the tabs choose the column on screen; on a
 // desktop they only mark the column being worked in.
-export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedCount, doneCount, change, retry, onViewPlan, stale, onRefresh, refreshing, onUndo, onRedo }: {
+export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedCount, doneCount, change, retry, onViewPlan, stale, onRefresh, refreshing, onUndo, onRedo, onStartOver }: {
   screen: BoardScreen;
   tab: Tab;
   working: Tab;
@@ -38,6 +37,8 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
   // The history's Undo and Redo (spec 027).
   onUndo: () => void;
   onRedo: () => void;
+  // Start over, once asked (spec 027).
+  onStartOver: () => void;
 }) {
   const [asking, setAsking] = useState(false);
   const { board, draft } = screen;
@@ -111,16 +112,13 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
           </AlertDialogHeader>
           <AlertDialogFooter className="-mx-5 -mb-5 rounded-b-lg px-5 py-3.5">
             <AlertDialogCancel className={plainButton('h-10 px-5 text-[13px]')}>Keep the plan</AlertDialogCancel>
-            <Button className={inkButton('h-10 px-5 text-[13px]')} onClick={() => { const over = startOverChange(draft); change(over.plan, over.said); setAsking(false); }}>Start over</Button>
+            <Button className={inkButton('h-10 px-5 text-[13px]')} onClick={() => { onStartOver(); setAsking(false); }}>Start over</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </header>
   );
 }
-
-// What Undo's or Redo's tooltip says: the change it would undo or redo, or that there is nothing to.
-export const historyTip = (verb: 'Undo' | 'Redo', line: string | null) => (line ? `${verb}: ${line}` : `Nothing to ${verb.toLowerCase()}`);
 
 // Undo or Redo (spec 027): an icon button named by the change it would undo or redo, also in its tooltip, and off with
 // nothing to do. Off is the app's disabled look and Base UI's disabled button, which ignores presses; it stays

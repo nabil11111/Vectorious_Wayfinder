@@ -205,7 +205,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
       </div>
 
       <div className="mt-auto flex items-center justify-between gap-3 px-3.5 pt-6 pb-3.5">
-        <Button variant="outline" className={plainButton('h-9 px-4 text-[13px]')} onClick={() => { const removed = removeTripChange(draft, trip, index); change(removed.plan, removed.said); onRemoved(); }}>Remove trip</Button>
+        <Button variant="outline" className={plainButton('h-9 px-4 text-[13px]')} onClick={() => { const removed = removeTripChange(draft, trip, index, true); change(removed.plan, removed.said); onRemoved(); }}>Remove trip</Button>
         <Button variant="secondary" className={inkButton('h-9 px-6 text-[13px]')} onClick={onDone}>Mark trip done</Button>
       </div>
     </div>

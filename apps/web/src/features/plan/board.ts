@@ -136,8 +136,9 @@ export type Saving = 'saved' | 'saving' | 'retrying' | 'refused';
 
 // What a change of the draft is called (spec 027): the line that names it, in the header's Undo and Redo and, when it
 // is about a trip, in the green line that trip shows with Undo. from is the trip that was open before a change that
-// moved it to another key, such as Swap truck, which Undo opens again (L-10), and Redo opens tripKey once more.
-export interface Undo { line: string; tripKey: string | null; from?: string }
+// changed which trip is open, or null for none: Swap truck (L-10), Start a trip, removing the open trip and Start over
+// (L-16). Undo opens from again, and Redo opens tripKey once more, or none when it is null.
+export interface Undo { line: string; tripKey: string | null; from?: string | null }
 
 // One step of the board's history: the draft before and after a change, and what the change is called.
 interface Step extends Undo { before: DraftPlan; after: DraftPlan }

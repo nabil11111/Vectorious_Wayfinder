@@ -40,6 +40,11 @@ stop from the planning section".
    and Undo brings back all 27 trips and 6 deferrals in one step.
 5. **The history is this tab's.** Ruwan's change in another tab, a split or a join replaces the draft, and Undo and Redo
    are then off until the next change.
+6. **Undo opens what was open.** With Chaminda's trip open, Ruwan starts a second trip on Wasantha's reefer van, which
+   opens, and adds Fresh Puttalam to it. Undo twice: Puttalam goes back to Unplanned, the second trip goes, and
+   Chaminda's trip is open again, with the address naming it. Undoing "Remove trip" on the open trip, a truck swap or
+   Start over opens the trip that was open before it, and Redo opens the one after it, or none. A trip the draft no
+   longer has is never left open or in the address.
 
 ## Acceptance criteria
 - [ ] AC-1 When a change of the draft is made, the system shall let Undo put back the draft before it and Redo make it

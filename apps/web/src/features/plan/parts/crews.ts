@@ -86,7 +86,7 @@ export function crewRows(read: CrewList, pick: Pick, plan: DraftPlan, index: Boa
       `fuel ${crew.fuelLeftPct}% left`,
     ].join(' · ');
     // Every driver the pick displaces, said before the press (rule 2).
-    const made = crewChange(pick, plan, { vehicleId: crew.vehicleId, driverId: crew.driverId }, index);
+    const made = crewChange(pick, plan, { vehicleId: crew.vehicleId, driverId: crew.driverId }, index, null);
     const moved = made ? displaced(plan, made.plan, crew) : { left: [], off: [] };
     const warning = [
       ...moved.left.map((vehicleId) => `${driver?.name ?? 'The driver'} ${movesLine(vehicleId)}`),
@@ -97,9 +97,9 @@ export function crewRows(read: CrewList, pick: Pick, plan: DraftPlan, index: Boa
 }
 
 // The change a picked crew makes (rule 1): the trip started on its truck, or moved there, with its driver, as one change
-// of the draft with one Undo, whose line names the crew and any truck the driver left. null when the truck runs two
-// trips already.
-export function crewChange(pick: Pick, plan: DraftPlan, crew: CrewRef, index: BoardIndex): { plan: DraftPlan; key: TripKey; undo: Undo } | null {
+// of the draft with one Undo, whose line names the crew and any truck the driver left. open is the trip open on the
+// board when the crew is picked. null when the truck runs two trips already.
+export function crewChange(pick: Pick, plan: DraftPlan, crew: CrewRef, index: BoardIndex, open: TripKey | null): { plan: DraftPlan; key: TripKey; undo: Undo } | null {
   const made = pick.kind === 'start' ? startTrip(plan, crew, pick.startWith) : swapTruck(plan, pick.key, crew);
   const trip = made ? tripOf(made.plan, made.key) : null;
   if (!made || !trip) return null;
@@ -110,6 +110,7 @@ export function crewChange(pick: Pick, plan: DraftPlan, crew: CrewRef, index: Bo
   const moved = displaced(plan, made.plan, crew);
   for (const vehicleId of moved.left) line += `. ${vehicleId} has no driver now.`;
   for (const { driverId, vehicleId } of moved.off) line += `${line.endsWith('.') ? '' : '.'} ${index.driver(driverId)?.name ?? 'A driver'} is off ${vehicleId} now.`;
-  // A swapped trip has a new key: Undo opens it again at the one it had (L-10).
-  return { ...made, undo: { line, tripKey: made.key, ...(pick.kind === 'swap' ? { from: pick.key } : {}) } };
+  // The pick opens the trip: Undo opens what was open before, a swapped trip at the key it had (L-10), a started one's
+  // the trip that was open, or none (L-16).
+  return { ...made, undo: { line, tripKey: made.key, from: pick.kind === 'swap' ? pick.key : open } };
 }

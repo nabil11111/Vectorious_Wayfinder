@@ -89,28 +89,30 @@ it('rule 2 says before the press when the crew\'s driver drives another truck, w
 
 it('rule 1 a pick is one change of the draft with one Undo, naming the crew', () => {
   const button: Pick = { kind: 'start', group: { brand: 'Fresh', district: 'Colombo' }, orders: [BOARD.orders[2]!], startWith: [] };
-  expect(crewChange(button, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toEqual({
-    ...startTrip(DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA })!, undo: { line: 'Trip started on Wasantha\'s reefer van', tripKey: 'VEH035-1' },
+  // A started trip's Undo opens what was open before it (L-16): nothing here, Chaminda's trip below.
+  expect(crewChange(button, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX, null)).toEqual({
+    ...startTrip(DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA })!, undo: { line: 'Trip started on Wasantha\'s reefer van', tripKey: 'VEH035-1', from: null },
   });
-  expect(crewChange(DROPPED, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toMatchObject({ undo: { line: 'Fresh Dehiwala added to Wasantha\'s reefer van' } });
+  expect(crewChange(button, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX, 'VEH011-1')).toMatchObject({ undo: { tripKey: 'VEH035-1', from: 'VEH011-1' } });
+  expect(crewChange(DROPPED, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX, null)).toMatchObject({ undo: { line: 'Fresh Dehiwala added to Wasantha\'s reefer van' } });
   // A driver who moves is said in the same line, and the one Undo puts him back.
-  expect(crewChange(DROPPED, DRAFT, { vehicleId: 'VEH035', driverId: DILSHAN }, INDEX)).toMatchObject({
+  expect(crewChange(DROPPED, DRAFT, { vehicleId: 'VEH035', driverId: DILSHAN }, INDEX, null)).toMatchObject({
     key: 'VEH035-1', undo: { line: 'Fresh Dehiwala added to Dilshan\'s reefer van. VEH001 has no driver now.' },
   });
-  expect(crewChange({ kind: 'swap', key: 'VEH011-1' }, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX)).toEqual({
+  expect(crewChange({ kind: 'swap', key: 'VEH011-1' }, DRAFT, { vehicleId: 'VEH035', driverId: WASANTHA }, INDEX, 'VEH011-1')).toEqual({
     ...swapTruck(DRAFT, 'VEH011-1', { vehicleId: 'VEH035', driverId: WASANTHA })!, // Chaminda drove the trip, and Wasantha drives it now, so the line says Chaminda is off his truck.
     // The swapped trip's old key, which Undo opens again (L-10).
     undo: { line: 'Trip moved to Wasantha\'s reefer van. Chaminda is off VEH011 now.', tripKey: 'VEH035-1', from: 'VEH011-1' },
   });
   // A second trip says so.
-  expect(crewChange(button, DRAFT, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX)).toMatchObject({ key: 'VEH011-2', undo: { line: 'Second trip started on Chaminda\'s dry truck' } });
+  expect(crewChange(button, DRAFT, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX, null)).toMatchObject({ key: 'VEH011-2', undo: { line: 'Second trip started on Chaminda\'s dry truck' } });
 });
 
 it('rule 1 picks for the group\'s orders, the dropped ones, or the trip\'s, and a truck already on two trips takes nothing', () => {
   expect(pickOrders(DROPPED, DRAFT, INDEX)).toEqual([BOARD.orders[2]]);
   expect(pickOrders({ kind: 'swap', key: 'VEH011-1' }, DRAFT, INDEX)).toEqual([BOARD.orders[0]]);
   const full = { ...DRAFT, trips: [...DRAFT.trips, trip('VEH011', CHAMINDA, 'OUT006', uuid(7), 2)] };
-  expect(crewChange(DROPPED, full, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX)).toBeNull();
+  expect(crewChange(DROPPED, full, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX, null)).toBeNull();
   expect(crewRows({ ...LIST, crews: [crew('VEH011', CHAMINDA)] }, DROPPED, full, INDEX)[0]).toMatchObject({ line: 'on two trips already', disabled: true });
 });
 
@@ -121,7 +123,7 @@ it('rule 2 names every driver a pick displaces, the truck\'s own driver too', ()
   const old = { ...LIST, crews: [crew('VEH001', DILSHAN)] };
   expect(crewRows(old, DROPPED, now, INDEX)[0]!.warning)
     .toBe('Dilshan drives VEH002 now; it will have no driver. Chaminda drives VEH001 now and will be taken off it');
-  expect(crewChange(DROPPED, now, { vehicleId: 'VEH001', driverId: DILSHAN }, INDEX)!.undo.line)
+  expect(crewChange(DROPPED, now, { vehicleId: 'VEH001', driverId: DILSHAN }, INDEX, null)!.undo.line)
     .toBe('Fresh Dehiwala added to the second trip of Dilshan\'s reefer truck. VEH002 has no driver now. Chaminda is off VEH001 now.');
 });
 

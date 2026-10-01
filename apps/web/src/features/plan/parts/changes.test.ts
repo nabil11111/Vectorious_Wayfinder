@@ -30,6 +30,10 @@ it('AC-3 removes a trip from its Done card as one step, its orders back in Unpla
   expect(removeTripChange(DRAFT, trip, INDEX)).toEqual({ plan: { ...DRAFT, trips: [] }, said: { line: 'Trip on Chaminda\'s reefer truck removed', tripKey: null } });
 });
 
+it('L-16 removes the open trip as a step whose Undo opens it again, and whose Redo closes it', () => {
+  expect(removeTripChange(DRAFT, trip, INDEX, true).said).toEqual({ line: 'Trip on Chaminda\'s reefer truck removed', tripKey: null, from: 'VEH004-1' });
+});
+
 it('AC-3 takes a stop off the open trip with its × as one step, every order of it', () => {
   expect(takeStopOffChange(DRAFT, trip, 0, INDEX)).toEqual({
     plan: { ...DRAFT, trips: [{ ...trip, stops: [trip.stops[1]!] }] },
@@ -38,5 +42,7 @@ it('AC-3 takes a stop off the open trip with its × as one step, every order of 
 });
 
 it('AC-4 starts over as one step: no trip and no deferral, Mix brands as it was', () => {
-  expect(startOverChange({ ...DRAFT, mixBrands: true })).toEqual({ plan: { mixBrands: true, trips: [], deferrals: [] }, said: { line: 'Plan started over', tripKey: null } });
+  expect(startOverChange({ ...DRAFT, mixBrands: true }, null)).toEqual({ plan: { mixBrands: true, trips: [], deferrals: [] }, said: { line: 'Plan started over', tripKey: null } });
+  // With a trip open, Undo opens it again (L-16).
+  expect(startOverChange(DRAFT, 'VEH004-1').said).toEqual({ line: 'Plan started over', tripKey: null, from: 'VEH004-1' });
 });
