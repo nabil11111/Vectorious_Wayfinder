@@ -128,10 +128,10 @@ it('AC-5 leaves a truck that is out or done off the list', async () => {
   }
 });
 
-it('AC-6 turns away no session, the other roles and an admin on all seven endpoints', async () => {
+it('AC-6 turns away no session, the other roles and an admin on all eight endpoints, Q-16 taking a stop off again among them', async () => {
   type Endpoint = [method: 'get' | 'post', url: string];
   const id = randomUUID();
-  const loaders: Endpoint[] = [['get', '/api/v1/loading'], ...['start', 'stop-loaded', 'flags', 'ready'].map((write): Endpoint => ['post', `/api/v1/loading/trips/${id}/${write}`])];
+  const loaders: Endpoint[] = [['get', '/api/v1/loading'], ...['start', 'stop-loaded', 'undo-stop', 'flags', 'ready'].map((write): Endpoint => ['post', `/api/v1/loading/trips/${id}/${write}`])];
   const dispatchers: Endpoint[] = [['get', '/api/v1/issues'], ['post', `/api/v1/issues/${id}/decide`]];
   const call = (agent: ReturnType<typeof request.agent>, [method, url]: Endpoint) => method === 'get' ? agent.get(url) : agent.post(url).send({});
   for (const path of [...loaders, ...dispatchers]) {

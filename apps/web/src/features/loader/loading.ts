@@ -39,14 +39,16 @@ export const worthRetrying = (error: unknown) =>
   !(error instanceof ApiRequestError) || error.code === 'network' || error.status >= 500 || error.status === 429;
 
 type Without<T> = Omit<T, 'writeId'>;
+// undo takes a stop marked loaded by mistake off again (Q-16), naming its stop as marking it loaded does.
 type WriteOf =
   | { kind: 'start'; body: Without<StartLoadingRequest> }
   | { kind: 'stop'; body: Without<StopLoadedRequest> }
+  | { kind: 'undo'; body: Without<StopLoadedRequest> }
   | { kind: 'flag'; body: Without<RaiseFlagRequest> }
   | { kind: 'ready'; body: Without<MarkReadyRequest> };
 export type WriteKind = WriteOf['kind'];
 
-const PATH: Record<WriteKind, string> = { start: 'start', stop: 'stop-loaded', flag: 'flags', ready: 'ready' };
+const PATH: Record<WriteKind, string> = { start: 'start', stop: 'stop-loaded', undo: 'undo-stop', flag: 'flags', ready: 'ready' };
 
 interface Write { kind: WriteKind; tripId: string; body: { writeId: string }; done?: () => void }
 

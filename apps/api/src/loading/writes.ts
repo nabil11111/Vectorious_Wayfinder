@@ -12,8 +12,9 @@ import { dayLabel } from '../plans/board-day';
 import { loadingDayOf, trucksOf } from './day';
 import { loaderDay } from './loader-day';
 
-// The loader's four writes (spec 012): starting a truck, marking a stop loaded, flagging lines and marking the truck
-// ready. Each is one transaction that answers the loading day, and is announced once it has committed.
+// The loader's writes (spec 012): starting a truck, marking a stop loaded or taking it off again (Q-16), flagging lines
+// and marking the truck ready. Each is one transaction that answers the loading day, and is announced once it has
+// committed.
 
 type TripRow = typeof trips.$inferSelect;
 interface OpenTrip { moment: DayMoment; trip: TripRow; plan: typeof plans.$inferSelect }
@@ -108,6 +109,27 @@ export function markStopLoaded(caller: DepotCaller, tripId: string, body: StopLo
     await writeTrip(tx, trip, body.writeId);
     await tx.insert(auditLog).values({ actorId: caller.userId, action: 'stop.loaded', entity: 'stop', entityId: stop.id,
       before: { loadedAt: null }, after: { tripId: trip.id, seq: stop.seq, loadedAt: moment.at.toISOString() } });
+    return [{ topic: 'loading', depotId: caller.depotId }];
+  });
+}
+
+// A stop marked loaded by mistake comes off again until the truck is ready (Q-16). Only the last stop loaded can, as it
+// went in last and sits in front of the others, so the stops on the truck stay the ones after the first not loaded.
+// Its lines and flags stay as they are, and its cartons are no longer counted on.
+export function undoStopLoaded(caller: DepotCaller, tripId: string, body: StopLoadedRequest): Promise<LoadingDay> {
+  return loaderWrite(caller, tripId, body.writeId, false, async (tx, { trip }) => {
+    requireLoading(trip, body.revision);
+    const tripStops = await tx.select().from(stops).where(eq(stops.tripId, trip.id)).orderBy(stops.seq);
+    const stop = tripStops.find((s) => s.id === body.stopId);
+    if (!stop) throw unknownRecord(body.stopId, 'That stop is not on this truck.');
+    if (!stop.loadedAt) throw stale(trip);
+    // The stop loaded last is the loaded one with the lowest number.
+    const later = tripStops.find((s) => s.seq < stop.seq && s.loadedAt);
+    if (later) throw new HttpError(409, 'load_order', `Undo stop ${later.seq} first. The last stop loaded comes off first.`, { stopSeq: later.seq });
+    await tx.update(stops).set({ loadedAt: null }).where(eq(stops.id, stop.id));
+    await writeTrip(tx, trip, body.writeId);
+    await tx.insert(auditLog).values({ actorId: caller.userId, action: 'stop.load_undone', entity: 'stop', entityId: stop.id,
+      before: { loadedAt: stop.loadedAt.toISOString() }, after: { tripId: trip.id, seq: stop.seq, loadedAt: null } });
     return [{ topic: 'loading', depotId: caller.depotId }];
   });
 }

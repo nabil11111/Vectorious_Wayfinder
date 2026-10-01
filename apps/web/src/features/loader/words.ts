@@ -72,6 +72,11 @@ export const stopGoingOf = (stop: LoadingStop) => `${whole(stop.going)} of ${who
 export const stopOn = (stop: LoadingStop) => `${whole(stop.going)} on`;
 export const stopOnShort = (stop: LoadingStop) => `${whole(stop.going)} on · ${whole(stop.short)} short`;
 
+// A loaded stop's menu (Q-16): "Undo stop 3 loaded", after the button that loaded it, and on a stop loaded before the
+// last one, which stop comes off first: "undo stop 2 first".
+export const undoStopWords = (stop: Pick<LoadingStop, 'seq'>) => `Undo stop ${stop.seq} loaded`;
+export const undoFirstWords = (stop: Pick<LoadingStop, 'seq'>) => `undo stop ${stop.seq} first`;
+
 // "117 of 118 on, 1 short" when every stop is loaded.
 export const allOnLine = (truck: LoadingTruck) =>
   `${whole(truck.on.units)} of ${whole(truck.units)} on${truck.short > 0 ? `, ${whole(truck.short)} short` : ''}`;

@@ -1,4 +1,5 @@
-import { StoreOrderList, type LoadingTruck } from '@wayfinder/contracts';
+import { randomUUID } from 'node:crypto';
+import { LoadingDay, StoreOrderList, type LoadingTruck } from '@wayfinder/contracts';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
@@ -287,6 +288,82 @@ it('AC-24 refuses a loader write caught behind a reset with unknown_record once 
   const refused = await writing;
   expect(code(refused)).toEqual([400, 'unknown_record']);
   expect(refused.body.error.details).toEqual({ id: truck.tripId });
+});
+
+// Q-16: a stop marked loaded by mistake comes off again while the truck loads, and a loaded stop can still be flagged.
+it('Q-16 takes the last stop loaded off again: not loaded, its cartons off the truck, the revision up, the audit row and loading told', async () => {
+  let truck = await loading('VEH004', { withVeh004: true });
+  freeze(THU, 2 * 60 + 40);
+  truck = answeredTruck(await loader.stopLoaded(truck, 2), 'VEH004');
+  freeze(THU, 2 * 60 + 41);
+  vi.mocked(announce).mockClear();
+  const undone = answeredTruck(await loader.undoStop(truck, 2), 'VEH004');
+  expect(undone).toMatchObject({ status: 'loading', revision: truck.revision + 1, units: 210, short: 0, on: { units: 0, kg: 0, m3: 0 } });
+  expect(undone.stops.map((s) => [s.seq, s.loaded, s.units, s.going])).toEqual([[2, false, 99, 99], [1, false, 111, 111]]);
+  expect((await db.select().from(stops).where(eq(stops.id, stopOf(truck, 2).id)))[0]!.loadedAt).toBeNull();
+  const audits = await auditsOf(stopOf(truck, 2).id, 'stop.load_undone');
+  expect(audits).toHaveLength(1);
+  expect(audits[0]).toMatchObject({ actorId: kasunId, entity: 'stop', before: { loadedAt: depotInstant(THU, 2 * 60 + 40).toISOString() },
+    after: { tripId: truck.tripId, seq: 2, loadedAt: null } });
+  expect(told()).toEqual([{ topic: 'loading', depotId: 'Peliyagoda' }]);
+  // Loaded again, the stop counts its 99 cartons once.
+  expect(answeredTruck(await loader.stopLoaded(undone, 2), 'VEH004').on).toEqual({ units: 99, kg: 683.1, m3: 3.663 });
+});
+
+it('Q-16 flags a line of a stop already loaded, and a stop taken off again keeps its counts and its open flag', async () => {
+  let truck = await loading('VEH035');
+  truck = answeredTruck(await loader.stopLoaded(truck, 2), 'VEH035');
+  expect(truck.on.units).toBe(94);
+  const dry = stopOf(truck, 2).lines.find((line) => line.temp === 'dry')!;
+  truck = answeredTruck(await loader.flag(truck, 2, [{ lineId: dry.lineId, counted: 40 }], { reason: 'damaged' }), 'VEH035');
+  expect(stopOf(truck, 2)).toMatchObject({ loaded: true, units: 94, going: 88, short: 6 });
+  expect(truck.on.units).toBe(88);
+  expect(truck.issues.map((issue) => [issue.reason, issue.status, issue.stop.seq, issue.short])).toEqual([['damaged', 'open', 2, 6]]);
+
+  const undone = answeredTruck(await loader.undoStop(truck, 2), 'VEH035');
+  expect(stopOf(undone, 2)).toMatchObject({ loaded: false, units: 94, going: 88, short: 6 });
+  expect(undone.on).toEqual({ units: 0, kg: 0, m3: 0 });
+  expect(undone.issues.map((issue) => [issue.reason, issue.status, issue.stop.seq, issue.short])).toEqual([['damaged', 'open', 2, 6]]);
+});
+
+it('Q-16 refuses to take off a stop loaded before the last one with load_order, one not loaded with stale, and any on a truck not loading with not_loading, changing nothing', async () => {
+  await sendWalkthroughPlan(walk, { withVeh004: true });
+  const day = await loader.read();
+  const planned = truckOf(day, 'VEH004');
+  let before = await heldRows();
+  expect(code(await loader.undoStop(planned, 2))).toEqual([409, 'not_loading']);
+  expect(await heldRows()).toEqual(before);
+
+  let truck = answeredTruck(await loader.start(planned, day.plan!), 'VEH004');
+  before = await heldRows();
+  expect(code(await loader.undoStop(truck, 2))).toEqual([409, 'stale']);
+  expect(await heldRows()).toEqual(before);
+
+  truck = answeredTruck(await loader.stopLoaded(truck, 2), 'VEH004');
+  truck = answeredTruck(await loader.stopLoaded(truck, 1), 'VEH004');
+  before = await heldRows();
+  const early = await loader.undoStop(truck, 2);
+  expect(code(early)).toEqual([409, 'load_order']);
+  expect(early.body.error).toMatchObject({ message: 'Undo stop 1 first. The last stop loaded comes off first.', details: { stopSeq: 1 } });
+  expect(await heldRows()).toEqual(before);
+
+  truck = answeredTruck(await loader.ready(truck), 'VEH004');
+  before = await heldRows();
+  expect(code(await loader.undoStop(truck, 1))).toEqual([409, 'not_loading']);
+  expect(await heldRows()).toEqual(before);
+});
+
+it('Q-16 answers an undo sent twice in a row with the day as it is, and writes one audit row for it', async () => {
+  let truck = await loading('VEH035');
+  truck = answeredTruck(await loader.stopLoaded(truck, 2), 'VEH035');
+  const writeId = randomUUID();
+  const first = await loader.undoStop(truck, 2, writeId);
+  expect(first.status).toBe(200);
+  const again = await loader.undoStop(truck, 2, writeId);
+  expect(again.status).toBe(200);
+  expect(again.body).toEqual(first.body);
+  expect(LoadingDay.parse(again.body)).toEqual(await loader.read());
+  expect(await auditsOf(stopOf(truck, 2).id, 'stop.load_undone')).toHaveLength(1);
 });
 
 it('driver AC-7 allows a line flagged on an earlier trip to be flagged on this trip', async () => {

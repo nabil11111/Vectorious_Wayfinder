@@ -65,7 +65,7 @@ it('AC-7 refuses a truck, stop or line of another depot with unknown_record and 
   const kandy = await kandyTrip();
   const everything = { plan, stopId: kandy.stop.id, reason: 'short', note: '', lines: [{ lineId: kandy.line.id, counted: 1 }] };
   let before = await heldRows();
-  for (const action of ['start', 'stop-loaded', 'flags', 'ready']) {
+  for (const action of ['start', 'stop-loaded', 'undo-stop', 'flags', 'ready']) {
     const res = await loader.post({ ...truck, tripId: kandy.trip.id }, action, everything);
     expect(code(res)).toEqual([400, 'unknown_record']);
     expect(res.body.error.details).toEqual({ id: kandy.trip.id });
@@ -74,9 +74,11 @@ it('AC-7 refuses a truck, stop or line of another depot with unknown_record and 
 
   const loading = answeredTruck(await loader.start(truck, plan), 'VEH035');
   before = await heldRows();
-  const kandyStop = await loader.post(loading, 'stop-loaded', { stopId: kandy.stop.id });
-  expect(code(kandyStop)).toEqual([400, 'unknown_record']);
-  expect(kandyStop.body.error.details).toEqual({ id: kandy.stop.id });
+  for (const action of ['stop-loaded', 'undo-stop']) {
+    const kandyStop = await loader.post(loading, action, { stopId: kandy.stop.id });
+    expect(code(kandyStop)).toEqual([400, 'unknown_record']);
+    expect(kandyStop.body.error.details).toEqual({ id: kandy.stop.id });
+  }
   const flagOnKandyStop = await loader.flag(loading, 1, [{ lineId: dryLine(loading).lineId, counted: 3 }], { stopId: kandy.stop.id });
   expect(code(flagOnKandyStop)).toEqual([400, 'unknown_record']);
   expect(flagOnKandyStop.body.error.details).toEqual({ id: kandy.stop.id });

@@ -81,6 +81,8 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
     start: () => { if (day.plan) writes.send(truck.tripId, { kind: 'start', body: { revision: truck.revision, plan: day.plan } }); },
     stop: () => { if (current) writes.send(truck.tripId, { kind: 'stop', body: { revision: truck.revision, stopId: current.id } }); },
     ready: () => writes.send(truck.tripId, { kind: 'ready', body: { revision: truck.revision } }),
+    // A stop marked loaded by mistake comes off again (Q-16), and its lines are ticked again as they go back on.
+    undo: (stop: LoadingStop) => writes.send(truck.tripId, { kind: 'undo', body: { revision: truck.revision, stopId: stop.id } }, () => ticks.clear(stop.lines.map((line) => line.lineId))),
   };
   const readyWords = open.length > 0 ? `Mark ready · ${countOf(open.length, 'flag')}` : 'Mark ready';
 
@@ -126,7 +128,8 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
           ))}
           <div className="mt-auto hidden pt-6 lg:block">{buttons}</div>
         </Card>
-        <StopList truck={truck} current={current} className="mt-1 lg:col-start-1 lg:row-start-2 lg:mt-2" />
+        {/* While the truck loads, a loaded stop's row flags a problem on it or takes it off again (Q-16). */}
+        <StopList truck={truck} current={current} menu={loading ? { busy, undoing: saving('undo'), onUndo: send.undo } : undefined} className="mt-1 lg:col-start-1 lg:row-start-2 lg:mt-2" />
       </div>
       <ActionBar>{buttons}</ActionBar>
     </div>

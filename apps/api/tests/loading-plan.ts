@@ -77,8 +77,8 @@ export function stopOf(truck: LoadingTruck, seq: number): LoadingStop {
 // The walkthrough's flagged line: Fresh Nugegoda's 4 dry cartons on VEH035's stop 1.
 export const dryLine = (truck: LoadingTruck) => stopOf(truck, 1).lines.find((line) => line.temp === 'dry')!;
 
-// The loader's screen: the loading day, and the four writes as the phone sends them, each naming the trip's revision
-// the screen saw and carrying a new id, unless a retry passes the same one. A body may override any field.
+// The loader's screen: the loading day, and the writes as the phone sends them, each naming the trip's revision the
+// screen saw and carrying a new id, unless a retry passes the same one. A body may override any field.
 export function loaderScreen(agent: Agent) {
   const post = (truck: LoadingTruck, action: string, body: object = {}, writeId: string = randomUUID()) =>
     agent.post(`/api/v1/loading/trips/${truck.tripId}/${action}`).send({ writeId, revision: truck.revision, ...body });
@@ -91,6 +91,8 @@ export function loaderScreen(agent: Agent) {
     },
     start: (truck: LoadingTruck, plan: { id: string; revision: number }, writeId?: string) => post(truck, 'start', { plan }, writeId),
     stopLoaded: (truck: LoadingTruck, seq: number, writeId?: string) => post(truck, 'stop-loaded', { stopId: stopOf(truck, seq).id }, writeId),
+    // A stop marked loaded by mistake, taken off again (Q-16).
+    undoStop: (truck: LoadingTruck, seq: number, writeId?: string) => post(truck, 'undo-stop', { stopId: stopOf(truck, seq).id }, writeId),
     flag: (truck: LoadingTruck, seq: number, lines: { lineId: string; counted: number }[], more: object = {}, writeId?: string) =>
       post(truck, 'flags', { stopId: stopOf(truck, seq).id, reason: 'short', note: '', lines, ...more }, writeId),
     ready: (truck: LoadingTruck, writeId?: string) => post(truck, 'ready', {}, writeId),
