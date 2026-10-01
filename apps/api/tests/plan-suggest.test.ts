@@ -22,12 +22,16 @@ vi.mock('../src/lib/clock', async (original) => {
   return { ...clock, demoClockAt: (...args: Parameters<typeof clock.demoClockAt>) => ({ ...clock.demoClockAt(...args), now: testClock.at || clock.demoClockAt(...args).now }) };
 });
 vi.mock('../src/lib/live', async (original) => ({ ...await original<typeof import('../src/lib/live')>(), announce: vi.fn() }));
-// One test makes the planner find no plan that passes every check. Every other build runs the real planner.
-const planner = vi.hoisted(() => ({ unavailable: null as PlanCheck | null }));
+// One test makes the planner find no plan that passes every check, and one gives the build a plan a save would refuse.
+// Every other build runs the real planner as it is.
+const planner = vi.hoisted(() => ({ unavailable: null as PlanCheck | null, alter: null as ((result: PlannerResult) => PlannerResult) | null }));
 vi.mock('../src/planning/planner/build', async (original) => {
   const real = await original<typeof import('../src/planning/planner/build')>();
-  return { ...real, buildSuggestedPlan: (input: Parameters<typeof real.buildSuggestedPlan>[0]): PlannerResult =>
-    (planner.unavailable ? { status: 'unavailable', check: planner.unavailable } : real.buildSuggestedPlan(input)) };
+  return { ...real, buildSuggestedPlan: (input: Parameters<typeof real.buildSuggestedPlan>[0]): PlannerResult => {
+    if (planner.unavailable) return { status: 'unavailable', check: planner.unavailable };
+    const result = real.buildSuggestedPlan(input);
+    return planner.alter ? planner.alter(result) : result;
+  } };
 });
 
 const WED = '2026-06-24';
@@ -352,6 +356,23 @@ it('AC-8 refuses a day of more than 300 orders before the planner runs', async (
   expect(refused.body.error).toMatchObject({ message: 'The planner plans at most 300 orders, and Thu 25 Jun has 301.', details: { blocks: [] } });
   expect(await held()).toEqual(before);
   expect(announce).not.toHaveBeenCalled();
+});
+
+it('answers a plan of the planner\'s that a save would refuse as a server error, writing and announcing nothing', async () => {
+  // plan.md, step 8: the draft is checked as a save would be, and a failure there is a fault on our side. Nadeesha's
+  // unplaced draft is a real order, but not one of the day's, so only that check stops it.
+  const draftOrder = demoId('order', `${DATE}:OUT001:chilled`);
+  planner.alter = (result) => (result.status === 'unavailable' ? result : { ...result, input: { ...result.input, plan: { ...result.input.plan,
+    deferrals: [...result.input.plan.deferrals, { orderId: draftOrder, code: 'window', reason: 'Not an order of this day.' }] } } });
+  try {
+    const before = await held();
+    const refused = await build();
+    expect(code(refused)).toEqual([500, 'server_error']);
+    expect(await held()).toEqual(before);
+    expect(announce).not.toHaveBeenCalled();
+  } finally {
+    planner.alter = null;
+  }
 });
 
 it('AC-9 writes plan.suggested and announces the plan, and a split shop\'s orders, only after the commit', async () => {

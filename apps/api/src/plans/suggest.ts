@@ -36,9 +36,10 @@ export function plannerInputOf(board: PlanBoard, input: PlanInput): PlannerInput
 const plannerUnavailable = (message: string, blocks: Problem[]) => new HttpError(409, 'planner_unavailable', message, { blocks });
 
 // A hand save's checks failing on the planner's own plan, or a split of the planner's that does not fit its order, is
-// a fault on our side: it is answered as a server error, and the transaction leaves nothing behind.
+// a fault on our side: it is answered as a server error, and the transaction leaves nothing behind. The log keeps the
+// check's own words.
 const plannerFault = (what: string) => (error: unknown): never => {
-  throw new Error(`The planner's ${what} failed a hand save's check.`, { cause: error });
+  throw new Error(`The planner's ${what} failed a hand save's check: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
 };
 
 // The split originals of the day whose two parts are both among the day's orders, placed, and on no stop or deferral of
