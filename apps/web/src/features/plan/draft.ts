@@ -37,13 +37,19 @@ function without(plan: DraftPlan, ids: Set<string>): DraftPlan {
   return { ...plan, trips: offStops(plan.trips, ids), deferrals: plan.deferrals.filter((deferral) => !ids.has(deferral.orderId)) };
 }
 
-// Puts orders on a trip (rule 4): on the stop at the order's shop when the trip has one, else on a new last stop.
-function onto(trip: DraftTrip, orders: OrderRef[]): DraftTrip {
+// Puts orders on a trip (rule 4): on the stop at the order's shop when the trip has one, else on a new stop, the last
+// one unless a drop puts it before stop `at` (spec 023). New stops keep the orders' order.
+function onto(trip: DraftTrip, orders: OrderRef[], at = trip.stops.length): DraftTrip {
   const stops = trip.stops.map((stop) => ({ ...stop, orderIds: [...stop.orderIds] }));
+  let next = Math.min(Math.max(at, 0), stops.length);
   for (const order of orders) {
     const stop = stops.find((s) => s.outletId === order.outletId);
-    if (stop) stop.orderIds.push(order.id);
-    else stops.push({ outletId: order.outletId, orderIds: [order.id] });
+    if (stop) {
+      stop.orderIds.push(order.id);
+    } else {
+      stops.splice(next, 0, { outletId: order.outletId, orderIds: [order.id] });
+      next += 1;
+    }
   }
   return { ...trip, stops };
 }
@@ -64,11 +70,11 @@ export function startTrip(plan: DraftPlan, vehicleId: string, orders: OrderRef[]
   return { plan: { ...rest, trips: [...rest.trips, trip] }, key: keyOf(trip) };
 }
 
-// Puts orders on a trip. An order the draft had elsewhere, on another stop or deferred, comes off there first,
-// so the draft never names an order twice.
-export function addOrders(plan: DraftPlan, key: TripKey, orders: OrderRef[]): DraftPlan {
+// Puts orders on a trip, new stops at the end or, for a drop, before stop `at`. An order the draft had elsewhere, on
+// another stop or deferred, comes off there first, so the draft never names an order twice.
+export function addOrders(plan: DraftPlan, key: TripKey, orders: OrderRef[], at?: number): DraftPlan {
   const rest = without(plan, new Set(orders.map((order) => order.id)));
-  return { ...rest, trips: rest.trips.map((trip) => (keyOf(trip) === key ? onto(trip, orders) : trip)) };
+  return { ...rest, trips: rest.trips.map((trip) => (keyOf(trip) === key ? onto(trip, orders, at) : trip)) };
 }
 
 // Takes orders off their stops. They are unplanned again, and a stop left empty goes (rule 4).
@@ -81,15 +87,17 @@ export function removeTrip(plan: DraftPlan, key: TripKey): DraftPlan {
   return { ...plan, trips: renumber(plan.trips.filter((trip) => keyOf(trip) !== key), gone.vehicleId) };
 }
 
-// Moves a stop one place up (-1) or down (1).
-export function moveStop(plan: DraftPlan, key: TripKey, index: number, by: -1 | 1): DraftPlan {
+// Moves a stop up (by below 0) or down: one place from the menu, which swaps it with its neighbour, and as many as a
+// drag takes it (spec 023). A move to nowhere changes nothing.
+export function moveStop(plan: DraftPlan, key: TripKey, index: number, by: number): DraftPlan {
   return {
     ...plan,
     trips: plan.trips.map((trip) => {
       const to = index + by;
-      if (keyOf(trip) !== key || to < 0 || to >= trip.stops.length) return trip;
+      if (keyOf(trip) !== key || by === 0 || index < 0 || index >= trip.stops.length || to < 0 || to >= trip.stops.length) return trip;
       const stops = [...trip.stops];
-      [stops[index], stops[to]] = [stops[to]!, stops[index]!];
+      const [moved] = stops.splice(index, 1);
+      stops.splice(to, 0, moved!);
       return { ...trip, stops };
     }),
   };
