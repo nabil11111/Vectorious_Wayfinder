@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { Brand, DraftTrip } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import type { BoardScreen } from '../board';
@@ -58,8 +59,9 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
           <span className="block">{name} · {driver ? driver.name : <span className="text-warn-ink">no driver</span>}{where && ' ·'}</span>
           {where && <span className="block">{where}</span>}
         </button>
-        <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${title}` : `Show the stops of ${title}`} onClick={() => setOpen(!open)} className="-mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-sm font-bold text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-          {open ? '⌃' : '⌄'}
+        {/* One chevron for both states, turned while the card is open. */}
+        <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${title}` : `Show the stops of ${title}`} onClick={() => setOpen(!open)} className="group -mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+          <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-aria-expanded:rotate-180" />
         </button>
       </div>
       <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">
