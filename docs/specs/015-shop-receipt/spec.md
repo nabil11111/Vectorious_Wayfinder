@@ -76,7 +76,7 @@ These are in `docs/decisions.md`.
 |  | Sent, all received | No frame | As above, with the green chip "All received", "The depot has your receipt.", and "Sent at 08:33". |
 |  | Sent, answered | No frame | The green chip "Replacement on Fri 26 Jun" with "The depot is sending 1 chilled carton on Fri 26 Jun. It shows in your open orders.", or the grey chip "No replacement" with "The depot will not replace the missing carton. Place another order if you need it." The foot: "Sent at 08:33 · replacement on Fri 26 Jun" or "· no replacement". |
 |  | Nothing to confirm | No frame | "Deliveries", "No delivery is waiting for you to confirm." and the plain "View past orders". |
-|  | Not accepted | No frame | On the saved screen, in red: "The depot did not accept this receipt." and the server's sentence, such as "This delivery was already confirmed." or "That delivery is not on your list.", with "Clear", which takes it off the phone and shows the delivery as the depot has it, or "No delivery is waiting for you to confirm." when the depot no longer has it. It shows from the phone's copy, also after a reset or a reload, until it is cleared. |
+|  | Not accepted | No frame | On the saved screen, in red: "The depot did not accept this receipt." and the server's sentence, such as "This delivery was already confirmed." or "That delivery is not on your list.", with "Clear", which takes it off the phone and shows the delivery as the depot has it, or "No delivery is waiting for you to confirm." when the depot no longer has it. It shows from the phone's copy, also after a reset or a reload, until it is cleared. Nothing goes without a word (Q-37): when another device confirmed the delivery first, "Confirmed on another device at 08:42" with that confirmation's line cards and status card as the depot has them, then "What this phone recorded" with the phone's own cards and note. Every refused receipt ends with "This phone's report did not reach the depot. To report anything more, contact your depot using your store's usual contact number." ("receipt" when it reported nothing). |
 |  | Sign in again | No frame, spec 013's line | A yellow line: "Sign in again to send this receipt." with "Sign in". |
 |  | Could not save | No frame | "Could not save on this phone. Try again." in red on top of the form, which keeps its counts. Nothing is sent. |
 |  | Could not load | No frame | "Could not load your deliveries." and "Try again", only when nothing is kept on the phone. |
@@ -254,8 +254,10 @@ shows as it is:
 - **Two tabs.** Only the tab that owns the shop's queue fetches, keeps and sends. Deliveries in another tab says
   "Wayfinder is open in another tab." and the rest of the shop's area works there.
 - **Two phones, one delivery.** The later receipt is refused `stale`, "This delivery was already confirmed.", whatever
-  revision it names, also when both arrive at once. It shows under "Not accepted" until cleared, and the delivery shows
-  as the depot has it.
+  revision it names, also when both arrive at once. It shows under "Not accepted" until cleared, with the delivery as the
+  depot has it above it, "Confirmed on another device at 08:42", and the line that the phone's report did not reach the
+  depot and how to raise anything more (Q-37); the phone reads the delivery on its own when its deliveries no longer list
+  it.
 - **Waiting behind the driver.** A receipt that waits for the trip's lock behind a driver's write on the same trip is
   judged on the stop and its orders as that write left them.
 - **An id reused.** `write_reused`, "This record was already sent with other details."

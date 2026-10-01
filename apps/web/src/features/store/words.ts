@@ -236,6 +236,12 @@ export const keptSentences = (reports: boolean) => (reports
   : ['Your receipt is kept on this phone.', 'It will retry when the connection returns.', 'You do not need to confirm this delivery again.']);
 export const savedFoot = (savedAt: string, today: string) => `Saved at ${whenOf(savedAt, today)} · waiting to sync`;
 export const NOT_ACCEPTED = 'The depot did not accept this receipt.';
+// A refused receipt keeps the phone's report on screen and says where it stands (Q-37): the delivery confirmed on
+// another device, with what that confirmation said, and how to raise anything more.
+export const confirmedElsewhere = (receipt: Pick<StoreReceipt, 'at'>, today: string) => `Confirmed on another device at ${whenOf(receipt.at, today)}`;
+export const PHONE_RECORDED = 'What this phone recorded';
+export const notReached = (reports: boolean) =>
+  `This phone’s ${reports ? 'report' : 'receipt'} did not reach the depot. To report anything more, contact your depot using your store’s usual contact number.`;
 export const notAcceptedFoot = (savedAt: string, today: string) => `Saved at ${whenOf(savedAt, today)} · not accepted`;
 
 // Sent (Shop · Receipt sent): "Confirmed at 08:31 · Fresh · Nugegoda", with the day for a receipt of another day.

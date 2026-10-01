@@ -60,7 +60,10 @@ function Screen({ view, stopId }: { view: DeliveriesView; stopId: string | null 
   const { failure, unanswered, signedOut } = shopQueue.useSync();
   const signal = useSignal();
   const { at } = useAppClock();
-  const unread = stopId !== null && view.day !== null && !recordFor(view, stopId) && !view.day.deliveries.some((delivery) => delivery.stopId === stopId);
+  // A stop the phone's deliveries do not hold is read on its own: one with no receipt on the phone, and one whose receipt
+  // the depot refused, whose delivery as the depot has it shows beside it (Q-37).
+  const record = stopId === null ? null : recordFor(view, stopId);
+  const unread = stopId !== null && view.day !== null && (!record || record.state === 'refused') && !view.day.deliveries.some((delivery) => delivery.stopId === stopId);
   const one = useOneDelivery(stopId ?? '', unread);
   const screen = screenOf({
     view, stopId, one, failure, unanswered, signedOut, signal, today: at !== null ? depotDayOf(at) : null, shownSaved: wasShownSaved,
@@ -79,7 +82,7 @@ function Screen({ view, stopId }: { view: DeliveriesView; stopId: string | null 
     case 'refused': {
       // Cleared, it shows the delivery as the depot has it, or that nothing is waiting when the depot no longer has it.
       const cleared = () => { if (!screen.listed) navigate('/store/deliveries', { replace: true }); };
-      return <RefusedReceipt record={screen.record} drawn={screen.drawn} brand={screen.outlet.brand} today={screen.today} onCleared={cleared} />;
+      return <RefusedReceipt record={screen.record} drawn={screen.drawn} depot={screen.depot} brand={screen.outlet.brand} today={screen.today} onCleared={cleared} />;
     }
     case 'saved': return <SavedReceipt record={screen.record} drawn={screen.drawn} brand={screen.outlet.brand} today={screen.today} />;
     case 'sending': return <ReceiptForm key={stopId} delivery={screen.delivery} outlet={screen.outlet} today={screen.today} record={screen.record} />;

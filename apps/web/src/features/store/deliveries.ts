@@ -103,7 +103,7 @@ export type DeliveriesScreen =
   | { show: 'redirect'; stopId: string }
   | { show: 'nothing' }
   | { show: 'not-on-list' }
-  | { show: 'refused'; record: ReceiptRecord; drawn: StoreDelivery | null; outlet: StoreOutlet; today: string; listed: boolean }
+  | { show: 'refused'; record: ReceiptRecord; drawn: StoreDelivery | null; depot: StoreDelivery | null; outlet: StoreOutlet; today: string; listed: boolean }
   | { show: 'saved'; record: ReceiptRecord; drawn: StoreDelivery | null; outlet: StoreOutlet; today: string }
   | { show: 'sending'; record: ReceiptRecord; delivery: StoreDelivery; outlet: StoreOutlet; today: string }
   | { show: 'sent' | 'form'; delivery: StoreDelivery; outlet: StoreOutlet; today: string };
@@ -133,7 +133,13 @@ export function screenOf(input: ScreenInput): DeliveriesScreen {
     // "Saved at 08:31" says its day when that is not the app clock's today.
     const today = input.today ?? day?.today ?? depotDayOf(record.savedAt);
     const drawn = drawnRecord(record, outlet, today);
-    if (record.state === 'refused') return { show: 'refused', record, drawn, outlet, today, listed: day?.deliveries.some((delivery) => delivery.stopId === stopId) ?? false };
+    if (record.state === 'refused') {
+      // The delivery as the depot has it, from the deliveries the phone kept or the one-delivery read, so a receipt
+      // refused because another device confirmed first shows what that confirmation said (Q-37).
+      const listed = day?.deliveries.find((delivery) => delivery.stopId === stopId) ?? null;
+      const depot = listed ?? (one.data?.stopId === stopId ? one.data : null);
+      return { show: 'refused', record, drawn, depot, outlet, today, listed: listed !== null };
+    }
     // On its way: the form says "Sending…" while the phone has a signal and no send of it went unanswered. Once the
     // saved screen was up, it stays.
     const goes = input.signal && !input.unanswered.includes(record.write.writeId) && !input.signedOut;

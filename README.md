@@ -340,6 +340,10 @@ Anything we built differently from our Designathon submission, and why.
   not accept says so at its foot. No frame draws these.
 - **A shop's report on Live day** uses the issue-open card with "Send N replacements on <day>", "No replacement" and
   "Send to shop"; the design draws only the "Next" line for it.
+- **A receipt refused because another device confirmed first keeps its report on screen,** under "Confirmed on another
+  device at 08:42" and what that confirmation said, with a line that the report did not reach the depot and to contact
+  the depot for anything more: two staff checking one delivery is a normal morning, and the report used to go without a
+  word. No frame draws it.
 - **Today lists the deliveries still to confirm** when a shop had more than one, "2 deliveries to confirm" with a row
   and Confirm for each, until the last is confirmed: a shop that confirmed its chilled drop never heard its dry one
   waited. No frame draws it.

@@ -13,8 +13,8 @@ import { ReceivedCard } from './parts/ReceiptLineCard';
 import { ReceiptNote } from './parts/ReceiptNote';
 import { ReceiptFoot, StatusCard, StatusHead } from './parts/ReceiptStatusCard';
 import {
-  confirmedLine, COULD_NOT_CLEAR, DROPPED, keptSentences, NO_SIGNAL, NOT_ACCEPTED, NOT_SENT_YET, notAcceptedFoot, reportFacts, SAVED_TITLE, savedFoot,
-  SENT_TITLE, sentStatus,
+  confirmedElsewhere, confirmedLine, COULD_NOT_CLEAR, DROPPED, keptSentences, NO_SIGNAL, NOT_ACCEPTED, NOT_SENT_YET, notAcceptedFoot, PHONE_RECORDED,
+  notReached, reportFacts, SAVED_TITLE, savedFoot, SENT_TITLE, sentStatus,
 } from './words';
 
 // The lines of a receipt, each as received, with what the shop said about each one that is short (Q-40), and the note
@@ -37,6 +37,10 @@ function Lines({ delivery, brand }: { delivery: StoreDelivery | null; brand: Bra
   );
 }
 
+// A receipt reports something: a line with a reason, or the one reason of a receipt saved before lines had their own
+// (Q-40), or warm goods.
+const reportsOf = (record: ReceiptRecord) => record.write.lines.some((line) => writtenReason(record.write, line) !== null) || record.write.cold === false;
+
 // Saved on this phone (Shop · Short delivery · receipt pending sync, spec 015, rule 6): a receipt waiting on the phone,
 // drawn from its own copy, with why it waits. It goes by itself when the signal is back; "Retry sending" asks for the
 // signal now. While it goes, the button says "Sending…". Once shown, it stays until the receipt is in or refused.
@@ -47,8 +51,7 @@ export function SavedReceipt({ record, drawn, brand, today }: { record: ReceiptR
   useEffect(() => { markShownSaved(writeId); }, [writeId]);
   const dropped = unanswered.includes(writeId);
   const sending = signal && !dropped && !signedOut;
-  // A line with a reason, or the one reason of a receipt saved before lines had their own (Q-40), or warm goods.
-  const reports = record.write.lines.some((line) => writtenReason(record.write, line) !== null) || record.write.cold === false;
+  const reports = reportsOf(record);
   return (
     <div className="max-w-xl lg:pt-2.5">
       <StatusHead icon={trayIcon} title={SAVED_TITLE} sub={dropped ? DROPPED : signal ? null : NO_SIGNAL} />
@@ -70,9 +73,13 @@ export function SavedReceipt({ record, drawn, brand, today }: { record: ReceiptR
 
 // Not accepted (no frame): the depot turned the receipt down, in its own words. It is never sent again, and stays on the
 // phone, drawn from its own copy, until "Clear" takes it off; then the page shows the delivery as the depot has it.
-export function RefusedReceipt({ record, drawn, brand, today, onCleared }: {
-  record: ReceiptRecord; drawn: StoreDelivery | null; brand: Brand; today: string; onCleared: () => void;
+// Nothing goes without a word (Q-37): when another device confirmed the delivery first, the screen says so and shows
+// what that confirmation said, keeps what this phone recorded under it, and says the phone's report did not reach the
+// depot and how to raise anything more.
+export function RefusedReceipt({ record, drawn, depot, brand, today, onCleared }: {
+  record: ReceiptRecord; drawn: StoreDelivery | null; depot: StoreDelivery | null; brand: Brand; today: string; onCleared: () => void;
 }) {
+  const other = depot?.receipt ? depot : null;
   const [clearing, setClearing] = useState(false);
   const [failed, setFailed] = useState(false);
   const clear = async () => {
@@ -94,7 +101,10 @@ export function RefusedReceipt({ record, drawn, brand, today, onCleared }: {
         <p className="font-semibold">{NOT_ACCEPTED}</p>
         {record.refusal && <p className="mt-0.5">{record.refusal.message}</p>}
       </div>
+      {other && <DepotCopy delivery={other} brand={brand} today={today} />}
+      {other && drawn && <h2 className="mt-6 px-2 font-sans text-[15px] leading-[18px] font-semibold">{PHONE_RECORDED}</h2>}
       <Lines delivery={drawn} brand={brand} />
+      <p className="mt-4 px-2 text-[13px] leading-[18px] text-muted-foreground">{notReached(reportsOf(record))}</p>
       <ReceiptFoot line={notAcceptedFoot(record.savedAt, today)}>
         {failed && <p role="alert" className="mb-2.5 text-[13px] leading-4 font-semibold text-bad">{COULD_NOT_CLEAR}</p>}
         <Button className={cn(ORANGE, 'h-[46px] w-full text-sm')} disabled={clearing} onClick={() => { void clear(); }}>
@@ -102,6 +112,20 @@ export function RefusedReceipt({ record, drawn, brand, today, onCleared }: {
         </Button>
       </ReceiptFoot>
     </div>
+  );
+}
+
+// The delivery as the depot has it, confirmed on another device (Q-37): when, its lines as received, and its status.
+function DepotCopy({ delivery, brand, today }: { delivery: StoreDelivery; brand: Brand; today: string }) {
+  const receipt = delivery.receipt!;
+  const { short, temps } = reportFacts(delivery, deliveryFigures(delivery));
+  const status = sentStatus(receipt, brand, short, temps);
+  return (
+    <section className="mt-6">
+      <h2 className="px-2 font-sans text-[15px] leading-[18px] font-semibold">{confirmedElsewhere(receipt, today)}</h2>
+      <Lines delivery={delivery} brand={brand} />
+      <StatusCard chip={status.chip.label} tone={status.chip.tone} sentences={status.sentences} className="mt-3" />
+    </section>
   );
 }
 
