@@ -203,6 +203,9 @@ export const shortChip = (short: number, unit: string, reason: ShortReason) => `
 // Under a line the depot sent short, and one the shop refused some of at the door.
 export const shortFromDepotLine = (units: number) => `${WHOLE.format(units)} short from the depot`;
 export const refusedAtDoorLine = (units: number) => `${WHOLE.format(units)} refused at the door`;
+// Under a receipt's count box that holds more than was handed over (Q-38): it stays as typed, and this says why it
+// cannot go. A minus or a fraction gets the loader's "Whole numbers from 0 to 50." instead.
+export const overLine = (handedOver: number) => `More than the ${WHOLE.format(handedOver)} handed over.`;
 
 export const SHORT_REASON_WORDS: Record<ShortReason, string> = { missing: 'Missing', damaged: 'Damaged' };
 

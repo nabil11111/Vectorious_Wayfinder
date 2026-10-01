@@ -326,6 +326,9 @@ Anything we built differently from our Designathon submission, and why.
 - **Confirm delivery lists every line of the drop,** so Nugegoda's three orders are three cards, as the driver's Unload
   does; the frame shows one order. A line expects what the driver handed over, and says when the depot sent it short or
   the shop refused some at the door, with the design's damaged picture.
+- **A typed count stays as typed.** A minus or a fraction says "Whole numbers from 0 to 50." and a count above what was
+  handed over "More than the 50 handed over.", in red, and Confirm waits; the frame draws no wrong count, and changing
+  what was typed sent a report the shop never meant.
 - **"What's wrong?" shows once a count is lower,** with "Missing" and "Damaged", and "Add a photo (optional)" only on a
   receipt that reports something.
 - **The saved screen** says "There is no signal right now." when the phone knew it had none, and "The connection dropped

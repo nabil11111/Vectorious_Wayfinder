@@ -1,10 +1,12 @@
-import type { ReactNode } from 'react';
-import { NumberField } from '@base-ui/react/number-field';
+import { useId, type ReactNode } from 'react';
 import type { Brand, DeliveryFigures, ShortReason, StoreDeliveryLine } from '@wayfinder/contracts';
 import damaged from '@/assets/icons/icon-damaged.png';
 import shortfall from '@/assets/icons/icon-shortfall.png';
 import { Chip } from '@/components/ui/chip';
-import { countOf, expectedWords, lineGoods, receiptLineName, refusedAtDoorLine, SHORT_REASON_WORDS, shortChip, shortFromDepotLine } from '../words';
+import { countLine } from '@/features/loader/words';
+import { cn } from '@/lib/utils';
+import { receiptBox } from '../receipt-counts';
+import { countOf, expectedWords, lineGoods, overLine, receiptLineName, refusedAtDoorLine, SHORT_REASON_WORDS, shortChip, shortFromDepotLine } from '../words';
 import { goodsIcon } from './icons';
 import { Panel } from './Panel';
 
@@ -13,29 +15,48 @@ type LineFigures = DeliveryFigures['byLine'][number];
 const STEP = 'flex size-11 shrink-0 items-center justify-center rounded-[10px] border bg-card text-lg leading-none font-semibold outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:text-muted-foreground/45';
 
 // − the count +, as Confirm delivery draws it. The count is the form's own and runs from 0 to what the driver handed
-// over. It can be typed as well.
-function ReceivedCounter({ name, value, max, disabled, onChange }: { name: string; value: number; max: number; disabled: boolean; onChange: (value: number) => void }) {
+// over. It can be typed as well, and the box keeps what is typed as it is (Q-38), as the loader's flag box and the shop's
+// quantity box do: a minus, a fraction or more than was handed over is never turned into another number. It is marked
+// red with its line under the card's counter row, and − and + wait until it is a whole number from 0 to what was handed
+// over. text is what the box holds while it is not the count.
+function ReceivedCounter({ name, value, text, max, disabled, lineId, onStep, onType, onLeave }: {
+  name: string; value: number; text: string | undefined; max: number; disabled: boolean; lineId: string;
+  onStep: (value: number) => void; onType: (text: string) => void; onLeave: () => void;
+}) {
+  const wrong = text !== undefined && receiptBox(text, max).wrong !== null;
+  const shown = text ?? String(value);
+  const off = disabled || wrong;
+  const step = (by: number) => onStep(Math.min(max, Math.max(0, value + by)));
   return (
-    <NumberField.Root
-      value={value}
-      min={0}
-      max={max}
-      disabled={disabled}
-      locale="en-GB"
-      format={{ maximumFractionDigits: 0, useGrouping: false }}
-      onValueChange={(next) => onChange(Math.min(max, Math.max(0, Math.round(next ?? 0))))}
-    >
-      <NumberField.Group className="flex items-center">
-        <NumberField.Decrement aria-label={`One less: ${name}`} className={STEP}>−</NumberField.Decrement>
-        <NumberField.Input
-          aria-label={`${name} received`}
-          maxLength={3}
-          onClick={(event) => event.currentTarget.select()}
-          className="w-16 min-w-0 bg-transparent p-0 text-center text-xl leading-6 font-semibold tabular-nums outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-foreground disabled:text-muted-foreground"
-        />
-        <NumberField.Increment aria-label={`One more: ${name}`} className={STEP}>+</NumberField.Increment>
-      </NumberField.Group>
-    </NumberField.Root>
+    <div role="group" className="flex items-center">
+      <button type="button" aria-label={`One less: ${name}`} disabled={off || value <= 0} className={STEP} onClick={() => step(-1)}>−</button>
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        aria-label={`${name} received`}
+        aria-invalid={wrong || undefined}
+        aria-describedby={wrong ? lineId : undefined}
+        value={shown}
+        disabled={disabled}
+        onChange={(event) => onType(event.currentTarget.value)}
+        onBlur={onLeave}
+        // A tap selects the count, so typing replaces it.
+        onClick={(event) => event.currentTarget.select()}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+          event.preventDefault();
+          if (!wrong) step(event.key === 'ArrowUp' ? 1 : -1);
+        }}
+        // A longer text than four figures widens the box, so all of it shows.
+        style={shown.length > 4 ? { width: `${shown.length + 1}ch` } : undefined}
+        className={cn(
+          'w-16 min-w-0 rounded-md bg-transparent p-0 text-center text-xl leading-6 font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:text-muted-foreground',
+          wrong && 'text-bad ring-1 ring-bad focus-visible:ring-bad',
+        )}
+      />
+      <button type="button" aria-label={`One more: ${name}`} disabled={off || value >= max} className={STEP} onClick={() => step(1)}>+</button>
+    </div>
   );
 }
 
@@ -52,11 +73,14 @@ function Note({ icon, children }: { icon: string; children: ReactNode }) {
 // Confirm delivery's card for one line (Shop · Confirm delivery): the goods' picture and name, what the driver handed
 // over, the shop's own count, the units missing or damaged once the count is lower, and what the depot sent short or
 // the shop refused at the door, reported where it was found (D-56).
-export function CountCard({ brand, line, figures, count, reason, disabled, onCount }: {
-  brand: Brand; line: StoreDeliveryLine; figures: LineFigures; count: number; reason: ShortReason; disabled: boolean; onCount: (count: number) => void;
+export function CountCard({ brand, line, figures, count, text, reason, disabled, onStep, onType, onLeave }: {
+  brand: Brand; line: StoreDeliveryLine; figures: LineFigures; count: number; text: string | undefined; reason: ShortReason; disabled: boolean;
+  onStep: (count: number) => void; onType: (text: string) => void; onLeave: () => void;
 }) {
   const name = receiptLineName(brand, line);
   const short = figures.expected - count;
+  const lineId = useId();
+  const wrong = text === undefined ? null : receiptBox(text, figures.expected).wrong;
   return (
     <Panel line className="pt-[9px]">
       <div className="flex items-end">
@@ -67,8 +91,13 @@ export function CountCard({ brand, line, figures, count, reason, disabled, onCou
       </div>
       <div className="mt-2 flex items-center justify-between gap-3">
         <span className="text-sm leading-[17px] font-semibold">Received</span>
-        <ReceivedCounter name={name} value={count} max={figures.expected} disabled={disabled} onChange={onCount} />
+        <ReceivedCounter name={name} value={count} text={text} max={figures.expected} disabled={disabled} lineId={lineId} onStep={onStep} onType={onType} onLeave={onLeave} />
       </div>
+      {wrong && (
+        <p id={lineId} role="alert" className="mt-1.5 text-right text-[11px] leading-[14px] font-semibold text-bad">
+          {wrong === 'over' ? overLine(figures.expected) : countLine(figures.expected)}
+        </p>
+      )}
       {short > 0 && <Chip tone="warn" size="sm" className="mt-[21px] px-[9px] py-1.5">{shortChip(short, line.unit, reason)}</Chip>}
       {figures.shortFromDepot > 0 && <Note icon={shortfall}>{shortFromDepotLine(figures.shortFromDepot)}</Note>}
       {figures.refused > 0 && <Note icon={damaged}>{refusedAtDoorLine(figures.refused)}</Note>}

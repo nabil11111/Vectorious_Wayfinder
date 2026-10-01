@@ -12,6 +12,7 @@ import { ORANGE, PLAIN } from './parts/actions';
 import { Panel } from './parts/Panel';
 import { CountCard } from './parts/ReceiptLineCard';
 import { Problem, ReceiptFoot } from './parts/ReceiptStatusCard';
+import { receiptBox, receiptCounts } from './receipt-counts';
 import { aboutDelivery, ADD_PHOTO, arrivedLine, NOT_SAVED_ON_PHONE, RECEIPT_TITLE, SHORT_REASON_WORDS } from './words';
 
 // Confirm delivery at /store/deliveries/:stopId (Shop · Confirm delivery, spec 015, rules 2 and 3, D-56): every line
@@ -29,13 +30,16 @@ export function ReceiptForm({ delivery, outlet, today, record }: { delivery: Sto
   const sent = record?.write ?? null;
   // The form's own counters, from what was handed over, and its answers.
   const [counts, setCounts] = useState<Record<string, number>>(() => Object.fromEntries((sent?.lines ?? []).map((line) => [line.lineId, line.received])));
+  // What a count box holds while it is not the count the form holds: what is being typed, and a wrong number, which
+  // stays as it was typed (Q-38).
+  const [typed, setTyped] = useState<Record<string, string>>({});
   const [reason, setReason] = useState<ShortReason>(sent?.reason ?? 'missing');
   const [cold, setCold] = useState(sent?.cold ?? true);
   const sending = record !== null;
   const off = saving || sending;
 
-  const countAt = (i: number) => counts[delivery.lines[i]!.lineId] ?? figures.byLine[i]!.expected;
-  const short = figures.byLine.some((line, i) => countAt(i) < line.expected);
+  const tally = receiptCounts(figures.byLine, counts, typed);
+  const { countAt, short } = tally;
   // A receipt reports something once a count is lower, or the chilled goods were not cold (rule 5, D-60).
   const reports = short || (figures.chilled && !cold);
   const shownPhoto = sent ? sent.photo ?? null : photo;
@@ -47,7 +51,7 @@ export function ReceiptForm({ delivery, outlet, today, record }: { delivery: Sto
   // none, would go instead. With no clock known yet, it waits. The receipt takes the app clock's time at the press.
   const confirm = () => {
     const now = readNow();
-    if (now === null || off || reading) return;
+    if (now === null || off || reading || !tally.canConfirm) return;
     const write: ReceiptWrite = {
       kind: 'receipt',
       writeId: newWriteId(),
@@ -62,6 +66,23 @@ export function ReceiptForm({ delivery, outlet, today, record }: { delivery: Sto
     // The record keeps the delivery as the form showed it and its shop, so it draws with no deliveries kept.
     const shown: ShownReceipt = { ...delivery, outlet };
     void save(write, aboutDelivery(delivery, outlet), shown);
+  };
+
+  // − and + step from the count the form holds, and what was typed in the box goes. A whole number from 0 to what was
+  // handed over is its count; anything else stays in the box as typed. Leaving the box shows its count, "048" as 48,
+  // and a wrong number stays.
+  const without = (held: Record<string, string>, lineId: string) => Object.fromEntries(Object.entries(held).filter(([id]) => id !== lineId));
+  const box = {
+    step: (lineId: string, value: number) => {
+      setCounts((held) => ({ ...held, [lineId]: value }));
+      setTyped((held) => without(held, lineId));
+    },
+    type: (lineId: string, expected: number, text: string) => {
+      setTyped((held) => ({ ...held, [lineId]: text }));
+      const { count } = receiptBox(text, expected);
+      if (count !== null) setCounts((held) => ({ ...held, [lineId]: count }));
+    },
+    leave: (lineId: string, expected: number) => setTyped((held) => (held[lineId] !== undefined && receiptBox(held[lineId]!, expected).wrong === null ? without(held, lineId) : held)),
   };
 
   return (
@@ -80,9 +101,12 @@ export function ReceiptForm({ delivery, outlet, today, record }: { delivery: Sto
             line={line}
             figures={figures.byLine[i]!}
             count={countAt(i)}
+            text={typed[line.lineId]}
             reason={reason}
             disabled={off}
-            onCount={(count) => setCounts((held) => ({ ...held, [line.lineId]: count }))}
+            onStep={(count) => box.step(line.lineId, count)}
+            onType={(text) => box.type(line.lineId, figures.byLine[i]!.expected, text)}
+            onLeave={() => box.leave(line.lineId, figures.byLine[i]!.expected)}
           />
         ))}
 
@@ -129,7 +153,7 @@ export function ReceiptForm({ delivery, outlet, today, record }: { delivery: Sto
       <ReceiptFoot>
         <Button
           className={cn(ORANGE, 'h-[46px] w-full text-sm', off && 'disabled:bg-primary disabled:text-primary-foreground')}
-          disabled={off || reading || at === null}
+          disabled={off || reading || at === null || !tally.canConfirm}
           focusableWhenDisabled
           onClick={confirm}
         >
