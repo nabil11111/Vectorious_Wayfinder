@@ -136,7 +136,8 @@ column of the trip: a ready reads the problems under the trip's lock, so it sees
   Folded clothing" or "2 pallets of 8 · Televisions" with the item's name for Style and Tech.
 - "leaves 04:36", "in 42 min", "in 2 h 6 min" and "12 min late", from `leavesAt` and the app clock on screen. The load
   figure "165 / 1,040 kg · 0.9 / 7.0 m³" for a vehicle under 2 t, and "4.5 / 6.8 t · 21.0 / 33.4 m³" for a truck: the
-  weight rounded down and never at the limit's figure while weight is free, the cubic metres to one decimal.
+  weight rounded down and never at the limit's figure while weight is free, at or over the limit the limit's own
+  figure ("4.0 / 4.0 t" for a full 3,990 kg truck), and the cubic metres to one decimal.
 - A problem's title by reason: "1 dry carton short", "2 chilled cartons damaged", "1 dry carton was the wrong item",
   "4 chilled cartons won't fit", and "3 items short" when its lines differ.
 - The loader's answer line: "Ruwan, dispatcher · 02:35", then "Go with 1 dry carton short for Fresh Nugegoda." or

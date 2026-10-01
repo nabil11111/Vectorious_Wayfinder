@@ -235,6 +235,17 @@ describe('Q-21 the load\'s weight never rounds up to look full', () => {
     expect(figure(2000, 1999.9, 0, 9)).toBe('1.9 / 2.0 t · 0.0 / 9.0 m³');
   });
 
+  it('reads the limit\'s own figure once the vehicle is full or over it, and never while weight is free', () => {
+    // VEH002's limit is 3,990 kg, which its one place writes 4.0 t.
+    expect(figure(3990, 3990, 0, 22)).toBe('4.0 / 4.0 t · 0.0 / 22.0 m³');
+    expect(figure(3990, 4100, 0, 22)).toBe('4.0 / 4.0 t · 0.0 / 22.0 m³');
+    expect(figure(3990, 3989.9, 0, 22)).toBe('3.9 / 4.0 t · 0.0 / 22.0 m³');
+    expect(figure(6840, 7000, 0, 33.4)).toBe('6.8 / 6.8 t · 0.0 / 33.4 m³');
+    expect(figure(1040, 1040)).toBe('1,040 / 1,040 kg · 0.0 / 7.0 m³');
+    expect(figure(1040, 1045.5)).toBe('1,040 / 1,040 kg · 0.0 / 7.0 m³');
+    expect(figure(1040, 1039.9)).toBe('1,039 / 1,040 kg · 0.0 / 7.0 m³');
+  });
+
   it('keeps the cubic metres to the nearest tenth, as the walkthrough reads them', () => {
     // The walkthrough's VEH035 with stop 2 on: 94 cartons, 648.6 kg and 3.478 m³.
     expect(figure(1040, 648.6, 3.478)).toBe('648 / 1,040 kg · 3.5 / 7.0 m³');
