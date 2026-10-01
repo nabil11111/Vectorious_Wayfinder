@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import * as checker from '../check';
 import { checkPlan } from '../check';
 import { computeLoad } from '../load';
-import type { EngineOrder, PlannerInput, PlannerResult } from '../types';
+import type { EngineOrder, PlannerInput, PlannerOrder, PlannerResult } from '../types';
 import { buildSuggestedPlan } from './build';
 import { prepareInput } from './priority';
-import { demoFixture, threeHundredOrders } from './testing/demo';
+import { demoFixture, kandyFixture, threeHundredOrders } from './testing/demo';
 
 const quantities = (orders: EngineOrder[]) => {
   const totals = new Map<string, number>();
@@ -65,6 +65,23 @@ describe('the exact seeded planner day without a database', () => {
     ]);
   });
 
+  it('spec 020 reconstructs Kandy\'s seeded day: 64 orders by the same rules, none waiting, and 22 vehicles with a full fuel week', async () => {
+    const { input } = await kandyFixture();
+    expect([input.date, input.depotId]).toEqual(['2026-06-25', 'Kandy']);
+    expect(input.orders).toHaveLength(64);
+    expect(input.orders.every((o) => o.deliveryDate === input.date && o.timesDeferred === 0 && o.splitFrom === null)).toBe(true);
+    // The seed's own totals (tests/demo-day.test.ts).
+    expect(computeLoad(input.orders.flatMap((o) => o.lines), input.products)).toMatchObject({ units: 3025, kg: 24694.1, m3: 165.513 });
+    // OUT076: 45 + (836 mod 21) = 62 dry cartons and 38 + (380 mod 23) = 50 chilled ones, under the seed's ids.
+    expect(input.orders.filter((o) => o.outletId === 'OUT076').map((o) => [o.id, o.lines])).toEqual([
+      ['d503f849-bc1c-5b87-bbe6-b7370452bd5d', [{ productId: 'fresh-dry-carton', quantity: 62 }]],
+      ['21756f46-df43-53ca-b243-a31e015300e7', [{ productId: 'fresh-chilled-carton', quantity: 50 }]],
+    ]);
+    expect(input.vehicles).toHaveLength(22);
+    expect(input.vehicles.every((v) => v.depotId === 'Kandy' && v.available && v.litresUsedThisWeek === 0)).toBe(true);
+    expect(buildSuggestedPlan(input).status).not.toBe('unavailable');
+  });
+
   it('AC-21 returns a valid plan with every seeded unit accounted for exactly once', async () => {
     const { input } = await demoFixture();
     const result = buildSuggestedPlan(input);
@@ -119,32 +136,44 @@ describe('the exact seeded planner day without a database', () => {
     }
   });
 
-  it('AC-17 keeps every reason within 200 characters and whole words on varied days made from the seeded one', async () => {
-    // A fixed sample of days: some of the day's orders on a few of its working vehicles, about a third of them waiting
-    // and larger, so splits and refused remainders come up, and on half the days drivers with long three-part names.
-    const { input } = await demoFixture();
+  it('AC-17 keeps every reason within 200 characters and whole words on varied days made from Peliyagoda\'s and Kandy\'s seeded ones', async () => {
+    // A fixed sample of days, Peliyagoda's and Kandy's by turns: some of the day's orders on a few of its working vehicles,
+    // about a third of them waiting and larger, and every other pair of days a heavy one, a few waiting orders with lines
+    // near the 999 a line can hold. So splits and refused remainders come up, and on half the days drivers have long
+    // three-part names.
+    const depots = [(await demoFixture()).input, (await kandyFixture()).input];
     let seed = 7;
     const next = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
     const some = <T>(rows: T[], n: number) => rows.map((row) => [next(), row] as const).sort(([a], [b]) => a - b).slice(0, n).map(([, row]) => row);
+    const waiting = (order: PlannerOrder, nearCap: boolean): PlannerOrder => ({
+      ...order, deliveryDate: '2026-06-24', timesDeferred: 1,
+      lines: order.lines.map((line) => ({ ...line, quantity: nearCap ? 900 + Math.floor(next() * 100) : line.quantity * (2 + Math.floor(next() * 4)) })),
+    });
     const names = ['Chaminda Kumara Wickramasinghe', 'Dilshan Pradeep Jayawardena', 'Lasantha Bandara Ekanayake', 'Priyantha Gamini Senanayake'];
-    const reasons: string[] = [];
-    for (let day = 0; day < 60; day += 1) {
+    const reasons: { depot: string; reason: string }[] = [];
+    for (let day = 0; day < 64; day += 1) {
+      const input = depots[day % 2]!;
+      const heavy = day % 4 >= 2;
       const fleet = some(input.vehicles.filter((v) => v.available), 2 + Math.floor(next() * 6));
       const named = next() < 0.5;
-      const orders = some(input.orders, 10 + Math.floor(next() * 40)).map((order) => (next() < 0.3
-        ? { ...order, deliveryDate: '2026-06-24', timesDeferred: 1, lines: order.lines.map((line) => ({ ...line, quantity: line.quantity * (2 + Math.floor(next() * 4)) })) }
-        : order));
+      const orders = heavy
+        ? some(input.orders, 3 + Math.floor(next() * 6)).map((order) => waiting(order, true))
+        : some(input.orders, 10 + Math.floor(next() * 40)).map((order) => (next() < 0.3 ? waiting(order, next() < 0.3) : order));
       const result = buildSuggestedPlan({ ...input, orders, vehicles: fleet.map((v, i) => (named ? { ...v, driverName: names[i % names.length]! } : v)) });
-      if (result.status !== 'unavailable') reasons.push(...[...result.choices, ...result.decisions].map((entry) => entry.reason));
+      if (result.status === 'unavailable') continue;
+      reasons.push(...[...result.choices, ...result.decisions, ...result.input.plan.deferrals].map((entry) => ({ depot: input.depotId, reason: entry.reason })));
     }
-    expect(reasons.length).toBeGreaterThan(1000);
-    for (const reason of reasons) {
+    expect(reasons.filter((r) => r.depot === 'Peliyagoda').length).toBeGreaterThan(500);
+    expect(reasons.filter((r) => r.depot === 'Kandy').length).toBeGreaterThan(500);
+    for (const { reason } of reasons) {
       expect(reason.length, reason).toBeLessThanOrEqual(200);
       expect(reason, reason).not.toContain('…');
     }
-    // The sample reaches every wording: drivers' names where they fit, and the tight form where even kind and id do not.
-    expect(reasons.some((reason) => names.some((name) => reason.includes(`${name}'s `)))).toBe(true);
-    expect(reasons.some((reason) => / wait: reached at /.test(reason))).toBe(true);
+    // The sample reaches every wording: drivers' names where they fit, the tight form where even kind and id do not,
+    // and the tightest, with no deciding rule in brackets, where even the tight form does not.
+    expect(reasons.some(({ reason }) => names.some((name) => reason.includes(`${name}'s `)))).toBe(true);
+    expect(reasons.some(({ reason }) => / wait: reached at /.test(reason))).toBe(true);
+    expect(reasons.some(({ reason }) => /; \d+ (?:cartons|boxes|items) (?:on|joined) (?:dry truck|reefer truck|reefer van|van) VEH\d{3}(?:'s second trip)?(?:;|$)/.test(reason))).toBe(true);
   });
 
   it('AC-17 says fridge truck in every seeded chilled deferral', async () => {
