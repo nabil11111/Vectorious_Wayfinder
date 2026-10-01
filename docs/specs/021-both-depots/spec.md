@@ -1,6 +1,6 @@
 # 021 · Both depots together
 
-**Status:** Ready  ·  **Owner:** Claude builders (T0 and T1, T2)  ·  **Design:** the depot switch in every Dispatcher
+**Status:** Done  ·  **Owner:** Claude builders (T0 and T1, T2)  ·  **Design:** the depot switch in every Dispatcher
 frame's top bar ("Peliyagoda · Kandy · Both") and the dashboard map card's "Map view" switch (`53:11540`). No frame
 draws a Both screen, so Both reuses each page's frame for the two depots together.
 
@@ -79,22 +79,22 @@ other role keeps its own shop or depot, as in spec 020.
 - The live stream on Both carries both depots' announcements.
 
 ## Acceptance criteria
-- [ ] AC-1 When a dispatcher puts `{ depotId: 'Both' }`, the system shall answer `Me` with `depotId: 'Both'` and keep
+- [x] AC-1 When a dispatcher puts `{ depotId: 'Both' }`, the system shall answer `Me` with `depotId: 'Both'` and keep
   it on the session. Peliyagoda or Kandy afterwards shall bring back one depot. A loader, driver, shop or admin shall
   get 403, as in spec 020.
-- [ ] AC-2 While the session is on Both, every dispatcher read (operations, problems, look-ups, photos) shall answer
+- [x] AC-2 While the session is on Both, every dispatcher read (operations, problems, look-ups, photos) shall answer
   the depot its `?depot=` names. With none named, it shall answer 400 `pick_a_depot`. With a depot named on a session
   that is on the other depot, it shall answer 409 `depot_changed`.
-- [ ] AC-3 While the session is on Both, every plan write shall answer 409 `pick_a_depot` and change nothing. A
+- [x] AC-3 While the session is on Both, every plan write shall answer 409 `pick_a_depot` and change nothing. A
   problem's answer shall be saved on the problem's own depot.
-- [ ] AC-4 While the session is on Both, the live stream shall carry both depots' announcements.
-- [ ] AC-5 With Both chosen, the dashboard shall add the two depots up as rule 1 says. Every row shall say its depot,
+- [x] AC-4 While the session is on Both, the live stream shall carry both depots' announcements.
+- [x] AC-5 With Both chosen, the dashboard shall add the two depots up as rule 1 says. Every row shall say its depot,
   and the map card shall draw the Both view with 120 stores and 60 vehicles.
-- [ ] AC-6 With Both chosen, Live day, Orders, History and Fleet shall show Peliyagoda's part and then Kandy's, under
+- [x] AC-6 With Both chosen, Live day, Orders, History and Fleet shall show Peliyagoda's part and then Kandy's, under
   their names, and the plan board and View plan shall ask for a depot.
-- [ ] AC-7 With Both chosen, one depot's failed read shall show only that depot's part as failed, and switching to or
+- [x] AC-7 With Both chosen, one depot's failed read shall show only that depot's part as failed, and switching to or
   from Both shall follow spec 020's switching and failure states.
-- [ ] AC-8 The README's departures shall say what Both shows, and that planning picks one depot (D-96).
+- [x] AC-8 The README's departures shall say what Both shows, and that planning picks one depot (D-96).
 
 ## Out of scope
 A plan covering both depots, moving orders or trucks between depots, and a combined plan board.
