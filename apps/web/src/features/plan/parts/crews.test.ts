@@ -67,6 +67,12 @@ it('AC-1 shows too heavy and too big against the truck\'s own limits, and greys 
     ['too heavy: 7.6 t of 7.2 t · too big: 41.2 m³ of 38 m³ · trip 2 · fuel 62% left', false],
     ['on two trips already', true],
   ]);
+  // Every chilled order without a fridge is counted once, and a van-only shop named once.
+  const many = { ...LIST, crews: [crew('VEH011', CHAMINDA, { fits: false, misfits: [
+    { code: 'van_only', orderId: null, outletId: 'OUT005' }, { code: 'needs_reefer', orderId: DEHIWALA, outletId: 'OUT005' },
+    { code: 'van_only', orderId: null, outletId: 'OUT005' }, { code: 'needs_reefer', orderId: FORT, outletId: 'OUT006' },
+  ] })] };
+  expect(crewRows(many, DROPPED, DRAFT, INDEX)[0]!.line).toBe('cannot reach Fresh Dehiwala: van only · no fridge for 2 chilled orders · trip 2 · fuel 62% left');
 });
 
 it('rule 2 says before the press when the crew\'s driver drives another truck, which will have no driver', () => {

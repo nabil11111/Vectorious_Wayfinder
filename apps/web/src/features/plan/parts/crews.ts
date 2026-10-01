@@ -40,7 +40,7 @@ function misfitWords(crew: Crew, load: CrewList['load'], index: BoardIndex): str
     words.push(`cannot reach ${(outletId && index.shop(outletId)?.name) ?? 'a shop'}: van only`);
   }
   const chilled = new Set(crew.misfits.filter((m) => m.code === 'needs_reefer').map((m) => m.orderId)).size;
-  if (chilled > 0) words.push(`no fridge for the chilled ${countOf(chilled, 'order').replace(/^1 /, '')}`);
+  if (chilled > 0) words.push(chilled === 1 ? 'no fridge for the chilled order' : `no fridge for ${countOf(chilled, 'chilled order')}`);
   return words;
 }
 
