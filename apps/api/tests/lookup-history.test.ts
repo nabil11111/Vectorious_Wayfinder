@@ -48,9 +48,26 @@ it.each(['refused', 'closed'] as const)('AC-13 zero handover finishes without de
   const day = await read(), stop = day.trips[0]!.stops[1]!;
   expect(day.counts).toMatchObject({ stops: 2, delivered: 1, finished: 2, partial: 0 });
   expect(stop.stages).toMatchObject(kind === 'closed'
-    ? { handedOver: { units: null }, received: { units: null }, notDelivered: { units: 94 }, refused: { units: 0 } }
+    ? { handedOver: { units: 0, known: 2, total: 2 }, received: { units: 0 }, receiptShort: { units: 0 }, notDelivered: { units: 94 }, refused: { units: 0 } }
     : { handedOver: { units: 0 }, received: { units: null }, notDelivered: { units: 0 }, refused: { units: 94 } });
   expect(stop.attempts).toHaveLength(kind === 'closed' ? 1 : 0);
+});
+// L-13: VEH035 with Nugegoda confirmed and Wellawatte closed read "Handed over · not recorded · 2 of 3 lines", although
+// nothing more can be recorded for Wellawatte's lines. A closed shop was handed nothing, so the trip's figures are whole.
+it('L-13 counts a closed shop as nothing handed over, received or short on the receipt, so the trip reads whole figures', async () => {
+  const trip = await deliveredWalkthrough(h, { wellawatte: 'closed' });
+  const shop = shopScreen(h.nadeesha), delivery = await shop.one(driverStop(trip, 1).id);
+  h.freeze(THU, 513);
+  expect((await shop.send(receiptOf(delivery, [11, 8, 3], { reason: 'missing', photo }))).status).toBe(200);
+  const day = await read(), closed = day.trips[0]!.stops[1]!;
+  expect(closed.outcome).toBe('closed');
+  expect(closed.lines.map(line => [line.delivered, line.received, line.receiptShort])).toEqual([[0, 0, 0], [0, 0, 0]]);
+  const whole = { loaded: { units: 117, known: 5, total: 5 }, handedOver: { units: 23, known: 5, total: 5 }, received: { units: 22, known: 5, total: 5 },
+    receiptShort: { units: 1, known: 5, total: 5 }, notDelivered: { units: 94, known: 5, total: 5 } };
+  expect(day.trips[0]!.stages).toMatchObject(whole);
+  expect(day.counts).toMatchObject({ delivered: 1, finished: 2, confirmations: 1, stages: whole });
+  // The closed shop is still not delivered, and has no receipt or proof to wait for.
+  expect(closed).toMatchObject({ receipt: null, proof: null, flags: { short: false } });
 });
 it('AC-16 three received orders make one confirmation, 22 cartons and separate receipt and depot shortages', async () => {
   const trip = await deliveredWalkthrough(h, { wellawatte: 'refused' });
