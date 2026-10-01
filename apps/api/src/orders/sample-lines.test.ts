@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PRODUCTS } from '../db/fixtures';
-import { DRIVER_NOTES, pickShops, sampleOrder, spacedTimes, type SampleShop } from './sample-lines';
+import { DRIVER_NOTES, pickShops, sampleOrder, spacedTimes, topUpOrder, type SampleShop } from './sample-lines';
 
 // Spec 028, rules 3 to 5: which shops a press picks, what each one orders and when. Pure, so no database.
 
@@ -80,6 +80,42 @@ describe('what a shop orders (rule 4)', () => {
     const fresh = Array.from({ length: 30 }, (_, i) => shop(out(i + 1), 'Fresh'));
     expect(fresh.map((s) => order(s))).toEqual(fresh.map((s) => order(s)));
     expect(fresh.map((s) => order(s, '2026-06-26'))).not.toEqual(fresh.map((s) => order(s)));
+  });
+});
+
+describe('a top-up (rule 4)', () => {
+  const top = (s: SampleShop, k = 1, date = THU) => topUpOrder(s, own(s), date, k);
+
+  it('is one line of one temperature for a Fresh shop, 10% to 35% of its seeded size, with no note', () => {
+    for (let n = 1; n <= 120; n += 1) {
+      const { lines, driverNote } = top(shop(out(n), 'Fresh'));
+      expect(lines).toHaveLength(1);
+      expect(driverNote).toBe('');
+      const [line] = lines;
+      const base = line!.productId === 'fresh-dry-carton' ? 45 + ((11 * n) % 21) : 38 + ((5 * n) % 23);
+      if (line!.productId === 'fresh-chilled-carton') expect(![0, 4, 7].includes(n % 10)).toBe(true);
+      expect(line!.quantity).toBeGreaterThanOrEqual(Math.max(1, Math.floor(base * 0.1)));
+      expect(line!.quantity).toBeLessThanOrEqual(Math.ceil(base * 0.35));
+    }
+  });
+
+  it('is a few of a Style shop boxes, and one crate or pallet for a Tech shop, never one needing a tail lift where only a van goes', () => {
+    for (let n = 1; n <= 120; n += 1) {
+      const style = top(shop(out(n), 'Style')).lines;
+      expect(style.length).toBeGreaterThanOrEqual(1);
+      expect(style.every((line) => line.productId.startsWith('style-') && line.quantity >= 1 && line.quantity <= 7)).toBe(true);
+      const tech = top(shop(out(n), 'Tech', 'van_only')).lines;
+      expect(tech).toHaveLength(1);
+      expect(tech[0]!.quantity).toBe(1);
+      expect(['tech-washer', 'tech-fridge']).not.toContain(tech[0]!.productId);
+    }
+  });
+
+  it('is the same for the same shop, day and count of orders it has, and another top-up can differ', () => {
+    const fresh = Array.from({ length: 30 }, (_, i) => shop(out(i + 1), 'Fresh'));
+    expect(fresh.map((s) => top(s))).toEqual(fresh.map((s) => top(s)));
+    expect(fresh.map((s) => top(s, 2))).not.toEqual(fresh.map((s) => top(s, 1)));
+    expect(topUpOrder(shop('OUT020', 'Style'), [], THU, 1).lines).toEqual([]);
   });
 });
 

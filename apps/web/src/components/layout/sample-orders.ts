@@ -47,8 +47,11 @@ export function canOrderLine(depot: SampleOrdersPreview['depots'][number]): stri
 }
 
 // What a press did at one depot: "Placed 10 orders from 10 shops at Peliyagoda; 65 shops already had an order or a
-// draft."
+// draft.", or with top-ups "Placed 25 orders at Peliyagoda: 10 from shops that hadn't ordered, 15 top-ups."
 export function sampleAnswer(depot: SampleOrdersDepot, deliveryDate: string): string {
+  if (depot.topUpIds.length) {
+    return `Placed ${count(depot.orders, 'order')} at ${depot.depotId}: ${depot.newOrders} from shops that hadn't ordered, ${count(depot.topUpIds.length, 'top-up')}.`;
+  }
   const had = `${count(depot.alreadyHad, 'shop')} already had an order or a draft`;
   const cannot = depot.cannotOrder ? `; ${count(depot.cannotOrder, 'shop')} had no account or nothing to order` : '';
   if (!depot.orders) {

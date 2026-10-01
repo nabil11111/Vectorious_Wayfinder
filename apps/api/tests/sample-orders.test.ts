@@ -147,24 +147,59 @@ describe('outside "Orders open" (AC-9)', () => {
 });
 
 describe('a press at Peliyagoda', () => {
-  it('AC-2 AC-3 on the seeded day places the 10 shops that may order, whatever was asked, and leaves the rest alone', async () => {
+  it('AC-3 every shop that has not ordered: on the seeded day the 10 free shops, and the rest left alone', async () => {
     const preview = SampleOrdersPreview.parse((await as.ruwan.get(SAMPLE)).body);
     expect(preview).toEqual({ deliveryDate: THU, depots: [{ depotId: 'Peliyagoda', shops: 75, canOrder: 10 }] });
     const before = await db.select({ id: orders.id, status: orders.status, revision: orders.revision }).from(orders);
 
-    const result = await pressed(25);
+    const result = await pressed('all');
     expect(result.deliveryDate).toBe(THU);
-    expect(result.depots).toEqual([{ depotId: 'Peliyagoda', orders: 10, outletIds: expect.any(Array), alreadyHad: 65, cannotOrder: 0 }]);
+    expect(result.depots).toEqual([{ depotId: 'Peliyagoda', orders: 10, newOrders: 10, outletIds: expect.any(Array), topUpIds: [], alreadyHad: 65, cannotOrder: 0 }]);
     expect([...result.depots[0]!.outletIds].sort()).toEqual(FREE_AT_PELIYAGODA);
     // Nothing that was there changed, Nadeesha's draft included.
     const after = await db.select({ id: orders.id, status: orders.status, revision: orders.revision }).from(orders).where(inArray(orders.id, before.map((o) => o.id)));
     expect(after.sort((a, b) => a.id.localeCompare(b.id))).toEqual(before.sort((a, b) => a.id.localeCompare(b.id)));
     expect((await db.select().from(orders).where(and(eq(orders.outletId, 'OUT001'), eq(orders.status, 'draft')))).length).toBe(2);
 
-    // A second press finds every shop ordered.
+    // "Every shop that hasn't ordered" never tops up: a second press places nothing.
     const again = await pressed('all');
-    expect(again.depots).toEqual([{ depotId: 'Peliyagoda', orders: 0, outletIds: [], alreadyHad: 75, cannotOrder: 0 }]);
+    expect(again.depots).toEqual([{ depotId: 'Peliyagoda', orders: 0, newOrders: 0, outletIds: [], topUpIds: [], alreadyHad: 75, cannotOrder: 0 }]);
     expect((await sampleOrders()).length).toBe(10);
+  });
+
+  it('AC-2 when the free shops run out, tops up from shops that ordered, by the same shuffle, never the draft shop or a shop twice', async () => {
+    const result = await pressed(25);
+    const done = result.depots[0]!;
+    expect(done).toMatchObject({ depotId: 'Peliyagoda', orders: 25, newOrders: 10, alreadyHad: 65, cannotOrder: 0 });
+    expect([...done.outletIds].sort()).toEqual(FREE_AT_PELIYAGODA);
+    expect(done.topUpIds).toHaveLength(15);
+    expect(new Set([...done.outletIds, ...done.topUpIds]).size).toBe(25);
+    expect(done.topUpIds).not.toContain('OUT001');
+    // The top-ups are the first shops of the day's shuffle that had ordered.
+    const all = await db.select({ id: outlets.id }).from(outlets).where(eq(outlets.depotId, 'Peliyagoda'));
+    const ordered = (shop: { id: string }) => !FREE_AT_PELIYAGODA.includes(shop.id) && shop.id !== 'OUT001';
+    expect(done.topUpIds).toEqual(pickShops(all, THU, 'Peliyagoda').filter(ordered).slice(0, 15).map((shop) => shop.id));
+
+    // Each top-up is one small order of one line or a few, with no note, beside the shop's seeded order.
+    const made = await sampleOrders();
+    expect(made).toHaveLength(25);
+    for (const id of done.topUpIds) {
+      const mine = made.filter((o) => o.outletId === id);
+      expect(mine).toHaveLength(1);
+      expect(mine[0]!.driverNote).toBeNull();
+      const seeded = await db.select().from(orders).where(and(eq(orders.outletId, id), eq(orders.deliveryDate, THU), isNull(orders.placedBy)));
+      expect(seeded.length).toBeGreaterThan(0);
+      const units = (mine[0]!.lines as [string, number][]).reduce((sum, [, q]) => sum + q, 0);
+      const seededUnits = (await db.select().from(orderLines).where(inArray(orderLines.orderId, seeded.map((o) => o.id)))).reduce((sum, l) => sum + l.quantity, 0);
+      expect(units).toBeLessThanOrEqual(Math.max(1, Math.ceil(seededUnits * 0.35)));
+    }
+
+    // A second press tops up again, and a shop topped up before may get another.
+    const second = (await pressed(25)).depots[0]!;
+    expect(second).toMatchObject({ orders: 25, newOrders: 0, outletIds: [] });
+    expect(new Set(second.topUpIds).size).toBe(25);
+    expect(second.topUpIds).not.toContain('OUT001');
+    expect((await sampleOrders()).length).toBe(50);
   });
 
   it('AC-1 AC-6 places each order as the shop itself would, signed by its manager, and the shop sees it', async () => {
@@ -269,9 +304,9 @@ describe('on Both (AC-8)', () => {
     const preview = SampleOrdersPreview.parse((await as.ruwan.get(SAMPLE)).body);
     expect(preview.depots).toEqual([{ depotId: 'Peliyagoda', shops: 75, canOrder: 10 }, { depotId: 'Kandy', shops: 45, canOrder: 2 }]);
     const result = await pressed(10);
-    expect(result.depots.map((d) => [d.depotId, d.orders, [...d.outletIds].sort(), d.alreadyHad])).toEqual([
-      ['Peliyagoda', 10, FREE_AT_PELIYAGODA, 65],
-      ['Kandy', 2, ['OUT090', 'OUT120'], 43],
+    expect(result.depots.map((d) => [d.depotId, d.orders, d.newOrders, [...d.outletIds].sort(), d.topUpIds.length, d.alreadyHad])).toEqual([
+      ['Peliyagoda', 10, 10, FREE_AT_PELIYAGODA, 0, 65],
+      ['Kandy', 10, 2, ['OUT090', 'OUT120'], 8, 43],
     ]);
   });
 });

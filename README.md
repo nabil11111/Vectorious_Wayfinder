@@ -39,7 +39,8 @@ screen follows at once. `DEMO_MODE=false` runs on the real clock with no seeded 
 An install seeded before the shop's receipt keeps its old shop history until **Reset the demo day** is pressed once.
 While orders are open, the dispatcher's demo control also has **Add sample shop orders**: 10 shops, 25 shops or every
 shop that hasn't ordered, at the depot on show (each depot on Both), place an order of their own brand, each through
-the shop's own Place and signed by its manager, and Orders and the Dashboard follow at once (spec 028).
+the shop's own Place and signed by its manager, and Orders and the Dashboard follow at once (spec 028). Once the shops
+that have not ordered run out, 10 and 25 go on with small top-ups from shops that already ordered.
 
 ### Working on the code
 
@@ -195,10 +196,11 @@ once Friday's plan takes it. Orders reads "48 chilled cartons: brought back to t
 with no day until then.
 
 **More shops ordering.** For a presenter at step 1: signed in as Ruwan (`P-001`) with orders still open, open the demo
-clock, press **Add sample shop orders**, keep "10 shops" and press **Place the orders**. "Placed 10 orders from 10 shops at
-Peliyagoda; 65 shops already had an order or a draft.": the seeded day leaves only four Style and six Tech shops
-without an order, and Nadeesha's draft is left alone. The same press after a reset places the same orders. Step 3 then
-counts 114 unplanned orders, and **Reset the demo day** takes them away again.
+clock, press **Add sample shop orders**, choose "25 shops" and press **Place the orders**. "Placed 25 orders at
+Peliyagoda: 10 from shops that hadn't ordered, 15 top-ups.": the seeded day leaves only four Style and six Tech shops
+without an order, so 15 shops that already ordered add a few cartons, boxes or one crate. Nadeesha's draft is left
+alone. The same press after a reset places the same orders. Step 3 then counts 129 unplanned orders, and **Reset the
+demo day** takes them away again.
 
 **A second trip.** A truck the plan sends out twice, such as VEH057 at Kandy, gives its driver both trips. **I'm back at the
 depot** on trip 1 opens trip 2's Today's trip under "✓ Trip 1 closed · 4 of 4 stops · all records sent · checked in

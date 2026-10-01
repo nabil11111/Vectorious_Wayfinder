@@ -52,7 +52,8 @@ export const LiveEvent = z.strictObject({ topic: z.string().min(1).max(40), id: 
 export type LiveEvent = z.infer<typeof LiveEvent>;
 
 // Sample shop orders from the demo control (spec 028): while orders are open, the dispatcher has 10, 25 or every shop
-// of the depot on show that has not ordered place its own order for the open day.
+// of the depot on show that has not ordered place its own order for the open day. When those run out, 10 and 25 go on
+// with small top-ups from shops that already ordered.
 export const SAMPLE_SHOP_CHOICES = [10, 25, 'all'] as const;
 export const SampleOrdersRequest = z.strictObject({ shops: z.union([z.literal(10), z.literal(25), z.literal('all')]) });
 export type SampleOrdersRequest = z.infer<typeof SampleOrdersRequest>;
@@ -65,12 +66,15 @@ export const SampleOrdersPreview = z.object({
 });
 export type SampleOrdersPreview = z.infer<typeof SampleOrdersPreview>;
 
-// After the press, for each depot: the orders placed and the shops that placed them, the shops that already had an
-// order or a draft, and the shops with no store manager or nothing on their list to order.
+// After the press, for each depot: every order placed, those from shops that had not ordered and those shops, the shops
+// that added a top-up to an order they had (one order each), the shops that already had an order or a draft, and the
+// shops with no store manager or nothing on their list to order.
 export const SampleOrdersDepot = z.object({
   depotId: z.string(),
   orders: z.number().int(),
+  newOrders: z.number().int(),
   outletIds: z.array(z.string()),
+  topUpIds: z.array(z.string()),
   alreadyHad: z.number().int(),
   cannotOrder: z.number().int(),
 });

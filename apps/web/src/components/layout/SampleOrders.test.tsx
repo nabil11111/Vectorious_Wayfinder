@@ -62,6 +62,7 @@ describe('the panel (AC-13)', () => {
       'Each shop places its own order for Thu 25 Jun, as if its manager pressed Place. At Peliyagoda.',
       "10 of Peliyagoda's 75 shops have not ordered yet.",
       "10 shops 25 shops Every shop that hasn't ordered",
+      'When the shops that have not ordered run out, 10 and 25 shops go on with small top-ups from shops that already ordered.',
       'Place the orders Back',
     ].join(' '));
     expect(html).toContain('role="radiogroup" aria-label="How many shops"');
@@ -88,23 +89,30 @@ describe('the panel (AC-13)', () => {
 
   it('after the press shows the answer for each depot and Done', () => {
     const result: SampleOrdersResult = { deliveryDate: '2026-06-25', depots: [
-      { depotId: 'Peliyagoda', orders: 10, outletIds: Array.from({ length: 10 }, (_, i) => `OUT0${i + 10}`), alreadyHad: 65, cannotOrder: 0 },
-      { depotId: 'Kandy', orders: 2, outletIds: ['OUT090', 'OUT120'], alreadyHad: 43, cannotOrder: 0 },
+      { depotId: 'Peliyagoda', orders: 10, newOrders: 10, outletIds: Array.from({ length: 10 }, (_, i) => `OUT0${i + 10}`), topUpIds: [], alreadyHad: 65, cannotOrder: 0 },
+      { depotId: 'Kandy', orders: 10, newOrders: 2, outletIds: ['OUT090', 'OUT120'], topUpIds: Array(8).fill('OUT076'), alreadyHad: 43, cannotOrder: 0 },
     ] };
     const html = view({ result });
     expect(text(html)).toBe('Sample shop orders Placed 10 orders from 10 shops at Peliyagoda; 65 shops already had an order or a draft. '
-      + 'Placed 2 orders from 2 shops at Kandy; 43 shops already had an order or a draft. Done');
+      + 'Placed 10 orders at Kandy: 2 from shops that hadn\'t ordered, 8 top-ups. Done');
     expect(html.match(/role="status"/g)).toHaveLength(2);
   });
 });
 
 describe('the answer line', () => {
-  const depot = { depotId: 'Peliyagoda', orders: 41, outletIds: Array(25).fill('OUT'), alreadyHad: 3, cannotOrder: 0 };
+  const depot = { depotId: 'Peliyagoda', orders: 41, newOrders: 41, outletIds: Array(25).fill('OUT'), topUpIds: [] as string[], alreadyHad: 3, cannotOrder: 0 };
   it('says how many orders from how many shops and how many already had one', () => {
     expect(sampleAnswer(depot, '2026-06-25')).toBe('Placed 41 orders from 25 shops at Peliyagoda; 3 shops already had an order or a draft.');
     expect(sampleAnswer({ ...depot, orders: 1, outletIds: ['OUT015'], alreadyHad: 1 }, '2026-06-25')).toBe('Placed 1 order from 1 shop at Peliyagoda; 1 shop already had an order or a draft.');
     expect(sampleAnswer({ ...depot, alreadyHad: 0 }, '2026-06-25')).toBe('Placed 41 orders from 25 shops at Peliyagoda.');
     expect(sampleAnswer({ ...depot, cannotOrder: 2 }, '2026-06-25')).toBe('Placed 41 orders from 25 shops at Peliyagoda; 3 shops already had an order or a draft; 2 shops had no account or nothing to order.');
+  });
+
+  it('counts the top-ups apart when the free shops ran out', () => {
+    const topped = { ...depot, orders: 25, newOrders: 10, outletIds: Array(10).fill('OUT'), topUpIds: Array(15).fill('OUT'), alreadyHad: 65 };
+    expect(sampleAnswer(topped, '2026-06-25')).toBe("Placed 25 orders at Peliyagoda: 10 from shops that hadn't ordered, 15 top-ups.");
+    expect(sampleAnswer({ ...topped, orders: 1, newOrders: 0, outletIds: [], topUpIds: ['OUT002'] }, '2026-06-25'))
+      .toBe("Placed 1 order at Peliyagoda: 0 from shops that hadn't ordered, 1 top-up.");
   });
 
   it('says so when nothing was placed', () => {

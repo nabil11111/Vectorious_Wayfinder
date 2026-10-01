@@ -84,6 +84,32 @@ export function sampleOrder(shop: SampleShop, items: readonly SampleItem[], deli
   return { lines: lines.filter(([productId]) => orderable.has(productId)).map(([productId, quantity]) => ({ productId, quantity })), driverNote: note, gapSeconds };
 }
 
+// A top-up: a small order added before 16:00 by a shop that already ordered (rule 4). One line of one temperature for a
+// Fresh shop, a few of a Style shop's boxes, one crate or pallet for a Tech shop, each 10% to 35% of the shop's usual
+// order and at least one, with no note. `placed` is how many orders the shop has for the day, so a second top-up from
+// a later press can differ from the first and the same press on the same day still gives the same.
+export function topUpOrder(shop: SampleShop, items: readonly SampleItem[], deliveryDate: string, placed: number): { lines: SampleLine[]; driverNote: string; gapSeconds: number } {
+  const random = seeded(`sample-top-up:${deliveryDate}:${shop.id}:${placed}`);
+  const n = numberOf(shop.id);
+  const orderable = new Set(items.map((item) => item.id));
+  const share = (base: number) => clamp(base * (0.1 + random() * 0.25));
+  let lines: Line[];
+  if (shop.brand === 'Fresh') {
+    lines = [ordersChilled(n) && random() < 0.5 ? ['fresh-chilled-carton', share(chilledCartons(n))] : ['fresh-dry-carton', share(dryCartons(n))]];
+  } else if (shop.brand === 'Style') {
+    const all = styleLines(n).map(([productId, quantity]): Line => [productId, share(quantity)]);
+    lines = all.filter(() => random() < 0.5);
+    if (!lines.length) lines = [all[Math.floor(random() * all.length)]!];
+  } else {
+    const tailLift = new Set(items.filter((item) => item.needsTailLift).map((item) => item.id));
+    const kinds = [...new Set(TECH_SHAPES.flat().map(([productId]) => productId))]
+      .filter((productId) => shop.parking !== 'van_only' || !tailLift.has(productId));
+    lines = [[kinds[Math.floor(random() * kinds.length)]!, 1]];
+  }
+  const gapSeconds = 40 + Math.floor(random() * 51);
+  return { lines: lines.filter(([productId]) => orderable.has(productId)).map(([productId, quantity]) => ({ productId, quantity })), driverNote: '', gapSeconds };
+}
+
 // When each picked shop placed its order: the last at the press, and each one before it earlier by the gap of the shop
 // after it. Every time is at or before the press. Gaps that would reach back before `earliest` are shortened to fit.
 export function spacedTimes(at: Date, gapSeconds: readonly number[], earliest: Date): Date[] {

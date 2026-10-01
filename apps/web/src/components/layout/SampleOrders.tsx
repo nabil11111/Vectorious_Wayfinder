@@ -63,6 +63,7 @@ export function SampleOrdersView({ Title, depot, deliveryDate, preview, choice, 
           </button>
         ))}
       </div>
+      <p className="text-sm text-muted-foreground">When the shops that have not ordered run out, 10 and 25 shops go on with small top-ups from shops that already ordered.</p>
       {problem && <p role="alert" className="text-sm font-semibold text-bad">{problem}</p>}
       <div className="grid gap-2">
         <Button className={BUTTON} disabled={placing} focusableWhenDisabled onClick={onPlace}>{placing ? 'Placing…' : 'Place the orders'}</Button>

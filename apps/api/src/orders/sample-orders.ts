@@ -8,12 +8,13 @@ import { auditLog, demoDay, depots, orders, outlets, products, users } from '../
 import { clockState, depotDate, depotInstant, now } from '../lib/clock';
 import { HttpError } from '../lib/errors';
 import type { DepotCaller } from '../middleware/auth';
-import { pickShops, sampleOrder, spacedTimes, type SampleItem, type SampleLine, type SampleShop } from './sample-lines';
+import { pickShops, sampleOrder, spacedTimes, topUpOrder, type SampleItem, type SampleLine, type SampleShop } from './sample-lines';
 import { openDayAt, placeOrders, saveDraft } from './store-orders';
 
 // The demo control's "Add sample shop orders" (spec 028, D-103). While orders are open, shops of the depot on show that
-// have not ordered each place their own order for the open day, through the shop's own save and place and signed as
-// the shop's store manager, so every rule and every announcement is the one a shop's own Place meets.
+// have not ordered each place their own order for the open day, and once those run out shops that ordered add a top-up.
+// Each goes through the shop's own save and place, signed as the shop's store manager, so every rule and every
+// announcement is the one a shop's own Place meets.
 
 type Reader = Db | Tx;
 
@@ -30,7 +31,11 @@ async function depotsOf(on: Reader, scope: string): Promise<string[]> {
 interface Candidate extends SampleShop {
   // The shop's store manager who places the order, or null when the shop has none.
   managerId: string | null;
-  // The shop has a draft, or an order for the open day that is not cancelled, so a press leaves it alone (rule 2).
+  // The shop has a draft, which a press never touches (rule 2).
+  hasDraft: boolean;
+  // How many orders the shop has for the open day that are not cancelled.
+  placed: number;
+  // Either of those, so the shop has ordered and is not one of the free shops.
   busy: boolean;
 }
 
@@ -44,14 +49,14 @@ async function candidates(on: Reader, depotId: string, deliveryDate: string): Pr
   const managers = await on.select({ id: users.id, outletId: users.outletId }).from(users)
     .where(and(eq(users.role, 'store_manager'), eq(users.active, true), inArray(users.outletId, ids)))
     .orderBy(sql`${users.staffId} asc nulls last`, asc(users.id));
-  const busy = await on.selectDistinct({ outletId: orders.outletId }).from(orders)
+  const held = await on.select({ outletId: orders.outletId, status: orders.status }).from(orders)
     .where(and(inArray(orders.outletId, ids), or(eq(orders.status, 'draft'), and(eq(orders.deliveryDate, deliveryDate), ne(orders.status, 'cancelled')))));
-  const busyIds = new Set(busy.map((row) => row.outletId));
-  return shops.map((shop) => ({
-    ...shop,
-    managerId: managers.find((manager) => manager.outletId === shop.id)?.id ?? null,
-    busy: busyIds.has(shop.id),
-  }));
+  return shops.map((shop) => {
+    const own = held.filter((row) => row.outletId === shop.id);
+    const hasDraft = own.some((row) => row.status === 'draft');
+    const placed = own.filter((row) => row.status !== 'draft').length;
+    return { ...shop, managerId: managers.find((manager) => manager.outletId === shop.id)?.id ?? null, hasDraft, placed, busy: hasDraft || placed > 0 };
+  });
 }
 
 // What each brand's shops can order now: its active items.
@@ -110,21 +115,38 @@ export function addSampleOrders(caller: DepotCaller, body: SampleOrdersRequest):
     for (const depotId of await depotsOf(tx, caller.depotId)) {
       const shops = await candidates(tx, depotId, open.deliveryDate);
       // The day's shuffle of every shop of the depot, so the same press on the same day takes the same shops (rule 3).
-      const free = pickShops(shops, open.deliveryDate, depotId).filter((shop) => !shop.busy);
+      const shuffled = pickShops(shops, open.deliveryDate, depotId);
+      const free = shuffled.filter((shop) => !shop.busy);
       const ready = free.filter((shop) => shop.managerId)
-        .map((shop) => ({ ...shop, ...sampleOrder(shop, itemsOf(shop.brand), open.deliveryDate) }))
+        .map((shop) => ({ ...shop, ...sampleOrder(shop, itemsOf(shop.brand), open.deliveryDate), topUp: false }))
         .filter((shop) => shop.lines.length);
       const chosen = body.shops === 'all' ? ready : ready.slice(0, body.shops);
+      // When the free shops run out, 10 and 25 go on with top-ups from shops that ordered, by the same shuffle, never a
+      // shop with a draft and never one twice in a press. "Every shop that hasn't ordered" stays with the free shops.
+      if (body.shops !== 'all' && chosen.length < body.shops) {
+        const topUps = shuffled.filter((shop) => !shop.hasDraft && shop.placed > 0 && shop.managerId)
+          .map((shop) => ({ ...shop, ...topUpOrder(shop, itemsOf(shop.brand), open.deliveryDate, shop.placed), topUp: true }))
+          .filter((shop) => shop.lines.length);
+        chosen.push(...topUps.slice(0, body.shops - chosen.length));
+      }
       const times = spacedTimes(at, chosen.map((shop) => shop.gapSeconds), earliest);
 
-      const done: SampleOrdersDepot = { depotId, orders: 0, outletIds: [], alreadyHad: shops.length - free.length, cannotOrder: free.length - ready.length };
+      const done: SampleOrdersDepot = {
+        depotId, orders: 0, newOrders: 0, outletIds: [], topUpIds: [], alreadyHad: shops.length - free.length, cannotOrder: free.length - ready.length,
+      };
       for (const [i, shop] of chosen.entries()) {
         const placed = await placeAsTheShop(shop, open.deliveryDate, times[i]!);
-        if (placed === 'stale') done.alreadyHad += 1;
-        else if (placed === 'refused') done.cannotOrder += 1;
-        else {
+        if (placed === 'stale') {
+          if (!shop.topUp) done.alreadyHad += 1;
+        } else if (placed === 'refused') {
+          if (!shop.topUp) done.cannotOrder += 1;
+        } else {
           done.orders += placed;
-          done.outletIds.push(shop.id);
+          if (shop.topUp) done.topUpIds.push(shop.id);
+          else {
+            done.newOrders += placed;
+            done.outletIds.push(shop.id);
+          }
         }
       }
       result.depots.push(done);
