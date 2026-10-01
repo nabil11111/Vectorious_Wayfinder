@@ -99,7 +99,7 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
   };
 
   const back = sent
-    ? board.plan.canUnsend && (
+    ? !board.plan.canUnsend ? current.data?.day?.date === date && <p className="flex min-h-9 items-center text-[13px] leading-4 text-muted-foreground">Loading has started, so this plan cannot go back to edit.</p> : (
       <Button variant="outline" className={plainButton('h-9 px-5 text-[13px]')} disabled={busy !== null} onClick={() => { void run('unsend', unsendPlan); }}>
         {busy === 'unsend' ? 'Taking back…' : '← Back to edit'}
       </Button>
