@@ -494,3 +494,27 @@ describe('Q-08 Place pressed while the draft is still saving', () => {
     expect(screen.refused).toBeFalsy();
   });
 });
+
+describe('Q-04 and Q-08 signing out just after Place', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  it('lets the order on its way be placed before the sign-out goes', async () => {
+    server = new Server({ [CHILLED.id]: 8 });
+    const { qc, form, placed } = openForm(server);
+    const answer = held();
+    server.placeAnswers.push(answer.answer);
+    const placing = form.place();
+    await after(0);
+    const signingOut = signOut(qc);
+    await after(5000);
+    expect(server.log).toEqual(['POST place']);
+    answer.release('usual');
+    await placing;
+    await signingOut;
+    expect(server.log).toEqual(['POST place', 'POST logout']);
+    expect(placed).toHaveLength(1);
+    expect(toast).not.toHaveBeenCalled();
+  });
+});

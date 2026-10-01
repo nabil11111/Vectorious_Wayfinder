@@ -103,6 +103,8 @@ export class DraftForm {
   private failed = false;
   private failure: unknown = null;
   private placing = false;
+  // The place on its way, from the press until its answer is taken in, so a sign-out never overtakes it.
+  private placingNow: Promise<void> | null = null;
   // The drafts the last place from this form named, so a place whose answer was lost is known as its own (Q-07).
   private tried: DraftRefs | null = null;
   private timer = 0;
@@ -310,9 +312,11 @@ export class DraftForm {
     }
   }
 
-  // Sign-out waits for this, and so does leaving the form: every change is saved first. One that cannot be saved is
-  // never lost without a word: the person is told, on whatever screen comes next (Q-04).
+  // Sign-out waits for this, and so does leaving the form: a place on its way goes first, then every change is
+  // saved. One that cannot be saved is never lost without a word: the person is told, on whatever screen comes
+  // next (Q-04).
   leave = async () => {
+    if (this.placingNow) await this.placingNow;
     if (!(await this.settle())) notKept();
   };
 
@@ -367,6 +371,13 @@ export class DraftForm {
   // the form says why. A box that holds something that is not a whole number has its own line, and Place is off.
   place = async () => {
     if (this.placing || this.invalid()) return;
+    const run = this.placeNow();
+    this.placingNow = run;
+    await run;
+    this.placingNow = null;
+  };
+
+  private async placeNow() {
     this.placing = true;
     this.tell({ placing: true, refused: null });
     const day = this.base.deliveryDate;
@@ -399,7 +410,7 @@ export class DraftForm {
       this.placing = false;
       this.tell({ placing: false });
     }
-  };
+  }
 
   // The answer of a refetch. When the form has nothing unsaved, a draft that changed somewhere else, or a
   // day that moved on, is shown at once. With a change waiting, the save's own answer decides, and while placing
