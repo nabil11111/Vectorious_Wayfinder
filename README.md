@@ -476,6 +476,14 @@ Anything we built differently from our Designathon submission, and why.
 - **The loader's "Plan changed"** names no docks and has no "Why" line. The plan can change only before loading starts
   (D-70), where the design also draws a truck changed after loading began.
 
+**Submission workflow improvements (spec 028)**
+- History opens a wider accessible trip dialog with separate quantity and timing sections; its summary uses cards.
+  Dashboard separates actionable problems from watching trips and offers Show all for longer lists.
+- Before planning opens, the board shows received demand and an application-clock countdown while keeping editing
+  locked. The Wayfinder wordmark opens the signed-in role's home.
+- Driver unload lines have an explicit All unloaded action using the actual loaded quantity. Receipt entries retain
+  product units, and dirty loader/shop forms ask before discarding unsent input.
+
 **The look-up pages**
 - **They only read (D-80):** Orders has no "Plan first" and no "Call the shop" (the data has no phone numbers, D-40),
   and Fleet has no "Next 6 weeks", forecast or booking.
