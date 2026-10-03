@@ -197,6 +197,10 @@ describe('the driver\'s phone', () => {
     function Screen() { shown = useDriverView(DILSHAN.id).day; return null; }
     renderToStaticMarkup(createElement(Screen));
     expect(shown).toBeNull();
+    hooks.signal = false;
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toMatchObject({ trips: [{ tripId: TRIP }] });
+    hooks.signal = true;
     answer(new Response(JSON.stringify({ ...dayFor(DILSHAN, []), trips: [] }), { headers: { 'Content-Type': 'application/json' } }));
     await until(() => phone.sync().fetched);
     renderToStaticMarkup(createElement(Screen));

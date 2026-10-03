@@ -34,7 +34,11 @@ export function createApp() {
   app.set('trust proxy', config.TRUST_PROXY);
   // docker compose serves the app over plain http on localhost, where telling the browser to upgrade every request
   // to https would break the page. Hosted, every request is https already, so the upgrade adds nothing there.
-  app.use(helmet({ contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } } }));
+  app.use(helmet({ contentSecurityPolicy: { directives: {
+    upgradeInsecureRequests: null,
+    // Proof and report viewers draw authenticated bytes using short-lived object URLs.
+    imgSrc: ["'self'", 'data:', 'blob:'],
+  } } }));
   // Log the method, path, status and time only. Full headers would write session cookies into the logs. The
   // health check and the live stream are left out: one is polled all day, the other is one long request.
   app.use(pinoHttp({

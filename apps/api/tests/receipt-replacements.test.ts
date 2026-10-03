@@ -128,7 +128,7 @@ async function refusalReplaced() {
   expect(saved.status).toBe(200);
   const placed = await wellawatte.post('/api/v1/store/next-order/place').send({ deliveryDate: next.deliveryDate, refs: saved.body.draft.refs });
   expect(placed.status).toBe(200);
-  return { refusal, replacement: await replacementOf(refusal.id), own: StoreNextOrder.parse(placed.body).placed!.orders[0]! };
+  return { refusal, replacement: await replacementOf(refusal.id), own: PlaceOrdersResponse.parse(placed.body).placedOrders[0]! };
 }
 
 it('A2 includes eligible placed replacements in Today, alongside own orders and only for this outlet', async () => {

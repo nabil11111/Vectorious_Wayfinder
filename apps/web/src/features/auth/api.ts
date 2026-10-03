@@ -139,10 +139,20 @@ async function finishWork() {
 }
 
 export const logoutMutation = (qc: QueryClient): UseMutationOptions<void, Error, void> => ({
+  networkMode: 'always',
   onMutate: () => qc.cancelQueries({ queryKey: meKey }),
   mutationFn: async () => {
     if (beforeSignOut.size) await finishWork();
-    return api<void>('/auth/logout', { method: 'POST', json: {} });
+    const request = new AbortController();
+    const timer = window.setTimeout(() => request.abort(), 15_000);
+    try {
+      await api<void>('/auth/logout', { method: 'POST', json: {}, signal: request.signal });
+    } catch (error) {
+      if (request.signal.aborted) throw new Error('Sign-out could not be confirmed. Check the connection and try again.');
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
   },
   // The screens on show must see the empty account before the rest of the cache goes, or they keep the old one.
   onSuccess: async () => {

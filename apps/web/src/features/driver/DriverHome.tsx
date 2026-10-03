@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import { nextStop, type Me } from '@wayfinder/contracts';
 import { AppShell } from '@/components/layout/AppShell';
@@ -38,11 +38,14 @@ export function DriverHome() {
 
 function DriverArea({ me }: { me: Me }) {
   const { id } = me;
-  useEffect(() => { setAccount({ id }); }, [id]);
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+  useEffect(() => { setAccount({ id }); setOpenedFor(id); }, [id]);
   useEffect(() => { holdPictures(); }, []);
   // The query ['driver'] brings the live stream's messages and the minute's refetch to the sync loop.
   useDriverQuery();
   const kept = useKept();
+  // A fresh mount cannot paint the previous session's runtime before its account effect runs.
+  if (openedFor !== id) return null;
   // The phone could not read what it kept for this account: every route says so until it can.
   if (kept.userId === id && kept.failed) return <CouldNotRead />;
   return (

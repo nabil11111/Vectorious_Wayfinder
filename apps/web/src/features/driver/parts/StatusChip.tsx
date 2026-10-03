@@ -6,7 +6,7 @@ import { useSignal } from '@/lib/phone/signal';
 import { cn } from '@/lib/utils';
 import { clearRefused, recordOf, retrySync, type Queued } from '../queue';
 import { useDriverView } from '../view';
-import { clockTime, whole } from '../words';
+import { clockTime, waitingSheetTitle, whole } from '../words';
 import { ICON } from './icons';
 import { BIG, PLAIN } from './ui';
 
@@ -56,7 +56,7 @@ export function StatusChip() {
         )}
       </SheetTrigger>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[480px] rounded-t-xl border-t-0 px-4 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-        <WaitingSheet waiting={view.waiting} refused={view.refused} />
+        <WaitingSheet read={view.ready} waiting={view.waiting} refused={view.refused} />
       </SheetContent>
     </Sheet>
   );
@@ -82,7 +82,7 @@ function refusedRows(entries: Queued[]): Row[] {
 
 // The waiting sheet (no frame): what waits to send and what the server did not accept, with "Clear" and, while
 // something waits, "Retry sync".
-function WaitingSheet({ waiting, refused }: { waiting: Queued[]; refused: Queued[] }) {
+function WaitingSheet({ read, waiting, refused }: { read: boolean; waiting: Queued[]; refused: Queued[] }) {
   const [clearing, setClearing] = useState(false);
   const [clearFailed, setClearFailed] = useState(false);
   const waitingList = waitingRows(waiting);
@@ -107,7 +107,7 @@ function WaitingSheet({ waiting, refused }: { waiting: Queued[]; refused: Queued
     <div className="flex flex-col gap-5">
       <section className="pr-8">
         <SheetTitle className="font-heading text-lg leading-6 font-bold text-foreground">
-          {waitingCount > 0 ? `Waiting to send · ${whole(waitingCount)}` : 'Everything is sent.'}
+          {waitingSheetTitle(read, waitingCount, refusedCount)}
         </SheetTitle>
         {waitingList.length > 0 && (
           <ul className="mt-2 divide-y">

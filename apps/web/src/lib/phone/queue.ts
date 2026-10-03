@@ -392,8 +392,10 @@ export function createPhoneQueue<Day extends { appliedWriteIds: string[] }, Writ
       });
       return;
     }
-    // The same account signed in again after a 401: the writes go now.
-    update({ signedOut: false });
+    // A same-account sign-in is a new activation too. An earlier read must not restore an old run.
+    generation += 1;
+    fetching?.abort();
+    update({ signedOut: false, fetched: false, backOnline: null });
     ring();
   }
 

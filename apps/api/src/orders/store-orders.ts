@@ -2,8 +2,8 @@ import {
   TEMPS, type Brand, type CutoffPassedDetails, type DraftRefs, type OrderLine, type PlaceOrdersRequest, type PlaceOrdersResponse,
   type SaveDraftRequest, type StoreNextOrder, type StoreOrder, type StoreOutlet, type StoreProduct,
 } from '@wayfinder/contracts';
-import { and, desc, eq, gte, inArray, isNotNull, isNull, max, ne, notExists, notInArray, sql, type SQL } from 'drizzle-orm';
-import { alias, type PgColumn } from 'drizzle-orm/pg-core';
+import { and, desc, eq, gte, inArray, max, ne, notInArray, sql, type SQL } from 'drizzle-orm';
+import { type PgColumn } from 'drizzle-orm/pg-core';
 import { db, type Db, type Tx } from '../db/client';
 import { PRODUCTS } from '../db/fixtures';
 import { calendarDays, deferrals, depots, orderLines, orders, outlets, plans, products, stopOrders, stops, trips } from '../db/schema';
@@ -137,11 +137,6 @@ const lastDeferral = db.selectDistinctOn([deferrals.orderId], { orderId: deferra
 // The day an order counts for: the day of the sent plan it is on, and until then the day the shop wanted.
 export const countsFor = sql<string>`coalesce(${scheduled.date}, ${orders.deliveryDate})`;
 
-// An order the shop placed itself: neither a replacement the depot placed (D-59) nor a part of one the plan split.
-const original = alias(orders, 'original');
-const placedByTheShop = and(isNull(orders.replacesIssueId), notExists(db.select({ id: original.id }).from(original)
-  .where(and(eq(original.id, orders.splitFrom), isNotNull(original.replacesIssueId)))));
-
 // The shop's orders that match, as its screens show them. Unless told otherwise they come chilled before dry,
 // then the one placed first. It reads the given shop's orders and no others, whatever the condition asks for.
 export async function readOrders(
@@ -208,9 +203,10 @@ function latest(moments: (string | null)[], what: string): string {
 // What GET /store/next-order answers, and a save and a place after their change.
 async function nextOrder(on: Reader, shop: Shop, open: OpenDay | null): Promise<StoreNextOrder> {
   const drafts = await readDrafts(on, shop.outlet.id);
-  // A replacement is the depot's order, so the shop's next order never counts it, or a part of one, as placed.
+  // The next-day summary includes depot replacements too. Split originals keep their old lines, so only
+  // their active parts count, exactly as in the shop's Orders list (submission A2).
   const placed = open
-    ? await readOrders(on, shop, and(eq(orders.deliveryDate, open.deliveryDate), notInArray(orders.status, ['draft', 'cancelled']), placedByTheShop))
+    ? await readOrders(on, shop, and(eq(orders.deliveryDate, open.deliveryDate), notInArray(orders.status, ['draft', 'cancelled', 'split'])))
     : [];
   const draftLines = shownLines(drafts.flatMap((draft) => draft.lines), shop.items);
   const placedLines = shownLines(placed.flatMap((order) => order.lines), shop.items);
