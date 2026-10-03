@@ -11,7 +11,7 @@ describe('read-only planning scenario boundary (028 F)', () => {
   });
   it('reports service counts without pretending mixed ordering units are capacity', () => {
     const summary = { totalOrders: 3, fullyPlanned: 1, partiallyPlanned: 1, deferred: 1,
-      shopsFullyPlanned: 1, vehicles: 2, trips: 2, fuelLitres: 14.3, repeatedDeferrals: 1 };
+      shopsFullyPlanned: 1, shopsWithWaiting: 2, vehicles: 2, trips: 2, fuelLitres: 14.3, repeatedDeferrals: 1 };
     expect(ScenarioSummary.parse(summary)).toEqual(summary);
     expect(ScenarioSummary.safeParse({ ...summary, fuelLitres: -1 }).success).toBe(false);
     expect(ScenarioSummary.safeParse({ ...summary, fullyPlanned: 1.5 }).success).toBe(false);
