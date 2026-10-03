@@ -6,7 +6,7 @@ import { FlagPage } from './FlagPage';
 // A mounted hook/tree harness, with keyed instances and unmount cleanup. It retains hook state on rerender
 // and drives the actual form handlers; network, router and presentation primitives are stand-ins.
 const state = vi.hoisted(() => ({
-  day: undefined as unknown as LoadingDay, owner: 'loader-a', depot: 'Peliyagoda', run: 1,
+  day: undefined as unknown as LoadingDay, owner: 'loader-a' as string | null, depot: 'Peliyagoda', run: 1,
   frame: '', slot: 0, changed: false, seen: new Set<string>(), slots: new Map<string, unknown[]>(),
   effects: [] as (() => void)[], cleanups: new Map<string, (() => void)[]>(),
   predicate: undefined as undefined | ((args: unknown) => boolean), blocked: false, destination: '', navigated: [] as string[],
@@ -42,7 +42,7 @@ vi.mock('react', async (original) => {
 vi.mock('./loading', () => ({ useLoadingDay: () => ({ data: state.day, isError: false }),
   useLoaderWrites: () => ({ phase: 'idle', out: null, refused: null, send: state.send, holding: () => false }) }));
 vi.mock('@/features/auth/api', () => ({
-  useMe: () => ({ data: { id: state.owner, depotId: state.depot } }),
+  useMe: () => ({ data: state.owner === null ? null : { id: state.owner, depotId: state.depot } }),
   useLogout: () => ({ isError: false }), askBeforeSignOut: () => () => {},
 }));
 vi.mock('@/lib/clock', () => ({ useAppClock: () => ({ state: { day: state.run } }) }));
@@ -153,7 +153,7 @@ describe('mounted loader report during background loading changes', () => {
     press(find('button', (props) => props.children === 'Leave report'));
     state.discard!.onDiscard(); draw(); expect(state.navigated).toEqual(['/loader']);
   });
-  it('blocks even a stale send handler after the truck becomes ready', () => {
+  it('blocks submission from the retained form after the truck becomes ready', () => {
     enterDraft(false);
     const send = find('button', (props) => props.children === 'Send to dispatcher');
     expect(send.disabled).toBe(false);
@@ -170,5 +170,34 @@ describe('mounted loader report during background loading changes', () => {
     expect(find('textarea').value).toBe('');
     expect(hosts.filter((host) => host.type === 'input')).toHaveLength(0);
     expect(find('button', (props) => props.role === 'radio' && props.children === 'Short')['aria-checked']).toBe(true);
+  });
+  it('clears reset input before the loading read catches up and never seeds a draft from the old run', () => {
+    enterDraft();
+    state.run = 2; draw();
+    expect(hosts.some((host) => host.type === 'textarea')).toBe(false);
+    state.day.demoDay = 2; draw();
+    expect(find('textarea').value).toBe('');
+    expect(hosts.some((host) => host.type === 'input')).toBe(false);
+  });
+  it('clears reset input when loading announces the reset before the clock catches up', () => {
+    enterDraft();
+    state.day.demoDay = 2; draw();
+    expect(find('textarea').value).toBe('');
+    expect(hosts.some((host) => host.type === 'input')).toBe(false);
+  });
+  it('removes the draft on sign-out and never restores it for the next account', () => {
+    enterDraft(); state.owner = null; draw();
+    expect(hosts.some((host) => host.type === 'textarea')).toBe(false);
+    state.owner = 'loader-b'; draw();
+    expect(find('textarea').value).toBe('');
+    expect(hosts.some((host) => host.type === 'input')).toBe(false);
+  });
+  it('retains entered values and uses the latest revision for an unchanged stop counted by another loader', () => {
+    enterDraft(false);
+    state.day.trucks = [{ ...truck(), revision: 3, stops: [{ ...truck().stops[0]!, loaded: true }] }]; draw();
+    const send = find('button', (props) => props.children === 'Send to dispatcher');
+    expect(send.disabled).toBe(false); press(send);
+    expect(state.send).toHaveBeenCalledWith('trip', { kind: 'flag', body: { revision: 3, stopId: 'stop', reason: 'damaged',
+      lines: [{ lineId: 'line-0', counted: 4 }], note: 'Keep this dock report' } }, expect.any(Function));
   });
 });

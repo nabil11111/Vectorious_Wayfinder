@@ -4,10 +4,11 @@ import { FLAG_REASONS, type FlagReason, type LoadingLine, type LoadingStop, type
 import { StaleNotice } from '@/features/store/parts/LoadError';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useLogout } from '@/features/auth/api';
+import { useLogout, useMe } from '@/features/auth/api';
 import { orangeButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
 import { DiscardDraft, hasFormEdits } from '@/lib/dirty-form';
+import { useAppClock } from '@/lib/clock';
 import { flagCounts, wholeCount } from './count';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { GOODS_ICON } from './parts/icons';
@@ -27,30 +28,54 @@ export function FlagPage() {
   const { tripId = '' } = useParams();
   const [params] = useSearchParams();
   const stopId = params.get('stop') ?? '';
-  // A form and its write belong to one stop of one truck.
-  return <FlagScreen key={`${tripId}:${stopId}`} tripId={tripId} stopId={stopId} />;
+  const query = useLoadingDay();
+  const { data: me } = useMe();
+  const clock = useAppClock();
+  const run = Math.max(clock.state?.day ?? 0, query.data?.demoDay ?? 0);
+  if (!me) return <FlagSkeleton />;
+  // Retain drafts only for their owner/depot/run. A reset clears immediately, even while loading still holds
+  // the previous run's response; ordinary day and truck transitions leave the mounted report in place.
+  const scope = `${me.id}:${me.depotId}:${run}`;
+  const currentScope = query.data?.depot === me.depotId && query.data.demoDay === run;
+  return <FlagScreen key={`${scope}:${tripId}:${stopId}`} tripId={tripId} stopId={stopId} query={query} currentScope={currentScope} />;
 }
 
-function FlagScreen({ tripId, stopId }: { tripId: string; stopId: string }) {
-  const query = useLoadingDay();
+function FlagScreen({ tripId, stopId, query, currentScope }: {
+  tripId: string; stopId: string; query: ReturnType<typeof useLoadingDay>; currentScope: boolean;
+}) {
   const writes = useLoaderWrites();
+  const [opened, setOpened] = useState<{ truck: LoadingTruck; stop: LoadingStop; day: string | null; planId: string | null } | null>(null);
+  const truck = currentScope ? query.data?.trucks.find((t) => t.tripId === tripId) : undefined;
+  const stop = truck?.stops.find((s) => s.id === stopId);
+  if (opened) {
+    const ownIssues = (one: LoadingTruck) => one.issues.filter((issue) => issue.lines.some((line) => opened.stop.lines.some((held) => held.lineId === line.lineId)));
+    const changed = !currentScope || !truck || !stop || truck.status !== 'loading' || query.isError
+      || query.data?.day !== opened.day || (query.data?.plan?.id ?? null) !== opened.planId
+      || stop.seq !== opened.stop.seq || stop.shopName !== opened.stop.shopName || stop.outletId !== opened.stop.outletId
+      || JSON.stringify(stop.lines) !== JSON.stringify(opened.stop.lines)
+      || JSON.stringify(ownIssues(truck)) !== JSON.stringify(ownIssues(opened.truck));
+    const stale = query.isError ? <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : null;
+    return <FlagForm truck={changed ? opened.truck : truck!} stop={opened.stop} writes={writes} stale={stale} changed={changed} />;
+  }
 
-  if (!query.data) {
+  if (!query.data || !currentScope) {
     return query.isError
       ? <LoadFailed what="the trucks" error={query.error} busy={query.isFetching} onRetry={() => { void query.refetch(); }} />
       : <FlagSkeleton />;
   }
-  const truck = query.data.trucks.find((t) => t.tripId === tripId);
   // A truck its driver drove away says who and when (Q-34); any other left the plan.
   if (!truck) return <TruckGone day={query.data} tripId={tripId} />;
-  const stop = truck.stops.find((s) => s.id === stopId);
   // A flag is raised while the truck loads, on one of its stops. Anything else goes back to the truck.
   if (!stop || truck.status !== 'loading') return <Navigate to={`/loader/trucks/${truck.tripId}`} replace />;
-  const stale = query.isError ? <StaleNotice busy={query.isFetching} onRetry={() => { void query.refetch(); }} /> : null;
-  return <FlagForm truck={truck} stop={stop} writes={writes} stale={stale} />;
+  // Capture the form's complete goods context once. A live update must not remove a picked line or replace
+  // its typed count with another loader's decision before this loader can explicitly leave.
+  setOpened({ truck: structuredClone(truck), stop: structuredClone(stop), day: query.data.day, planId: query.data.plan?.id ?? null });
+  return null;
 }
 
-function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: LoadingStop; writes: LoaderWrites; stale: ReactNode }) {
+function FlagForm({ truck, stop, writes, stale, changed }: {
+  truck: LoadingTruck; stop: LoadingStop; writes: LoaderWrites; stale: ReactNode; changed: boolean;
+}) {
   const navigate = useNavigate();
   const ticks = useTicks(truck.tripId);
   const brand = brandOfStop(truck, stop);
@@ -88,13 +113,16 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
     leave: (l: LoadingLine) => setTyped((held) => (held[l.lineId] !== undefined && wholeCount(held[l.lineId]!, l.quantity) !== null ? without(held, l.lineId) : held)),
   };
 
-  const send = () => writes.send(truck.tripId, {
+  const send = () => {
+    if (changed || busy || !tally.canSend) return;
+    writes.send(truck.tripId, {
     kind: 'flag',
     body: { revision: truck.revision, stopId: stop.id, reason, lines: tally.lowered.map((l) => ({ lineId: l.lineId, counted: tally.countAt(l) })), note: note.trim() },
-  }, () => { completed.current = true; navigate(`/loader/trucks/${truck.tripId}`); });
+    }, () => { completed.current = true; navigate(`/loader/trucks/${truck.tripId}`); });
+  };
 
   const sendButton = (
-    <Button className={orangeButton('h-16 w-full rounded-[12px] text-lg')} disabled={busy || !tally.canSend} focusableWhenDisabled onClick={send}>
+    <Button className={orangeButton('h-16 w-full rounded-[12px] text-lg')} disabled={changed || busy || !tally.canSend} focusableWhenDisabled onClick={send}>
       {writes.out === 'flag' && writes.phase === 'saving' ? 'Sending…' : 'Send to dispatcher'}
     </Button>
   );
@@ -131,6 +159,11 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
         }} />
       <BackLink to={`/loader/trucks/${truck.tripId}`}>{truckName(truck)}</BackLink>
       <div className="mt-2.5 lg:mt-3.5">
+        {changed && <Card role="alert" className="mb-3 px-4 py-4">
+          <p className="font-semibold">This truck or stop has changed.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Your unsent report is kept below. It cannot be sent from this loading state. Leave the report to view the current trucks.</p>
+          <Button variant="outline" className="mt-3" onClick={() => navigate('/loader')}>Leave report</Button>
+        </Card>}
         {stale}
         {writes.refused && <Refused>{writes.refused}</Refused>}
         {signOutAsked && unsent ? (

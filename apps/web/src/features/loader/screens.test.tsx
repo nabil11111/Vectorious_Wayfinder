@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { clockKey } from '@/lib/clock';
+import { meKey } from '@/features/auth/api';
 import { flagCounts, wholeCount } from './count';
 import { Counter, FlagPage } from './FlagPage';
 import { loadingKey } from './loading';
@@ -66,6 +67,8 @@ const CLOCK: ClockState = { demo: true, now: '2026-06-24T21:05:00.000Z', part: '
 // A loader page at an address, drawn with the day in the query.
 function page(path: string, day: LoadingDay): string {
   const qc = new QueryClient();
+  // Loader routes are mounted only under the signed-in loader's depot.
+  qc.setQueryData(meKey, { id: 'loader-fixture', username: 'loader', staffId: 'L-001', displayName: 'Loader', role: 'loader', depotId: day.depot, outletId: null });
   qc.setQueryData(loadingKey, day);
   qc.setQueryData(clockKey, { ...CLOCK, heldAt: performance.now() });
   const router = createMemoryRouter([
