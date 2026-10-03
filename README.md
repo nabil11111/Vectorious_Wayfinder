@@ -392,6 +392,13 @@ Anything we built differently from our Designathon submission, and why.
   results show full/partial/deferred orders, shops waiting, trip fuel and real planner reasons. The generated baseline
   may differ from a hand-edited draft. This is a read-only preview with no Apply action or optimality claim.
 
+- **Receiving readiness** on the shop's Today page records Not confirmed, Ready to receive or Temporarily unavailable,
+  with an optional note and update time for the current calendar day. Save readiness requires a connection. The driver's
+  next-stop screen shows the declaration for that trip's day, labelled Last known when using a cached view; Live day
+  shows each shop's current-day declaration. Updates notify the assigned driver and authorized dispatcher. This is
+  advisory: it describes receiving goods, not customer opening hours or proof that a driver arrived. It does not gate
+  driver actions, carry yesterday forward or move to tomorrow at the order cutoff.
+
 **Loading and Live day**
 - **One list of trucks in leaving order,** with no "Wave 1 · 03:30" and "Wave 2 · 08:30" tabs, no dock numbers and no
   call buttons: every trip has its own leaving time (D-19), and the data has no docks or phone numbers (D-40).
