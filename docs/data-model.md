@@ -9,6 +9,8 @@ erDiagram
     depots ||--o{ vehicles : "home of"
     depots ||--o{ district_travel : "travel from"
     outlets ||--o{ orders : places
+    outlets ||--o{ outlet_receiving : "declares for a day"
+    users ||--o{ outlet_receiving : "last updated by"
     orders ||--|{ order_lines : has
     products ||--o{ order_lines : "ordered as"
     users }o--o| outlets : "store manager of"
@@ -50,6 +52,7 @@ erDiagram
 | Driver | `driver_writes`, `photos`, and on `trips`, `stops` and `order_lines` | Photos commit with their delivery or problem. Trips keep departure, return and last event times; stops keep revisions, retries, arrival, outcome and completion; lines keep delivered counts (spec 013). |
 | Phone writes | `driver_writes` | Every write a phone saved first and the server applied, the driver's and the shop's receipts alike (D-45, D-57): its UUID bound to the account, trip, kind and body hash, and when it was last answered, on the real clock. The SQL table and its account column keep spec 013's names, `driver_writes` and `driver_id`; the schema calls them `phoneWrites` and `userId`, so no migration renamed them. |
 | Shop receipts | on `orders` and `order_lines`, and `issues` of kind `receipt` | A receipt is kept on the orders it covers (D-61): `received_at`, when the shop confirmed as the time rule keeps it, `receipt_sent_at`, when it reached the server, and `arrived_cold` on a chilled order; each line keeps its `received_qty` beside its loaded and delivered counts. A receipt that reports something short, damaged or not cold is a problem of kind `receipt` with the receipt's id, its photo in `photos`. A replacement is an order whose `replaces_issue_id` points at the problem its answer placed it for; a part of a split replacement reaches it through `split_from` (spec 015). |
+| Receiving readiness | `outlet_receiving` | One advisory declaration per outlet and calendar date, with status, optional note, revision, updater and app-clock update time. Missing means unconfirmed; yesterday is never carried forward. This is separate from customer opening hours and recorded delivery actions. Demo reset clears these declarations. |
 | Fleet days | `vehicle_days_off`, `fuel_log` | A vehicle that cannot be used on a date, with the reason. Litres a vehicle used on a date: one history row a day, and one row for each sent trip. The plan checker reads both. |
 | The demo day | `demo_day` | One row: the app's clock, stored as the app's time and the real time it was set, and whether the seeded day has been written. |
 | History | `audit_log` | Who changed what and when, with before and after. |
