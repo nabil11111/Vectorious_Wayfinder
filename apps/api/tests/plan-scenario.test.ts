@@ -60,6 +60,7 @@ it('F1 runs two real checked plans from one snapshot without creating a draft or
   expect(preview.baseline.check.ok).toBe(true); expect(preview.scenario.check.ok).toBe(true);
   expect(preview.baseline.summary).toMatchObject({ totalOrders: 102, fullyPlanned: 96, partiallyPlanned: 0, deferred: 6, trips: 27 });
   expect(preview.scenario.summary).toMatchObject({ totalOrders: 102, fullyPlanned: 93, deferred: 9, trips: 26 });
+  for (const outcome of [preview.baseline, preview.scenario]) expect(outcome.summary.shopsWithWaiting).toBe(new Set(outcome.orders.filter((o) => o.status !== 'planned').map((o) => o.outletId)).size);
   expect(engine.calls).toHaveLength(2);
   expect(engine.calls[1]).toEqual({ ...engine.calls[0], vehicles: engine.calls[0]!.vehicles.map((v) => v.id === 'VEH035' ? { ...v, available: false } : v) });
   expect(preview.scenario.orders.every((o) => !o.vehicleIds.includes('VEH035') && o.reasons.every((r) => r.length > 0))).toBe(true);
