@@ -342,7 +342,7 @@ export type CrewList = z.infer<typeof CrewList>;
 export const PLAN_ERROR_CODES = [
   'no_depot', 'orders_open', 'no_plan_day', 'day_moved', 'plan_sent', 'stale', 'invalid_input', 'unknown_record',
   'driver_taken', 'cannot_split', 'cannot_join', 'not_ready', 'split_mismatch', 'departed_already', 'loading_started',
-  'planner_unavailable', 'decisions_open',
+  'planner_unavailable', 'decisions_open', 'driver_required',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 

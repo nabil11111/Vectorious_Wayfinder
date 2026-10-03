@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { newWriteId } from '@/features/loader/loading';
 import { truckIcon } from '@/features/loader/parts/icons';
-import { useAppClock } from '@/lib/clock';
+import { inDepot, useAppClock } from '@/lib/clock';
 import { ClosedBand, HandBackCard } from './DonePage';
 import { TopArea } from './parts/TopArea';
 import { ActionBar, BIG, Card, PLAIN, Problem } from './parts/ui';
@@ -24,13 +24,18 @@ export function TodaysTrip({ view, trip, figures }: { view: DriverView; trip: Dr
   const { at, readNow } = useAppClock();
   const { save, saving, failed } = useSave();
   const ready = trip.status === 'ready';
+  const unknownGate = trip.tripNo > 1 && (trip.startAfter === undefined || trip.startBlocked === undefined);
+  const reloadWaiting = trip.startAfter != null && (at === null || at < Date.parse(trip.startAfter));
+  const gateLine = trip.startBlocked ?? (unknownGate ? 'Reconnect to check the vehicle return and reload readiness.'
+    : reloadWaiting ? `Reload until ${inDepot(Date.parse(trip.startAfter!)).time} before starting trip ${trip.tripNo}.` : null);
+  const canStart = ready && !gateLine;
   const { closed } = view;
 
   // "Start trip" makes the ready trip out, at the app clock's time at the press, naming the trip's revision on screen
   // (rule 3).
   const start = () => {
     const now = readNow();
-    if (now === null) return;
+    if (now === null || !canStart || (trip.startAfter && now < Date.parse(trip.startAfter))) return;
     void save({ kind: 'start', writeId: newWriteId(), tripId: trip.tripId, at: new Date(now).toISOString(), revision: trip.revision }, aboutTrip(trip, 'start'));
   };
 
@@ -80,8 +85,9 @@ export function TodaysTrip({ view, trip, figures }: { view: DriverView; trip: Dr
       </Card>
 
       <ActionBar>
+        {gateLine && <p role="status" className="text-center text-[13px] leading-4 text-muted-foreground">{gateLine}</p>}
         {!ready && <p className="text-center text-[13px] leading-4 text-muted-foreground">{startWhenLoaded(trip)}</p>}
-        <Button className={BIG()} disabled={!ready || saving || at === null} focusableWhenDisabled onClick={start}>
+        <Button className={BIG()} disabled={!canStart || saving || at === null} focusableWhenDisabled onClick={start}>
           {saving ? 'Saving…' : 'Start trip'}
         </Button>
       </ActionBar>

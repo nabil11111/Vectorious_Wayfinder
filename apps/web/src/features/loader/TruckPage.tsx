@@ -75,12 +75,15 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
   const busy = writes.phase !== 'idle';
   const saving = (kind: WriteKind) => writes.out === kind && writes.phase === 'saving';
   const loading = truck.status === 'loading';
+  const blocked = Boolean(truck.loadingBlocked);
   // A stop can be marked loaded once each of its lines is ticked or flagged.
   const stopDone = current !== null && current.lines.every((line) => ticks.isTicked(line.lineId) || flagged.has(line.lineId));
-  const canReady = loading && current === null && open.length === 0;
+  const canReady = loading && !blocked && current === null && open.length === 0;
 
   const send = {
-    start: () => { if (day.plan) writes.send(truck.tripId, { kind: 'start', body: { revision: truck.revision, plan: day.plan } }); },
+    start: () => { if (day.plan) writes.send(truck.tripId, { kind: 'start', body: { revision: truck.revision, plan: day.plan } }, () => {
+      if (truck.reloadRequired) ticks.clear(truck.stops.flatMap(stop => stop.lines.map(line => line.lineId)));
+    }); },
     stop: () => { if (current) writes.send(truck.tripId, { kind: 'stop', body: { revision: truck.revision, stopId: current.id } }); },
     ready: () => writes.send(truck.tripId, { kind: 'ready', body: { revision: truck.revision } }),
     // A stop marked loaded by mistake comes off again (Q-16), and its lines are ticked again as they go back on.
@@ -89,14 +92,14 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
   const readyWords = open.length > 0 ? `Mark ready · ${countOf(open.length, 'flag')}` : 'Mark ready';
 
   const orange = !loading
-    ? <Button className={orangeButton(BIG)} disabled={busy} focusableWhenDisabled onClick={send.start}>{saving('start') ? 'Saving…' : `Start loading ${truckName(truck)}`}</Button>
+    ? <Button className={orangeButton(BIG)} disabled={busy || blocked} focusableWhenDisabled onClick={send.start}>{saving('start') ? 'Saving…' : `Start loading ${truckName(truck)}`}</Button>
     : current
-      ? <Button className={orangeButton(BIG)} disabled={busy || !stopDone} focusableWhenDisabled onClick={send.stop}>{saving('stop') ? 'Saving…' : `Stop ${current.seq} loaded`}</Button>
+      ? <Button className={orangeButton(BIG)} disabled={busy || blocked || !stopDone} focusableWhenDisabled onClick={send.stop}>{saving('stop') ? 'Saving…' : `Stop ${current.seq} loaded`}</Button>
       : <Button className={orangeButton(BIG)} disabled={busy || !canReady} focusableWhenDisabled onClick={send.ready}>{saving('ready') ? 'Saving…' : readyWords}</Button>;
   // Once every stop is on, Mark ready is the one button left.
   const plain = current && (
     <div className="grid grid-cols-2 gap-2.5 lg:gap-3">
-      {loading && !busy
+      {loading && !busy && !blocked
         ? <Link to={`/loader/trucks/${truck.tripId}/flag?stop=${current.id}`} className={plainButton(SMALL)}>Flag a problem</Link>
         : <Button variant="outline" className={plainButton(cn(SMALL, PLAIN_OFF))} disabled>Flag a problem</Button>}
       <Button variant="outline" className={plainButton(cn(SMALL, PLAIN_OFF))} disabled>{readyWords}</Button>
@@ -119,7 +122,7 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
         <LoadCard truck={truck} at={at} className="lg:col-start-1 lg:row-start-1" />
         <Card className="flex flex-col px-4 pt-4 pb-5 lg:sticky lg:top-[77px] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:min-h-[calc(100dvh-149px)] lg:self-start lg:px-5 lg:pt-[18px]">
           {current ? (
-            <NowLoading truck={truck} stop={current} started={loading} ticks={ticks} flagged={flagged} />
+            <NowLoading truck={truck} stop={current} started={loading && !blocked} blocked={blocked} ticks={ticks} flagged={flagged} />
           ) : (
             <AllOn truck={truck} />
           )}
@@ -134,7 +137,7 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
           <div className="mt-auto hidden pt-6 lg:block">{buttons}</div>
         </Card>
         {/* While the truck loads, a loaded stop's row flags a problem on it or takes it off again (Q-16). */}
-        <StopList truck={truck} current={current} menu={loading ? { busy, undoing: saving('undo'), onUndo: send.undo } : undefined} className="mt-1 lg:col-start-1 lg:row-start-2 lg:mt-2" />
+        <StopList truck={truck} current={current} menu={loading && !blocked ? { busy, undoing: saving('undo'), onUndo: send.undo } : undefined} className="mt-1 lg:col-start-1 lg:row-start-2 lg:mt-2" />
       </div>
       <ActionBar>{buttons}</ActionBar>
     </div>
@@ -143,8 +146,8 @@ function LoadTruck({ day, truck, writes, stale }: { day: LoadingDay; truck: Load
 
 // "Now loading · stop 2", the shop, and a tick box per line: the loader's own checklist, which is never saved. A
 // flagged line says how many are short, or won't fit (L-09).
-function NowLoading({ truck, stop, started, ticks, flagged }: {
-  truck: LoadingTruck; stop: LoadingStop; started: boolean; ticks: ReturnType<typeof useTicks>; flagged: Set<string>;
+function NowLoading({ truck, stop, started, blocked, ticks, flagged }: {
+  truck: LoadingTruck; stop: LoadingStop; started: boolean; blocked: boolean; ticks: ReturnType<typeof useTicks>; flagged: Set<string>;
 }) {
   const brand = brandOfStop(truck, stop);
   return (
@@ -153,17 +156,17 @@ function NowLoading({ truck, stop, started, ticks, flagged }: {
       <h2 className="mt-[15px] text-2xl leading-8 font-bold">{stop.shopName}</h2>
       <ul className="mt-1.5">
         {stop.lines.map((line) => (
-          <LineRow key={line.lineId} line={line} words={lineWords(line, brand)} ticked={ticks.isTicked(line.lineId)} flagged={flagged.has(line.lineId)} onToggle={() => ticks.toggle(line.lineId)} />
+          <LineRow key={line.lineId} line={line} words={lineWords(line, brand)} disabled={blocked} ticked={ticks.isTicked(line.lineId)} flagged={flagged.has(line.lineId)} onToggle={() => ticks.toggle(line.lineId)} />
         ))}
       </ul>
     </>
   );
 }
 
-function LineRow({ line, words, ticked, flagged, onToggle }: { line: LoadingLine; words: string; ticked: boolean; flagged: boolean; onToggle: () => void }) {
+function LineRow({ line, words, ticked, flagged, disabled, onToggle }: { line: LoadingLine; words: string; ticked: boolean; flagged: boolean; disabled: boolean; onToggle: () => void }) {
   return (
     <li>
-      <button type="button" role="checkbox" aria-checked={ticked} onClick={onToggle} className="flex w-full items-center gap-3.5 rounded-lg py-4 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+      <button type="button" role="checkbox" aria-checked={ticked} disabled={disabled} onClick={onToggle} className="flex w-full items-center gap-3.5 rounded-lg py-4 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60">
         <TickBox ticked={ticked} />
         <span className={cn('min-w-0 flex-1 text-lg leading-6', ticked ? 'text-muted-foreground' : 'font-semibold')}>{words}</span>
         {flagged && line.short > 0 && <Tag tone="bad" className="h-[26px] text-[13px]">{notGoing(line)}</Tag>}
@@ -182,10 +185,9 @@ function AllOn({ truck }: { truck: LoadingTruck }) {
   );
 }
 
-// A trip whose vehicle is still out on an earlier one says so at the top of its page (Q-26): it can be started, and its
-// goods go ready on the dock until the vehicle is back. The trip and the time come from the API.
+// The next permitted action comes from the server's actual-return gate; the planned return is only an estimate.
 function OutOnLine({ truck }: { truck: LoadingTruck }) {
-  const line = outOnLine(truck);
+  const line = truck.loadingBlocked ?? (truck.reloadRequired ? `Trip ${truck.tripNo} was marked ready before the vehicle returned. Start loading again and count the goods on the truck.` : outOnLine(truck));
   if (!line) return null;
   return <p role="status" className="mb-3 rounded-[10px] bg-warn-tint px-3 py-2.5 text-[13px] leading-4 font-semibold text-warn-ink">{line}</p>;
 }

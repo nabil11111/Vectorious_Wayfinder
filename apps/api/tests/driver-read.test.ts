@@ -71,7 +71,7 @@ it('AC-2 reads VEH035 ready with the saved times, plan stop order, windows, note
   expect(day.trips).toHaveLength(1);
   const { stops: shownStops, ...trip } = day.trips[0]!;
   expect(trip).toEqual({ tripId: loaded.tripId, revision: loaded.revision, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1,
-    brand: 'Fresh', district: 'Colombo', status: 'ready', leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString(), backBy: depotInstant(THU, 6 * 60 + 10).toISOString(),
+    brand: 'Fresh', district: 'Colombo', status: 'ready', startAfter: null, startBlocked: null, leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString(), backBy: depotInstant(THU, 6 * 60 + 10).toISOString(),
     backByWords: 'back by 06:10', readyAt: depotInstant(THU, 2 * 60 + 36).toISOString(), leftAt: null, backAt: null, problems: [] });
   expect(shownStops.map(({ id: _id, lines: _lines, ...shown }) => shown)).toEqual([
     { seq: 1, revision: 0, retriedAt: null, outletId: 'OUT001', shopName: 'Fresh Nugegoda', district: 'Colombo', dockType: 'street', windowOpen: '05:00', windowClose: '07:30',

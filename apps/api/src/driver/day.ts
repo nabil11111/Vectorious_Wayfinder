@@ -6,6 +6,7 @@ import { issuesOf } from '../issues/read';
 import { depotDate, depotInstant, depotMinutes, dueBackWords } from '../lib/clock';
 import { appliedWriteIdsOf } from '../lib/phone-writes';
 import { byLoadOrder, loaderDay } from '../loading/loader-day';
+import { returnFactsOf, tripGate } from '../loading/lifecycle';
 import type { DepotCaller } from '../middleware/auth';
 import { snapshot } from '../orders/store-orders';
 import { toClock, toMinutes } from '../planning';
@@ -18,6 +19,7 @@ type TripPlan = { trip: typeof trips.$inferSelect; plan: typeof plans.$inferSele
 export async function driverTripsOf(tx: Tx, rows: TripPlan[], at: Date): Promise<DriverTrip[]> {
   if (!rows.length) return [];
   const tripIds = rows.map(row => row.trip.id);
+  const allTrips = await tx.select().from(trips).where(inArray(trips.planId, [...new Set(rows.map(row => row.plan.id))]));
   const fleet = await tx.select().from(vehicles).where(inArray(vehicles.id, rows.map(row => row.trip.vehicleId)));
   const stopRows = await tx.select({ stop: stops, shop: outlets }).from(stops).innerJoin(outlets, eq(outlets.id, stops.outletId)).where(inArray(stops.tripId, tripIds));
   const lines = stopRows.length ? await tx.select({ stopId: stopOrders.stopId, lineId: orderLines.id, orderId: orders.id, temp: orders.temp,
@@ -32,7 +34,12 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[], at: Date): Promise
   const problems = read.filter(problem => problem.kind !== 'loading');
   const notFitting = new Set(read.filter(problem => problem.kind === 'loading' && problem.reason === 'wont_fit')
     .flatMap(problem => problem.lines.map(line => `${problem.trip.id}:${line.lineId}`)));
+  const facts = new Map<string, Awaited<ReturnType<typeof returnFactsOf>>>();
+  for (const { trip } of rows) facts.set(trip.id, await returnFactsOf(tx, trip,
+    allTrips.find(row => row.planId === trip.planId && row.vehicleId === trip.vehicleId && row.tripNo === trip.tripNo - 1) ?? null));
   return rows.map(({ trip, plan }) => {
+    const previous = allTrips.find(row => row.planId === trip.planId && row.vehicleId === trip.vehicleId && row.tripNo === trip.tripNo - 1) ?? null;
+    const gate = tripGate(trip, previous, facts.get(trip.id)!.readyAfterReturn);
     const vehicle = fleet.find(vehicle => vehicle.id === trip.vehicleId);
     if (!vehicle) throw new Error(`No vehicle ${trip.vehicleId}.`);
     const check = plan.sentCheck === null ? null : PlanCheck.parse(plan.sentCheck);
@@ -51,6 +58,7 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[], at: Date): Promise
       leavesAt: depotInstant(plan.date, times.leaveAt).toISOString(), backBy: depotInstant(plan.date, times.backAt).toISOString(),
       backByWords: dueBackWords(depotInstant(plan.date, times.backAt), at),
       readyAt: trip.readyAt?.toISOString() ?? null, leftAt: trip.leftAt?.toISOString() ?? null, backAt: trip.backAt?.toISOString() ?? null,
+      startBlocked: gate.startBlocked, startAfter: gate.startAfter?.toISOString() ?? null,
       stops: own.map(({ stop, shop }) => {
         const ownLines = lines.filter(line => line.stopId === stop.id).sort(byLoadOrder);
         const notes = [...new Set([...ownLines].sort((a, b) => (a.placedAt?.getTime() ?? Infinity) - (b.placedAt?.getTime() ?? Infinity) || a.orderId.localeCompare(b.orderId))

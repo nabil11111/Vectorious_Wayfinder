@@ -91,7 +91,7 @@ async function tripOneOut(): Promise<string> {
   return first.tripId;
 }
 
-it('Q-26 names the trip a vehicle is still out on, and when it is back, on its next trip, which can still be started', async () => {
+it('Q-26 names the trip a vehicle is still out on, and when it is back, on its next trip, which waits for actual return', async () => {
   const backBy = await twoTrips();
   expect(vehicleTrips(await loader.read()).map((t) => [t.tripNo, t.outOn])).toEqual([[1, null], [2, null]]);
 
@@ -99,10 +99,11 @@ it('Q-26 names the trip a vehicle is still out on, and when it is back, on its n
   const day = await loader.read();
   const words = `out on trip 1 · back by ${depotClock(new Date(backBy))}`;
   expect(vehicleTrips(day).map((t) => [t.tripNo, t.status, t.outOn])).toEqual([[2, 'planned', { tripNo: 1, backBy, words }]]);
-  // Rule 2: trip 2's cartons go ready on the dock while the truck is away.
+  // Submission B2 supersedes old dock staging: it must not be recorded as physically loaded.
   const started = await loader.start(tripOf(day, 2), day.plan!);
-  expect(started.status).toBe(200);
-  expect(tripOf(LoadingDay.parse(started.body), 2)).toMatchObject({ status: 'loading', outOn: { tripNo: 1, backBy, words } });
+  expect(started.status).toBe(409);
+  expect(started.body.error.code).toBe('previous_trip_not_returned');
+  expect(tripOf(await loader.read(), 2)).toMatchObject({ status: 'planned', outOn: { tripNo: 1, backBy, words } });
   // Once the app clock passes trip 1's planned return, the row says when it was due, not when it will be (spec 012).
   freeze(THU, depotMinutes(new Date(backBy)) + 1);
   expect(tripOf(await loader.read(), 2).outOn).toEqual({ tripNo: 1, backBy, words: `out on trip 1 · was due back ${depotClock(new Date(backBy))}` });

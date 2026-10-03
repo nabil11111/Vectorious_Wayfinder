@@ -11,13 +11,15 @@ import { operatingDays } from '../plans/board';
 import { dayLabel } from '../plans/board-day';
 import { loadingDayOf, trucksOf } from './day';
 import { loaderDay } from './loader-day';
+import { physicallyLoaded, previousTripOf, returnFactsOf, tripGate } from './lifecycle';
 
 // The loader's writes (spec 012): starting a truck, marking a stop loaded or taking it off again (Q-16), flagging lines
 // and marking the truck ready. Each is one transaction that answers the loading day, and is announced once it has
 // committed.
 
 type TripRow = typeof trips.$inferSelect;
-interface OpenTrip { moment: DayMoment; trip: TripRow; plan: typeof plans.$inferSelect }
+interface OpenTrip { moment: DayMoment; trip: TripRow; plan: typeof plans.$inferSelect; previous: TripRow | null;
+  gate: ReturnType<typeof tripGate>; countedAfterReturn: Set<string> }
 
 // The refusals, each with the sentence the screen shows as it is (plan.md, Contracts).
 const unknownRecord = (id: string, message: string) => new HttpError(400, 'unknown_record', message, { id });
@@ -49,7 +51,9 @@ async function openTrip(tx: Tx, caller: DepotCaller, tripId: string, withDepot: 
   const [row] = await tx.select({ trip: trips, plan: plans }).from(trips).innerJoin(plans, eq(plans.id, trips.planId))
     .where(and(eq(trips.id, tripId), eq(plans.depotId, caller.depotId))).for('update', { of: trips });
   if (!row) throw unknownRecord(tripId, 'That truck is not on this depot\'s list.');
-  return { moment, ...row };
+  const previous = await previousTripOf(tx, row.trip, true);
+  const facts = await returnFactsOf(tx, row.trip, previous);
+  return { moment: moment.read(), ...row, previous, gate: tripGate(row.trip, previous, facts.readyAfterReturn), countedAfterReturn: facts.countedAfterReturn };
 }
 
 // One loader write. The same id as the last write applied to the trip is a retry, answered with the day as it is and
@@ -59,7 +63,13 @@ async function loaderWrite(caller: DepotCaller, tripId: string, writeId: string,
   work: (tx: Tx, open: OpenTrip) => Promise<Announcement[]>): Promise<LoadingDay> {
   const done = await db.transaction(async (tx) => {
     const open = await openTrip(tx, caller, tripId, withDepot);
-    const told = open.trip.lastWriteId === writeId.toLowerCase() ? [] : await work(tx, open);
+    let told: Announcement[] = [];
+    if (open.trip.lastWriteId !== writeId.toLowerCase()) {
+      const gate = open.gate;
+      if (gate.loadingBlocked) throw new HttpError(409, 'previous_trip_not_returned', gate.loadingBlocked,
+        { vehicleId: open.trip.vehicleId, tripNo: open.trip.tripNo - 1 });
+      told = await work(tx, open);
+    }
     return { day: await loadingDayOf(tx, caller.depotId, open.moment), told };
   });
   for (const change of done.told) announce(change);
@@ -80,15 +90,25 @@ function requireLoading(trip: TripRow, revision: number): void {
 // "Start loading" (rule 3): a planned trip of the loader's day becomes loading, and its plan can no longer go back to
 // edit (D-33).
 export function startLoading(caller: DepotCaller, tripId: string, body: StartLoadingRequest): Promise<LoadingDay> {
-  return loaderWrite(caller, tripId, body.writeId, true, async (tx, { moment, trip, plan }) => {
+  return loaderWrite(caller, tripId, body.writeId, true, async (tx, { moment, trip, plan, gate }) => {
     if (plan.id !== body.plan.id || plan.status !== 'published' || plan.revision !== body.plan.revision) {
       throw new HttpError(409, 'plan_changed', `The plan for ${dayLabel(plan.date)} changed after this screen loaded it.`);
     }
     const day = loaderDay(depotDate(moment.at), depotMinutes(moment.at), await operatingDays(tx));
     if (!day) throw new HttpError(409, 'no_plan_day', 'No delivery day is left.');
     if (day !== plan.date) throw new HttpError(409, 'day_moved', `Loading has moved on to ${dayLabel(day)}.`, { date: day });
-    if (trip.status !== 'planned' || trip.revision !== body.revision) throw stale(trip);
-    await writeTrip(tx, trip, body.writeId, { status: 'loading' });
+    const reload = gate.reloadRequired;
+    if ((!reload && trip.status !== 'planned') || trip.revision !== body.revision) throw stale(trip);
+    if (reload) {
+      const onTrip = await tx.select({ orderId: stopOrders.orderId }).from(stops).innerJoin(stopOrders, eq(stopOrders.stopId, stops.id)).where(eq(stops.tripId, trip.id));
+      const ids = [...new Set(onTrip.map(row => row.orderId))];
+      await tx.update(stops).set({ loadedAt: null }).where(eq(stops.tripId, trip.id));
+      if (ids.length) {
+        await tx.update(orderLines).set({ loadedQty: null }).where(inArray(orderLines.orderId, ids));
+        await tx.update(orders).set({ status: 'planned', revision: sql`${orders.revision} + 1`, updatedAt: sql`now()` }).where(inArray(orders.id, ids));
+      }
+    }
+    await writeTrip(tx, trip, body.writeId, { status: 'loading', readyAt: null });
     await tx.insert(auditLog).values({ actorId: caller.userId, action: 'trip.loading_started', entity: 'trip', entityId: trip.id,
       before: { status: trip.status, revision: trip.revision }, after: { status: 'loading', revision: trip.revision + 1 } });
     return [{ topic: 'loading', depotId: caller.depotId }, { topic: 'plans', depotId: caller.depotId }];
@@ -97,13 +117,13 @@ export function startLoading(caller: DepotCaller, tripId: string, body: StartLoa
 
 // A stop is loaded whole, and only once every stop after it is (rule 4, D-35).
 export function markStopLoaded(caller: DepotCaller, tripId: string, body: StopLoadedRequest): Promise<LoadingDay> {
-  return loaderWrite(caller, tripId, body.writeId, false, async (tx, { moment, trip }) => {
+  return loaderWrite(caller, tripId, body.writeId, false, async (tx, { moment, trip, previous, countedAfterReturn }) => {
     requireLoading(trip, body.revision);
     const tripStops = await tx.select().from(stops).where(eq(stops.tripId, trip.id)).orderBy(stops.seq);
     const stop = tripStops.find((s) => s.id === body.stopId);
     if (!stop) throw unknownRecord(body.stopId, 'That stop is not on this truck.');
-    if (stop.loadedAt) throw stale(trip);
-    const first = tripStops.filter((s) => s.seq > stop.seq && !s.loadedAt).at(-1);
+    if (physicallyLoaded(trip, previous, stop.loadedAt, countedAfterReturn.has(stop.id))) throw stale(trip);
+    const first = tripStops.filter((s) => s.seq > stop.seq && !physicallyLoaded(trip, previous, s.loadedAt, countedAfterReturn.has(s.id))).at(-1);
     if (first) throw new HttpError(409, 'load_order', `Load stop ${first.seq} first. The last stop goes in first.`, { stopSeq: first.seq });
     await tx.update(stops).set({ loadedAt: moment.at }).where(eq(stops.id, stop.id));
     await writeTrip(tx, trip, body.writeId);

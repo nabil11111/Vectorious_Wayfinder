@@ -71,12 +71,16 @@ async function published(): Promise<void> {
 }
 const own = (day: LoadingDay, tripNo: number): LoadingTruck => day.trucks.find(trip => trip.vehicleId === 'VEH004' && trip.tripNo === tripNo)!;
 async function load(tripNo: number): Promise<LoadingTruck> {
-  let day = await loader.read();
-  expect((await loader.start(own(day, tripNo), day.plan!)).status).toBe(200);
-  for (const seq of own(day, tripNo).stops.map(stop => stop.seq)) {
-    expect((await loader.stopLoaded(own(await loader.read(), tripNo), seq)).status).toBe(200);
+  const day = await loader.read();
+  const started = await loader.start(own(day, tripNo), day.plan!);
+  expect(started.status).toBe(200);
+  let current = own(LoadingDay.parse(started.body), tripNo);
+  for (const seq of current.stops.map(stop => stop.seq)) {
+    const counted = await loader.stopLoaded(current, seq);
+    expect(counted.status).toBe(200);
+    current = own(LoadingDay.parse(counted.body), tripNo);
   }
-  const result = await loader.ready(own(await loader.read(), tripNo));
+  const result = await loader.ready(current);
   expect(result.status).toBe(200);
   return own(LoadingDay.parse(result.body), tripNo);
 }
@@ -240,11 +244,12 @@ it('B2 requires recounting old staged stops when loading and return share an app
 it('B3 fails closed if an old second trip no longer has its vehicle\'s preceding trip', async () => {
   await published();
   const day = await loader.read(), second = own(day, 2);
+  const cached = driverTrip(await phone(), 'VEH004', 2);
   await db.update(trips).set({ vehicleId: 'VEH010', status: 'done', backAt: depotInstant(THU, 150) }).where(eq(trips.id, own(day, 1).tripId));
   await db.update(trips).set({ status: 'ready', readyAt: depotInstant(THU, 151) }).where(eq(trips.id, second.tripId));
   freeze(180);
-  expect(code(await departure())).toEqual([409, 'previous_trip_not_returned']);
-  expect(code(await loader.start(own(await loader.read(), 2), day.plan!))).toEqual([409, 'previous_trip_not_returned']);
+  expect(code(await anura.post('/api/v1/driver/writes').send(driverWrite(cached, 'start', clock.at)))).toEqual([409, 'previous_trip_not_returned']);
+  expect(code(await loader.start(second, day.plan!))).toEqual([409, 'previous_trip_not_returned']);
 });
 
 it('B3 serializes simultaneous second departure requests without counting twice', async () => {

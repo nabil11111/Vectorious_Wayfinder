@@ -28,6 +28,9 @@ export async function sendPlan(caller: Planner, date: string, body: SendPlanRequ
     const cleaned = await boardOf(tx, caller.depotId, date, opened.moment);
     await replaceDraft(tx, opened.plan.id, cleaned.plan);
     const board = await boardOf(tx, caller.depotId, date, opened.moment);
+    const driverless = board.plan.trips.filter(trip => !trip.driverId).map(({ vehicleId, tripNo }) => ({ vehicleId, tripNo }));
+    if (driverless.length) throw new HttpError(409, 'driver_required',
+      `Assign a driver to ${driverless.map(trip => `${trip.vehicleId} trip ${trip.tripNo}`).join(', ')} before sending the plan.`, { trips: driverless });
     const check = board.check;
     if (!check) throw new Error('A draft has no plan check.');
     if (!check.ok) throw new HttpError(409, 'not_ready', 'This plan still has checks to resolve.', { blocks: check.problems.filter((p) => p.level === 'block') });

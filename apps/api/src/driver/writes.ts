@@ -6,6 +6,8 @@ import { lockDay, lockDepotDay } from '../lib/day-lock';
 import { HttpError } from '../lib/errors';
 import { jpegOf } from '../lib/jpeg';
 import { keptTime } from '../lib/kept-time';
+import { depotClock } from '../lib/clock';
+import { previousTripOf, returnFactsOf, tripGate } from '../loading/lifecycle';
 import { announce, type Announcement } from '../lib/live';
 import { reserveWrite } from '../lib/phone-writes';
 import type { DepotCaller } from '../middleware/auth';
@@ -42,6 +44,14 @@ export async function applyWrite(caller: DepotCaller, write: DriverWrite): Promi
       if (trip.status !== 'ready') throw new HttpError(409, 'trip_not_ready', `${trip.vehicleId} is not loaded yet.`, details);
       const [other] = await tx.select().from(trips).where(and(eq(trips.vehicleId, trip.vehicleId), eq(trips.status, 'out')));
       if (other) throw new HttpError(409, 'other_trip_out', `${trip.vehicleId} is still out on trip ${other.tripNo}.`, { vehicleId: trip.vehicleId, tripNo: other.tripNo });
+      const previous = await previousTripOf(tx, trip, true);
+      const gate = tripGate(trip, previous, (await returnFactsOf(tx, trip, previous)).readyAfterReturn);
+      if (gate.loadingBlocked) throw new HttpError(409, 'previous_trip_not_returned', gate.loadingBlocked, { vehicleId: trip.vehicleId, tripNo: trip.tripNo - 1 });
+      if (gate.reloadRequired) throw new HttpError(409, 'reload_required', gate.startBlocked!, details);
+      if (gate.startAfter && (moment.at < gate.startAfter || new Date(write.at) < gate.startAfter)) {
+        throw new HttpError(409, 'reload_wait', `Reload until ${depotClock(gate.startAfter)} before starting ${trip.vehicleId} trip ${trip.tripNo}.`,
+          { ...details, notBefore: gate.startAfter.toISOString() });
+      }
     } else if (trip.status !== 'out') throw new HttpError(409, 'trip_not_out', `${trip.vehicleId} is not out on the road.`, details);
     if (stop) {
       if (stop.outcome || (write.kind === 'arrive' && stop.arrivedAt)) {

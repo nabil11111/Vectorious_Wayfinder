@@ -10,6 +10,7 @@ import { computeLoad } from '../planning';
 import { operatingDays, readMoment, type BoardMoment } from '../plans/board';
 import { goingOf, wontFitOf, type LineFlag } from './going';
 import { byLoadOrder, loaderDay, sentTrip } from './loader-day';
+import { physicallyLoaded, returnFactsOf, tripGate } from './lifecycle';
 
 // The loader's day (spec 012): the day's sent trucks in leaving order, each with its stops last stop first, what goes
 // out of every line, what is on so far and its problems. GET /loading answers it, and so does every loader write, from
@@ -35,6 +36,7 @@ const openThenLatest = (a: Issue, b: Issue) => (a.status === b.status ? 0 : a.st
 export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: TripRow[], at: Date): Promise<LoadingTruck[]> {
   if (!tripRows.length) return [];
   const check = plan.sentCheck === null ? null : PlanCheck.parse(plan.sentCheck);
+  const allTrips = await tx.select().from(trips).where(eq(trips.planId, plan.id));
   const tripIds = tripRows.map((trip) => trip.id);
   const fleet = await tx.select().from(vehicles).where(inArray(vehicles.id, tripRows.map((trip) => trip.vehicleId)));
   const driverIds = tripRows.flatMap((trip) => (trip.driverId ? [trip.driverId] : []));
@@ -52,8 +54,14 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: 
   const problems = (await issuesOf(tx, inArray(trips.id, tripIds))).filter(problem => problem.kind === 'loading').map(problem => LoadingIssue.parse(problem));
   // A line is flagged once while its truck loads, so it has one flag at most.
   const flags = new Map<string, LineFlag>(problems.flatMap((problem) => problem.lines.map((line) => [`${problem.trip.id}:${line.lineId}`, { counted: line.counted, decision: problem.decision, reason: problem.reason }] as const)));
+  const facts = new Map<string, Awaited<ReturnType<typeof returnFactsOf>>>();
+  for (const trip of tripRows) facts.set(trip.id, await returnFactsOf(tx, trip,
+    allTrips.find(row => row.vehicleId === trip.vehicleId && row.tripNo === trip.tripNo - 1) ?? null));
 
   const trucks = tripRows.map((trip): LoadingTruck => {
+    const previous = allTrips.find(row => row.vehicleId === trip.vehicleId && row.tripNo === trip.tripNo - 1) ?? null;
+    const ownFacts = facts.get(trip.id)!;
+    const gate = tripGate(trip, previous, ownFacts.readyAfterReturn);
     const vehicle = fleet.find((v) => v.id === trip.vehicleId);
     if (!vehicle) throw new Error(`No vehicle ${trip.vehicleId}.`);
     const { leavesAt, district } = sentTrip(plan.date, check, trip.vehicleId, trip.tripNo);
@@ -67,7 +75,7 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: 
         return { lineId: line.lineId, orderId: line.orderId, temp: line.temp, productId: item.id, name: item.name, unit: item.unit, quantity: line.quantity, going,
           short: line.quantity - going, wontFit: wontFitOf(line.quantity, flag) };
       });
-      return { id: stop.id, seq: stop.seq, outletId: stop.outletId, shopName, loaded: stop.loadedAt !== null,
+      return { id: stop.id, seq: stop.seq, outletId: stop.outletId, shopName, loaded: !gate.reloadRequired && physicallyLoaded(trip, previous, stop.loadedAt, ownFacts.countedAfterReturn.has(stop.id)),
         units: total(lines.map((l) => l.quantity)), going: total(lines.map((l) => l.going)), short: total(lines.map((l) => l.short)), wontFit: total(lines.map((l) => l.wontFit)), lines };
     });
     // What is on so far: the loaded stops' lines at their counts, from the one load calculator. A line at 0 adds nothing.
@@ -76,7 +84,8 @@ export async function trucksOf(tx: Tx, plan: PlanRow, tripRows: TripRow[], out: 
     const away = out.filter((t) => t.vehicleId === trip.vehicleId && t.tripNo < trip.tripNo && t.status === 'out').sort((a, b) => b.tripNo - a.tripNo)[0];
     return {
       tripId: trip.id, revision: trip.revision, vehicleId: trip.vehicleId, vehicleType: vehicle.type, vehicleTemp: vehicle.temp, tripNo: trip.tripNo,
-      brand: brands.length === 1 ? brands[0]! : null, district, status: listed(trip), leavesAt: leavesAt.toISOString(), readyAt: trip.readyAt?.toISOString() ?? null,
+      brand: brands.length === 1 ? brands[0]! : null, district, status: gate.reloadRequired ? 'planned' : listed(trip),
+      loadingBlocked: gate.loadingBlocked, reloadRequired: gate.reloadRequired, leavesAt: leavesAt.toISOString(), readyAt: gate.reloadRequired ? null : trip.readyAt?.toISOString() ?? null,
       driver: drivers.find((d) => d.id === trip.driverId)?.name ?? null, weightCapKg: vehicle.weightCapKg, volumeCapM3: Number(vehicle.volumeCapM3),
       units: total(truckStops.map((s) => s.units)), on: { units: on.units, kg: on.kg, m3: on.m3 }, short: total(truckStops.map((s) => s.short)), wontFit: total(truckStops.map((s) => s.wontFit)),
       stops: truckStops, issues: problems.filter((problem) => problem.trip.id === trip.id).sort(openThenLatest),
