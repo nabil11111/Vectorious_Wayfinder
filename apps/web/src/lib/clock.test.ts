@@ -20,8 +20,10 @@ const hooks = vi.hoisted(() => ({
   effects: [] as (() => void | (() => void))[],
   saved: [] as unknown[],
 }));
+vi.mock('@/lib/phone/signal', () => ({ useSignal: () => true }));
 vi.mock('@/features/driver/queue', async (original) => ({
   ...await original<typeof import('@/features/driver/queue')>(),
+  useSync: () => ({ failure: null, signedOut: false }),
   useSave: () => ({ save: async (write: unknown) => { hooks.saved.push(write); return true; }, saving: false, failed: false }),
 }));
 vi.mock('react', async (original) => ({
