@@ -2,10 +2,11 @@ import { useId, useState } from 'react';
 import { DEFERRAL_CODES, type BoardOrder, type DeferralCode, type DraftDeferral } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { countOf, DEFERRAL, REASON_MOST, reasonFits, reasonLine } from '../words';
+import { DEFERRAL, REASON_MOST, reasonFits, reasonLine } from '../words';
 import type { BoardIndex } from './lookup';
 import { inkButton, plainButton } from './look';
 import { Pills } from './ui';
+import { demandCount } from './shop-summary';
 
 // Deferring, in place (spec 010, "Deferring, splitting"): the six reasons as chips and the sentence the shop will
 // read. It defers one order, a shop row's orders or a whole group, each order with its own deferral. A carried-over
@@ -13,11 +14,12 @@ import { Pills } from './ui';
 // shop's sentence, so a group's "window" reasons name each shop's closing time. The sentence takes 200 characters at
 // most: the box takes any length, so the browser never cuts a paste, and a change that would make it longer is
 // refused whole with a line in red. Near the end the line counts what is left, and at 200 it says it is full (Q-11).
-export function DeferForm({ orders, index, code, reason, onDefer, onCancel }: {
+export function DeferForm({ orders, index, code, reason, disabled = false, onDefer, onCancel }: {
   orders: BoardOrder[];
   index: BoardIndex;
   code?: DeferralCode;
   reason?: string;
+  disabled?: boolean;
   onDefer: (deferrals: DraftDeferral[]) => void;
   onCancel: () => void;
 }) {
@@ -38,6 +40,7 @@ export function DeferForm({ orders, index, code, reason, onDefer, onCancel }: {
   };
 
   const submit = () => {
+    if (disabled) return;
     if (!chosen) return setProblem('Choose why the order waits.');
     const deferrals = orders.map((order) => {
       const shop = index.shop(order.outletId);
@@ -54,7 +57,7 @@ export function DeferForm({ orders, index, code, reason, onDefer, onCancel }: {
       className="mt-2 space-y-2.5 rounded-[10px] bg-muted p-3"
       onSubmit={(event) => { event.preventDefault(); submit(); }}
     >
-      <p className="text-[11px] leading-[14px] font-semibold">{orders.length === 1 ? 'Defer this order' : `Defer ${countOf(orders.length, 'order')}`}</p>
+      <p className="text-[11px] leading-[14px] font-semibold">{orders.length === 1 ? orders[0]!.splitFrom ? 'Defer this split part' : 'Defer this order' : `Defer ${demandCount(orders)}`}</p>
       <Pills
         label="Why it waits"
         value={chosen ?? ('' as DeferralCode)}
@@ -87,7 +90,7 @@ export function DeferForm({ orders, index, code, reason, onDefer, onCancel }: {
       </div>
       {problem && <p role="alert" className="text-[11px] leading-[14px] font-semibold text-bad">{problem}</p>}
       <div className="flex gap-2">
-        <Button type="submit" variant="secondary" className={inkButton('h-8 px-4 text-xs')}>Defer</Button>
+        <Button type="submit" variant="secondary" disabled={disabled} className={inkButton('h-8 px-4 text-xs')}>Defer</Button>
         <Button type="button" variant="outline" className={plainButton('h-8 px-4 text-xs')} onClick={onCancel}>Cancel</Button>
       </div>
     </form>

@@ -109,7 +109,7 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
   const back = sent
     ? !board.plan.canUnsend ? board.plan.lockedReason && <p className="flex min-h-9 items-center text-[13px] leading-4 text-muted-foreground">{board.plan.lockedReason}</p> : (
       <Button variant="outline" className={plainButton('h-9 px-5 text-[13px]')} disabled={busy !== null} onClick={() => { void run('unsend', unsendPlan); }}>
-        {busy === 'unsend' ? 'Taking back…' : '← Back to edit'}
+        {busy === 'unsend' ? 'Withdrawing…' : 'Withdraw plan and edit'}
       </Button>
     )
     : <Button variant="outline" className={plainButton('h-9 px-5 text-[13px]')} onClick={() => navigate('/dispatcher/plan')}>← Back to edit</Button>;
@@ -139,6 +139,7 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
           {send}
         </div>
       </header>
+      {sent && board.plan.canUnsend && <p className="mt-2 text-xs leading-4 text-muted-foreground">Takes this plan back from loaders and drivers until you send it again.</p>}
       {stale && <div className="mt-3">{stale}</div>}
       {refused && <p role="alert" className="mt-3 rounded-[10px] bg-bad-tint px-3 py-2 text-xs leading-[15px] font-semibold text-bad">{refused}</p>}
       {board.counts && <Counts counts={board.counts} />}

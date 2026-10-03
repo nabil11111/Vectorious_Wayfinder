@@ -4,11 +4,13 @@ import { X } from 'lucide-react';
 import { CSS } from '@dnd-kit/utilities';
 import type { BoardOrder, BoardShop, StopTime } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { deferredOn, entranceAndWindow, hhmm, orderAmount, partLine } from '../words';
 import { draggedOf, keysOf, landingLook, pressOf } from './dragging';
 import type { Dragged, DragData, DropData, Landing } from './drops';
 import { MenuGroup, MenuItem, MenuLabel, MenuPopup, MenuRoot, MenuSeparator, MenuTrigger, Tag } from './ui';
 import { Why, type WhyReason } from './Why';
+import { plainButton } from './look';
 
 // A stop as drag and drop knows it (spec 023): its id in the sortable list, what it is when dragged, the place it is
 // for something dropped on it, that place's name, and whether anything can move now.
@@ -88,11 +90,15 @@ export function StopRow({ seq, shop, orders, time, longWait, why, first, last, d
                 {order.splitFrom === null
                   ? <MenuItem onClick={() => onSplit(order)}>Split</MenuItem>
                   : <MenuItem onClick={() => onJoin(order)}>Join back</MenuItem>}
-                <MenuItem onClick={() => onDefer(order)}>Defer</MenuItem>
               </MenuGroup>
             ))}
           </MenuPopup>
         </MenuRoot>
+      </div>
+      <div className="mb-2 flex flex-wrap justify-end gap-1.5">
+        {orders.map(order => <Button key={order.id} type="button" variant="outline" disabled={!drag.movable} className={plainButton('h-auto min-h-[26px] max-w-full px-2.5 py-1 text-[11px] whitespace-normal text-left')} onClick={() => onDefer(order)} aria-label={`Defer ${orderAmount(shop.brand, order)} at ${shop.name}`}>
+          Defer{orders.length > 1 ? ` · ${orderAmount(shop.brand, order)}` : ''}
+        </Button>)}
       </div>
       {children}
     </li>

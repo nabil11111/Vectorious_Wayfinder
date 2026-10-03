@@ -339,6 +339,12 @@ Anything we built differently from our Designathon submission, and why.
   the dispatcher's six tabs fit the top bar.
 
 **The plan board and View plan**
+- **Shop rows explain what remains in the current draft.** Available rows in both grouped and list views show
+  active orders and explicitly named split parts on trips, waiting and deferred, including carried-over demand.
+  Defer is a visible button for orders, shops, groups and trip-stop orders, using the existing reason form; deferred
+  rows retain their reason, Undo and Edit reason. A sent plan says **Withdraw plan and edit** and explains that
+  loaders and drivers lose it until it is sent again; draft Back to edit remains navigation and loading locks still
+  prevent withdrawal (spec 029). Added summary and action rows wrap within the existing responsive columns.
 - **"why?" gives the planner's reason for an order.** The design's why chips, which ask why the dispatcher changed
   the suggestion, are not built (D-55).
 - **Building shows a moving bar,** since one request has no progress to report, and its line has no "16 windows to
@@ -375,8 +381,8 @@ Anything we built differently from our Designathon submission, and why.
   trip.
 - **Moving stops** shows no "12 km shorter" or "35 min earlier", and a late stop says "late": the checker's
   kilometres depend only on the number of stops, and its sentence under the timeline gives the minutes.
-- **More actions than the frames draw:** a stop's ⋮ menu has Take off, Split and Defer for each order, group and
-  shop rows have ⋮ menus, a trip has Remove trip in its footer, and split orders carry a
+- **More actions than the frames draw:** a stop's ⋮ menu has Take off and Split or Join back for each order;
+  Defer is visible on available order, shop, group and trip-stop rows. A trip has Remove trip in its footer, and split orders carry a
   "split" chip.
 - **A deferred order gets no new date,** so the shop's "Tuesday works for me" is not built.
 - **Below 1024 wide** the board's three columns become three tabs, and between 1024 and 1280 the side columns are
