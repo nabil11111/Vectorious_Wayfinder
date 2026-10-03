@@ -48,10 +48,19 @@ it('Q-19 says loading has started where "Back to edit" was, once a truck of the 
   expect(html).toContain('✓ Sent');
 });
 
-it('Q-19 keeps "Back to edit" while no truck has started', () => {
+it('U4 names withdrawal and explains its effect while no truck has started', () => {
   const html = viewPlan(sentThursday(true), onShow(THU));
-  expect(html).toContain('← Back to edit');
+  expect(html).toContain('Withdraw plan and edit');
+  expect(html).toContain('Takes this plan back from loaders and drivers until you send it again.');
   expect(html).not.toContain(LOCKED);
+});
+
+it('U4 draft Back to edit remains a navigation action without withdrawal wording', () => {
+  const draft = sentThursday(true); draft.plan.status = 'draft'; draft.plan.sentAt = null;
+  const html = viewPlan(draft, onShow(THU));
+  expect(html).toContain('← Back to edit');
+  expect(html).not.toContain('Withdraw plan');
+  expect(html).not.toContain('Takes this plan back');
 });
 
 it('Q-19 still says loading has started once the board has moved past the plan\'s day, as Thursday\'s look back did not', () => {
