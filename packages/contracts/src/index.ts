@@ -75,3 +75,4 @@ export * from './operations';
 export * from './receipt';
 export * from './lookup';
 export * from './notifications';
+export * from './receiving';
