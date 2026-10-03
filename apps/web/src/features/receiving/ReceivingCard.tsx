@@ -31,7 +31,7 @@ function ReceivingForm({ me, held, blocked, stale, online, readError, reading, r
     <ReceivingNotice state={held.state} stale={stale} />
     {!online && <p className="mt-2 text-xs">Connect and read today’s declaration before saving.</p>}
     {online && readError && <p role="alert" className="mt-2 text-xs">Could not read the current declaration. Read again before saving.</p>}
-    <form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault(); void save.mutateAsync({ status, note }).then(replace).catch(() => {}); }}>
+    <form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault(); save.mutate({ status, note }, { onSuccess: replace }); }}>
       <label className="block text-sm">Today’s receiving status<select className="mt-1 block w-full rounded-md border bg-background px-3 py-2" value={status} onChange={event => setStatus(event.target.value as ReceivingStatus)} disabled={save.isPending}>
         {Object.entries(statusWords).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
       </select></label>
