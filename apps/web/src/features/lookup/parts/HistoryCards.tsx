@@ -16,7 +16,7 @@ const TITLE = 'text-[15px] leading-5 font-bold';
 const placeOf = (name: string, brand: string) => (name.startsWith(`${brand} `) ? name.slice(brand.length + 1) : name);
 
 // Closed shops and refused goods, with whether the depot said to bring them back. Deferred orders are not here.
-export function NotDelivered({ trips, onOpen }: { trips: HistoryTrip[]; onOpen: (tripId: string) => void }) {
+export function NotDelivered({ trips, onOpen }: { trips: HistoryTrip[]; onOpen: (tripId: string, trigger?: HTMLElement) => void }) {
   const stops = trips.flatMap((trip) => trip.stops
     .filter((stop) => stop.outcome === 'closed' || (stop.stages.refused.units ?? 0) > 0 || stop.flags.returned)
     .map((stop) => ({ trip, stop })));
@@ -36,7 +36,7 @@ export function NotDelivered({ trips, onOpen }: { trips: HistoryTrip[]; onOpen: 
               : `${stop.stages.refused.units === null ? 'refusal not recorded' : `${unitsWords(brand, stop.stages.refused.units)} refused`}`;
             return (
               <li key={stop.id} className="flex items-start justify-between gap-3 py-[7px]">
-                <button type="button" onClick={() => onOpen(trip.tripId)} className="min-w-0 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                <button type="button" onClick={(event) => onOpen(trip.tripId, event.currentTarget)} className="min-w-0 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
                   <span className="block text-xs leading-4 font-semibold">{stop.outlet.name}</span>
                   <span className="mt-0.5 block text-[11px] leading-[15px] text-muted-foreground">{what} · {tripName(trip)}</span>
                 </button>
@@ -51,7 +51,7 @@ export function NotDelivered({ trips, onOpen }: { trips: HistoryTrip[]; onOpen: 
 }
 
 // The shops' confirmations by time: each a stop confirmed once, named by its time and place, never "Signed".
-export function Confirmations({ read, onOpen }: { read: LookupHistory; onOpen: (tripId: string) => void }) {
+export function Confirmations({ read, onOpen }: { read: LookupHistory; onOpen: (tripId: string, trigger?: HTMLElement) => void }) {
   const receipts = read.trips
     .flatMap((trip) => trip.stops.flatMap((stop) => (stop.receipt ? [{ trip, stop, receipt: stop.receipt }] : [])))
     .sort((a, b) => a.receipt.confirmedAt.localeCompare(b.receipt.confirmedAt));
@@ -68,7 +68,7 @@ export function Confirmations({ read, onOpen }: { read: LookupHistory; onOpen: (
             <li key={stop.id}>
               <button
                 type="button"
-                onClick={() => onOpen(trip.tripId)}
+                onClick={(event) => onOpen(trip.tripId, event.currentTarget)}
                 aria-label={`${stop.outlet.name}, confirmed ${clockTime(receipt.confirmedAt)}`}
                 className="flex w-full flex-col items-center gap-1 rounded-[10px] bg-muted px-2 py-2.5 outline-none hover:bg-border/70 focus-visible:ring-3 focus-visible:ring-ring/50"
               >

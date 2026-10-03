@@ -3,12 +3,12 @@ import { Link } from 'react-router';
 import type {
   Brand, HistoryClosedAttempt, HistoryMeasure, HistoryProblem, HistoryReceipt, HistoryStages, HistoryStop, HistoryTrip, LookupPhoto,
 } from '@wayfinder/contracts';
-import { CARD, Chip } from '@/features/live/parts/ui';
+import { Chip } from '@/features/live/parts/ui';
 import { cn } from '@/lib/utils';
 import { PhotoViewer } from './PhotoViewer';
 import { ICON, vehiclePicture } from './parts/icons';
 import { TripFlags } from './parts/HistoryTrips';
-import { CloseButton, DetailHeading, Facts } from './parts/ui';
+import { CloseButton, DetailHeading } from './parts/ui';
 import type { PhotoViewer as Viewer } from './queries';
 import {
   NOT_CONFIRMED, NO_PHOTO, OUTCOME_WORDS, RETURN_INSTRUCTED, TRIP_STATUS_WORDS, answerWords, clockTime, coldWords, countWords, issueWords, kilos, kmWords,
@@ -32,22 +32,25 @@ export function HistoryDetail({ trip, brand, viewer, anchor, onClose }: { trip: 
     ['Back', trip.backAt ? clockTime(trip.backAt) : 'not recorded'],
   ];
   return (
-    <section id={anchor} aria-labelledby={title} className={cn(CARD, 'scroll-mt-24 px-5 pt-[18px] pb-5')}>
+    <section id={anchor} aria-labelledby={title} className="px-4 py-5 sm:px-6 sm:py-6">
       <div className="flex items-start gap-2.5">
         <img src={vehiclePicture({ type: trip.vehicleType, temp: trip.vehicleTemp })} alt="" className="mt-[-3px] size-[26px] shrink-0 object-contain" />
-        <h2 id={title} className="min-w-0 flex-1 text-[15px] leading-5 font-bold">{tripName(trip)}</h2>
+        <h2 id={title} className="min-w-0 flex-1 text-xl leading-7 font-bold">{tripName(trip)}</h2>
         <CloseButton label={`Close ${tripName(trip)}`} onClick={onClose} />
       </div>
-      <p className="mt-1.5 text-[11px] leading-4 text-muted-foreground">{tripPlace(trip)} · sent plan {shortDay(trip.date)}</p>
+      <p className="mt-1.5 text-sm leading-5 text-muted-foreground">{tripPlace(trip)} · sent plan {shortDay(trip.date)}</p>
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <Chip tone="plain">{TRIP_STATUS_WORDS[trip.status]}</Chip>
         <TripFlags trip={trip} quiet />
         {trip.archived && <Chip tone="plain">Vehicle archived</Chip>}
       </div>
       <PhotoViewer viewer={viewer} className="mt-3 shadow-none ring-1 ring-border" />
-      <Facts rows={recorded} className="mt-3.5" />
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <section className="rounded-[12px] border bg-muted/30 p-4"><h3 className="text-sm font-bold">Trip schedule and actual times</h3><dl className="mt-3.5 space-y-2 text-sm leading-5">{recorded.map(([label, value]) => <div key={label} className="flex justify-between gap-4"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-semibold">{value}</dd></div>)}</dl></section>
+        <section className="rounded-[12px] border bg-muted/30 p-4"><h3 className="text-sm font-bold">Quantity journey</h3><Stages stages={trip.stages} brand={trip.brand} className="mt-3" /></section>
+      </div>
+      <Journey trip={trip} />
       <DetailHeading>Every line of the trip</DetailHeading>
-      <Stages stages={trip.stages} brand={trip.brand} className="mt-1.5" />
       <ol className="mt-1">
         {trip.stops.map((stop) => (
           <StopBlock key={stop.id} stop={stop} viewer={viewer} other={brand !== 'all' && stop.outlet.brand !== brand ? brand : null} />
@@ -55,6 +58,23 @@ export function HistoryDetail({ trip, brand, viewer, anchor, onClose }: { trip: 
       </ol>
     </section>
   );
+}
+
+function Journey({ trip }: { trip: HistoryTrip }) {
+  const rows = [
+    { key: 'depart', place: 'Leave depot', planned: trip.schedule.leavesAt, actual: trip.leftAt, outcome: 'Departed' },
+    ...trip.stops.map((stop) => ({ key: stop.id, place: `${stop.seq}. ${stop.outlet.name}`, planned: stop.plannedArrival, actual: stop.arrivedAt,
+      outcome: stop.doneAt ? `${stop.outcome ? OUTCOME_WORDS[stop.outcome] : 'Done'} ${clockTime(stop.doneAt)}` : 'No completion recorded' })),
+    { key: 'return', place: 'Back at depot', planned: trip.schedule.backAt, actual: trip.backAt, outcome: 'Returned' },
+  ];
+  return <section aria-label="Trip timeline" className="mt-5 rounded-[12px] border p-4">
+    <h3 className="text-sm font-bold">Trip timeline</h3>
+    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_70px_85px] gap-2 border-b pb-2 text-xs font-semibold text-muted-foreground"><span>Journey</span><span>Planned</span><span>Actual</span></div>
+    <ol>{rows.map((row) => <li key={row.key} className="grid grid-cols-[minmax(0,1fr)_70px_85px] items-start gap-2 border-b py-3 text-sm last:border-b-0">
+      <div className="border-l-2 border-good pl-3"><p className="font-semibold">{row.place}</p><p className="mt-1 text-xs leading-4 text-muted-foreground">{row.actual ? row.outcome : 'Not recorded yet'}</p></div>
+      <span className="font-mono tabular-nums">{clockTime(row.planned)}</span><span className="font-mono tabular-nums">{row.actual ? clockTime(row.actual) : '—'}</span>
+    </li>)}</ol>
+  </section>;
 }
 
 // The stage totals of a set of lines: ordered, then each later stage as recorded, or not recorded with how many of its
@@ -67,7 +87,7 @@ function Stages({ stages, brand, className }: { stages: HistoryStages; brand: Br
     ['Refused', stages.refused], ['Short on the receipt', stages.receiptShort], ['Not delivered', stages.notDelivered],
   ];
   return (
-    <dl className={cn('space-y-1 text-[11px] leading-[15px]', className)}>
+    <dl className={cn('space-y-2 text-sm leading-5', className)}>
       <div className="flex items-baseline justify-between gap-3">
         <dt className="text-muted-foreground">Ordered</dt>
         <dd className="font-mono font-semibold">{unitsWords(brand, stages.ordered)}</dd>
@@ -103,10 +123,10 @@ function StopBlock({ stop, viewer, other }: { stop: HistoryStop; viewer: Viewer;
     <li className="mt-3.5 border-t pt-3.5">
       <div className="flex items-baseline gap-2">
         <span className="font-mono text-xs leading-4 font-bold">{clockTime(stop.plannedArrival)}</span>
-        <span className="min-w-0 flex-1 text-xs leading-4 font-semibold">{stop.outlet.name}</span>
+        <span className="min-w-0 flex-1 text-[15px] leading-5 font-semibold">{stop.outlet.name}</span>
         <span className="text-[10px] leading-3 text-muted-foreground">stop {stop.seq}</span>
       </div>
-      <p className="mt-1 text-[11px] leading-[15px] text-muted-foreground">
+      <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
         window {clockTime(stop.windowOpen)}–{clockTime(stop.windowClose)} · {times.length ? times.join(' · ') : 'nothing recorded yet'}
       </p>
       <div className="mt-1.5 flex flex-wrap gap-1">
@@ -116,12 +136,12 @@ function StopBlock({ stop, viewer, other }: { stop: HistoryStop; viewer: Viewer;
         {stop.flags.returned && <Chip tone="bad">{RETURN_INSTRUCTED}</Chip>}
       </div>
       <Lines stop={stop} />
-      {differences.length > 0 && <p className="mt-1.5 text-[11px] leading-[15px] font-semibold text-bad">{differences.join(' · ')}</p>}
+      {differences.length > 0 && <p className="mt-1.5 text-[13px] leading-5 font-semibold text-bad">{differences.join(' · ')}</p>}
       <div className="mt-2 space-y-2">
         {stop.proof ? <PhotoButton photo={stop.proof} label={`Proof · ${stop.outlet.name}`} viewer={viewer}>Proof photo · {clockTime(stop.proof.takenAt)}</PhotoButton>
-          : handed && <p className="text-[11px] leading-[15px] text-muted-foreground">Proof · {NO_PHOTO}</p>}
+          : handed && <p className="text-[13px] leading-5 text-muted-foreground">Proof · {NO_PHOTO}</p>}
         {stop.receipt ? <Receipt receipt={stop.receipt} stop={stop} viewer={viewer} />
-          : handed && <p className="text-[11px] leading-[15px] text-muted-foreground">{NOT_CONFIRMED}</p>}
+          : handed && <p className="text-[13px] leading-5 text-muted-foreground">{NOT_CONFIRMED}</p>}
         {stop.problems.filter((problem) => !listedElsewhere.has(problem.id)).map((problem) => <Problem key={problem.id} problem={problem} stop={stop} viewer={viewer} />)}
         {stop.attempts.map((attempt) => <Attempt key={attempt.issueId} attempt={attempt} stop={stop} viewer={viewer} />)}
       </div>
@@ -131,10 +151,11 @@ function StopBlock({ stop, viewer, other }: { stop: HistoryStop; viewer: Viewer;
 
 // Each line by stage: ordered, loaded, handed over, received. A stage not recorded for the line is a dash.
 function Lines({ stop }: { stop: HistoryStop }) {
-  const cols = 'grid grid-cols-[minmax(0,1fr)_repeat(4,40px)] gap-x-1.5';
+  const cols = 'grid grid-cols-[minmax(120px,1fr)_repeat(4,76px)] gap-x-3';
   return (
-    <div role="table" aria-label={`${stop.outlet.name} lines`} className="mt-2 text-[11px] leading-[15px]">
-      <div role="row" className={cn(cols, 'text-[9px] leading-3 font-semibold text-muted-foreground')}>
+    <div role="region" aria-label={`${stop.outlet.name} quantity table`} tabIndex={0} className="mt-3 overflow-x-auto rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+    <div role="table" aria-label={`${stop.outlet.name} lines`} className="min-w-[470px] text-sm leading-5">
+      <div role="row" className={cn(cols, 'text-xs leading-4 font-semibold text-muted-foreground')}>
         <span role="columnheader">Line</span>
         <span role="columnheader" className="text-right">Ordered</span>
         <span role="columnheader" className="text-right">Loaded</span>
@@ -142,14 +163,15 @@ function Lines({ stop }: { stop: HistoryStop }) {
         <span role="columnheader" className="text-right">Received</span>
       </div>
       {stop.lines.map((line) => (
-        <div key={line.lineId} role="row" className={cn(cols, 'mt-0.5')}>
-          <span role="cell" className="truncate">{line.name}</span>
+        <div key={line.lineId} role="row" className={cn(cols, 'mt-2')}>
+          <span role="cell">{line.name}<span className="block text-xs text-muted-foreground">{line.unit}</span></span>
           <span role="cell" className="text-right font-mono">{whole(line.quantity)}</span>
           <span role="cell" className="text-right font-mono">{countWords(line.loaded)}</span>
           <span role="cell" className="text-right font-mono">{countWords(line.delivered)}</span>
           <span role="cell" className="text-right font-mono">{countWords(line.received)}</span>
         </div>
       ))}
+    </div>
     </div>
   );
 }
@@ -159,7 +181,7 @@ function PhotoButton({ photo, label, viewer, children }: { photo: LookupPhoto; l
     <button
       type="button"
       onClick={() => viewer.open(photo, label)}
-      className="flex items-center gap-2 rounded-[10px] bg-muted px-2.5 py-1.5 text-left text-[11px] leading-[15px] font-semibold outline-none hover:bg-border/70 focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="flex items-center gap-2 rounded-[10px] bg-muted px-2.5 py-1.5 text-left text-[13px] leading-5 font-semibold outline-none hover:bg-border/70 focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <img src={ICON.proof} alt="" className="size-5 object-contain" />
       {children}
@@ -175,7 +197,7 @@ function Receipt({ receipt, stop, viewer }: { receipt: HistoryReceipt; stop: His
   // The report is also the stop's problem, which names who answered it.
   const answeredBy = report ? stop.problems.find((problem) => problem.id === report.id)?.decidedBy ?? null : null;
   return (
-    <div className="rounded-[10px] border px-3 py-2.5 text-[11px] leading-[15px]">
+    <div className="rounded-[10px] border px-3 py-2.5 text-[13px] leading-5">
       <p className="font-semibold">Shop confirmation · {stop.outlet.name}</p>
       <p className="text-muted-foreground">confirmed {clockTime(receipt.confirmedAt)} · {sentWords(receipt.sentAt)}</p>
       <p className="mt-1">
@@ -207,7 +229,7 @@ function Problem({ problem, stop, viewer }: { problem: HistoryProblem; stop: His
     ? problem.lines.map((line) => `${whole(line.counted)} of ${whole(line.quantity)} ${line.name} at the dock`).join(', ')
     : `${unitsWords(brand, problem.short)} ${problem.kind === 'refused' ? 'refused' : reasonWords(problem.reason)}`;
   return (
-    <div className="rounded-[10px] border px-3 py-2.5 text-[11px] leading-[15px]">
+    <div className="rounded-[10px] border px-3 py-2.5 text-[13px] leading-5">
       <p className="font-semibold">{issueWords(problem.kind)} · {reasonWords(problem.reason)}</p>
       <p className="text-muted-foreground">raised by {problem.raisedBy} {clockTime(problem.raisedAt)} · {counted}</p>
       {problem.note && <p className="mt-0.5">“{problem.note}”</p>}
@@ -225,7 +247,7 @@ function Problem({ problem, stop, viewer }: { problem: HistoryProblem; stop: His
 // its answer. No arrival is recovered for it and no later receipt is added to it.
 function Attempt({ attempt, stop, viewer }: { attempt: HistoryClosedAttempt; stop: HistoryStop; viewer: Viewer }) {
   return (
-    <div className="rounded-[10px] border border-dashed px-3 py-2.5 text-[11px] leading-[15px]">
+    <div className="rounded-[10px] border border-dashed px-3 py-2.5 text-[13px] leading-5">
       <p className="font-semibold">Closed attempt · {reasonWords(attempt.reason)}</p>
       <p className="text-muted-foreground">closed by {attempt.raisedBy} {clockTime(attempt.raisedAt)} · {unitsWords(stop.outlet.brand, attempt.notDelivered)} not delivered</p>
       <ul aria-label="Counted on this attempt" className="mt-1 space-y-0.5">

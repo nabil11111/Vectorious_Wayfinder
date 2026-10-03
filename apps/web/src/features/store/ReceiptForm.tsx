@@ -7,6 +7,7 @@ import { UNUSABLE, usePhoto } from '@/lib/phone/photo';
 import { PhotoInput, PhotoTile } from '@/lib/phone/PhotoTile';
 import { shopQueue } from '@/lib/phone/shop';
 import { cn } from '@/lib/utils';
+import { DirtyFormWarning, hasFormEdits } from '@/lib/dirty-form';
 import type { ReceiptRecord, ShownReceipt } from './deliveries';
 import { ORANGE, PLAIN, SENDING } from './parts/actions';
 import { Choice } from './parts/Choice';
@@ -84,6 +85,7 @@ export function ReceiptForm({ delivery, outlet, today, record }: { delivery: Sto
 
   return (
     <div className="max-w-xl lg:pt-2.5">
+      <DirtyFormWarning dirty={!sending && hasFormEdits({ counts, typed, reasons, note, cold, photo })} name="receipt" />
       {failed && <Problem>{NOT_SAVED_ON_PHONE}</Problem>}
       <header>
         <h1 className="text-[22px] leading-[27px] font-bold">{RECEIPT_TITLE}</h1>

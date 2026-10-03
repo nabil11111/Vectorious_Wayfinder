@@ -57,6 +57,9 @@ export const LoadingTruck = z.object({
   brand: Brand.nullable(),
   district: z.string(),
   status: z.enum(['planned', 'loading', 'ready']),
+  // Optional for older cached reads. These gates come from actual return records, not planned return times.
+  loadingBlocked: z.string().nullable().optional(),
+  reloadRequired: z.boolean().optional(),
   leavesAt: Moment,
   readyAt: Moment.nullable(),
   driver: z.string().nullable(),
@@ -72,7 +75,7 @@ export const LoadingTruck = z.object({
   // The open ones first, then the answered ones, latest first.
   issues: z.array(LoadingIssue),
   // The vehicle's earlier trip it is still out on, and when that trip is due back, or null while the vehicle is at the
-  // depot (Q-26). Its goods are put ready on the dock meanwhile (rule 2).
+  // depot (Q-26). The second trip waits for actual return before loading (submission B2).
   // words: "out on trip 1 · back by 06:38", or "out on trip 1 · was due back 06:38" once the app clock has passed it.
   outOn: z.object({ tripNo: z.number().int().min(1), backBy: Moment, words: z.string() }).nullable(),
 });
@@ -130,7 +133,7 @@ export type MarkReadyRequest = z.infer<typeof MarkReadyRequest>;
 
 // ── Refusals, beside spec 010's codes used again (no_depot, unknown_record, day_moved, no_plan_day, stale) ────────
 
-export const LOADING_ERROR_CODES = ['plan_changed', 'not_loading', 'load_order', 'already_flagged', 'stops_left', 'flag_open'] as const;
+export const LOADING_ERROR_CODES = ['plan_changed', 'not_loading', 'load_order', 'already_flagged', 'stops_left', 'flag_open', 'previous_trip_not_returned'] as const;
 export type LoadingErrorCode = (typeof LOADING_ERROR_CODES)[number];
 
 // not_loading names the trip with spec 010's TripDetails.

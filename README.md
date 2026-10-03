@@ -365,7 +365,8 @@ Anything we built differently from our Designathon submission, and why.
 - **Trucks are named by their drivers** on the plan board's and View plan's cards and headers, "Chaminda · dry truck",
   where the frames show the vehicle number. The number stays where someone must find the truck: the loader's and
   driver's screens, and Fleet.
-- **Drivers** are picked from the depot's driver accounts, and a vehicle may have none (D-31). Each truck has a usual
+- **Drivers** are picked from the depot's driver accounts. A draft vehicle may have none, but Send requires an assigned
+  driver for every trip (spec 028 submission hardening, superseding D-31 at publication). Each truck has a usual
   driver, from the latest sent plan, and the suggested plan gives it them. The driver menu in a trip's header changes
   the driver alone, and a driver taken from another truck leaves it with none.
 - **Undo, Redo and Start over** sit in the board's header, where the design draws none: every change of the draft is a
@@ -386,6 +387,18 @@ Anything we built differently from our Designathon submission, and why.
   and for the suggested plan: replacing a draft, the line after a build, a refused build, and a plan ready with
   warnings.
 
+- **What if a vehicle is unavailable?** on the draft board compares two generated plans for the same outstanding
+  demand. Pick one working vehicle and choose Compare plans. Counts group split parts back into original orders;
+  results show full/partial/deferred orders, shops waiting, trip fuel and real planner reasons. The generated baseline
+  may differ from a hand-edited draft. This is a read-only preview with no Apply action or optimality claim.
+
+- **Receiving readiness** on the shop's Today page records Not confirmed, Ready to receive or Temporarily unavailable,
+  with an optional note and update time for the current calendar day. Save readiness requires a connection. The driver's
+  next-stop screen shows the declaration for that trip's day, labelled Last known when using a cached view; Live day
+  shows each shop's current-day declaration. Updates notify the assigned driver and authorized dispatcher. This is
+  advisory: it describes receiving goods, not customer opening hours or proof that a driver arrived. It does not gate
+  driver actions, carry yesterday forward or move to tomorrow at the order cutoff.
+
 **Loading and Live day**
 - **One list of trucks in leaving order,** with no "Wave 1 · 03:30" and "Wave 2 · 08:30" tabs, no dock numbers and no
   call buttons: every trip has its own leaving time (D-19), and the data has no docks or phone numbers (D-40).
@@ -401,6 +414,8 @@ Anything we built differently from our Designathon submission, and why.
   sending" or "Sign out anyway". The loader works online with no outbox, so a flag that did not go would otherwise be
   lost without a word.
 - **The load figure is what is on the truck so far.**
+- **Second trips load after the first trip returns.** Their departure also waits for the configured reload interval
+  on the application clock and a fresh ready state. The screens explain which action or time is still needed.
 - **A van's load reads in kilos,** "648 / 1,040 kg", and a truck's weight in tonnes rounds down. In tonnes a 1,040 kg
   van read "1.0 / 1.0 t" with 81 kg still free.
 - **The dispatcher answers a loader's flag** with "Go short" or "Load it all" and "Send to loader" (D-37); the design
@@ -472,6 +487,15 @@ Anything we built differently from our Designathon submission, and why.
   truck.
 - **The loader's "Plan changed"** names no docks and has no "Why" line. The plan can change only before loading starts
   (D-70), where the design also draws a truck changed after loading began.
+
+**Submission workflow improvements (spec 028)**
+- History opens a wider accessible trip dialog with separate quantity and timing sections; its summary uses cards.
+  Dashboard separates actionable problems from watching trips and offers Show all for longer lists.
+- Before planning opens, the board shows received demand and an application-clock countdown while keeping editing
+  locked. The Wayfinder wordmark opens the signed-in role's home.
+- Driver unload lines have an explicit All unloaded action using the actual loaded quantity. Receipt entries retain
+  product units, and dirty loader/shop forms ask before discarding unsent input. A background truck change keeps an
+  unsent loader report visible and blocks submitting it against changed loading data.
 
 **The look-up pages**
 - **They only read (D-80):** Orders has no "Plan first" and no "Call the shop" (the data has no phone numbers, D-40),

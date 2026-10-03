@@ -260,3 +260,11 @@ describe('the live stream', () => {
     expect(streams.map((stream) => stream.state)).toEqual(['ended', 'ended', 'ended']);
   });
 });
+
+
+it('filters explicitly targeted receiving recipients without changing existing depot or outlet rules', async () => {
+  const me = async (person: Person) => (await fetch(`${base}/api/v1/auth/me`, { headers: { cookie: cookies[person] } })).json() as Promise<{ id: string }>;
+  const [driver, dispatcher, outsider] = await Promise.all([me('dilshan'), me('ruwan'), me('prasanna')]);
+  expect(await whoHears({ topic: 'receiving', depotId: 'Peliyagoda', outletId: 'OUT001', recipientIds: [driver.id, dispatcher.id, outsider.id] }, ['dilshan', 'ruwan', 'kasun', 'prasanna', 'admin'])).toEqual(['dilshan', 'ruwan']);
+  expect(await whoHears({ topic: 'receiving', depotId: 'Peliyagoda', outletId: 'OUT001', recipientIds: [] }, ['dilshan', 'ruwan'])).toEqual([]);
+});

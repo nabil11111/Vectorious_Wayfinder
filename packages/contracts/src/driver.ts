@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Brand, CLOSED_REASONS, IssueDecision, PhotoDataUrl, RefusalReason, StopOutcome, Temp } from './basics';
 import { DockType } from './store';
+import { ReceivingState } from './receiving';
 import { TripStatus } from './plans';
 
 const Moment = z.iso.datetime();
@@ -14,6 +15,7 @@ export const DriverLine = z.object({ lineId: z.uuid(), orderId: z.uuid(), temp: 
 export type DriverLine = z.infer<typeof DriverLine>;
 export const DriverStop = z.object({
   id: z.uuid(), seq: z.number().int().min(1), revision: Count, retriedAt: Moment.nullable(), outletId: z.string(), shopName: z.string(), district: z.string(), dockType: DockType,
+  receiving: ReceivingState.nullable().optional(),
   windowOpen: z.string(), windowClose: z.string(), note: z.string().nullable(), arrivedAt: Moment.nullable(), doneAt: Moment.nullable(), outcome: StopOutcome.nullable(), lines: z.array(DriverLine),
 });
 export type DriverStop = z.infer<typeof DriverStop>;
@@ -27,6 +29,9 @@ export const DriverTrip = z.object({
   // backByWords is the server's wording of backBy against the app clock: "back by 06:10", or "was due back 06:10" once
   // it has passed, as a planned time is the plan's and not a promise.
   leavesAt: Moment, backBy: Moment, backByWords: z.string(), readyAt: Moment.nullable(), leftAt: Moment.nullable(), backAt: Moment.nullable(), stops: z.array(DriverStop), problems: z.array(DriverProblem),
+  // Server gates based on this vehicle's preceding actual return and configured reload interval. Older cached
+  // second trips without these fields must refresh before departure.
+  startAfter: Moment.nullable().optional(), startBlocked: z.string().nullable().optional(),
 });
 export type DriverTrip = z.infer<typeof DriverTrip>;
 // driverId is the signed-in account, so a phone holding one driver's writes can tell another account apart even when
@@ -46,7 +51,7 @@ export const DriverWrite = z.discriminatedUnion('kind', [
   StopWrite.extend({ kind: z.literal('closed'), note: Note.optional(), photo: Photo.optional() }),
 ]);
 export type DriverWrite = z.infer<typeof DriverWrite>;
-export const DRIVER_ERROR_CODES = ['trip_not_ready', 'other_trip_out', 'trip_not_out', 'not_next', 'not_arrived', 'stop_done', 'write_reused'] as const;
+export const DRIVER_ERROR_CODES = ['trip_not_ready', 'other_trip_out', 'trip_not_out', 'not_next', 'not_arrived', 'stop_done', 'write_reused', 'previous_trip_not_returned', 'reload_wait', 'reload_required'] as const;
 export type DriverErrorCode = (typeof DRIVER_ERROR_CODES)[number];
 export const DriverStopDetails = z.object({ stopSeq: z.number().int().min(1) });
 export const WriteReusedDetails = z.object({ writeId: z.uuid() });

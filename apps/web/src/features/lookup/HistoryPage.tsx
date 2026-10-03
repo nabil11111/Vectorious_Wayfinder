@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQueries, type UseQueryResult } from '@tanstack/react-query';
+import { Dialog } from '@base-ui/react/dialog';
 import { LookupHistoryQuery, type Brand, type HistoryCounts, type HistoryTrip, type LookupHistory, type Me } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
@@ -25,7 +26,7 @@ import {
   currentRead, historyOptions, historySelection, readState, scopeOf, useFollowDefault, useFollowGeneration, useFollowLookupMessages, usePhotoViewer,
 } from './queries';
 import {
-  HISTORY_FAILED, NOT_A_DATE, NO_SENT_PLANS_YET, NO_SENT_PLAN_ON, NO_TRIPS_SENT, NO_TRIP_MATCH, PICK_TRIP, TRIP_NOT_ON_PLAN, historyTitle, openDay,
+  HISTORY_FAILED, NOT_A_DATE, NO_SENT_PLANS_YET, NO_SENT_PLAN_ON, NO_TRIPS_SENT, NO_TRIP_MATCH, TRIP_NOT_ON_PLAN, historyTitle, openDay,
   sentLater, shortDay, showingTrips, unrecordedWords, whole,
 } from './words';
 
@@ -41,8 +42,6 @@ function paramsOf(search: URLSearchParams): HistoryParams | null {
   if (!parsed.success) return null;
   return parsed.data.date ? { date: parsed.data.date } : {};
 }
-
-const narrow = () => window.matchMedia('(max-width: 1023.98px)').matches;
 
 // History at /dispatcher/history (spec 017, Dispatcher · History 112:78211): one sent plan as it was recorded, on a
 // static timeline, with the selected trip's stops, loading, problems, attempts, proofs and shop confirmations. ?trip=
@@ -68,6 +67,7 @@ export function HistoryPage() {
   const loaded = reads.filter((read): read is LookupHistory => read !== undefined);
   const all = reads.length > 0 && loaded.length === reads.length ? loaded : null;
   const [filters, setFilters] = useState<TripFilters>(NO_TRIP_FILTERS);
+  const returnFocus = useRef<HTMLElement | null>(null);
 
   // The sent-plan dates the reads are of. A depot with no sent plan yet has none.
   const dates = [...new Set(loaded.flatMap((read) => (read.date === null ? [] : [read.date])))].sort();
@@ -96,14 +96,13 @@ export function HistoryPage() {
     }
     return next;
   });
-  const toggle = (tripId: string, anchor: string) => {
+  const toggle = (tripId: string, _anchor: string, trigger?: HTMLElement) => {
     if (selected?.tripId === tripId) {
       setParams({ trip: null });
-      window.requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-trip="${tripId}"]`)?.focus());
       return;
     }
+    returnFocus.current = trigger ?? (document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null);
     setParams({ trip: tripId });
-    if (narrow()) window.requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   };
 
   // A trip named by a link (Orders, Fleet) is brought into view once its row is drawn.
@@ -123,7 +122,7 @@ export function HistoryPage() {
   const part = (i: number, className: string) => (
     <HistoryPart depot={depots[i]!} both={both} me={me} params={params} query={queries[i]!} queryKey={options[i]!.queryKey} data={reads[i]}
       selected={selections[i]!.trip} filters={filters} setFilters={setFilters} onToggle={toggle} onOpenDate={(date) => setParams({ date, trip: null })}
-      clockDay={clockDay} online={online} notice={both ? null : goneLine} className={className} />
+      clockDay={clockDay} online={online} notice={both ? null : goneLine} className={className} returnFocus={returnFocus} />
   );
   return (
     <div className="lg:-mt-[7px]">
@@ -155,8 +154,8 @@ export function HistoryPage() {
       </header>
 
       <div className="mt-2.5 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          {counts ? <Figures items={summaryOf(counts)} /> : loading && <FiguresSkeleton />}
+        <div className="space-y-3">
+          {counts ? <SummaryCards items={summaryOf(counts)} /> : loading && <FiguresSkeleton />}
           {params !== null && !both && <ReadLine query={{ ...queries[0]!, data: reads[0] }} online={online} />}
         </div>
         {counts && <StageLine counts={counts} />}
@@ -179,11 +178,12 @@ export function HistoryPage() {
 
 // One depot's sent plan: its trips on the timeline or what stands in for them, and beside them the selected trip, what
 // was not delivered, the shops' confirmations and the deferrals.
-function HistoryPart({ depot, both, me, params, query, queryKey, data, selected, filters, setFilters, onToggle, onOpenDate, clockDay, online, notice, className }: {
+function HistoryPart({ depot, both, me, params, query, queryKey, data, selected, filters, setFilters, onToggle, onOpenDate, clockDay, online, notice, className, returnFocus }: {
   depot: string; both: boolean; me: Me | null | undefined; params: HistoryParams | null; query: UseQueryResult<LookupHistory>; queryKey: readonly unknown[];
   data: LookupHistory | undefined; selected: HistoryTrip | null; filters: TripFilters; setFilters: (change: (held: TripFilters) => TripFilters) => void;
-  onToggle: (tripId: string, anchor: string) => void; onOpenDate: (date: string) => void; clockDay: number | null; online: boolean; notice: ReactNode;
+  onToggle: (tripId: string, anchor: string, trigger?: HTMLElement) => void; onOpenDate: (date: string) => void; clockDay: number | null; online: boolean; notice: ReactNode;
   className: string;
+  returnFocus: React.RefObject<HTMLElement | null>;
 }) {
   // The latest sent date follows the calendar past midnight; a chosen date stays chosen.
   useFollowDefault(queryKey, data?.readAt, params?.date === undefined, 'calendar');
@@ -197,7 +197,9 @@ function HistoryPart({ depot, both, me, params, query, queryKey, data, selected,
   const state = readState(read, online);
   // Where the narrow page scrolls to: one detail per depot on both depots together.
   const anchor = both ? `history-detail-${depot}` : 'history-detail';
-  const toggle = (tripId: string) => onToggle(tripId, anchor);
+  const toggle = (tripId: string, trigger?: HTMLElement) => onToggle(tripId, anchor, trigger);
+  const lastSelected = useRef<string | null>(null);
+  useEffect(() => { if (selected) lastSelected.current = selected.tripId; }, [selected]);
   const clear = () => setFilters(() => NO_TRIP_FILTERS);
   // With no plan sent for today or earlier, every plan the depot sent is for a later day, and the chips list them, so the
   // page names the soonest it lists and opens it (Q-14).
@@ -231,8 +233,16 @@ function HistoryPart({ depot, both, me, params, query, queryKey, data, selected,
                       )}
       </section>
       <aside aria-label="Trip detail, goods not delivered and shop confirmations" className="min-w-0 space-y-4">
-        {selected && data ? <HistoryDetail key={selected.tripId} trip={selected} brand={filters.brand} viewer={viewer} anchor={anchor} onClose={() => toggle(selected.tripId)} />
-          : data?.trips.length ? <Note className="max-lg:hidden">{PICK_TRIP}</Note> : null}
+        <Dialog.Root open={Boolean(selected && data)} onOpenChange={(open) => { if (!open && selected) toggle(selected.tripId); }}>
+          <Dialog.Portal>
+            <Dialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30" />
+            <Dialog.Popup aria-label={selected ? `Trip detail · ${selected.vehicleId} trip ${selected.tripNo}` : 'Trip detail'}
+              finalFocus={() => returnFocus.current?.isConnected ? returnFocus.current : lastSelected.current ? document.querySelector<HTMLElement>(`[data-trip="${lastSelected.current}"]`) : false}
+              className="fixed inset-0 z-50 overflow-y-auto bg-card outline-none sm:inset-x-6 sm:inset-y-6 sm:mx-auto sm:max-w-4xl sm:rounded-[14px] sm:shadow-xl">
+              {selected && data && <HistoryDetail key={selected.tripId} trip={selected} brand={filters.brand} viewer={viewer} anchor={anchor} onClose={() => toggle(selected.tripId)} />}
+            </Dialog.Popup>
+          </Dialog.Portal>
+        </Dialog.Root>
         {data?.publication && (
           <>
             <NotDelivered trips={data.trips} onOpen={toggle} />
@@ -244,6 +254,15 @@ function HistoryPart({ depot, both, me, params, query, queryKey, data, selected,
       </aside>
     </div>
   );
+}
+
+function SummaryCards({ items }: { items: Figure[] }) {
+  return <dl aria-label="Sent plan summary" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+    {items.map((item) => <div key={item.label} className="rounded-[12px] border bg-card px-4 py-3 shadow-sm">
+      <dd className={cn('font-mono text-xl leading-7 font-bold', item.tone === 'warn' && 'text-warn-ink', item.tone === 'bad' && 'text-bad')}>{item.value}</dd>
+      <dt className="mt-1 text-xs leading-4 text-muted-foreground">{item.label}</dt>
+    </div>)}
+  </dl>;
 }
 
 function StageLine({ counts }: { counts: HistoryCounts }) {

@@ -170,10 +170,12 @@ it('AC-13 permits exactly one of two simultaneous starts for VEH004', async () =
   freeze(THU, 3 * 60 + 31);
   const responses = await Promise.all(pair.map(trip => driver.send(driverWrite(trip, 'start', at(3 * 60 + 31).toISOString()))));
   expect(responses.map(res => res.status).sort()).toEqual([200, 409]);
-  expect(responses.find(res => res.status === 409)!.body.error.code).toBe('other_trip_out');
+  // The second trip loses regardless of request ordering: while first is ready, or after it has gone out.
+  expect(['previous_trip_not_returned', 'other_trip_out']).toContain(responses.find(res => res.status === 409)!.body.error.code);
   const stored = await db.select().from(trips).where(inArray(trips.id, pair.map(trip => trip.tripId)));
   expect(stored.filter(trip => trip.status === 'out')).toHaveLength(1);
-  expect(stored.filter(trip => trip.status === 'ready')).toHaveLength(1);
+  expect(stored.find(trip => trip.tripNo === 1)!.status).toBe('out');
+  expect(stored.find(trip => trip.tripNo === 2)!.status).toBe('ready');
   expect((await db.select().from(auditLog).where(and(eq(auditLog.action, 'trip.started'), inArray(auditLog.entityId, pair.map(trip => trip.tripId)))))).toHaveLength(1);
 });
 

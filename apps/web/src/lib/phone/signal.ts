@@ -34,6 +34,8 @@ export const hasSignal = () => signal;
 
 // A request got an answer, whatever its status: the phone can reach the server.
 export function answered() {
+  // A delayed response cannot override a newer browser offline event.
+  if (!navigator.onLine) { noAnswer(); return; }
   attempt = 0;
   window.clearTimeout(timer);
   set(true);
@@ -91,6 +93,8 @@ export function probeNow() {
 
 // Starts listening to the browser once, when the driver's app first opens.
 export function startSignal() {
+  // Modules may load before this area opens and before its offline listener exists.
+  if (!navigator.onLine) noAnswer();
   if (started) return;
   started = true;
   window.addEventListener('offline', () => noAnswer());

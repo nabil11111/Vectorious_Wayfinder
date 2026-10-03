@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { dayFigures, phoneView, tripFigures, type DriverDay, type DriverTrip } from '@wayfinder/contracts';
-import { recordOf, useKept, type Queued } from './queue';
+import { useSignal } from '@/lib/phone/signal';
+import { recordOf, useKept, useSync, type Queued } from './queue';
 import type { Figures } from './words';
 
 // What the driver's screens show (spec 013, rule 13, D-50): the day the server last sent with the still-waiting writes
@@ -47,12 +48,16 @@ const records = (entries: Queued[]) => new Set(entries.map((entry) => recordOf(e
 
 export function useDriverView(userId: string): DriverView {
   const kept = useKept();
+  const { fetched, signedOut, failure } = useSync();
+  const signal = useSignal();
   return useMemo(() => {
     const ready = kept.ready && kept.userId === userId;
     const own = ready ? kept.queue : [];
     const held = own.filter((entry) => entry.state === 'waiting');
     const refused = own.filter((entry) => entry.state === 'refused');
-    if (!ready || !kept.day) {
+    // Online startup must read the current run before displaying an earlier cached trip. The
+    // offline copy, a failed current read and reauthentication keep the own-account cache usable.
+    if (!ready || !kept.day || (signal && !fetched && !signedOut && failure === null)) {
       return {
         ready, day: null, waiting: held, refused, waitingRecords: records(held), refusedRecords: records(refused),
         trip: null, figures: null, allDone: false, closed: null, wholeDay: null,
@@ -62,5 +67,5 @@ export function useDriverView(userId: string): DriverView {
     const left = new Set(view.writes.map((write) => write.writeId));
     const waiting = held.filter((entry) => left.has(entry.write.writeId));
     return { ready, day: view.day, waiting, refused, waitingRecords: records(waiting), refusedRecords: records(refused), ...tripsOf(view.day) };
-  }, [kept, userId]);
+  }, [kept, userId, signal, fetched, signedOut, failure]);
 }

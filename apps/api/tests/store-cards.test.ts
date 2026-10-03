@@ -16,7 +16,7 @@ import { serve, stop } from './serve';
 import { PIN, signInAs } from './sign-in';
 
 // Spec 015, rule 11: what each of a shop's orders carries for its card, its delivery, receipt, problems and
-// replacement (AC-31 up to the receipt, AC-32), and a replacement read through its parts and left out of the next order.
+// replacement (AC-31 up to the receipt, AC-32), and a replacement read through its parts and counted once in the next order.
 
 const testClock = vi.hoisted(() => ({ at: '' }));
 vi.mock('../src/lib/clock', async (original) => {
@@ -201,7 +201,7 @@ it('AC-32 calls an arrival after the window\'s close late, Wellawatte\'s at 08:0
   expect((await nugegodaShop.list('today')).orders.map((order) => order.delivery?.late)).toEqual([false, false, false]);
 });
 
-it('reads a replacement and each part of a split one as replacing the delivery\'s day, and leaves them all out of the shop\'s next order', async () => {
+it('reads a replacement and each part of a split one as replacing the delivery\'s day, and counts their active quantities once in the shop\'s next order', async () => {
   const trip = await deliveredWalkthrough(walk, { wellawatte: 'refused' });
   const refusal = trip.problems[0]!;
   const chilledLine = driverStop(trip, 2).lines.find((line) => line.temp === 'chilled')!;
@@ -216,7 +216,9 @@ it('reads a replacement and each part of a split one as replacing the delivery\'
   expect(byId(list, own!.id).replacementFor).toBeNull();
   expect(byId(list, WELLAWATTE.chilled).problems).toEqual([{ id: refusal.id, kind: 'refused', units: 2, decision: null, replacementDay: FRI, line: '2 damaged chilled cartons: the depot decides what happens to them' }]);
   const next = async () => StoreNextOrder.parse((await wellawatte.get('/api/v1/store/next-order')).body);
-  expect((await next()).placed?.orders.map((order) => order.id)).toEqual([own!.id]);
+  const whole = (await next()).placed!;
+  expect(whole.orders.map((order) => order.id).sort()).toEqual([replacement!.id, own!.id].sort());
+  expect(whole.lines.reduce((total, line) => total + line.quantity, 0)).toBe(7);
 
   // The plan splits it into 1 and 1 (D-30): the original is split and each part points at it.
   await db.update(orders).set({ status: 'split' }).where(eq(orders.id, replacement!.id));
@@ -225,7 +227,9 @@ it('reads a replacement and each part of a split one as replacing the delivery\'
   list = (await wellawatteShop.list('open')).orders;
   expect(parts.map((part) => byId(list, part.id).replacementFor)).toEqual([THU, THU]);
   expect(list.some((order) => order.id === replacement!.id)).toBe(false);
-  expect((await next()).placed?.orders.map((order) => order.id)).toEqual([own!.id]);
+  const split = (await next()).placed!;
+  expect(split.orders.map((order) => order.id).sort()).toEqual([...parts.map((part) => part.id), own!.id].sort());
+  expect(split.lines.reduce((total, line) => total + line.quantity, 0)).toBe(7);
   expect(byId(list, WELLAWATTE.chilled).problems[0]!.replacementDay).toBe(FRI);
   // A shop's own order split by the plan is no replacement.
   await db.update(orders).set({ replacesIssueId: null }).where(eq(orders.id, replacement!.id));

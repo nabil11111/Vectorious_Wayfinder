@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { clockKey } from '@/lib/clock';
+import { meKey } from '@/features/auth/api';
 import { flagCounts, wholeCount } from './count';
 import { Counter, FlagPage } from './FlagPage';
 import { loadingKey } from './loading';
@@ -66,6 +67,8 @@ const CLOCK: ClockState = { demo: true, now: '2026-06-24T21:05:00.000Z', part: '
 // A loader page at an address, drawn with the day in the query.
 function page(path: string, day: LoadingDay): string {
   const qc = new QueryClient();
+  // Loader routes are mounted only under the signed-in loader's depot.
+  qc.setQueryData(meKey, { id: 'loader-fixture', username: 'loader', staffId: 'L-001', displayName: 'Loader', role: 'loader', depotId: day.depot, outletId: null });
   qc.setQueryData(loadingKey, day);
   qc.setQueryData(clockKey, { ...CLOCK, heldAt: performance.now() });
   const router = createMemoryRouter([
@@ -430,4 +433,16 @@ describe('L-09 a line flagged won\'t fit', () => {
     expect(html).toContain('3 won&#x27;t fit');
     expect(html).not.toContain('3 short');
   });
+});
+
+
+it('B2 explains the return gate and prevents loading and count confirmation on a second trip', () => {
+  for (const status of ['planned', 'loading'] as const) {
+    const truck = { ...veh038([], { tripNo: 2, status }), loadingBlocked: 'Wait for VEH038 trip 1 to return before loading trip 2.' };
+    const html = truckPage(truck);
+    expect(html).toContain(truck.loadingBlocked);
+    expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>(?:Start loading|Stop 3 loaded)/);
+    expect(html).toMatch(/<button[^>]*role="checkbox"[^>]*disabled/);
+    expect(html).not.toContain('/flag?stop=');
+  }
 });

@@ -1,8 +1,9 @@
 import {
   brandOfStop, driverAnswerSentence, driverAnswerShort, FlagReason, LoadingDecision, MAX_NOTIFICATIONS, Notification, PlanCheck, RefusalReason, tripFigures,
-  type Brand, type Issue, type NotificationList,
+  ReceivingState, type Brand, type Issue, type NotificationList,
 } from '@wayfinder/contracts';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { z } from 'zod';
 import type { Tx } from '../db/client';
 import { auditLog, deferrals, depots, orderLines, orders, outlets, plans, stopOrders, stops, trips, users, vehicles } from '../db/schema';
 import { driverTripsOf } from '../driver/day';
@@ -12,6 +13,7 @@ import { loaderDay, sentTrip } from '../loading/loader-day';
 import { snapshot } from '../orders/store-orders';
 import { toClock, toMinutes } from '../planning';
 import { operatingDays, readMoment } from '../plans/board';
+import { assignedOutlets } from '../receiving/read';
 import * as words from './words';
 import type { ByTemp, TruckFacts } from './words';
 
@@ -43,15 +45,15 @@ export async function notificationsOf(tx: Tx, reader: Reader, at: Date): Promise
   if (reader.role === 'admin') return [];
   const today = depotDate(at);
   const dates = await workedDays(tx, at);
-  if (!dates.length) return [];
-  let items: Item[];
-  if (reader.role === 'store_manager') items = await shopUpdates(tx, reader.outletId, dates);
-  else {
+  let items: Item[] = [];
+  if (dates.length && reader.role === 'store_manager') items = await shopUpdates(tx, reader.outletId, dates);
+  else if (dates.length && reader.role !== 'store_manager') {
     const day = await depotDay(tx, reader.depotId, dates);
     if (reader.role === 'dispatcher') items = dispatcherUpdates(day);
     else if (reader.role === 'loader') items = loaderUpdates(day);
     else items = await driverUpdates(tx, day, reader.userId, at);
   }
+  items.push(...await receivingUpdates(tx, reader, today, (await readMoment(tx)).demoDay));
   items.sort((a, b) => b.at.localeCompare(a.at) || a.line.localeCompare(b.line) || a.id.localeCompare(b.id));
   return items.slice(0, MAX_NOTIFICATIONS).map((item) => Notification.parse({ ...item, time: words.timeWords(new Date(item.at), today) }));
 }
@@ -72,7 +74,7 @@ const ms = (at: Date | string) => new Date(at).getTime();
 // ── What a depot's day holds ─────────────────────────────────────────────────────────────────────────────────────
 
 interface Send { kind: 'sent' | 'unsent'; at: Date }
-interface DepotTrip extends TruckFacts { id: string; row: typeof trips.$inferSelect; plan: Plan; readyAt: Date | null; leftAt: Date | null; backAt: Date | null; driverId: string | null }
+interface DepotTrip extends TruckFacts { readyLoaded: number | null; id: string; row: typeof trips.$inferSelect; plan: Plan; readyAt: Date | null; leftAt: Date | null; backAt: Date | null; driverId: string | null }
 interface DepotStop { id: string; tripId: string; seq: number; outletId: string; shopName: string; brand: Brand; window: { open: string; close: string };
   arrivedAt: Date | null; doneAt: Date | null; outcome: 'delivered' | 'refused' | 'closed' | null;
   ordered: ByTemp; loaded: ByTemp; delivered: ByTemp }
@@ -121,6 +123,26 @@ async function stopsOf(tx: Tx, tripIds: string[]): Promise<DepotStop[]> {
   });
 }
 
+// The loader already records every count in the ready audit. Later return decisions can clear loadedQty
+// for replanning, so that mutable order state cannot describe the historical ready event (submission A3).
+const ReadyFacts = z.object({ readyAt: z.string(), lines: z.array(z.object({ lineId: z.string(), loadedQty: z.number().int().nonnegative() })) });
+async function readyLoadsOf(tx: Tx, rows: (typeof trips.$inferSelect)[]): Promise<Map<string, number>> {
+  const ready = rows.filter((trip) => trip.readyAt !== null);
+  if (!ready.length) return new Map();
+  const audits = await tx.select({ tripId: auditLog.entityId, after: auditLog.after }).from(auditLog)
+    .where(and(eq(auditLog.entity, 'trip'), eq(auditLog.action, 'trip.ready'), inArray(auditLog.entityId, ready.map((trip) => trip.id))))
+    .orderBy(desc(auditLog.at), desc(auditLog.id));
+  const loads = new Map<string, number>();
+  for (const row of audits) {
+    if (loads.has(row.tripId)) continue;
+    const facts = ReadyFacts.parse(row.after);
+    const trip = ready.find((trip) => trip.id === row.tripId)!;
+    if (facts.readyAt !== trip.readyAt!.toISOString()) continue;
+    loads.set(row.tripId, facts.lines.reduce((total, line) => total + line.loadedQty, 0));
+  }
+  return loads;
+}
+
 // A depot's plans for the days, and of its sent ones every trip, stop and problem.
 async function depotDay(tx: Tx, depotId: string, dates: string[]): Promise<DepotDay> {
   const list = await tx.select().from(plans).where(and(eq(plans.depotId, depotId), inArray(plans.date, dates)));
@@ -128,7 +150,8 @@ async function depotDay(tx: Tx, depotId: string, dates: string[]): Promise<Depot
   const rows = sent.length ? await tx.select({ trip: trips, vehicle: vehicles, driver: users.displayName }).from(trips)
     .innerJoin(vehicles, eq(vehicles.id, trips.vehicleId)).leftJoin(users, eq(users.id, trips.driverId))
     .where(inArray(trips.planId, sent.map((plan) => plan.id))) : [];
-  const dayTrips = rows.map(({ trip, vehicle, driver }): DepotTrip => ({ id: trip.id, row: trip, plan: sent.find((plan) => plan.id === trip.planId)!, vehicleId: trip.vehicleId,
+  const readyLoads = await readyLoadsOf(tx, rows.map((row) => row.trip));
+  const dayTrips = rows.map(({ trip, vehicle, driver }): DepotTrip => ({ readyLoaded: readyLoads.get(trip.id) ?? null, id: trip.id, row: trip, plan: sent.find((plan) => plan.id === trip.planId)!, vehicleId: trip.vehicleId,
     type: vehicle.type, temp: vehicle.temp, tripNo: trip.tripNo, driver, driverId: trip.driverId, readyAt: trip.readyAt, leftAt: trip.leftAt, backAt: trip.backAt }));
   return {
     plans: list, sends: await sendsOf(tx, list), trips: dayTrips, stops: await stopsOf(tx, dayTrips.map((trip) => trip.id)),
@@ -239,7 +262,7 @@ function dispatcherUpdates(day: DepotDay): Item[] {
     const own = stopsOfTrip(day, trip.id);
     const link = `/dispatcher/live?trip=${trip.id}`;
     if (trip.readyAt) items.push({ ...base, id: `ready:${trip.id}`, kind: 'truck_ready', at: iso(trip.readyAt),
-      line: words.truckReadyLine(trip, own.reduce((n, stop) => n + total(stop.loaded), 0), own.reduce((n, stop) => n + total(stop.ordered), 0)), link, tone: 'good' });
+      line: words.truckReadyLine(trip, trip.readyLoaded ?? own.reduce((n, stop) => n + total(stop.loaded), 0), own.reduce((n, stop) => n + total(stop.ordered), 0)), link, tone: 'good' });
     if (trip.leftAt) items.push({ ...base, id: `left:${trip.id}`, kind: 'truck_left', at: iso(trip.leftAt), line: words.truckLeftLine(trip, own.length), link, tone: 'info' });
     if (trip.backAt) items.push({ ...base, id: `back:${trip.id}`, kind: 'truck_back', at: iso(trip.backAt),
       line: words.truckBackLine(trip, own.filter((stop) => stop.outcome !== null).length, own.length), link, tone: 'good' });
@@ -302,7 +325,7 @@ async function driverUpdates(tx: Tx, day: DepotDay, userId: string, at: Date): P
     if (trip.readyAt) {
       const stopsOn = stopsOfTrip(day, trip.id);
       items.push({ ...base, id: `ready:${trip.id}`, kind: 'truck_ready', at: iso(trip.readyAt), link: '/driver', tone: 'good',
-        line: words.yourTruckReadyLine(trip, stopsOn.reduce((n, stop) => n + total(stop.loaded), 0), stopsOn.reduce((n, stop) => n + total(stop.ordered), 0)) });
+        line: words.yourTruckReadyLine(trip, trip.readyLoaded ?? stopsOn.reduce((n, stop) => n + total(stop.loaded), 0), stopsOn.reduce((n, stop) => n + total(stop.ordered), 0)) });
     }
   }
   // The dispatcher's answers to their problems, in the words their phone uses, from the same figures.
@@ -325,4 +348,23 @@ async function driverUpdates(tx: Tx, day: DepotDay, userId: string, at: Date): P
     }
   }
   return items;
+}
+
+// Receiving follows the calendar day even after the dispatch day moves at 16:00.
+async function receivingUpdates(tx: Tx, reader: Reader, date: string, demoDay: number): Promise<Item[]> {
+  if (reader.role !== 'driver' && reader.role !== 'dispatcher') return [];
+  const assigned = reader.role === 'driver' ? await assignedOutlets(tx, reader.userId, date) : null;
+  const rows = await tx.select({ after: auditLog.after, outletId: outlets.id, name: outlets.name }).from(auditLog)
+    .innerJoin(outlets, eq(outlets.id, auditLog.entityId))
+    .where(and(eq(auditLog.action, 'receiving.updated'), eq(outlets.depotId, reader.depotId)));
+  return rows.flatMap(row => {
+    if ((row.after as { demoDay?: number } | null)?.demoDay !== demoDay) return [];
+    const parsed = ReceivingState.safeParse(row.after);
+    if (!parsed.success || parsed.data.date !== date || parsed.data.updatedAt === null || (assigned && !assigned.includes(row.outletId))) return [];
+    const state = parsed.data;
+    const status = { unconfirmed: 'Not confirmed', ready: 'Ready to receive', unavailable: 'Temporarily unavailable' }[state.status];
+    return [{ ...base, id: `receiving:${demoDay}:${row.outletId}:${date}:${state.revision}`, kind: 'receiving_updated' as const,
+      at: state.updatedAt!, line: `${row.name} · ${status}${state.note ? ` · ${state.note}` : ''}`,
+      link: reader.role === 'driver' ? '/driver' : '/dispatcher/live', tone: state.status === 'ready' ? 'good' as const : state.status === 'unavailable' ? 'warn' as const : 'info' as const }];
+  });
 }

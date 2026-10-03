@@ -10,7 +10,7 @@ import { HistoryPage } from './HistoryPage';
 import { OrderDetail } from './OrderDetail';
 import { OrdersPage } from './OrdersPage';
 import { lookupKey } from './queries';
-import { NOT_A_DATE, NO_SENT_PLANS_YET, PICK_TRIP, TRIP_NOT_ON_PLAN } from './words';
+import { NOT_A_DATE, NO_SENT_PLANS_YET, TRIP_NOT_ON_PLAN } from './words';
 
 // The three pages as they first draw from what the query cache already holds (spec 017, rule 12; AC-29 and AC-34). A
 // read answered for another reset than the clock shows is never drawn, so none of its rows can be chosen; a date in the
@@ -27,6 +27,18 @@ vi.mock('@/lib/clock', async (original) => ({
   useAppClock: () => ({ state: { day: held.clockDay }, at: Date.parse('2026-06-24T22:00:00.000Z'), time: '03:30', waiting: false, failed: false, retry: () => {} }),
 }));
 vi.mock('@/features/live/operations', async (original) => ({ ...await original<typeof import('@/features/live/operations')>(), useOnline: () => true }));
+// A server render has no portal target. Include portal content so reset/depot isolation assertions
+// keep checking the real selected detail, now presented as a dialog.
+vi.mock('@base-ui/react/dialog', async () => {
+  const react = await import('react');
+  const Open = react.createContext(false);
+  return { Dialog: {
+    Root: ({ open, children }: { open: boolean; children: ReactNode }) => <Open.Provider value={open}>{children}</Open.Provider>,
+    Portal: ({ children }: { children: ReactNode }) => react.useContext(Open) ? children : null,
+    Backdrop: () => null,
+    Popup: ({ children, 'aria-label': label }: { children: ReactNode; 'aria-label': string }) => <div role="dialog" aria-label={label}>{children}</div>,
+  } };
+});
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const THU = '2026-06-25';
@@ -193,7 +205,6 @@ it('AC-6 History on both depots finds the trip in the part that holds it, adds t
   expect([atPeliyagoda!.depot, atKandy!.depot]).toEqual(['Peliyagoda', 'Kandy']);
   // Kandy's trip is open in Kandy's part; Peliyagoda's part asks for a trip.
   expect(atKandy!.text).toContain('Close VEH045 · Sunil');
-  expect(atPeliyagoda!.text).toContain(PICK_TRIP);
   expect(atPeliyagoda!.text).not.toContain('Close VEH035');
   expect(textOf(html)).not.toContain(TRIP_NOT_ON_PLAN);
   expect(headerOf(html)).toContain('History · Thu 25 Jun');

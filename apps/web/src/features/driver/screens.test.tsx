@@ -543,3 +543,69 @@ describe('spec 025 AC-3b the trip\'s top line after the dispatcher answers', () 
     expect(textOf(html)).not.toContain('Bring the 39 cartons back');
   });
 });
+
+// D2: an unread queue and refused records cannot be described as sent.
+it('D2 the waiting sheet distinguishes unread, queued, refused and acknowledged records', async () => {
+  const { waitingSheetTitle } = await import('./words');
+  expect(waitingSheetTitle(false, 0, 0)).toBe('Records on this phone have not been read.');
+  expect(waitingSheetTitle(true, 2, 0)).toBe('Waiting to send · 2');
+  expect(waitingSheetTitle(true, 0, 1)).toBe('1 record not accepted');
+  expect(waitingSheetTitle(true, 0, 2)).toBe('2 records not accepted');
+  expect(waitingSheetTitle(true, 0, 0)).toBe('Everything is sent.');
+});
+
+it('B3 explains the app-clock reload time and keeps Start trip disabled until it passes', () => {
+  const trip = { ...veh057trip2('ready'), startAfter: at('04:26'), startBlocked: null };
+  const view = viewOf(dayOf(trip));
+  const html = draw(<TodaysTrip view={view} trip={trip} figures={view.figures!} />);
+  expect(textOf(html)).toContain('Reload until 04:26');
+  expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Start trip/);
+});
+
+it('B3 shows the server loading action for old premature readiness instead of enabling departure', () => {
+  const trip = { ...veh057trip2('ready'), startAfter: null, startBlocked: 'Ask the loader to reload trip 2 after trip 1 returns.' };
+  const view = viewOf(dayOf(trip));
+  const html = draw(<TodaysTrip view={view} trip={trip} figures={view.figures!} />);
+  expect(textOf(html)).toContain(trip.startBlocked);
+  expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Start trip/);
+});
+
+it('B3 keeps first-trip early departure available and allows a confirmed second trip after reload', () => {
+  for (const trip of [veh057trip2('ready', { tripNo: 1 }), { ...veh057trip2('ready'), startAfter: at('03:46'), startBlocked: null }]) {
+    const view = viewOf(dayOf(trip));
+    const html = draw(<TodaysTrip view={view} trip={trip} figures={view.figures!} />);
+    expect(html).toMatch(/<button[^>]*aria-disabled="false"[^>]*>Start trip/);
+  }
+});
+
+
+describe('028 E advisory receiving declarations', () => {
+  const drawReceiving = (status: 'ready' | 'unavailable' | 'unconfirmed', offline = false, failed = false) => {
+    hooks.signal = !offline; hooks.sync = { failure: failed ? 'server' : null };
+    const trip = veh057trip2('out');
+    trip.stops[0]!.receiving = { outletId: trip.stops[0]!.outletId, date: '2026-06-25', status, note: 'Use rear entrance.', updatedAt: at('03:55'), revision: 2 };
+    const day = dayOf(trip);
+    const html = draw(<NextStopPage view={viewOf(day)} day={day} trip={trip} figures={tripFigures(trip)} stop={trip.stops[0]!} />);
+    hooks.signal = true; hooks.sync = {}; return html;
+  };
+  it('shows unavailable as advisory without disabling arrival or calling the shop Closed', () => {
+    const html = drawReceiving('unavailable');
+    expect(html).toContain('Temporarily unavailable'); expect(html).toContain('Use rear entrance.'); expect(html).toContain('Thu 25 Jun');
+    expect(html).not.toContain('Closed'); expect(html).not.toMatch(/disabled=""[^>]*>I/);
+  });
+  it('marks cached receiving declarations Last known offline or after a failed fresh read', () => {
+    for (const html of [drawReceiving('ready', true), drawReceiving('ready', false, true)]) {
+      expect(html).toContain('Last known'); expect(html).toContain('03:55'); expect(html).toContain('Ready to receive');
+    }
+    expect(drawReceiving('unconfirmed')).toContain('Not confirmed');
+  });
+});
+
+  it('marks the signed-out cached driver declaration Last known even when the server is reachable', () => {
+    hooks.signal = true; hooks.sync = { signedOut: true, failure: null };
+    const trip = veh057trip2('out');
+    trip.stops[0]!.receiving = { outletId: trip.stops[0]!.outletId, date: '2026-06-25', status: 'ready', note: null, updatedAt: at('03:55'), revision: 2 };
+    const day = dayOf(trip);
+    const html = draw(<NextStopPage view={viewOf(day)} day={day} trip={trip} figures={tripFigures(trip)} stop={trip.stops[0]!} />);
+    hooks.sync = {}; expect(html).toContain('Last known'); expect(html).toContain('03:55');
+  });

@@ -1,5 +1,6 @@
-import { PlaceOrdersRequest, ReceiptWrite, SaveDraftRequest, StoreDelivery, StoreOrdersQuery } from '@wayfinder/contracts';
+import { SaveReceivingRequest, PlaceOrdersRequest, ReceiptWrite, SaveDraftRequest, StoreDelivery, StoreOrdersQuery } from '@wayfinder/contracts';
 import { Router, type Request, type RequestHandler } from 'express';
+import { getStoreReceiving, saveReceiving } from '../receiving/read';
 import { HttpError } from '../lib/errors';
 import { requireWriteOwner } from '../lib/phone-writes';
 import { requireRole } from '../middleware/auth';
@@ -66,3 +67,6 @@ storeRouter.post('/receipts', requireWriteOwner, async (req, res) => {
   }
   res.json(await confirmDelivery(callerOf(req), parsed.data));
 });
+
+storeRouter.get('/receiving', async (req, res) => { res.json(await getStoreReceiving(callerOf(req))); });
+storeRouter.put('/receiving', requireWriteOwner, async (req, res) => { res.json(await saveReceiving(callerOf(req), SaveReceivingRequest.parse(req.body))); });

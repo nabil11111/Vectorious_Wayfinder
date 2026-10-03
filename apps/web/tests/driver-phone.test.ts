@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { PHONE_ACCOUNT_HEADER, type DriverDay, type DriverWrite } from '@wayfinder/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -184,6 +186,79 @@ afterEach(() => {
 });
 
 describe('the driver\'s phone', () => {
+  it('keeps the dated receiving declaration and timestamp across an offline phone reload', async () => {
+    const day = dayFor(DILSHAN, []);
+    day.trips[0]!.stops[0]!.receiving = { outletId: 'OUT001', date: '2026-06-25', status: 'ready', note: 'Rear entrance.', updatedAt: '2026-06-24T22:00:00Z', revision: 2 };
+    db.days.set(`driver:${DILSHAN.id}`, { queue: 'driver', userId: DILSHAN.id, day }); hooks.signal = false;
+    const phone = await open(DILSHAN); await until(() => phone.store.readKept().ready);
+    expect(phone.store.readKept().day!.trips[0]!.stops[0]!.receiving).toEqual(day.trips[0]!.stops[0]!.receiving);
+  });
+
+  it('D3 waits for a fresh online day before showing a cached trip from an earlier run', async () => {
+    db.days.set(`driver:${DILSHAN.id}`, { queue: 'driver', userId: DILSHAN.id, day: dayFor(DILSHAN, []) });
+    let answer!: (value: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { answer = resolve; })));
+    const phone = await open(DILSHAN);
+    await until(() => phone.store.readKept().ready && typeof answer === 'function');
+    const { useDriverView } = await import('../src/features/driver/view');
+    let shown: DriverDay | null = null;
+    function Screen() { shown = useDriverView(DILSHAN.id).day; return null; }
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toBeNull();
+    hooks.signal = false;
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toMatchObject({ trips: [{ tripId: TRIP }] });
+    hooks.signal = true;
+    answer(new Response(JSON.stringify({ ...dayFor(DILSHAN, []), trips: [] }), { headers: { 'Content-Type': 'application/json' } }));
+    await until(() => phone.sync().fetched);
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toMatchObject({ trips: [] });
+  });
+
+  it.each([503, 429])('retains cached work and queued records through repeated reachable %s startup failures', async status => {
+    db.days.set(`driver:${DILSHAN.id}`, { queue: 'driver', userId: DILSHAN.id, day: dayFor(DILSHAN, []) });
+    const waiting = arrive(); keptBefore(db, DILSHAN, waiting);
+    const failedRead = vi.fn(async () => Response.json({ error: { code: 'unavailable', message: 'Try again soon.' } }, { status }));
+    vi.stubGlobal('fetch', failedRead);
+    const phone = await open(DILSHAN);
+    await until(() => failedRead.mock.calls.length >= 2 && phone.sync().failure !== null);
+    const { useDriverView } = await import('../src/features/driver/view');
+    let shown: DriverDay | null = null;
+    function Screen() { shown = useDriverView(DILSHAN.id).day; return null; }
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toMatchObject({ trips: [{ tripId: TRIP, stops: [{ arrivedAt: waiting.at }] }] });
+    expect(phone.queue()).toEqual([[waiting.writeId, 'waiting']]);
+    const next = closed();
+    await phone.sender.saveAction(next, 'Stop 1 · Fresh Nugegoda');
+    expect(phone.queue()).toEqual([[waiting.writeId, 'waiting'], [next.writeId, 'waiting']]);
+    // A new activation must hide the cache again while its current read is still pending.
+    let answer!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { answer = resolve; })));
+    phone.sender.setAccount(DILSHAN);
+    await until(() => typeof answer === 'function');
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toBeNull();
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [], named: [] };
+    serve(server);
+    answer(Response.json(dayFor(DILSHAN, [])));
+    await until(() => phone.sync().fetched && phone.queue().length === 0);
+    expect(server.posted).toEqual([waiting.writeId, next.writeId]);
+  });
+
+  it('D3 a same-account reactivation cancels the older day read before accepting the new run', async () => {
+    const answers: ((value: Response) => void)[] = [];
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { answers.push(resolve); })));
+    const phone = await open(DILSHAN);
+    await until(() => answers.length === 1);
+    phone.sender.setAccount(DILSHAN);
+    answers[0]!(new Response(JSON.stringify(dayFor(DILSHAN, [])), { headers: { 'Content-Type': 'application/json' } }));
+    await until(() => answers.length === 2);
+    expect(phone.sync().fetched).toBe(false);
+    answers[1]!(new Response(JSON.stringify({ ...dayFor(DILSHAN, []), trips: [] }), { headers: { 'Content-Type': 'application/json' } }));
+    await until(() => phone.sync().fetched);
+    expect(phone.store.readKept().day?.trips).toEqual([]);
+  });
+
   it('sends nothing under another account with the same name, refuses nothing for it, and sends once the session is the driver\'s own', async () => {
     const waiting = arrive();
     keptBefore(db, DILSHAN, waiting);

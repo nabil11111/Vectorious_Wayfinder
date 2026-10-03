@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { NavLink } from 'react-router';
+import { Link, NavLink } from 'react-router';
 import type { Role } from '@wayfinder/contracts';
 import dispatcherIcon from '@/assets/icons/icon-person-dispatcher.png';
 import driverIcon from '@/assets/icons/icon-person-driver.png';
@@ -7,7 +7,7 @@ import loaderIcon from '@/assets/icons/icon-person-loader.png';
 import storeManagerIcon from '@/assets/icons/icon-person-store-manager.png';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
-import { ROLE_LABEL, useLogout, useMe } from '@/features/auth/api';
+import { HOME, ROLE_LABEL, useLogout, useLogoutFailure, useMe } from '@/features/auth/api';
 import { NotificationBell } from '@/features/notifications/Bell';
 import { useAppClock } from '@/lib/clock';
 import { useLive } from '@/lib/live';
@@ -33,6 +33,7 @@ const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatch
 export function AppShell({ nav = [], place, bar, bell, status, wide = false, children }: { nav?: NavItem[]; place?: string; bar?: ReactNode; bell?: ReactNode; status?: ReactNode; wide?: boolean; children: ReactNode }) {
   const { data: me } = useMe();
   const logout = useLogout();
+  const logoutFailure = useLogoutFailure(me?.id);
   // The app's own time, never the device's, and the stream that keeps every open screen current (spec 008).
   const clock = useAppClock();
   useLive();
@@ -48,7 +49,7 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
         <span className="font-mono text-2xl font-bold tabular-nums lg:hidden">{clock.time}</span>
         {status && <span className="lg:hidden">{status}</span>}
         <DemoClock clock={clock} as="sheet" compact={Boolean(status)} className="lg:hidden" />
-        <Wordmark className="hidden lg:inline-flex" />
+        <Link to={HOME[me.role]} aria-label="Wayfinder home" className="hidden rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:inline-flex"><Wordmark /></Link>
         {nav.length > 0 && (
           <nav className="ml-4 hidden gap-1 lg:flex">
             {nav.map((n) => (
@@ -87,7 +88,13 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
         </Popover>
       </header>
 
-      <main className={cn('mx-auto w-full flex-1 p-4 md:p-6', !wide && 'max-w-6xl')}>{children}</main>
+      <main className={cn('mx-auto w-full flex-1 p-4 md:p-6', !wide && 'max-w-6xl')}>
+        {logoutFailure && <div role="alert" className="mb-4 flex items-center gap-3 rounded-[12px] border border-bad/30 bg-bad-tint p-4">
+          <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-bad">Sign-out could not be confirmed.</p><p className="mt-1 text-sm text-bad">{logoutFailure.message}</p></div>
+          <Button variant="outline" disabled={logout.isPending} onClick={() => { logout.signOut(); }}>Try again</Button>
+        </div>}
+        {children}
+      </main>
 
       {nav.length > 0 && (
         <nav className="sticky bottom-0 grid border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" style={{ gridTemplateColumns: `repeat(${nav.length}, 1fr)` }}>

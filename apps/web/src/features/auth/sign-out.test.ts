@@ -1,4 +1,4 @@
-import { MutationObserver, QueryClient } from '@tanstack/react-query';
+import { MutationObserver, onlineManager, QueryClient } from '@tanstack/react-query';
 import type { Me } from '@wayfinder/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { finishBeforeSignOut, logoutMutation, meKey } from './api';
@@ -29,6 +29,8 @@ describe('Q-04 sign-out waits for what must end first', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
   afterEach(() => {
+    onlineManager.setOnline(true);
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -76,6 +78,29 @@ describe('Q-04 sign-out waits for what must end first', () => {
       stop();
       vi.useRealTimers();
     }
+  });
+
+  it('D3 attempts sign-out while offline instead of leaving Signing out paused forever', async () => {
+    const { qc, sent, signOut } = signedIn();
+    onlineManager.setOnline(false);
+    const pending = signOut();
+    await later(20);
+    expect(sent).toEqual(['/api/v1/auth/logout']);
+    onlineManager.setOnline(true);
+    await pending;
+    expect(qc.getQueryData(meKey)).toBeNull();
+  });
+
+  it('D3 bounds an unanswered logout request and retains identity until the server acknowledges', async () => {
+    vi.useFakeTimers();
+    const { qc, signOut } = signedIn();
+    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(new DOMException('Timed out', 'AbortError')), { once: true });
+    })));
+    const result = signOut().catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await result).toBeInstanceOf(Error);
+    expect(qc.getQueryData(meKey)).toEqual(RUWAN);
   });
 
   it('no longer waits for work taken back', async () => {

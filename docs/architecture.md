@@ -56,3 +56,19 @@ an announcement is only as stale as its next fetch, and each screen also refetch
 Spec, branch, pull request, a review by someone who did not write it, CI passes (typecheck, fresh migrate and
 seed, schema matches migrations, tests, build), merge. `main` is always deployable. The full loop is in
 `docs/specs/README.md`.
+
+## Read-only planning comparisons
+
+The vehicle-unavailable preview reuses the same planner and checker for two copies of one authorized snapshot.
+Only one vehicle's availability changes. It does not open or save a plan, persist generated split orders or write
+fuel usage. The response identifies the input snapshot, reconciles split parts into original outstanding orders,
+and keeps generated-plan results distinct from the saved draft. The web app discards results when their board,
+account, depot, day or selection changes.
+
+## Receiving declarations
+
+A store manager's direct, account-bound readiness write checks the application-calendar date, demo generation and
+revision under the outlet lock. It never joins the offline outbox. The declaration and its audit record commit
+together; later live invalidation targets the relevant recipients. Notifications filter the audit's demo generation
+so a reset cannot revive an old declaration. Driver reads attach the declaration for the actual trip's plan date,
+while shop and dispatcher cards read the current calendar day independently of the ordering cutoff.

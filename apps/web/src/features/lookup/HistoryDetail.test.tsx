@@ -79,6 +79,14 @@ const trip = HistoryTrip.parse({
 const viewer: PhotoViewer = { view: CLOSED, open: () => {}, close: () => {}, retry: () => {}, broken: () => {} };
 const textOf = (node: React.ReactNode) => renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
+it('shows the quantity journey and distinguishes planned departure from actual departure without invented times', () => {
+  const text = textOf(<HistoryDetail trip={trip} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />);
+  expect(text).toContain('Quantity journey');
+  expect(text).toContain('Trip timeline Journey Planned Actual Leave depot Departed 04:36 04:40');
+  const unstarted = { ...trip, leftAt: null, backAt: null, stops: [] };
+  expect(textOf(<HistoryDetail trip={unstarted} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />)).toContain('Leave depot Not recorded yet 04:36 —');
+});
+
 it('History shows each stop\'s own shop confirmation and says one that is not there, never a signature or an empty receipt', () => {
   const text = textOf(<HistoryDetail trip={trip} brand="all" viewer={viewer} anchor="history-detail" onClose={() => {}} />);
   // The confirmed stop: the shop and its time, its orders and received cartons, the shortage on the receipt apart from

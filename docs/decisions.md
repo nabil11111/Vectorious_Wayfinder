@@ -460,3 +460,22 @@ and reaches the screens the same way. Contents follow the seeded day's rules for
 more or less and a few leaving a note, from a seed made of the delivery day, so a rehearsal gives the same orders.
 Times are spaced back from the press, never ahead of the clock. A presenter fills the day without signing in as each
 shop (Nabil, 2 Oct, spec 028).
+
+
+**D-104 · 4 Oct · A sent trip needs its driver, and a second trip reloads after return.** Drafts can still have an
+unassigned vehicle, but publication requires a driver for every trip; this supersedes D-31/D-97 at Send only. A
+second trip cannot be physically counted or marked ready before the earlier trip returns. Its departure requires
+its own current ready state and the configured reload interval after actual return, measured on the app clock.
+First-trip early departure remains available in the demo. Premature queued departures are refused rather than
+given invented later timestamps (submission hardening spec 028).
+
+
+**D-105 · 4 Oct · Receiving readiness is a dated advisory declaration.** A manager may state readiness and a short
+note for the current calendar day, distinct from customer opening hours. Assigned drivers and dispatchers see its
+update time; cached views say Last known. The declaration does not block delivery actions, survives the order cutoff
+for the same day, and cannot carry across a date or demo reset (submission hardening spec 028).
+
+**D-106 · 4 Oct · What-if comparisons use the existing planner without saving.** A dispatcher can exclude one
+working vehicle and compare two generated plans built from the same authorized demand snapshot. Results reconcile
+split parts into original outstanding orders and show actual checks and reasons. The generated baseline may differ
+from the saved draft. There is no Apply action, new optimizer or claim of optimality (submission hardening spec 028).

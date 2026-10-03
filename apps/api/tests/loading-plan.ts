@@ -60,7 +60,10 @@ export async function sendThursdaysPlan(walk: Walkthrough, { withVeh004 = false 
   const [dilshan] = await db.select({ id: users.id }).from(users).where(eq(users.username, 'dilshan'));
   const stopAt = (outletId: string) => ({ outletId, orderIds: board.orders.filter((o) => o.outletId === outletId).map((o) => o.id) });
   const planned: DraftTrip[] = [{ vehicleId: 'VEH035', tripNo: 1, leaveAt: null, driverId: dilshan!.id, stops: [stopAt('OUT001'), stopAt('OUT002')] }];
-  if (withVeh004) planned.push({ vehicleId: 'VEH004', tripNo: 1, leaveAt: null, driverId: null, stops: [stopAt('OUT026'), stopAt('OUT028')] });
+  if (withVeh004) {
+    const [anura] = await db.select({ id: users.id }).from(users).where(eq(users.username, 'anura'));
+    planned.push({ vehicleId: 'VEH004', tripNo: 1, leaveAt: null, driverId: anura!.id, stops: [stopAt('OUT026'), stopAt('OUT028')] });
+  }
   const on = new Set(planned.flatMap((t) => t.stops.flatMap((s) => s.orderIds)));
   const draft: DraftPlan = { mixBrands: false, trips: planned,
     deferrals: board.orders.filter((o) => !on.has(o.id)).map((o) => ({ orderId: o.id, code: 'dispatcher_choice', reason: 'Scheduled for a later run.' })) };

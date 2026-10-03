@@ -75,7 +75,7 @@ it("AC-3 holds the walkthrough's truck with its last stop first and nothing on y
   const { stops, ...truck } = day.trucks[0]!;
   expect(truck).toEqual({
     tripId: trip!.id, revision: 0, vehicleId: 'VEH035', vehicleType: 'van', vehicleTemp: 'reefer', tripNo: 1, brand: 'Fresh', district: 'Colombo',
-    status: 'planned', leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString(), readyAt: null, driver: 'Dilshan', weightCapKg: 1040, volumeCapM3: 7,
+    status: 'planned', loadingBlocked: null, reloadRequired: false, leavesAt: depotInstant(THU, 4 * 60 + 36).toISOString(), readyAt: null, driver: 'Dilshan', weightCapKg: 1040, volumeCapM3: 7,
     units: 118, on: { units: 0, kg: 0, m3: 0 }, short: 0, wontFit: 0, issues: [], outOn: null,
   });
   expect(stops.map(({ lines: _lines, id: _id, ...stop }) => stop)).toEqual([
@@ -103,7 +103,7 @@ it("AC-4 lists VEH004 first, leaving 03:30, and loads its Kandana stop before Ga
     ['VEH004', 1, depotInstant(THU, 3 * 60 + 30).toISOString(), 210],
     ['VEH035', 1, depotInstant(THU, 4 * 60 + 36).toISOString(), 118],
   ]);
-  expect(day.trucks[0]).toMatchObject({ vehicleType: 'truck', vehicleTemp: 'reefer', brand: 'Fresh', district: 'Gampaha', driver: null, weightCapKg: 6840, volumeCapM3: 33.4 });
+  expect(day.trucks[0]).toMatchObject({ vehicleType: 'truck', vehicleTemp: 'reefer', brand: 'Fresh', district: 'Gampaha', driver: 'Anura', weightCapKg: 6840, volumeCapM3: 33.4 });
   expect(day.trucks[0]!.stops.map((s) => [s.seq, s.shopName, s.units])).toEqual([[2, 'Fresh Kandana', 99], [1, 'Fresh Gampaha', 111]]);
 });
 

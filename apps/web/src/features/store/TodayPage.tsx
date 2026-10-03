@@ -1,4 +1,5 @@
 import type { StoreNextOrder } from '@wayfinder/contracts';
+import { ReceivingCard } from '@/features/receiving/ReceivingCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useNextOrder } from './next-order';
@@ -23,7 +24,7 @@ export function TodayPage() {
   const retry = () => { void next.refetch(); void today.refetch(); };
 
   if (!next.data && !today.data && next.isError && today.isError) {
-    return <LoadError what="today" error={today.error} busy={busy} onRetry={retry} />;
+    return <><ReceivingCard /><LoadError what="today" error={today.error} busy={busy} onRetry={retry} /></>;
   }
 
   const outlet = today.data?.outlet ?? next.data?.outlet;
@@ -44,6 +45,7 @@ export function TodayPage() {
           : <Skeleton className="ml-2 inline-block h-3.5 w-24 align-middle lg:ml-0 lg:h-4 lg:w-32" />}
       </header>
 
+      <ReceivingCard />
       <div className="mt-2.5 grid grid-cols-1 gap-y-3 lg:mt-6 lg:grid-cols-[minmax(0,728fr)_minmax(0,440fr)] lg:gap-x-8">
         <section>
           {/* Deliveries still to confirm when the shop had more than one (Q-35), above what is coming today. */}

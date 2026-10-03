@@ -5,7 +5,7 @@ import { depotInstant, realNow } from '../lib/clock';
 import { config } from '../lib/config';
 import { db, type Db, type Tx } from './client';
 import type { PRODUCTS } from './fixtures';
-import { calendarDays, deferrals, demoDay, fuelLog, orderLines, orders, outlets, plans, users, vehicleDaysOff, vehicles } from './schema';
+import { calendarDays, deferrals, demoDay, fuelLog, orderLines, orders, outletReceiving, outlets, plans, users, vehicleDaysOff, vehicles } from './schema';
 
 // The seeded delivery day (spec 008): Thu 25 Jun 2026 from Peliyagoda, written once in demo mode, and since spec 020
 // Kandy's orders for that Thursday too. Each later piece adds its own block of records to seedDemoDay, so a reset
@@ -378,6 +378,6 @@ export async function addKandysDay(on: Db | Tx = db): Promise<boolean> {
 export async function clearDemoDay(tx: Tx): Promise<void> {
   // The cascade empties every table that points at an order or a plan as well, including the ones later
   // pieces add, so none can be forgotten here.
-  await tx.execute(sql`truncate table ${orders}, ${plans}, ${fuelLog}, ${vehicleDaysOff} cascade`);
+  await tx.execute(sql`truncate table ${orders}, ${plans}, ${fuelLog}, ${vehicleDaysOff}, ${outletReceiving} cascade`);
   await tx.update(demoDay).set({ seededAt: null });
 }

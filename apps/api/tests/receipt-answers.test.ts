@@ -155,12 +155,13 @@ it('AC-22 answers the report "Send 1 replacement": a placed chilled order for OU
   expect(audit).toEqual([expect.objectContaining({ actorId: ruwanId, before: { status: 'open', revision: 0 },
     after: expect.objectContaining({ status: 'decided', decision: 'send_replacements', revision: 1, replacements: [made[0]!.id] }) })]);
   expect(told()).toEqual([{ topic: 'issues', depotId: 'Peliyagoda' }, { topic: 'orders', outletId: 'OUT001', depotId: 'Peliyagoda' }]);
-  // Nadeesha's open list holds it, replacing Thursday's delivery, and her next order, for Friday, never counts it.
+  // Nadeesha's open list holds it, replacing Thursday's delivery, and her next order, for Friday, counts it once.
   const replacement = (await shop.list('open')).orders.find((order) => order.id === made[0]!.id);
   expect(replacement).toMatchObject({ deliveryDate: FRI, temp: 'chilled', status: 'placed', units: 1, replacementFor: THU, placedAt: at(ANSWERED).toISOString() });
   const next = await nextOrder();
   expect(next.deliveryDate).toBe(FRI);
-  expect(next.placed).toBeNull();
+  expect(next.placed?.orders).toEqual([replacement]);
+  expect(next.placed?.lines.reduce((total, line) => total + line.quantity, 0)).toBe(1);
 });
 
 it('AC-23 answers the report "No replacement": decided, no order placed, and issues and orders announced', async () => {

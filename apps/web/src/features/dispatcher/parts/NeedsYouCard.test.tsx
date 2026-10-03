@@ -34,6 +34,14 @@ function needsYouHtml(issues: IssueList, trips: OperationsTrip[] = []) {
 }
 
 describe('Q-24 the trucks past their leaving time on the dashboard', () => {
+  it('bounds watching separately from actionable problems and exposes the remaining trips', () => {
+    const trips = Array.from({ length: 9 }, (_, i) => watched(i + 1, `VEH00${i + 1}`, 'Galle', 'Driver', { kind: 'not_loaded', plannedAt: LEAVES, sentence: 'Not loaded · planned 03:30', word: 'still at the dock' }));
+    const html = needsYouHtml(listOf([]), trips);
+    expect(rowsOf(html)).toHaveLength(3);
+    expect(html).toContain('Needs you · 0');
+    expect(html).toContain('Watching · 9');
+    expect(html).toContain('Show all 9 watching trips');
+  });
   it('says which are still at the dock, not loaded or still loading, apart from a ready truck not reported out', () => {
     const rows = needsYou(listOf([]), [
       watched(1, 'VEH006', 'Galle', 'Sanjeewa', { kind: 'not_loaded', plannedAt: LEAVES, sentence: 'Not loaded · planned 03:30', word: 'still at the dock' }),
@@ -79,6 +87,13 @@ const cardTitle = (problem: Issue) =>
   renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><MemoryRouter><IssueCard issue={problem} depot="Kandy" answering={ANSWERING} time /></MemoryRouter></QueryClientProvider>).match(/<article aria-label="([^"]*)"/)?.[1]?.replaceAll('&#x27;', '\'');
 
 describe('Q-39 the dashboard names each problem as Live day\'s card does', () => {
+  it('bounds the initial problems and keeps every problem reachable through Show all or Live day', () => {
+    const html = needsYouHtml(listOf(PROBLEMS.map(([, problem]) => problem)));
+    expect(rowsOf(html)).toHaveLength(3);
+    expect(html).toContain('Needs you · 7');
+    expect(html).toContain('Show all 7 problems');
+    expect(html).toContain('View all in Live day');
+  });
   it.each(PROBLEMS)('titles "%s" by what it is, in the card\'s own words', (title, problem) => {
     const [row] = needsYou(listOf([problem]));
     expect(row).toMatch(new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ${problem.raisedBy} · `));

@@ -59,16 +59,22 @@ it('AC-25 refuses blocked and already-departed plans without writing', async () 
 // Q-47: View plan's rows read "Charith · reefer truck" while the kept warning beside them said "VEH041's Fresh trips take
 // 277 minutes". The check a plan is sent with, and View plan reads back, names a truck by its driver as the rows do, and
 // by its kind and number only when it has none.
-it('Q-47 the check a plan is sent with names each truck by its driver, and by kind and number only with none', async () => {
+it('Q-47 names driverless draft trucks by kind and number, then requires a driver before Send', async () => {
   const early = { ...trip(['OUT026', 'OUT028', 'OUT030']), leaveAt: 120 }, driverless = { ...trip(['OUT006'], 'VEH002'), driverId: null, leaveAt: 120 };
-  const sent = PlanBoard.parse((await send(await save(ready([early, driverless])))).body);
+  const saved = await save(ready([early, driverless]));
+  expect(code(await send(saved))).toEqual([409, 'driver_required']);
   const reread = PlanBoard.parse((await as.get(URL)).body);
-  expect(reread.check).toEqual(sent.check);
+  expect(reread.check).toEqual(saved.check);
   const said = (vehicleId: string) => reread.check!.problems.filter((p) => p.vehicleId === vehicleId).map((p) => p.message);
   expect(said('VEH004')).toContain('Dilshan\'s reefer truck leaves at 02:00, and a trip with a Fresh shop normally leaves at 03:30 or later.');
   expect(said('VEH004').some((message) => message.includes('VEH004'))).toBe(false);
   expect(said('VEH002').length).toBeGreaterThan(0);
   expect(said('VEH002').every((message) => message.includes('the reefer truck VEH002') || message.includes('The reefer truck VEH002'))).toBe(true);
+  const [anura] = await db.select().from(users).where(eq(users.username, 'anura'));
+  const assigned = await save(ready([early, { ...driverless, driverId: anura!.id }]), saved);
+  const sent = PlanBoard.parse((await send(assigned)).body);
+  expect(PlanBoard.parse((await as.get(URL)).body).check).toEqual(sent.check);
+  expect(sent.check!.problems.filter(problem => problem.vehicleId === 'VEH002').every(problem => problem.message.includes('Anura'))).toBe(true);
 });
 
 it('AC-26 sends atomically, saves the check and times, revises orders and announces after commit', async () => {
@@ -92,7 +98,7 @@ it('AC-26 sends atomically, saves the check and times, revises orders and announ
 });
 
 it('AC-27 assigns exact vehicle litres across both trips', async () => {
-  const dryTrips = [trip(['OUT027', 'OUT034'], 'VEH010'), trip(['OUT025', 'OUT029'], 'VEH010', 2)].map((t) => ({ ...t, driverId: null, stops: t.stops.map((s) => ({ ...s, orderIds: s.orderIds.filter((id) => board.orders.find((o) => o.id === id)!.temp === 'dry') })) }));
+  const dryTrips = [trip(['OUT027', 'OUT034'], 'VEH010'), trip(['OUT025', 'OUT029'], 'VEH010', 2)].map((t) => ({ ...t, stops: t.stops.map((s) => ({ ...s, orderIds: s.orderIds.filter((id) => board.orders.find((o) => o.id === id)!.temp === 'dry') })) }));
   const b = await save(ready(dryTrips));
   expect(b.check!.ok).toBe(true); expect((await send(b)).status).toBe(200);
   const fuel = await db.select({ litres: fuelLog.litres, tripNo: trips.tripNo }).from(fuelLog).innerJoin(trips, eq(trips.id, fuelLog.tripId)).where(eq(trips.planId, b.plan.id!)).orderBy(trips.tripNo);

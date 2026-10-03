@@ -191,6 +191,13 @@ export const answerShortLine = (problem: DriverProblem, stop: DriverStop, brand:
 
 // ── The signal and the waiting writes ───────────────────────────────────────────────────────────────────────
 
+// A queue is sent only after its records were read and none wait or were refused.
+export function waitingSheetTitle(read: boolean, waiting: number, refused: number): string {
+  if (!read) return 'Records on this phone have not been read.';
+  if (waiting > 0) return `Waiting to send · ${whole(waiting)}`;
+  if (refused > 0) return `${whole(refused)} ${refused === 1 ? 'record' : 'records'} not accepted`;
+  return 'Everything is sent.';
+}
 export const waitingLine = (n: number) => `${whole(n)} waiting to send`;
 export const noSignalLine = (n: number) => `No signal · ${n > 0 ? waitingLine(n) : 'everything is sent'}`;
 
