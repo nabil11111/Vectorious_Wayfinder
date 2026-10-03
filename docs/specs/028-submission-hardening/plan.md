@@ -38,3 +38,29 @@ After A–D commits are joined, receiving builder owns API route/helper, live no
 card and driver/dispatcher presentation with narrow existing integration edits. It may extend driver and notification
 contracts for this feature. No other schema changes without lead. This ownership is granted after integration to
 avoid overlapping the initial evidence/interface/operations branches.
+
+## What-if comparison foundation and feasibility
+
+Contracts are in packages/contracts/src/scenario.ts. POST /plans/:date/scenario accepts PlanScenarioRequest;
+it is a read-only calculation despite using POST for its structured input. Never call openPlan, replaceDraft,
+makeParts, joinParts or suggestPlan: those write. Use snapshot/readBoard/plannerInputOf with explicit current
+day/cutoff/plan ref/locked-state validation and a maximum of 300 input orders, matching existing planner limits.
+
+Run the same structured input twice, once unchanged and once with exactly the selected available vehicle
+marked unavailable. Return PlanScenario with generated baseline clearly labelled (not the manual saved draft).
+Each outcome uses real checker results, per-original-order outstanding demand and real planner reasons.
+Map generated split IDs through result.splits/result.choices; aggregate persisted parts by splitFrom so totals
+do not double-count an original. A partially served order has some outstanding goods planned and some deferred.
+Fuel is the sum of planned trip fuel (not the entire weekly already-used quota). Count repeated deferrals only
+where an outstanding original had already waited and still has goods deferred. If either run is unavailable,
+return an actionable calculation failure and keep the saved plan unchanged.
+
+snapshotKey hashes relevant input content, not merely plan revision. Client discards results on depot/day/reset,
+board revision/content changes or new input selection, and ignores late responses from old identities. Excluded
+vehicle must exist in the chosen depot and be available in the baseline. No Apply button and no external dependency.
+
+Local feasibility on 2026-10-04 (Node 22.22.2, macOS arm64): pure planner benchmark median 133 ms for 102 seeded
+orders and 382 ms for 300 synthetic orders, 10 measured runs after warmup. This is local engine timing, not
+production API latency. A real fixture probe excluding VEH035 produced checked plans: baseline 27 trips / 6
+deferrals versus 26 trips / 9 deferrals. Original input remained unchanged. Feasibility passes; integration,
+source-part reconciliation, stale state and read-only database behavior still need tests.
