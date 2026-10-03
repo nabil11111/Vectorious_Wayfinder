@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { ENDS_HISTORY, joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
 import { keyOf, placesOf, tripOf, type CrewRef, type TripKey } from './draft';
 import { BoardHeader, type Tab } from './parts/BoardHeader';
+import { ScenarioPanel } from './scenario/ScenarioPanel';
 import { BuildPanel } from './parts/BuildPanel';
 import { crewChange, type Pick } from './parts/crews';
 import { DoneList } from './parts/DoneList';
@@ -283,6 +284,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         onStartOver={startOver}
         refreshing={refreshing}
       />
+      <ScenarioPanel screen={screen} stale={stale} refreshing={refreshing} />
       <PlanDnd screen={screen} index={index} change={change} undo={undo} onStartTrip={setDropped}>
       <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[300px_minmax(0,1fr)_270px] xl:grid-cols-[360px_minmax(0,1fr)_330px]">
         <div className={cn('min-h-0 flex-col gap-4', tab === 'unplanned' ? 'flex' : 'hidden lg:flex')}>

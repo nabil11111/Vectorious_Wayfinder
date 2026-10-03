@@ -10,7 +10,7 @@ export type PlanScenarioRequest = z.infer<typeof PlanScenarioRequest>;
 const Count = z.number().int().min(0);
 export const ScenarioSummary = z.object({
   totalOrders: Count, fullyPlanned: Count, partiallyPlanned: Count, deferred: Count,
-  shopsFullyPlanned: Count, vehicles: Count, trips: Count, fuelLitres: z.number().min(0), repeatedDeferrals: Count,
+  shopsFullyPlanned: Count, shopsWithWaiting: Count, vehicles: Count, trips: Count, fuelLitres: z.number().min(0), repeatedDeferrals: Count,
 });
 export type ScenarioSummary = z.infer<typeof ScenarioSummary>;
 export const ScenarioOrder = z.object({
