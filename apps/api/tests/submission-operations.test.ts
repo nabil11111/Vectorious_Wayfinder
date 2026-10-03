@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { DriverDay, LoadingDay, PlanBoard, type DraftPlan, type DraftTrip, type LoadingTruck } from '@wayfinder/contracts';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
-import { auditLog, demoDay, fuelLog, orderLines, outlets, stops, trips, users, vehicles } from '../src/db/schema';
+import { auditLog, demoDay, fuelLog, orderLines, outlets, stopOrders, stops, trips, users, vehicles } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { applyWrite } from '../src/driver/writes';
@@ -197,6 +197,8 @@ it('B3 rejects old premature readiness and lets the loader physically reload it 
   await db.update(trips).set({ status: 'ready', readyAt: depotInstant(THU, 151) }).where(eq(trips.id, second.tripId));
   await db.update(stops).set({ loadedAt: depotInstant(THU, 151) }).where(eq(stops.tripId, second.tripId));
   await returnFirst(); freeze(241);
+  const firstOrders = (await db.select({ id: stopOrders.orderId }).from(stops).innerJoin(stopOrders, eq(stopOrders.stopId, stops.id)).where(eq(stops.tripId, own(day, 1).tripId))).map(row => row.id);
+  const returnedGoods = await db.select().from(orderLines).where(inArray(orderLines.orderId, firstOrders));
   const before = await heldDriverRows();
   expect(code(await departure())).toEqual([409, 'reload_required']);
   expect(await heldDriverRows()).toEqual(before);
@@ -205,7 +207,44 @@ it('B3 rejects old premature readiness and lets the loader physically reload it 
   expect(shown.on.units).toBe(0);
   expect(shown.stops.every(stop => !stop.loaded)).toBe(true);
   await load(2);
+  expect(await db.select().from(orderLines).where(inArray(orderLines.orderId, firstOrders))).toEqual(returnedGoods);
   expect((await departure()).status).toBe(200);
+});
+
+it('B3 rejects premature readiness at the same app instant as return, while preserving the recorded event time', async () => {
+  await published(); await load(1);
+  const second = own(await loader.read(), 2);
+  await db.update(trips).set({ status: 'ready', readyAt: depotInstant(THU, 150) }).where(eq(trips.id, second.tripId));
+  await db.update(stops).set({ loadedAt: depotInstant(THU, 150) }).where(eq(stops.tripId, second.tripId));
+  await returnFirst(150); freeze(180);
+  const before = await heldDriverRows();
+  expect(code(await departure())).toEqual([409, 'reload_required']);
+  expect(await heldDriverRows()).toEqual(before);
+  await load(2);
+  expect((await departure()).status).toBe(200);
+});
+
+it('B2 requires recounting old staged stops when loading and return share an app instant', async () => {
+  await published(); await load(1);
+  const second = own(await loader.read(), 2);
+  await db.update(trips).set({ status: 'loading' }).where(eq(trips.id, second.tripId));
+  await db.update(stops).set({ loadedAt: depotInstant(THU, 150) }).where(eq(stops.tripId, second.tripId));
+  await returnFirst(150);
+  const shown = own(await loader.read(), 2);
+  expect(shown.stops[0]!.loaded).toBe(false);
+  expect(code(await loader.ready(shown))).toEqual([409, 'stops_left']);
+  expect((await loader.stopLoaded(shown, 1)).status).toBe(200);
+  expect((await loader.ready(own(await loader.read(), 2))).status).toBe(200);
+});
+
+it('B3 fails closed if an old second trip no longer has its vehicle\'s preceding trip', async () => {
+  await published();
+  const day = await loader.read(), second = own(day, 2);
+  await db.update(trips).set({ vehicleId: 'VEH010', status: 'done', backAt: depotInstant(THU, 150) }).where(eq(trips.id, own(day, 1).tripId));
+  await db.update(trips).set({ status: 'ready', readyAt: depotInstant(THU, 151) }).where(eq(trips.id, second.tripId));
+  freeze(180);
+  expect(code(await departure())).toEqual([409, 'previous_trip_not_returned']);
+  expect(code(await loader.start(own(await loader.read(), 2), day.plan!))).toEqual([409, 'previous_trip_not_returned']);
 });
 
 it('B3 serializes simultaneous second departure requests without counting twice', async () => {
