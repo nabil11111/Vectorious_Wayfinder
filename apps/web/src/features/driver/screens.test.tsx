@@ -577,3 +577,26 @@ it('B3 keeps first-trip early departure available and allows a confirmed second 
     expect(html).toMatch(/<button[^>]*aria-disabled="false"[^>]*>Start trip/);
   }
 });
+
+
+describe('028 E advisory receiving declarations', () => {
+  const drawReceiving = (status: 'ready' | 'unavailable' | 'unconfirmed', offline = false, failed = false) => {
+    hooks.signal = !offline; hooks.sync = { failure: failed ? 'server' : null };
+    const trip = veh057trip2('out');
+    trip.stops[0]!.receiving = { outletId: trip.stops[0]!.outletId, date: '2026-06-25', status, note: 'Use rear entrance.', updatedAt: at('03:55'), revision: 2 };
+    const day = dayOf(trip);
+    const html = draw(<NextStopPage view={viewOf(day)} day={day} trip={trip} figures={tripFigures(trip)} stop={trip.stops[0]!} />);
+    hooks.signal = true; hooks.sync = {}; return html;
+  };
+  it('shows unavailable as advisory without disabling arrival or calling the shop Closed', () => {
+    const html = drawReceiving('unavailable');
+    expect(html).toContain('Temporarily unavailable'); expect(html).toContain('Use rear entrance.'); expect(html).toContain('Thu 25 Jun');
+    expect(html).not.toContain('Closed'); expect(html).not.toMatch(/disabled=""[^>]*>I/);
+  });
+  it('marks cached receiving declarations Last known offline or after a failed fresh read', () => {
+    for (const html of [drawReceiving('ready', true), drawReceiving('ready', false, true)]) {
+      expect(html).toContain('Last known'); expect(html).toContain('03:55'); expect(html).toContain('Ready to receive');
+    }
+    expect(drawReceiving('unconfirmed')).toContain('Not confirmed');
+  });
+});
