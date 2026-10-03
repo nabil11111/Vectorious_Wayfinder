@@ -20,7 +20,7 @@ export const NOTIFICATION_KINDS = [
   'plan_out', 'plan_changed', 'plan_taken_back', 'flag_answered',
   // A driver's: their trip sent, their trip on a plan sent again, their truck ready (truck_ready), and the dispatcher's
   // answer to their problem.
-  'trip_sent', 'trip_changed', 'problem_answered',
+  'trip_sent', 'trip_changed', 'problem_answered', 'receiving_updated',
 ] as const;
 export const NotificationKind = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKind>;

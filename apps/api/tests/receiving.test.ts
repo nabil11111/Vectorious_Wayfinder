@@ -7,7 +7,8 @@ import { db, pool } from '../src/db/client';
 import { auditLog, demoDay } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
-import { resetDay, sendWalkthroughPlan, signIn, THU, WED } from './loading-plan';
+import { resetDay, signIn, THU, WED } from './loading-plan';
+import { readyWalkthrough, driverScreen, driverTrip, driverWrite, answeredTrip } from './driver-plan';
 import { serve, stop } from './serve';
 
 const clock = vi.hoisted(() => ({ at: '' }));
@@ -27,7 +28,7 @@ beforeAll(async () => {
   original = (await db.select().from(demoDay))[0]!;
   for (const [a, name] of [[shop, 'nadeesha'], [otherShop, 'chamari'], [dispatch, 'ruwan'], [driver, 'dilshan'], [otherDriver, 'anura'], [loader, 'kasun']] as const) await signIn(a, name);
 });
-beforeEach(async () => { await resetDay(); await initClock(); freeze(WED, 900); vi.mocked(announce).mockClear(); });
+beforeEach(async () => { await resetDay(); await db.delete(auditLog).where(eq(auditLog.action, 'receiving.updated')); await initClock(); freeze(WED, 900); vi.mocked(announce).mockClear(); });
 afterAll(async () => { await resetDay(); await db.update(demoDay).set(original); setClockForTests(null); await stop(server); await pool.end(); });
 const read = async () => { const res = await shop.get('/api/v1/store/receiving'); expect(res.status).toBe(200); return StoreReceiving.parse(res.body); };
 const write = (held: StoreReceiving, status = 'ready', note = '') => shop.put('/api/v1/store/receiving').send({ date: held.date, demoDay: held.demoDay, revision: held.state!.revision, status, note });
@@ -76,7 +77,10 @@ it('enforces role, outlet, captured account and dispatcher depot scope', async (
   expect(list.states.some(s => s.outletId === 'OUT076')).toBe(false);
 });
 it('enriches only assigned stops and notifies assigned drivers and dispatchers after 16:00 with stable IDs', async () => {
-  await sendWalkthroughPlan({ nadeesha: shop, ruwan: dispatch, freeze });
+  await readyWalkthrough({ nadeesha: shop, ruwan: dispatch, kasun: loader, freeze });
+  const screen = driverScreen(driver);
+  let trip = driverTrip(await screen.read());
+  trip = answeredTrip(await screen.send(driverWrite(trip, 'start', clock.at)));
   const held = await read(); freeze(THU, 1020);
   expect((await write(held, 'unavailable', 'Receiving team returns at 18:00.')).status).toBe(200);
   const notices = async (a: typeof driver) => NotificationList.parse((await a.get('/api/v1/notifications')).body).items.filter(n => n.kind === 'receiving_updated');
@@ -84,11 +88,18 @@ it('enriches only assigned stops and notifies assigned drivers and dispatchers a
   expect(await notices(dispatch)).toHaveLength(1); expect(await notices(driver)).toEqual(own);
   expect(own[0]).toMatchObject({ at: clock.at, tone: 'warn', link: '/driver' }); expect(own[0]!.line).toContain('Temporarily unavailable');
   // The driver day switches at 16:00; an earlier trip still out keeps its own dated declaration.
-  freeze(THU, 150);
   const day = DriverDay.parse((await driver.get('/api/v1/driver')).body);
   expect(day.trips[0]!.stops[0]).toMatchObject({ receiving: { date: THU, status: 'unavailable', note: 'Receiving team returns at 18:00.' } });
-  const event = vi.mocked(announce).mock.calls.findLast(([change]) => change.topic === 'receiving')![0];
+  const event = vi.mocked(announce).mock.calls.slice().reverse().find(([change]) => change.topic === 'receiving')![0];
   expect(event.recipientIds).toContain(day.driverId);
-  const outsider = (await otherDriver.get('/api/v1/me')).body;
-  expect(event.recipientIds).not.toContain(outsider.id);
+  const outsider = (await otherDriver.get('/api/v1/auth/me')).body;
+  expect(outsider.id).toBeTruthy(); expect(event.recipientIds).not.toContain(outsider.id);
+  // Manager unavailable is advisory: the driver can still record arrival with normal evidence.
+  trip = driverTrip(day);
+  expect((await screen.send(driverWrite(trip, 'arrive', clock.at, 1))).status).toBe(200);
+  const beforeReset = await read();
+  expect((await dispatch.post('/api/v1/demo/reset').send({})).status).toBe(200);
+  expect((await read()).state?.status).toBe('unconfirmed');
+  expect(await notices(driver)).toEqual([]); expect(await notices(dispatch)).toEqual([]);
+  expect((await write(beforeReset)).status).toBe(409);
 });

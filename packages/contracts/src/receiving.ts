@@ -24,6 +24,6 @@ export const SaveReceivingRequest = z.strictObject({
 export type SaveReceivingRequest = z.infer<typeof SaveReceivingRequest>;
 
 export const ReceivingList = z.object({
-  date: z.iso.date().nullable(), depot: z.string(), states: z.array(ReceivingState),
+  date: z.iso.date().nullable(), depot: z.string(), states: z.array(ReceivingState.extend({ shopName: z.string().min(1) })),
 });
 export type ReceivingList = z.infer<typeof ReceivingList>;

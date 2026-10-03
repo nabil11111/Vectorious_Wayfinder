@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { getReceivingList } from '../receiving/read';
 import { getOperationsDay } from '../operations/read';
 import { readerOf, requireDepot, requireRole } from '../middleware/auth';
 
@@ -8,3 +9,5 @@ export const operationsRouter = Router();
 operationsRouter.use(requireRole('dispatcher'), requireDepot);
 
 operationsRouter.get('/', async (req, res) => { res.json(await getOperationsDay(await readerOf(req))); });
+
+operationsRouter.get('/receiving', async (req, res) => { res.json(await getReceivingList(await readerOf(req))); });

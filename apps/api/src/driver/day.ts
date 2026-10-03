@@ -1,7 +1,8 @@
 import { PlanCheck, type DriverDay, type DriverProblem, type DriverTrip } from '@wayfinder/contracts';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import type { Tx } from '../db/client';
-import { depots, issues, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicles } from '../db/schema';
+import { depots, outletReceiving, issues, orderLines, orders, outlets, plans, products, stopOrders, stops, trips, users, vehicles } from '../db/schema';
+import { stateOf, unconfirmed } from '../receiving/read';
 import { issuesOf } from '../issues/read';
 import { depotDate, depotInstant, depotMinutes, dueBackWords } from '../lib/clock';
 import { appliedWriteIdsOf } from '../lib/phone-writes';
@@ -22,6 +23,7 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[], at: Date): Promise
   const allTrips = await tx.select().from(trips).where(inArray(trips.planId, [...new Set(rows.map(row => row.plan.id))]));
   const fleet = await tx.select().from(vehicles).where(inArray(vehicles.id, rows.map(row => row.trip.vehicleId)));
   const stopRows = await tx.select({ stop: stops, shop: outlets }).from(stops).innerJoin(outlets, eq(outlets.id, stops.outletId)).where(inArray(stops.tripId, tripIds));
+  const receiving = await tx.select().from(outletReceiving).where(inArray(outletReceiving.date, [...new Set(rows.map(row => row.plan.date))]));
   const lines = stopRows.length ? await tx.select({ stopId: stopOrders.stopId, lineId: orderLines.id, orderId: orders.id, temp: orders.temp,
     placedAt: orders.placedAt, note: orders.driverNote, productId: products.id, name: products.name, unit: products.unit,
     quantity: orderLines.quantity, loaded: orderLines.loadedQty, delivered: orderLines.deliveredQty })
@@ -69,6 +71,7 @@ export async function driverTripsOf(tx: Tx, rows: TripPlan[], at: Date): Promise
         const open = Math.max(toMinutes(shop.windowOpen.slice(0, 5)), mall ? toMinutes(mall[0]!) : 0);
         const close = Math.min(toMinutes(shop.windowClose.slice(0, 5)), mall ? toMinutes(mall[1]!) : 24 * 60);
         return { id: stop.id, seq: stop.seq, revision: stop.revision, retriedAt: stop.retriedAt?.toISOString() ?? null,
+          receiving: (() => { const row = receiving.find(row => row.outletId === stop.outletId && row.date === plan.date); return row ? stateOf(row) : unconfirmed(stop.outletId, plan.date); })(),
           outletId: stop.outletId, shopName: shop.name, district: shop.district, dockType: shop.dockType, windowOpen: toClock(open), windowClose: toClock(close),
           note: notes.length ? notes.join('\n') : null, arrivedAt: stop.arrivedAt?.toISOString() ?? null, doneAt: stop.doneAt?.toISOString() ?? null, outcome: stop.outcome,
           lines: ownLines.map(({ lineId, orderId, temp, productId, name, unit, quantity, loaded, delivered }) => {

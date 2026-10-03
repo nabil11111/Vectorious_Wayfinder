@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
 import { type ClockState, type Me, type StoreReceiving } from '@wayfinder/contracts';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, expect, it, vi } from 'vitest';

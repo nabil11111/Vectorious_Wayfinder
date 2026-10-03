@@ -1,6 +1,6 @@
 import {
   brandOfStop, driverAnswerSentence, driverAnswerShort, FlagReason, LoadingDecision, MAX_NOTIFICATIONS, Notification, PlanCheck, RefusalReason, tripFigures,
-  type Brand, type Issue, type NotificationList,
+  ReceivingState, type Brand, type Issue, type NotificationList,
 } from '@wayfinder/contracts';
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
@@ -13,6 +13,7 @@ import { loaderDay, sentTrip } from '../loading/loader-day';
 import { snapshot } from '../orders/store-orders';
 import { toClock, toMinutes } from '../planning';
 import { operatingDays, readMoment } from '../plans/board';
+import { assignedOutlets } from '../receiving/read';
 import * as words from './words';
 import type { ByTemp, TruckFacts } from './words';
 
@@ -44,15 +45,15 @@ export async function notificationsOf(tx: Tx, reader: Reader, at: Date): Promise
   if (reader.role === 'admin') return [];
   const today = depotDate(at);
   const dates = await workedDays(tx, at);
-  if (!dates.length) return [];
-  let items: Item[];
-  if (reader.role === 'store_manager') items = await shopUpdates(tx, reader.outletId, dates);
-  else {
+  let items: Item[] = [];
+  if (dates.length && reader.role === 'store_manager') items = await shopUpdates(tx, reader.outletId, dates);
+  else if (dates.length && reader.role !== 'store_manager') {
     const day = await depotDay(tx, reader.depotId, dates);
     if (reader.role === 'dispatcher') items = dispatcherUpdates(day);
     else if (reader.role === 'loader') items = loaderUpdates(day);
     else items = await driverUpdates(tx, day, reader.userId, at);
   }
+  items.push(...await receivingUpdates(tx, reader, today, (await readMoment(tx)).demoDay));
   items.sort((a, b) => b.at.localeCompare(a.at) || a.line.localeCompare(b.line) || a.id.localeCompare(b.id));
   return items.slice(0, MAX_NOTIFICATIONS).map((item) => Notification.parse({ ...item, time: words.timeWords(new Date(item.at), today) }));
 }
@@ -347,4 +348,23 @@ async function driverUpdates(tx: Tx, day: DepotDay, userId: string, at: Date): P
     }
   }
   return items;
+}
+
+// Receiving follows the calendar day even after the dispatch day moves at 16:00.
+async function receivingUpdates(tx: Tx, reader: Reader, date: string, demoDay: number): Promise<Item[]> {
+  if (reader.role !== 'driver' && reader.role !== 'dispatcher') return [];
+  const assigned = reader.role === 'driver' ? await assignedOutlets(tx, reader.userId, date) : null;
+  const rows = await tx.select({ after: auditLog.after, outletId: outlets.id, name: outlets.name }).from(auditLog)
+    .innerJoin(outlets, eq(outlets.id, auditLog.entityId))
+    .where(and(eq(auditLog.action, 'receiving.updated'), eq(outlets.depotId, reader.depotId)));
+  return rows.flatMap(row => {
+    if ((row.after as { demoDay?: number } | null)?.demoDay !== demoDay) return [];
+    const parsed = ReceivingState.safeParse(row.after);
+    if (!parsed.success || parsed.data.date !== date || parsed.data.updatedAt === null || (assigned && !assigned.includes(row.outletId))) return [];
+    const state = parsed.data;
+    const status = { unconfirmed: 'Not confirmed', ready: 'Ready to receive', unavailable: 'Temporarily unavailable' }[state.status];
+    return [{ ...base, id: `receiving:${demoDay}:${row.outletId}:${date}:${state.revision}`, kind: 'receiving_updated' as const,
+      at: state.updatedAt!, line: `${row.name} · ${status}${state.note ? ` · ${state.note}` : ''}`,
+      link: reader.role === 'driver' ? '/driver' : '/dispatcher/live', tone: state.status === 'ready' ? 'good' as const : state.status === 'unavailable' ? 'warn' as const : 'info' as const }];
+  });
 }

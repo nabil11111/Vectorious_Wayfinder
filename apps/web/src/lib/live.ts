@@ -64,6 +64,11 @@ export function useLive() {
           }
           // A driver's record moves a problem's card too: "Still on VEH057 · 39 cartons · 1 stop left" follows the
           // trip on Live day and the Dashboard, to "no stops left" once the last stop is done (Q-28).
+          if (topic === 'receiving') {
+            void qc.invalidateQueries({ queryKey: ['driver'] });
+            void qc.invalidateQueries({ queryKey: ['notifications'] });
+            void qc.invalidateQueries({ queryKey: ['operations'] });
+          }
           if (topic === 'driver') void qc.invalidateQueries({ queryKey: ['issues'] });
         }
       });

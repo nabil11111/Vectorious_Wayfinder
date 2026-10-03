@@ -12,6 +12,7 @@ import { reasonOf } from '@/features/store/words';
 import { clockTime, shortDay, whole } from '@/features/loader/words';
 import { useAppClock } from '@/lib/clock';
 import { cn } from '@/lib/utils';
+import { ReceivingListPanel } from '@/features/receiving/ReceivingListPanel';
 import { NeedsYou } from './NeedsYou';
 import { answeringIn, issuesKey, issuesKeyOf, useAnswer, useIssueLists, type Answering, type SentFrom } from './issues';
 import { isLive, useOnline, useOperations } from './operations';
@@ -145,11 +146,12 @@ export function LiveDayPage() {
           {parts.map((part) => (
             <section key={part.depot} aria-labelledby={partId(part.depot)} className="mt-6">
               <DepotHeading depot={part.depot}><ReadLine part={part} online={online} /></DepotHeading>
+              <ReceivingListPanel depot={part.depot} />
               {body(part, 'mt-2.5', null)}
             </section>
           ))}
         </>
-      ) : body(parts[0]!, 'mt-4 lg:mt-3', notice)}
+      ) : <><ReceivingListPanel depot={parts[0]!.depot} />{body(parts[0]!, 'mt-4 lg:mt-3', notice)}</>}
     </div>
   );
 }

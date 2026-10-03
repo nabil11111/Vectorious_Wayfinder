@@ -186,6 +186,14 @@ afterEach(() => {
 });
 
 describe('the driver\'s phone', () => {
+  it('keeps the dated receiving declaration and timestamp across an offline phone reload', async () => {
+    const day = dayFor(DILSHAN, []);
+    day.trips[0]!.stops[0]!.receiving = { outletId: 'OUT001', date: '2026-06-25', status: 'ready', note: 'Rear entrance.', updatedAt: '2026-06-24T22:00:00Z', revision: 2 };
+    db.days.set(`driver:${DILSHAN.id}`, { queue: 'driver', userId: DILSHAN.id, day }); hooks.signal = false;
+    const phone = await open(DILSHAN); await until(() => phone.store.readKept().ready);
+    expect(phone.store.readKept().day!.trips[0]!.stops[0]!.receiving).toEqual(day.trips[0]!.stops[0]!.receiving);
+  });
+
   it('D3 waits for a fresh online day before showing a cached trip from an earlier run', async () => {
     db.days.set(`driver:${DILSHAN.id}`, { queue: 'driver', userId: DILSHAN.id, day: dayFor(DILSHAN, []) });
     let answer!: (value: Response) => void;

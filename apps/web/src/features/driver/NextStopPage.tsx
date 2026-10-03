@@ -1,4 +1,6 @@
 import type { DriverDay, DriverStop, DriverTrip } from '@wayfinder/contracts';
+import { ReceivingNotice } from '@/features/receiving/ReceivingNotice';
+import { useSignal } from '@/lib/phone/signal';
 import { Button } from '@/components/ui/button';
 import { newWriteId } from '@/features/loader/loading';
 import { useAppClock } from '@/lib/clock';
@@ -8,7 +10,7 @@ import { TopArea } from './parts/TopArea';
 import { TopLines } from './parts/TopLine';
 import { TripBar } from './parts/TripBar';
 import { ActionBar, BIG, Card, Problem } from './parts/ui';
-import { useSave } from './queue';
+import { useSave, useSync } from './queue';
 import type { DriverView } from './view';
 import { aboutStop, backByLine, brandOf, isLate, leftLine, NOT_SAVED, shopLine, stopOfLine, unloadLine, whole, windowLine, type Figures } from './words';
 
@@ -16,6 +18,7 @@ import { aboutStop, backByLine, brandOf, isLate, leftLine, NOT_SAVED, shopLine, 
 // thing, what to unload, the shop's note, the trip bar and "I've arrived". The stop is the trip's next one by
 // nextStop, so a stop the dispatcher sent back comes after the others (rule 4).
 export function NextStopPage({ view, day, trip, figures, stop }: { view: DriverView; day: DriverDay; trip: DriverTrip; figures: Figures; stop: DriverStop }) {
+  const signal = useSignal(); const sync = useSync();
   const { at, readNow } = useAppClock();
   const { save, saving, failed } = useSave();
   const counts = figures.byStop[trip.stops.indexOf(stop)]!;
@@ -47,6 +50,7 @@ export function NextStopPage({ view, day, trip, figures, stop }: { view: DriverV
         <p className="mt-2 text-center text-[13px] leading-4 text-muted-foreground">
           window · <span className={cn('font-semibold', late ? 'text-bad' : 'text-good')}>{late ? 'late' : 'on time'}</span>
         </p>
+        <ReceivingNotice state={stop.receiving} stale={!signal || sync.signedOut || sync.failure !== null} />
         <div className="mt-[18px] flex flex-wrap items-center justify-center gap-2">
           <span className="rounded-full bg-secondary px-2.5 py-1 text-xs leading-[17px] font-semibold text-secondary-foreground">{unloadLine(brand, counts)}</span>
           {brand === 'Fresh' && counts.byTemp.chilled.loaded > 0 && (

@@ -16,6 +16,8 @@ export interface Announcement {
   id?: string;
   depotId?: string;
   outletId?: string;
+  // When supplied, only these accounts may hear it, still subject to the existing depot/outlet rules.
+  recipientIds?: readonly string[];
 }
 
 // The open streams, each with the person it belongs to.
@@ -48,6 +50,7 @@ function send(res: Response, text: string): void {
 // too, but a change about the depot is not hers to hear. A dispatcher on both depots together hears every
 // depot's changes (spec 021), and still none that concerns an outlet alone.
 function hears(user: Me, change: Announcement): boolean {
+  if (change.recipientIds && !change.recipientIds.includes(user.id)) return false;
   if (user.role === 'admin' || (change.depotId === undefined && change.outletId === undefined)) return true;
   if (user.role === 'store_manager') return user.outletId === change.outletId;
   if (user.role === 'dispatcher' && user.depotId === BOTH_DEPOTS) return change.depotId !== undefined;

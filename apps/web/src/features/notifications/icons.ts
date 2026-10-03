@@ -20,6 +20,7 @@ export const KIND_ICON: Record<NotificationKind, string> = {
   delivered: orderDelivered, refused: damaged, shop_closed: warning, report_answered: orderList,
   problem: warning, truck_ready: cartons, truck_back: backToDepot,
   plan_out: orderList, plan_changed: sync, plan_taken_back: orderWaiting, flag_answered: shortfall,
+  receiving_updated: deliveryWindow,
   trip_sent: route, trip_changed: sync, problem_answered: backToDepot,
 };
 

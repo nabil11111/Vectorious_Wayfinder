@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Brand, CLOSED_REASONS, IssueDecision, PhotoDataUrl, RefusalReason, StopOutcome, Temp } from './basics';
 import { DockType } from './store';
+import { ReceivingState } from './receiving';
 import { TripStatus } from './plans';
 
 const Moment = z.iso.datetime();
@@ -14,6 +15,7 @@ export const DriverLine = z.object({ lineId: z.uuid(), orderId: z.uuid(), temp: 
 export type DriverLine = z.infer<typeof DriverLine>;
 export const DriverStop = z.object({
   id: z.uuid(), seq: z.number().int().min(1), revision: Count, retriedAt: Moment.nullable(), outletId: z.string(), shopName: z.string(), district: z.string(), dockType: DockType,
+  receiving: ReceivingState.nullable().optional(),
   windowOpen: z.string(), windowClose: z.string(), note: z.string().nullable(), arrivedAt: Moment.nullable(), doneAt: Moment.nullable(), outcome: StopOutcome.nullable(), lines: z.array(DriverLine),
 });
 export type DriverStop = z.infer<typeof DriverStop>;
