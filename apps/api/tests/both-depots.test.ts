@@ -305,9 +305,9 @@ describe('a dispatcher on both depots', () => {
     const start = answered(await planner.agent.get('/api/v1/plans'));
     let board = answered(await planner.agent.post(`/api/v1/plans/${THU}/suggest`).send({ planId: null, demoDay: start.demoDay }));
     const vehicleId = board.plan.trips[0]!.vehicleId;
-    // The suggestion gives every truck its usual driver (spec 026), so D-037 moves to the first truck as the driver menu
-    // moves him, and the truck he drove is left with none.
-    const trips = board.plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId: ashen.me.id } : trip.driverId === ashen.me.id ? { ...trip, driverId: null } : trip));
+    // Swap the two crews so Ashen drives the first truck and every sent trip retains an assigned driver (028 B1).
+    const previousDriver = board.plan.trips[0]!.driverId;
+    const trips = board.plan.trips.map((trip) => (trip.vehicleId === vehicleId ? { ...trip, driverId: ashen.me.id } : trip.driverId === ashen.me.id ? { ...trip, driverId: previousDriver } : trip));
     board = answered(await planner.agent.put(`/api/v1/plans/${THU}/draft`)
       .send({ planId: board.plan.id, revision: board.plan.revision, plan: { mixBrands: board.plan.mixBrands, trips, deferrals: board.plan.deferrals } }));
     const open = board.suggestion!.decisions.filter((decision) => decision.open).map((decision) => decision.key);

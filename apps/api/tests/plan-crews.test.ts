@@ -141,7 +141,7 @@ it('AC-1 names the draft\'s driver for a truck on the draft, a driver once only,
 
 it('AC-4 takes the usual drivers and districts from the latest sent plan, and puts a crew that ran the orders\' district first', async () => {
   // Thursday's plan, sent: VEH035 to Fresh Nugegoda and Fresh Wellawatte in Colombo with Dilshan, and VEH004 to two
-  // Gampaha shops with no driver. Friday's orders close at Thursday 16:00.
+  // Gampaha shops with Anura. Friday's orders close at Thursday 16:00.
   await sendWalkthroughPlan({ nadeesha, ruwan, freeze }, { withVeh004: true });
   freeze(THU, 16 * 60);
   const friday = PlanBoard.parse((await ruwan.get(`/api/v1/plans/${FRI}`)).body);
@@ -151,11 +151,11 @@ it('AC-4 takes the usual drivers and districts from the latest sent plan, and pu
   const list = await crews(FRI, [order.id]);
   // Dilshan drove VEH035 to Colombo, so he is its usual driver now and it ran the order's district.
   expect(crewOf(list, 'VEH035')).toMatchObject({ driverId: dilshanId, lastDistricts: ['Colombo'], ranHere: true, fits: true });
-  // VEH004 ran Gampaha with no driver, so the pairing gives it one. The trucks history does not pair take the drivers it
-  // left, in staff ID order: VEH001 Chaminda (D-003) up to VEH034 Wasantha (D-036).
+  // VEH004 keeps Anura (D-019) from the sent plan. Remaining trucks take the remaining drivers in staff ID order.
   expect(crewOf(list, 'VEH004')).toMatchObject({ lastDistricts: ['Gampaha'], ranHere: false });
   expect(pairs(list)).toEqual(Object.fromEntries([
-    ...Array.from({ length: 34 }, (_, i) => [veh(i + 1), staffId(i + 3)]), ['VEH035', 'D-001'], ['VEH036', null], ['VEH037', null], ['VEH038', null],
+    ...Array.from({ length: 34 }, (_, i) => [veh(i + 1), staffId(i < 3 ? i + 3 : i === 3 ? 19 : i < 17 ? i + 2 : i + 3)]),
+    ['VEH035', 'D-001'], ['VEH036', null], ['VEH037', null], ['VEH038', null],
   ]));
   // Of the crews that fit, the one that ran Colombo comes first, ahead of trucks with more fuel left.
   const fitting = list.crews.filter((crew) => crew.fits && crew.unavailable === null);
