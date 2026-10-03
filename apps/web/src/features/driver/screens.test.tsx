@@ -600,3 +600,12 @@ describe('028 E advisory receiving declarations', () => {
     expect(drawReceiving('unconfirmed')).toContain('Not confirmed');
   });
 });
+
+  it('marks the signed-out cached driver declaration Last known even when the server is reachable', () => {
+    hooks.signal = true; hooks.sync = { signedOut: true, failure: null };
+    const trip = veh057trip2('out');
+    trip.stops[0]!.receiving = { outletId: trip.stops[0]!.outletId, date: '2026-06-25', status: 'ready', note: null, updatedAt: at('03:55'), revision: 2 };
+    const day = dayOf(trip);
+    const html = draw(<NextStopPage view={viewOf(day)} day={day} trip={trip} figures={tripFigures(trip)} stop={trip.stops[0]!} />);
+    hooks.sync = {}; expect(html).toContain('Last known'); expect(html).toContain('03:55');
+  });
