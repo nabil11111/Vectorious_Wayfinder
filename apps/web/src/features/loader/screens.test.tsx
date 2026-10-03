@@ -431,3 +431,15 @@ describe('L-09 a line flagged won\'t fit', () => {
     expect(html).not.toContain('3 short');
   });
 });
+
+
+it('B2 explains the return gate and prevents loading and count confirmation on a second trip', () => {
+  for (const status of ['planned', 'loading'] as const) {
+    const truck = { ...veh038([], { tripNo: 2, status }), loadingBlocked: 'Wait for VEH038 trip 1 to return before loading trip 2.' };
+    const html = truckPage(truck);
+    expect(html).toContain(truck.loadingBlocked);
+    expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>(?:Start loading|Stop 3 loaded)/);
+    expect(html).toMatch(/<button[^>]*role="checkbox"[^>]*disabled/);
+    expect(html).not.toContain('/flag?stop=');
+  }
+});

@@ -553,3 +553,27 @@ it('D2 the waiting sheet distinguishes unread, queued, refused and acknowledged 
   expect(waitingSheetTitle(true, 0, 2)).toBe('2 records not accepted');
   expect(waitingSheetTitle(true, 0, 0)).toBe('Everything is sent.');
 });
+
+it('B3 explains the app-clock reload time and keeps Start trip disabled until it passes', () => {
+  const trip = { ...veh057trip2('ready'), startAfter: at('04:26'), startBlocked: null };
+  const view = viewOf(dayOf(trip));
+  const html = draw(<TodaysTrip view={view} trip={trip} figures={view.figures!} />);
+  expect(textOf(html)).toContain('Reload until 04:26');
+  expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Start trip/);
+});
+
+it('B3 shows the server loading action for old premature readiness instead of enabling departure', () => {
+  const trip = { ...veh057trip2('ready'), startAfter: null, startBlocked: 'Ask the loader to reload trip 2 after trip 1 returns.' };
+  const view = viewOf(dayOf(trip));
+  const html = draw(<TodaysTrip view={view} trip={trip} figures={view.figures!} />);
+  expect(textOf(html)).toContain(trip.startBlocked);
+  expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Start trip/);
+});
+
+it('B3 keeps first-trip early departure available and allows a confirmed second trip after reload', () => {
+  for (const trip of [veh057trip2('ready', { tripNo: 1 }), { ...veh057trip2('ready'), startAfter: at('03:46'), startBlocked: null }]) {
+    const view = viewOf(dayOf(trip));
+    const html = draw(<TodaysTrip view={view} trip={trip} figures={view.figures!} />);
+    expect(html).toMatch(/<button[^>]*aria-disabled="false"[^>]*>Start trip/);
+  }
+});
