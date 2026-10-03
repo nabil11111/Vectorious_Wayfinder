@@ -387,6 +387,11 @@ Anything we built differently from our Designathon submission, and why.
   and for the suggested plan: replacing a draft, the line after a build, a refused build, and a plan ready with
   warnings.
 
+- **What if a vehicle is unavailable?** on the draft board compares two generated plans for the same outstanding
+  demand. Pick one working vehicle and choose Compare plans. Counts group split parts back into original orders;
+  results show full/partial/deferred orders, shops waiting, trip fuel and real planner reasons. The generated baseline
+  may differ from a hand-edited draft. This is a read-only preview with no Apply action or optimality claim.
+
 **Loading and Live day**
 - **One list of trucks in leaving order,** with no "Wave 1 · 03:30" and "Wave 2 · 08:30" tabs, no dock numbers and no
   call buttons: every trip has its own leaving time (D-19), and the data has no docks or phone numbers (D-40).
@@ -482,7 +487,8 @@ Anything we built differently from our Designathon submission, and why.
 - Before planning opens, the board shows received demand and an application-clock countdown while keeping editing
   locked. The Wayfinder wordmark opens the signed-in role's home.
 - Driver unload lines have an explicit All unloaded action using the actual loaded quantity. Receipt entries retain
-  product units, and dirty loader/shop forms ask before discarding unsent input.
+  product units, and dirty loader/shop forms ask before discarding unsent input. A background truck change keeps an
+  unsent loader report visible and blocks submitting it against changed loading data.
 
 **The look-up pages**
 - **They only read (D-80):** Orders has no "Plan first" and no "Call the shop" (the data has no phone numbers, D-40),
