@@ -203,6 +203,20 @@ describe('the driver\'s phone', () => {
     expect(shown).toMatchObject({ trips: [] });
   });
 
+  it('D3 a same-account reactivation cancels the older day read before accepting the new run', async () => {
+    const answers: ((value: Response) => void)[] = [];
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { answers.push(resolve); })));
+    const phone = await open(DILSHAN);
+    await until(() => answers.length === 1);
+    phone.sender.setAccount(DILSHAN);
+    answers[0]!(new Response(JSON.stringify(dayFor(DILSHAN, [])), { headers: { 'Content-Type': 'application/json' } }));
+    await until(() => answers.length === 2);
+    expect(phone.sync().fetched).toBe(false);
+    answers[1]!(new Response(JSON.stringify({ ...dayFor(DILSHAN, []), trips: [] }), { headers: { 'Content-Type': 'application/json' } }));
+    await until(() => phone.sync().fetched);
+    expect(phone.store.readKept().day?.trips).toEqual([]);
+  });
+
   it('sends nothing under another account with the same name, refuses nothing for it, and sends once the session is the driver\'s own', async () => {
     const waiting = arrive();
     keptBefore(db, DILSHAN, waiting);

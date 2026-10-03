@@ -543,3 +543,13 @@ describe('spec 025 AC-3b the trip\'s top line after the dispatcher answers', () 
     expect(textOf(html)).not.toContain('Bring the 39 cartons back');
   });
 });
+
+// D2: an unread queue and refused records cannot be described as sent.
+it('D2 the waiting sheet distinguishes unread, queued, refused and acknowledged records', async () => {
+  const { waitingSheetTitle } = await import('./words');
+  expect(waitingSheetTitle(false, 0, 0)).toBe('Checking records on this phone…');
+  expect(waitingSheetTitle(true, 2, 0)).toBe('Waiting to send · 2');
+  expect(waitingSheetTitle(true, 0, 1)).toBe('1 record not accepted');
+  expect(waitingSheetTitle(true, 0, 2)).toBe('2 records not accepted');
+  expect(waitingSheetTitle(true, 0, 0)).toBe('Everything is sent.');
+});
