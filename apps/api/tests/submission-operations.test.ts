@@ -9,6 +9,7 @@ import { auditLog, demoDay, fuelLog, orderLines, outlets, stopOrders, stops, tri
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { applyWrite } from '../src/driver/writes';
+import { getDriverDay } from '../src/driver/day';
 import { markStopLoaded, startLoading } from '../src/loading/writes';
 import { DEFAULT_SETTINGS, toClock } from '../src/planning';
 import { sendPlan } from '../src/plans/send';
@@ -84,7 +85,8 @@ async function load(tripNo: number): Promise<LoadingTruck> {
   expect(result.status).toBe(200);
   return own(LoadingDay.parse(result.body), tripNo);
 }
-const phone = async () => DriverDay.parse((await anura.get('/api/v1/driver')).body);
+// Use the production reader for fixture refreshes; lifecycle writes still exercise their real HTTP routes.
+const phone = async () => DriverDay.parse(await getDriverDay({ userId: driverId, depotId: 'Peliyagoda' }));
 const departure = async (tripNo = 2, at = clock.at) => anura.post('/api/v1/driver/writes').send(driverWrite(driverTrip(await phone(), 'VEH004', tripNo), 'start', at));
 async function returnFirst(minute = 211): Promise<void> {
   // Fast actual demo events stay legal: start, visit both stops and check in in the same app minute.

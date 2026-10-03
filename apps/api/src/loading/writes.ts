@@ -11,7 +11,7 @@ import { operatingDays } from '../plans/board';
 import { dayLabel } from '../plans/board-day';
 import { loadingDayOf, trucksOf } from './day';
 import { loaderDay } from './loader-day';
-import { physicallyLoaded, previousTripOf, returnFactsOf, tripGate } from './lifecycle';
+import { physicallyLoaded, previousTripOf, returnFactsOf, returnProvenance, tripGate } from './lifecycle';
 
 // The loader's writes (spec 012): starting a truck, marking a stop loaded or taking it off again (Q-16), flagging lines
 // and marking the truck ready. Each is one transaction that answers the loading day, and is announced once it has
@@ -128,7 +128,7 @@ export function markStopLoaded(caller: DepotCaller, tripId: string, body: StopLo
     await tx.update(stops).set({ loadedAt: moment.at }).where(eq(stops.id, stop.id));
     await writeTrip(tx, trip, body.writeId);
     await tx.insert(auditLog).values({ actorId: caller.userId, action: 'stop.loaded', entity: 'stop', entityId: stop.id,
-      before: { loadedAt: null }, after: { tripId: trip.id, seq: stop.seq, loadedAt: moment.at.toISOString() } });
+      before: { loadedAt: null }, after: { tripId: trip.id, seq: stop.seq, loadedAt: moment.at.toISOString(), ...returnProvenance(previous) } });
     return [{ topic: 'loading', depotId: caller.depotId }];
   });
 }
@@ -193,7 +193,7 @@ export function raiseFlag(caller: DepotCaller, tripId: string, body: RaiseFlagRe
 // "Mark ready" (rule 8): with every stop loaded and no flag open, each line gets the count that left the dock, each order
 // on the truck becomes loaded, even one whose lines all went out at 0, and the truck is ready.
 export function markReady(caller: DepotCaller, tripId: string, body: MarkReadyRequest): Promise<LoadingDay> {
-  return loaderWrite(caller, tripId, body.writeId, false, async (tx, { moment, trip, plan }) => {
+  return loaderWrite(caller, tripId, body.writeId, false, async (tx, { moment, trip, plan, previous }) => {
     requireLoading(trip, body.revision);
     // The problems are read under the trip's lock, so an answer is seen whole or not at all.
     const [truck] = await trucksOf(tx, plan, [trip], [], moment.at);
@@ -213,7 +213,7 @@ export function markReady(caller: DepotCaller, tripId: string, body: MarkReadyRe
     await writeTrip(tx, trip, body.writeId, { status: 'ready', readyAt: moment.at });
     await tx.insert(auditLog).values({ actorId: caller.userId, action: 'trip.ready', entity: 'trip', entityId: trip.id,
       before: { status: trip.status, revision: trip.revision },
-      after: { status: 'ready', revision: trip.revision + 1, readyAt: moment.at.toISOString(), lines: lines.map((l) => ({ lineId: l.lineId, loadedQty: l.going })) } });
+      after: { status: 'ready', revision: trip.revision + 1, readyAt: moment.at.toISOString(), ...returnProvenance(previous), lines: lines.map((l) => ({ lineId: l.lineId, loadedQty: l.going })) } });
     // Each shop on the truck hears of its orders with its depot, as a shop's place does.
     const shops = [...new Set(truck.stops.map((s) => s.outletId))];
     return [{ topic: 'loading', depotId: caller.depotId }, { topic: 'driver', depotId: caller.depotId }, ...shops.map((outletId) => ({ topic: 'orders', outletId, depotId: caller.depotId }))];

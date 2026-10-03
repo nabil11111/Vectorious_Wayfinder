@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { meKey } from '@/features/auth/api';
-import { retrySync, useSync } from '../queue';
+import { retrySync, useKept, useSync } from '../queue';
 import { NOT_SAVED_BAND, signInLine } from '../words';
 
 const ACTION = '-my-2 shrink-0 rounded-md px-1 py-2 text-[13px] leading-4 font-bold text-foreground underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50';
@@ -10,7 +10,8 @@ const ACTION = '-my-2 shrink-0 rounded-md px-1 py-2 text-[13px] leading-4 font-b
 // phone." when the phone could not keep a refusal, then the screen's own band, the top line or a signal bar. On a phone
 // it runs to the edges, as the frames draw it; from 768 px it sits in the column.
 export function TopArea({ waitingRecords, children }: { waitingRecords: number; children?: ReactNode }) {
-  const { signedOut, notSaved } = useSync();
+  const { signedOut, notSaved, failure } = useSync();
+  const kept = useKept();
   const qc = useQueryClient();
   return (
     <div className="-mx-4 -mt-4 mb-4 md:mx-0 md:mt-0 md:space-y-2">
@@ -22,6 +23,12 @@ export function TopArea({ waitingRecords, children }: { waitingRecords: number; 
           <button type="button" className={ACTION} onClick={() => qc.setQueryData(meKey, null)}>
             Sign in
           </button>
+        </div>
+      )}
+      {failure !== null && !signedOut && kept.ready && kept.day !== null && (
+        <div className="flex items-center gap-3 border-b border-warn/40 bg-warn-tint px-4 py-3 md:rounded-[12px] md:border-b-0">
+          <p role="alert" className="min-w-0 flex-1 text-[13px] leading-4 font-semibold text-warn-ink">Last known trip · {failure}</p>
+          <button type="button" className={ACTION} onClick={retrySync}>Try again</button>
         </div>
       )}
       {notSaved && (

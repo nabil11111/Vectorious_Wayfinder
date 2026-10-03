@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient, type QueryClient, type UseMutationOptions } from '@tanstack/react-query';
+import { useMutation, useMutationState, useQuery, useQueryClient, type QueryClient, type UseMutationOptions } from '@tanstack/react-query';
 import { Me, type LoginRequest, type Role } from '@wayfinder/contracts';
 import { api, ApiRequestError } from '@/lib/api';
 
 export const meKey = ['me'] as const;
+const logoutKey = ['auth', 'logout'] as const;
 const ACCOUNT_KEY = 'wayfinder-account';
 
 function keepAccount(me: Me | null) {
@@ -97,6 +98,7 @@ export const loginMutation = (qc: QueryClient): UseMutationOptions<Me, Error, Lo
     await qc.cancelQueries({ queryKey: meKey });
     qc.removeQueries({ predicate: (query) => query.queryKey[0] !== meKey[0] });
     qc.setQueryData(meKey, keepAccount(me));
+    for (const mutation of qc.getMutationCache().findAll({ mutationKey: logoutKey })) qc.getMutationCache().remove(mutation);
   },
 });
 
@@ -139,6 +141,7 @@ async function finishWork() {
 }
 
 export const logoutMutation = (qc: QueryClient): UseMutationOptions<void, Error, void> => ({
+  mutationKey: [...logoutKey, qc.getQueryData<Me | null>(meKey)?.id ?? null],
   networkMode: 'always',
   onMutate: () => qc.cancelQueries({ queryKey: meKey }),
   mutationFn: async () => {
@@ -188,6 +191,16 @@ export function useLogout() {
   const qc = useQueryClient();
   const mutation = useMutation(logoutMutation(qc));
   return { ...mutation, signOut: () => signOutUnlessAsked(() => mutation.mutate()), signOutAnyway: () => mutation.mutate() };
+}
+
+// The shell sees failures from its own avatar and a dirty form's separate sign-out hook. Only the latest attempt
+// for this account is shown; a retry hides the preceding error while it runs.
+export function useLogoutFailure(userId: string | undefined): Error | null {
+  const attempts = useMutationState({
+    filters: { mutationKey: logoutKey, predicate: (mutation) => mutation.options.mutationKey?.[2] === userId },
+    select: (mutation) => mutation.state.status === 'error' && mutation.state.error instanceof Error ? mutation.state.error : null,
+  });
+  return attempts.at(-1) ?? null;
 }
 
 export const HOME: Record<Role, string> = {

@@ -395,7 +395,7 @@ export function createPhoneQueue<Day extends { appliedWriteIds: string[] }, Writ
     // A same-account sign-in is a new activation too. An earlier read must not restore an old run.
     generation += 1;
     fetching?.abort();
-    update({ signedOut: false, fetched: false, backOnline: null });
+    update({ signedOut: false, fetched: false, failure: null, backOnline: null });
     ring();
   }
 

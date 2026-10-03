@@ -14,16 +14,16 @@ export async function previousTripOf(tx: Tx, trip: Trip, locked = false): Promis
   return previous ?? null;
 }
 
-// The demo can record several actions at the same app instant. In that case their immutable audit order proves
-// whether counting/ready actually followed the return. Compare in SQL to preserve Postgres timestamp precision.
+// Equal app timestamps need proof of the return actually observed under the predecessor lock. Audit at uses
+// transaction start time, which cannot establish action order when requests overlap.
 export async function returnFactsOf(tx: Tx, trip: Trip, previous: Trip | null) {
   const countedAfterReturn = new Set<string>();
   if (trip.tripNo === 1 || previous?.status !== 'done' || !previous.backAt) return { readyAfterReturn: false, countedAfterReturn };
   const returnedAt = previous.backAt.toISOString();
   const facts = await tx.select().from(auditLog).where(and(inArray(auditLog.action, ['trip.ready', 'stop.loaded']),
     or(eq(auditLog.entityId, trip.id), sql`${auditLog.after}->>'tripId' = ${trip.id}`),
-    sql`${auditLog.at} > (select max(returned.at) from ${auditLog} returned where returned.action = 'trip.finished'
-      and returned.entity_id = ${previous.id} and returned.after->>'keptAt' = ${returnedAt})`));
+    sql`${auditLog.after}->>'previousTripId' = ${previous.id}`,
+    sql`${auditLog.after}->>'returnedAt' = ${returnedAt}`));
   let readyAfterReturn = false;
   for (const fact of facts) {
     const after = fact.after as { revision?: number; readyAt?: string; loadedAt?: string } | null;
@@ -32,6 +32,10 @@ export async function returnFactsOf(tx: Tx, trip: Trip, previous: Trip | null) {
   }
   return { readyAfterReturn, countedAfterReturn };
 }
+
+// New audit facts carry the locked return they relied on; unknown historical equal-time facts stay unproven.
+export const returnProvenance = (previous: Trip | null) => previous?.status === 'done' && previous.backAt
+  ? { previousTripId: previous.id, returnedAt: previous.backAt.toISOString() } : {};
 
 export function tripGate(trip: Trip, previous: Trip | null, readyAfterReturn = false) {
   if (trip.tripNo === 1) return { loadingBlocked: null, reloadRequired: false, startBlocked: null, startAfter: null, returnedAt: null };

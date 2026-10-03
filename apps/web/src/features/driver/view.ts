@@ -48,7 +48,7 @@ const records = (entries: Queued[]) => new Set(entries.map((entry) => recordOf(e
 
 export function useDriverView(userId: string): DriverView {
   const kept = useKept();
-  const { fetched, signedOut } = useSync();
+  const { fetched, signedOut, failure } = useSync();
   const signal = useSignal();
   return useMemo(() => {
     const ready = kept.ready && kept.userId === userId;
@@ -56,8 +56,8 @@ export function useDriverView(userId: string): DriverView {
     const held = own.filter((entry) => entry.state === 'waiting');
     const refused = own.filter((entry) => entry.state === 'refused');
     // Online startup must read the current run before displaying an earlier cached trip. The
-    // offline copy and reauthentication screen remain usable when no current read is possible.
-    if (!ready || !kept.day || (signal && !fetched && !signedOut)) {
+    // offline copy, a failed current read and reauthentication keep the own-account cache usable.
+    if (!ready || !kept.day || (signal && !fetched && !signedOut && failure === null)) {
       return {
         ready, day: null, waiting: held, refused, waitingRecords: records(held), refusedRecords: records(refused),
         trip: null, figures: null, allDone: false, closed: null, wholeDay: null,
@@ -67,5 +67,5 @@ export function useDriverView(userId: string): DriverView {
     const left = new Set(view.writes.map((write) => write.writeId));
     const waiting = held.filter((entry) => left.has(entry.write.writeId));
     return { ready, day: view.day, waiting, refused, waitingRecords: records(waiting), refusedRecords: records(refused), ...tripsOf(view.day) };
-  }, [kept, userId, signal, fetched, signedOut]);
+  }, [kept, userId, signal, fetched, signedOut, failure]);
 }
