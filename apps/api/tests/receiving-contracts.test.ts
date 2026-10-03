@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ReceivingState, SaveReceivingRequest, StoreReceiving } from '@wayfinder/contracts';
+import { ReceivingList, ReceivingState, SaveReceivingRequest, StoreReceiving } from '@wayfinder/contracts';
 
 describe('receiving readiness contracts (028 E)', () => {
   const write = { date: '2026-06-25', demoDay: 1, revision: 0, status: 'ready', note: 'Use the rear entrance.' };
@@ -20,4 +20,9 @@ describe('receiving readiness contracts (028 E)', () => {
     expect(SaveReceivingRequest.parse({ ...write, status: 'unconfirmed', note: '  ' }).note).toBe('');
     expect(SaveReceivingRequest.parse({ ...write, status: 'unavailable' }).status).toBe('unavailable');
   });
+});
+
+it('keeps the shop name on depot declaration rows', () => {
+  const state = { outletId: 'OUT001', shopName: 'Fresh Nugegoda', date: '2026-06-25', status: 'unconfirmed', note: null, updatedAt: null, revision: 0 };
+  expect(ReceivingList.parse({ date: state.date, depot: 'Peliyagoda', states: [state] }).states[0]).toEqual(state);
 });
