@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { PHONE_ACCOUNT_HEADER, type DriverDay, type DriverWrite } from '@wayfinder/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -184,6 +186,23 @@ afterEach(() => {
 });
 
 describe('the driver\'s phone', () => {
+  it('D3 waits for a fresh online day before showing a cached trip from an earlier run', async () => {
+    db.days.set(`driver:${DILSHAN.id}`, { queue: 'driver', userId: DILSHAN.id, day: dayFor(DILSHAN, []) });
+    let answer!: (value: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { answer = resolve; })));
+    const phone = await open(DILSHAN);
+    await until(() => phone.store.readKept().ready && typeof answer === 'function');
+    const { useDriverView } = await import('../src/features/driver/view');
+    let shown: DriverDay | null = null;
+    function Screen() { shown = useDriverView(DILSHAN.id).day; return null; }
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toBeNull();
+    answer(new Response(JSON.stringify({ ...dayFor(DILSHAN, []), trips: [] }), { headers: { 'Content-Type': 'application/json' } }));
+    await until(() => phone.sync().fetched);
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toMatchObject({ trips: [] });
+  });
+
   it('sends nothing under another account with the same name, refuses nothing for it, and sends once the session is the driver\'s own', async () => {
     const waiting = arrive();
     keptBefore(db, DILSHAN, waiting);

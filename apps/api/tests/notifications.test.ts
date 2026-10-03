@@ -252,6 +252,35 @@ it('AC-4 each walkthrough person\'s bell after each step of the walkthrough', as
   for (const who of [ruwan, kasun, dilshan]) expect(await updatesOf(who)).toEqual([]);
 });
 
+it('A3 retains the ready-time loading count after a full refusal and a closed-shop return', async () => {
+  await sendWalkthroughPlan(walk);
+  const day = await loader.read();
+  let truck = answeredTruck(await loader.start(truckOf(day, 'VEH035'), day.plan!), 'VEH035');
+  truck = answeredTruck(await loader.stopLoaded(truck, 2), 'VEH035');
+  truck = answeredTruck(await loader.stopLoaded(truck, 1), 'VEH035');
+  await loader.ready(truck);
+  const before = async (who: Agent) => (await updatesOf(who)).find((item) => item.kind === 'truck_ready');
+  const dispatchReady = await before(ruwan);
+  const driverReady = await before(dilshan);
+  const send = async (kind: Parameters<typeof driverWrite>[1], minute: number, seq?: number, more: object = {}) => {
+    freeze(THU, minute);
+    return answeredTrip(await driver.send(driverWrite(driverTrip(await driver.read()), kind, at(minute).toISOString(), seq, more)));
+  };
+  await send('start', 211);
+  await send('arrive', 214, 1);
+  let trip = driverTrip(await driver.read());
+  trip = await send('refuse', 218, 1, { reason: 'damaged', note: '', lines: driverStop(trip, 1).lines.map((line) => ({ lineId: line.lineId, refused: line.loaded! })) });
+  await send('arrive', 225, 2);
+  trip = await send('closed', 228, 2, { note: 'Gate locked' });
+  for (const problem of trip.problems) {
+    const open = (await ruwan.get('/api/v1/issues')).body.issues.find((issue: { id: string }) => issue.id === problem.id);
+    expect((await ruwan.post(`/api/v1/issues/${problem.id}/decide`).send({ revision: open.revision, decision: 'bring_back' })).status).toBe(200);
+  }
+  await send('finish', 260);
+  expect(await before(ruwan)).toEqual(dispatchReady);
+  expect(await before(dilshan)).toEqual(driverReady);
+});
+
 it('AC-1 a closed shop: the shop and the dispatcher are told, and the driver\'s answer to try again is short', async () => {
   await sendWalkthroughPlan(walk);
   const day = await loader.read();

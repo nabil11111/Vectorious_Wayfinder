@@ -17,7 +17,7 @@ import { serve, stop } from './serve';
 import { PIN, signInAs } from './sign-in';
 
 // Spec 015, AC-28 to AC-30: a replacement in the plan. Split on Friday's board by hand (spec 010) or by the planner
-// (spec 014), and joined back, it stays a replacement of Thursday's delivery, out of the shop's next order, and the
+// (spec 014), and joined back, it stays a replacement of Thursday's delivery, counted once in the shop's next order, and the
 // problem's replacement reads the whole.
 
 const testClock = vi.hoisted(() => ({ at: '' }));
@@ -131,7 +131,17 @@ async function refusalReplaced() {
   return { refusal, replacement: await replacementOf(refusal.id), own: StoreNextOrder.parse(placed.body).placed!.orders[0]! };
 }
 
-it('AC-28 keeps both parts of a replacement Ruwan splits 1 and 1 on Friday\'s board replacements of Thu 25 Jun, out of OUT002\'s next order, and the refusal\'s replacement whole', async () => {
+it('A2 includes eligible placed replacements in Today, alongside own orders and only for this outlet', async () => {
+  const { replacement, own } = await refusalReplaced();
+  const next = (await nextOrderAtNine(wellawatte)).placed!;
+  expect(next.orders.map((order) => order.id).sort()).toEqual([replacement.id, own.id].sort());
+  expect(next.lines.reduce((total, line) => total + line.quantity, 0)).toBe(7);
+  expect((await nextOrderAtNine(nadeesha)).placed?.orders.some((order) => order.id === replacement.id)).not.toBe(true);
+  await db.update(orders).set({ status: 'cancelled' }).where(eq(orders.id, replacement.id));
+  expect((await nextOrderAtNine(wellawatte)).placed?.orders.map((order) => order.id)).toEqual([own.id]);
+});
+
+it('AC-28 keeps both parts of a replacement Ruwan splits 1 and 1 on Friday\'s board replacements of Thu 25 Jun, counted once in OUT002\'s next order, and the refusal\'s replacement whole', async () => {
   const { refusal, replacement, own } = await refusalReplaced();
   await readFriday();
   expect(board.orders.map((order) => order.id)).toContain(replacement.id);
@@ -142,10 +152,12 @@ it('AC-28 keeps both parts of a replacement Ruwan splits 1 and 1 on Friday\'s bo
   expect(parts.map((part) => open.find((order) => order.id === part.id)!.replacementFor)).toEqual([THU, THU]);
   expect(open.find((order) => order.id === own.id)!.replacementFor).toBeNull();
   expect((await problemNow(refusal.id)).replacement).toEqual({ day: FRI, units: 2 });
-  expect((await nextOrderAtNine(wellawatte)).placed?.orders.map((order) => order.id)).toEqual([own.id]);
+  const next = (await nextOrderAtNine(wellawatte)).placed!;
+  expect(next.orders.map((order) => order.id).sort()).toEqual([...parts.map((part) => part.id), own.id].sort());
+  expect(next.lines.reduce((total, line) => total + line.quantity, 0)).toBe(7);
 });
 
-it('AC-29 keeps both parts of a replacement the suggested plan for Friday splits replacements of Thu 25 Jun, out of the shop\'s next order, and the report\'s replacement whole', async () => {
+it('AC-29 keeps both parts of a replacement the suggested plan for Friday splits replacements of Thu 25 Jun, counted once in the shop\'s next order, and the report\'s replacement whole', async () => {
   const trip = await deliveredWalkthrough(walk);
   const delivery = (await shopScreen(nadeesha).read()).deliveries.find((each) => each.stopId === driverStop(trip, 1).id)!;
   const write = receiptOf(delivery, [11, 8, 3], { reason: 'missing' });
@@ -165,10 +177,12 @@ it('AC-29 keeps both parts of a replacement the suggested plan for Friday splits
   const open = await listOf(nadeesha);
   expect(parts.map((part) => open.find((order) => order.id === part.id)!.replacementFor)).toEqual([THU, THU]);
   expect((await problemNow(write.writeId)).replacement).toEqual({ day: FRI, units: 950 });
-  expect((await nextOrderAtNine(nadeesha)).placed).toBeNull();
+  const next = (await nextOrderAtNine(nadeesha)).placed!;
+  expect(next.orders.map((order) => order.id).sort()).toEqual(parts.map((part) => part.id).sort());
+  expect(next.lines.reduce((total, line) => total + line.quantity, 0)).toBe(950);
 });
 
-it('AC-30 gives the order joined back on the board Thu 25 Jun as the day it replaces again, and OUT002\'s next order still does not count it', async () => {
+it('AC-30 gives the order joined back on the board Thu 25 Jun as the day it replaces again, and OUT002\'s next order counts it once', async () => {
   const { refusal, replacement, own } = await refusalReplaced();
   await readFriday();
   await boardWrite(await ruwan.post(`${URL}/split`).send({ ...ref(), orderId: replacement.id, keep: [{ productId: 'fresh-chilled-carton', quantity: 1 }] }));
@@ -177,7 +191,9 @@ it('AC-30 gives the order joined back on the board Thu 25 Jun as the day it repl
   const joined = (await listOf(wellawatte)).find((order) => order.id === replacement.id)!;
   expect(joined).toMatchObject({ status: 'placed', units: 2, replacementFor: THU });
   expect((await problemNow(refusal.id)).replacement).toEqual({ day: FRI, units: 2 });
-  expect((await nextOrderAtNine(wellawatte)).placed?.orders.map((order) => order.id)).toEqual([own.id]);
+  const next = (await nextOrderAtNine(wellawatte)).placed!;
+  expect(next.orders.map((order) => order.id).sort()).toEqual([replacement.id, own.id].sort());
+  expect(next.lines.reduce((total, line) => total + line.quantity, 0)).toBe(7);
 });
 
 // Ruwan saves a day's plan with these trips, every other order of the day waiting, and sends it.
