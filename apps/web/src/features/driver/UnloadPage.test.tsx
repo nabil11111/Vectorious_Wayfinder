@@ -19,7 +19,9 @@ function find(node: ReactNode, text: string): { onClick: () => void; disabled?: 
 }
 describe('explicit unload confirmation', () => {
   it('waits for confirmation and All unloaded uses the loaded amount rather than ordered amount', () => {
+    step.mockClear();
     const page = UnloadPage({ view: { waitingRecords: 0 } as DriverView, trip, figures, stop });
+    expect(step).not.toHaveBeenCalled();
     expect(find(page, 'Done unloading')?.disabled).toBe(true);
     const all = find(page, 'All unloaded');
     expect(all).toBeDefined();

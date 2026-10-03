@@ -17,7 +17,7 @@ const LINE_CELL = 'col-start-4';
 const tripAnchor = (tripId: string) => `history-trip-${tripId}`;
 
 export function HistoryTrips({ read, trips, axis, selectedId, onToggle }: {
-  read: LookupHistory; trips: HistoryTrip[]; axis: Axis | null; selectedId: string | null; onToggle: (tripId: string) => void;
+  read: LookupHistory; trips: HistoryTrip[]; axis: Axis | null; selectedId: string | null; onToggle: (tripId: string, trigger?: HTMLElement) => void;
 }) {
   // Its own ids, as History on both depots together draws the trips per depot (spec 021).
   const id = useId();
@@ -77,17 +77,17 @@ function AxisRow({ axis }: { axis: Axis }) {
   );
 }
 
-function TripRow({ trip, axis, selected, onToggle }: { trip: HistoryTrip; axis: Axis | null; selected: boolean; onToggle: (tripId: string) => void }) {
+function TripRow({ trip, axis, selected, onToggle }: { trip: HistoryTrip; axis: Axis | null; selected: boolean; onToggle: (tripId: string, trigger?: HTMLElement) => void }) {
   const tint = trip.flags.returned || trip.flags.short ? 'bg-bad-tint' : trip.flags.late ? 'bg-warn-tint' : selected ? 'bg-selected' : null;
   return (
-    <li id={tripAnchor(trip.tripId)} className={cn(ROW, 'min-h-[34px] scroll-mt-28 rounded-[10px] px-2 py-1', tint, selected && 'ring-[1.5px] ring-foreground ring-inset')}>
+    <li id={tripAnchor(trip.tripId)} className={cn(ROW, 'min-h-[52px] scroll-mt-28 rounded-[10px] px-2 py-2 transition-colors hover:bg-muted focus-within:bg-muted focus-within:ring-2 focus-within:ring-ring/50', tint, selected && 'ring-[1.5px] ring-foreground ring-inset')}>
       <img src={vehiclePicture({ type: trip.vehicleType, temp: trip.vehicleTemp })} alt="" className="size-5 object-contain" />
       <button
         type="button"
         data-trip={trip.tripId}
         aria-expanded={selected}
-        aria-controls={selected ? 'history-detail' : undefined}
-        onClick={() => onToggle(trip.tripId)}
+        aria-haspopup="dialog"
+        onClick={(event) => onToggle(trip.tripId, event.currentTarget)}
         className="min-w-0 truncate rounded-md text-left text-xs leading-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <span className="font-mono font-bold">{trip.tripNo > 1 ? `${trip.vehicleId} trip ${trip.tripNo}` : trip.vehicleId}</span>
@@ -99,7 +99,7 @@ function TripRow({ trip, axis, selected, onToggle }: { trip: HistoryTrip; axis: 
       {axis ? <TripLine trip={trip} axis={axis} className={LINE_CELL} /> : <span className={LINE_CELL} />}
       <TripFlags trip={trip} />
       <div className="flex justify-end">
-        <Button variant="outline" aria-label={`${selected ? 'Close' : 'Open'} ${tripName(trip)}`} className={plainButton('h-6 w-[60px] rounded-full text-[11px]')} onClick={() => onToggle(trip.tripId)}>
+        <Button variant="outline" aria-haspopup="dialog" aria-label={`${selected ? 'Close' : 'Open'} ${tripName(trip)}`} className={plainButton('h-8 w-[60px] rounded-full text-xs')} onClick={(event) => onToggle(trip.tripId, event.currentTarget)}>
           {selected ? 'Close' : 'Open'}
         </Button>
       </div>
@@ -131,6 +131,7 @@ function TripLine({ trip, axis, className }: { trip: HistoryTrip; axis: Axis; cl
     <span className={cn('relative block h-[18px]', className)}>
       <span aria-hidden="true">
         <span className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-good-tint" style={{ left: `${from}%`, width: `${Math.max(0, to - from)}%` }} />
+        <span title={`Planned departure ${clockTime(trip.schedule.leavesAt)}`} className={cn(MARK, 'size-3 border-2 border-foreground bg-card')} style={at(trip.schedule.leavesAt)} />
         {trip.stops.map((stop) => <span key={stop.id} title={`${stop.outlet.name} planned ${clockTime(stop.plannedArrival)}`} className={cn(MARK, 'size-2.5 border-[1.5px] border-good bg-card')} style={at(stop.plannedArrival)} />)}
         {trip.leftAt && last && (
           <span className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-good" style={{ left: `${placeOn(axis, trip.leftAt)}%`, width: `${Math.max(0.6, placeOn(axis, last) - placeOn(axis, trip.leftAt))}%` }} />
@@ -139,6 +140,7 @@ function TripLine({ trip, axis, className }: { trip: HistoryTrip; axis: Axis; cl
         {trip.stops.map((stop) => <Recorded key={stop.id} stop={stop} at={at} />)}
         {trip.backAt && <span title={`Back ${clockTime(trip.backAt)}`} className={cn(MARK, 'size-2.5 bg-foreground')} style={at(trip.backAt)} />}
       </span>
+      <span className="absolute top-full mt-0.5 font-mono text-[10px] leading-3 text-muted-foreground" style={{ left: `${Math.min(80, from)}%` }}>Plan leave {clockTime(trip.schedule.leavesAt)}</span>
       <span className="sr-only">{describe(trip)}</span>
     </span>
   );

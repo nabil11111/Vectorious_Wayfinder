@@ -6,7 +6,7 @@ import { Chip } from '@/components/ui/chip';
 import { countLine } from '@/features/loader/words';
 import { cn } from '@/lib/utils';
 import { receiptBox } from '../receipt-counts';
-import { countOf, expectedWords, lineGoods, overLine, receiptLineName, refusedAtDoorLine, SHORT_REASON_WORDS, shortChip, shortFromDepotLine, wontFitLine } from '../words';
+import { countOf, lineGoods, overLine, receiptLineName, refusedAtDoorLine, SHORT_REASON_WORDS, shortChip, shortFromDepotLine, wontFitLine } from '../words';
 import { Choice } from './Choice';
 import { goodsIcon } from './icons';
 import { Panel } from './Panel';
@@ -84,14 +84,14 @@ export function CountCard({ brand, line, figures, count, text, reason, disabled,
   const wrong = text === undefined ? null : receiptBox(text, figures.expected).wrong;
   return (
     <Panel line className="pt-[9px]">
-      <div className="flex items-end">
+      <div className="flex flex-wrap items-end gap-y-1.5">
         {/* The picture's own margin sits left of the card's padding, as the frame places it. */}
         <img src={goodsIcon(brand, line.temp)} alt="" className="-ml-[9px] size-9 shrink-0 object-contain" />
         <h2 className="min-w-0 flex-1 font-sans text-[15px] leading-[18px] font-semibold">{name}</h2>
-        <p className="shrink-0 self-center pl-3 text-xs leading-[15px] text-muted-foreground">{expectedWords(figures.expected)}</p>
+        <p className="self-center pl-3 text-xs leading-[15px] text-muted-foreground">{countOf(figures.expected, line.unit)} expected</p>
       </div>
       <div className="mt-2 flex items-center justify-between gap-3">
-        <span className="text-sm leading-[17px] font-semibold">Received</span>
+        <span className="text-sm leading-[17px] font-semibold">Received <span className="block text-xs font-normal text-muted-foreground">{line.unit}</span></span>
         <ReceivedCounter name={name} value={count} text={text} max={figures.expected} disabled={disabled} lineId={lineId} onStep={onStep} onType={onType} onLeave={onLeave} />
       </div>
       {wrong && (

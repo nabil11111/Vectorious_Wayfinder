@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { BoardOrder, Brand } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PickDepot } from '@/features/dispatcher/parts/PickDepot';
 import { useScope } from '@/features/dispatcher/scope';
+import { useMe } from '@/features/auth/api';
+import { currentRead, ordersOptions, useFollowGeneration, useFollowLookupMessages } from '@/features/lookup/queries';
+import { useAppClock } from '@/lib/clock';
 import { reasonOf } from '@/features/store/words';
 import { cn } from '@/lib/utils';
 import { ENDS_HISTORY, joinOrder, useBoard, useBoardScreen, useOrdersFollow, type BoardScreen, type Saver } from './board';
@@ -38,6 +42,8 @@ export function PlanBoardPage() {
 
 function OneDepotBoard() {
   const query = useBoard();
+  const { scope } = useScope();
+  const clock = useAppClock();
   useOrdersFollow();
   const { saver, screen } = useBoardScreen(query.data);
 
@@ -50,7 +56,9 @@ function OneDepotBoard() {
   if (!board.day) return <Message title="Plan board" icon={ICON.day} line="No delivery day is left to plan." />;
   // The board opens for planning once the day's orders close (rule 1).
   if (!board.day.open) {
-    return <Message title={planFor(board.day.date)} icon={ICON.cutoff} line={`Orders for ${shortDay(board.day.date)} close at ${clockTime(board.day.cutoffAt)}. The board opens then.`} />;
+    if (board.depot !== scope || (clock.state?.day != null && board.demoDay !== clock.state.day)) return <BoardSkeleton />;
+    if (query.isError) return <CannotLoad error={query.error} busy={query.isFetching} onRetry={() => { void query.refetch(); }} />;
+    return <WaitingForOrders key={`${board.depot}:${board.day.date}:${board.demoDay}`} date={board.day.date} cutoffAt={board.day.cutoffAt} generation={board.demoDay} />;
   }
   // A sent plan is read on View plan, whose address keeps the day through a reload or a clock move. The board held
   // from an earlier visit can be out of date (the day may have moved on, or the plan gone back to edit), so only a
@@ -60,6 +68,42 @@ function OneDepotBoard() {
     return fresh?.day && fresh.plan.status === 'published' ? <Navigate to={`/dispatcher/plan/${fresh.day.date}`} replace /> : <BoardSkeleton />;
   }
   return <Board screen={screen} saver={saver} stale={query.isError} refreshing={query.isFetching} onRefresh={() => { void query.refetch(); }} />;
+}
+
+export function closingCountdown(cutoffAt: string, at: number | null) {
+  if (at === null) return null;
+  const minutes = Math.max(0, Math.ceil((Date.parse(cutoffAt) - at) / 60_000));
+  return minutes === 0 ? 'Orders are closing' : `${Math.floor(minutes / 60)}h ${minutes % 60}m until orders close`;
+}
+
+function WaitingForOrders({ date, cutoffAt, generation }: { date: string; cutoffAt: string; generation: number }) {
+  const { data: me } = useMe();
+  const { depots } = useScope();
+  const clock = useAppClock();
+  const depot = depots[0] ?? null;
+  const query = useQuery(ordersOptions(me, depot, { date, range: 'day' }));
+  useFollowLookupMessages();
+  useFollowGeneration(clock.state?.day ?? null, query.data?.demoDay ?? null);
+  const fresh = currentRead(query.data, clock.state?.day ?? null);
+  // A failed refresh or a read for a different day/depot/reset never stands in for current received demand.
+  const read = !query.isError && fresh?.date === date && fresh.depot.id === depot && fresh.demoDay === generation ? fresh : undefined;
+  const countdown = closingCountdown(cutoffAt, clock.at);
+  return <div className="space-y-4 lg:pt-2.5">
+    <h1 className="text-xl leading-6 font-bold">{planFor(date)}</h1>
+    <Column className="max-w-3xl gap-5 p-5 sm:p-6">
+      <div className="flex items-start gap-4"><img src={ICON.cutoff} alt="" className="size-12 shrink-0 object-contain" /><div>
+        <h2 className="text-lg font-bold">Receiving orders for {shortDay(date)}</h2>
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">Orders close at {clockTime(cutoffAt)}. Planning opens after closing.</p>
+        <p className="mt-3 font-mono text-lg font-bold">{countdown ?? 'Waiting for the application clock'}</p>
+      </div></div>
+      {read?.summary ? <dl className="grid grid-cols-2 gap-3" aria-label="Received demand">
+        <div className="rounded-[12px] border bg-muted/30 p-4"><dd className="font-mono text-2xl font-bold">{read.summary.orders}</dd><dt className="mt-1 text-sm text-muted-foreground">received orders</dt></div>
+        <div className="rounded-[12px] border bg-muted/30 p-4"><dd className="font-mono text-2xl font-bold">{new Set(read.rows.map((row) => row.outlet.id)).size}</dd><dt className="mt-1 text-sm text-muted-foreground">shops with orders</dt></div>
+      </dl> : query.isError ? <div role="alert"><p className="text-sm font-semibold">Could not load received demand.</p><p className="mt-1 text-xs text-muted-foreground">{reasonOf(query.error)}</p><Button variant="outline" className={plainButton('mt-3 h-10 px-4')} disabled={query.isFetching} onClick={() => { void query.refetch(); }}>Try again</Button></div>
+        : <p role="status" className="text-sm text-muted-foreground">Loading current received demand…</p>}
+      <Link to={`/dispatcher/orders?date=${date}&range=day`} className={plainButton('inline-flex h-11 items-center justify-center rounded-[10px] border px-5 text-sm font-semibold')}>View orders</Link>
+    </Column>
+  </div>;
 }
 
 // What the middle column shows besides the open trip: finding a slot for an order.

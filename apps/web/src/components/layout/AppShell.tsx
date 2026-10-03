@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { NavLink } from 'react-router';
+import { Link, NavLink } from 'react-router';
 import type { Role } from '@wayfinder/contracts';
 import dispatcherIcon from '@/assets/icons/icon-person-dispatcher.png';
 import driverIcon from '@/assets/icons/icon-person-driver.png';
@@ -7,7 +7,7 @@ import loaderIcon from '@/assets/icons/icon-person-loader.png';
 import storeManagerIcon from '@/assets/icons/icon-person-store-manager.png';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
-import { ROLE_LABEL, useLogout, useMe } from '@/features/auth/api';
+import { HOME, ROLE_LABEL, useLogout, useMe } from '@/features/auth/api';
 import { NotificationBell } from '@/features/notifications/Bell';
 import { useAppClock } from '@/lib/clock';
 import { useLive } from '@/lib/live';
@@ -48,7 +48,7 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
         <span className="font-mono text-2xl font-bold tabular-nums lg:hidden">{clock.time}</span>
         {status && <span className="lg:hidden">{status}</span>}
         <DemoClock clock={clock} as="sheet" compact={Boolean(status)} className="lg:hidden" />
-        <Wordmark className="hidden lg:inline-flex" />
+        <Link to={HOME[me.role]} aria-label="Wayfinder home" className="hidden rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:inline-flex"><Wordmark /></Link>
         {nav.length > 0 && (
           <nav className="ml-4 hidden gap-1 lg:flex">
             {nav.map((n) => (

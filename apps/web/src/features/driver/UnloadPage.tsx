@@ -56,6 +56,8 @@ export function UnloadPage({ view, trip, figures, stop }: { view: DriverView; tr
                     className="ml-auto"
                   />
                 </div>
+                <Button variant="outline" aria-label={`All unloaded: ${name}`} className="mt-3 h-11 w-full text-sm"
+                  onClick={() => tally.step(line.lineId, each.loaded)}>All unloaded</Button>
                 {reading && (
                   <p id={fix} role="alert" className="mt-2.5 text-[13px] leading-4 font-semibold text-bad">
                     {reading.kind === 'over' ? overLoadedLine(reading.count, each.loaded, brand) : wholeCountsLine(each.loaded)}

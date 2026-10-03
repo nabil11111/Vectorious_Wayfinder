@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { Issue, IssueList, OperationsDay } from '@wayfinder/contracts';
@@ -26,6 +27,8 @@ export interface DashboardPart { depot: string; issues: UseQueryResult<IssueList
 // trucks, each row with its depot's chip, counts them only once both lists are read, says which depot's list failed,
 // and has a next run line per depot.
 export function NeedsYouCard({ parts, both }: { parts: DashboardPart[]; both: boolean }) {
+  const [moreProblems, setMoreProblems] = useState(false);
+  const [moreWatching, setMoreWatching] = useState(false);
   const read = parts.filter((part) => part.issues.data);
   const allRead = read.length === parts.length;
   const open = openOf(read.map((part) => ({ depot: part.depot, list: part.issues.data! })));
@@ -53,13 +56,19 @@ export function NeedsYouCard({ parts, both }: { parts: DashboardPart[]; both: bo
         </div>
       ))}
       {parts.some((part) => !part.issues.data && !part.issues.isError) && <RowsSkeleton />}
-      {allRead && open.length === 0 && watching.length === 0 && <p className="mt-3 text-[13px] leading-[18px]">{NOTHING_NEEDS_YOU}</p>}
-      {(open.length > 0 || watching.length > 0) && (
-        <ul className="mt-3.5 space-y-3">
-          {open.map(({ depot, issue }, i) => <ProblemRow key={issue.id} issue={issue} depot={both ? depot : null} first={i === 0} />)}
-          {watching.map(({ depot, trip }) => <WatchingRow key={trip.tripId} trip={trip} depot={both ? depot : null} />)}
-        </ul>
-      )}
+      {allRead && open.length === 0 && <p className="mt-3 text-[13px] leading-[18px]">{NOTHING_NEEDS_YOU}</p>}
+      {open.length > 0 && <>
+        <h3 className="mt-4 text-xs font-bold text-muted-foreground">Actionable problems{allRead ? ` · ${whole(open.length)}` : ' · still loading'}</h3>
+        <ul aria-label="Actionable problems" className="mt-2 space-y-3">{open.slice(0, moreProblems ? open.length : 3).map(({ depot, issue }, i) => <ProblemRow key={issue.id} issue={issue} depot={both ? depot : null} first={i === 0} />)}</ul>
+        {open.length > 3 && <Button variant="outline" className={plainButton('mt-3 h-9 px-4 text-xs')} onClick={() => setMoreProblems(!moreProblems)}>{moreProblems ? 'Show fewer problems' : `Show all ${whole(open.length)} problems`}</Button>}
+        <Link to="/dispatcher/live" className="mt-3 ml-3 inline-block text-xs font-semibold underline underline-offset-2">View all in Live day</Link>
+      </>}
+      {watching.length > 0 && <section aria-label="Watching trips" className="mt-4 border-t pt-4">
+        <h3 className="text-sm font-bold">Watching · {whole(watching.length)}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Reports to watch. No problem awaiting your decision.</p>
+        <ul className="mt-3 space-y-3">{watching.slice(0, moreWatching ? watching.length : 3).map(({ depot, trip }) => <WatchingRow key={trip.tripId} trip={trip} depot={both ? depot : null} />)}</ul>
+        {watching.length > 3 && <Button variant="outline" className={plainButton('mt-3 h-9 px-4 text-xs')} onClick={() => setMoreWatching(!moreWatching)}>{moreWatching ? 'Show fewer trips' : `Show all ${whole(watching.length)} watching trips`}</Button>}
+      </section>}
 
       <NextRuns parts={parts} both={both} />
     </section>

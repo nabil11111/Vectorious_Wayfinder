@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
 import { FLAG_REASONS, type FlagReason, type LoadingLine, type LoadingStop, type LoadingTruck } from '@wayfinder/contracts';
 import { StaleNotice } from '@/features/store/parts/LoadError';
@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useLogout } from '@/features/auth/api';
 import { orangeButton } from '@/features/plan/parts/look';
 import { cn } from '@/lib/utils';
+import { DiscardDraft, hasFormEdits } from '@/lib/dirty-form';
 import { flagCounts, wholeCount } from './count';
 import { useLoadingDay, useLoaderWrites, type LoaderWrites } from './loading';
 import { GOODS_ICON } from './parts/icons';
@@ -66,6 +67,9 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
   const tally = flagCounts(stop.lines, flagged, counts, typed);
   const line = stop.lines.find((l) => l.lineId === picked && !flagged.has(l.lineId)) ?? null;
   const busy = writes.phase !== 'idle';
+  const completed = useRef(false);
+  const dirty = hasFormEdits({ counts, typed, note, reason });
+  const holding = () => !completed.current && (dirty || writes.holding('flag'));
 
   // − and + step from the count the form holds, and what was typed in the box goes. A whole number from 0 to the line's
   // count is its count; anything else stays in the box as typed. Leaving the box shows its count, "054" as 54, and a
@@ -87,7 +91,7 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
   const send = () => writes.send(truck.tripId, {
     kind: 'flag',
     body: { revision: truck.revision, stopId: stop.id, reason, lines: tally.lowered.map((l) => ({ lineId: l.lineId, counted: tally.countAt(l) })), note: note.trim() },
-  }, () => navigate(`/loader/trucks/${truck.tripId}`));
+  }, () => { completed.current = true; navigate(`/loader/trucks/${truck.tripId}`); });
 
   const sendButton = (
     <Button className={orangeButton('h-16 w-full rounded-[12px] text-lg')} disabled={busy || !tally.canSend} focusableWhenDisabled onClick={send}>
@@ -98,31 +102,39 @@ function FlagForm({ truck, stop, writes, stale }: { truck: LoadingTruck; stop: L
   // A flag on its way or not sent keeps the loader on the form until it is sent, or until they choose to leave without
   // it (Q-22): by the back link, the bell, the browser's back, or closing or reloading the tab. Once the flag is sent the
   // form goes on to the truck as before, and a flag the server refused lets them go, as the refusal says why.
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => asksBeforeLeaving(writes.holding('flag'), currentLocation, nextLocation));
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => asksBeforeLeaving(holding(), currentLocation, nextLocation));
   const unsent = writes.out === 'flag' && writes.phase !== 'idle';
   // Sign out asks the same way, as signing out would take the form and its flag with it.
   const logout = useLogout();
+  useEffect(() => { if (logout.isError) completed.current = false; }, [logout.isError]);
   const [signOutAsked, setSignOutAsked] = useState(false);
-  useAsksBeforeSignOut(() => writes.holding('flag'), () => setSignOutAsked(true));
+  useAsksBeforeSignOut(holding, () => setSignOutAsked(true));
   useEffect(() => {
-    if (blocker.state === 'blocked' && !unsent) blocker.reset();
-  }, [blocker, unsent]);
+    if (blocker.state === 'blocked' && !unsent && !dirty) blocker.reset();
+  }, [blocker, unsent, dirty]);
   useEffect(() => {
-    if (!unsent) return;
-    const ask = (event: BeforeUnloadEvent) => event.preventDefault();
+    if (!unsent && !dirty) return;
+    const ask = (event: BeforeUnloadEvent) => { if (!completed.current) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', ask);
     return () => window.removeEventListener('beforeunload', ask);
-  }, [unsent]);
+  }, [unsent, dirty]);
   const leaving = blocker.state === 'blocked' ? blocker : null;
 
   return (
     <div>
+      <DiscardDraft open={!unsent && (signOutAsked || leaving !== null)} name="problem report" signingOut={signOutAsked}
+        onKeep={() => { setSignOutAsked(false); leaving?.reset(); }}
+        onDiscard={() => {
+          completed.current = true;
+          if (signOutAsked) { setSignOutAsked(false); logout.signOutAnyway(); }
+          else leaving?.proceed();
+        }} />
       <BackLink to={`/loader/trucks/${truck.tripId}`}>{truckName(truck)}</BackLink>
       <div className="mt-2.5 lg:mt-3.5">
         {stale}
         {writes.refused && <Refused>{writes.refused}</Refused>}
         {signOutAsked && unsent ? (
-          <LeaveUnsent signingOut onRetry={() => { setSignOutAsked(false); writes.retry(); }} onLeave={() => { setSignOutAsked(false); logout.signOutAnyway(); }} />
+          <LeaveUnsent signingOut onRetry={() => { setSignOutAsked(false); writes.retry(); }} onLeave={() => { completed.current = true; setSignOutAsked(false); logout.signOutAnyway(); }} />
         ) : (
           <>
             {leaving && writes.phase === 'unsaved' && <LeaveUnsent onRetry={() => { leaving.reset(); writes.retry(); }} onLeave={() => leaving.proceed()} />}

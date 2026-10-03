@@ -21,6 +21,13 @@ const card = (text?: string, count = 50) => renderToStaticMarkup(
 const stepButtons = (html: string) => [...html.matchAll(/<button[^>]*aria-label="One (?:less|more)[^>]*>/g)].map(([tag]) => tag);
 const lineUnder = (html: string) => html.match(/<p[^>]*id="([^"]+)"[^>]*role="alert"[^>]*>([^<]*)<\/p>/);
 
+it('retains the unit and known pack size beside receipt quantity entry', () => {
+  const html = renderToStaticMarkup(<CountCard brand="Tech" line={{ ...kotahena, name: 'Refrigerators', unit: 'crate of 2' }} figures={figures} count={50} text={undefined} reason="missing" disabled={false}
+    onStep={() => {}} onType={() => {}} onLeave={() => {}} onReason={() => {}} />);
+  expect(html).toContain('50 crates of 2 expected');
+  expect(html).toContain('>crate of 2</span>');
+});
+
 describe('Q-38 the receipt\'s count box', () => {
   it('reads a whole number from 0 to what was handed over as the count, and anything else as wrong, saying which', () => {
     expect([receiptBox('0', 50), receiptBox('48', 50), receiptBox('50', 50), receiptBox('048', 50), receiptBox('', 50)])
