@@ -207,6 +207,36 @@ describe('the driver\'s phone', () => {
     expect(shown).toMatchObject({ trips: [] });
   });
 
+  it.each([503, 429])('retains cached work and queued records through repeated reachable %s startup failures', async status => {
+    db.days.set(`driver:${DILSHAN.id}`, { queue: 'driver', userId: DILSHAN.id, day: dayFor(DILSHAN, []) });
+    const waiting = arrive(); keptBefore(db, DILSHAN, waiting);
+    const failedRead = vi.fn(async () => Response.json({ error: { code: 'unavailable', message: 'Try again soon.' } }, { status }));
+    vi.stubGlobal('fetch', failedRead);
+    const phone = await open(DILSHAN);
+    await until(() => failedRead.mock.calls.length >= 2 && phone.sync().failure !== null);
+    const { useDriverView } = await import('../src/features/driver/view');
+    let shown: DriverDay | null = null;
+    function Screen() { shown = useDriverView(DILSHAN.id).day; return null; }
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toMatchObject({ trips: [{ tripId: TRIP, stops: [{ arrivedAt: waiting.at }] }] });
+    expect(phone.queue()).toEqual([[waiting.writeId, 'waiting']]);
+    const next = closed();
+    await phone.sender.saveAction(next, 'Stop 1 · Fresh Nugegoda');
+    expect(phone.queue()).toEqual([[waiting.writeId, 'waiting'], [next.writeId, 'waiting']]);
+    // A new activation must hide the cache again while its current read is still pending.
+    let answer!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { answer = resolve; })));
+    phone.sender.setAccount(DILSHAN);
+    await until(() => typeof answer === 'function');
+    renderToStaticMarkup(createElement(Screen));
+    expect(shown).toBeNull();
+    const server: Server = { session: DILSHAN, applied: [], refuse: new Set(), posted: [], named: [] };
+    serve(server);
+    answer(Response.json(dayFor(DILSHAN, [])));
+    await until(() => phone.sync().fetched && phone.queue().length === 0);
+    expect(server.posted).toEqual([waiting.writeId, next.writeId]);
+  });
+
   it('D3 a same-account reactivation cancels the older day read before accepting the new run', async () => {
     const answers: ((value: Response) => void)[] = [];
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { answers.push(resolve); })));

@@ -9,7 +9,7 @@ import { auditLog, demoDay, fuelLog, orderLines, outlets, stopOrders, stops, tri
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import { applyWrite } from '../src/driver/writes';
-import { startLoading } from '../src/loading/writes';
+import { markStopLoaded, startLoading } from '../src/loading/writes';
 import { DEFAULT_SETTINGS, toClock } from '../src/planning';
 import { sendPlan } from '../src/plans/send';
 import { driverTrip, driverWrite, heldDriverRows } from './driver-plan';
@@ -297,4 +297,50 @@ it('B4 allows exact weight, volume, window and fuel boundaries through Send', as
   await db.update(vehicles).set({ weightCapKg: 690, volumeCapM3: '3.70', kmPerL: checked.times!.km.toFixed(2), weeklyFuelQuotaL: 1 }).where(eq(vehicles.id, 'VEH004'));
   await db.update(outlets).set({ windowClose: toClock(checked.times!.stops[0]!.arriveAt) }).where(eq(outlets.id, 'OUT026'));
   expect((await ruwan.post(`/api/v1/plans/${THU}/send`).send({ planId: saved.plan.id, revision: saved.plan.revision })).status).toBe(200);
+});
+
+
+it('B2 keeps a post-return count physical when its transaction began before the return', async () => {
+  await published(); await load(1);
+  const second = own(await loader.read(), 2);
+  await db.update(trips).set({ status: 'loading' }).where(eq(trips.id, second.tripId));
+  const current = own(await loader.read(), 2), writeId = randomUUID();
+  const body = { writeId, revision: current.revision, stopId: current.stops[0]!.id };
+  const blocker = await pool.connect();
+  let count: Promise<LoadingDay> | undefined;
+  try {
+    await blocker.query('begin');
+    await blocker.query('select id from trips where id = $1 for update', [second.tripId]);
+    count = markStopLoaded({ userId: loaderId, depotId: 'Peliyagoda' }, second.tripId, body);
+    // Wait until the count transaction has begun and is blocked on the second trip, rather than guessing timing.
+    let waiting = false;
+    for (let attempt = 0; attempt < 100 && !waiting; attempt++) {
+      const result = await pool.query("select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%trips%'");
+      waiting = result.rowCount! > 0;
+      if (!waiting) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    expect(waiting).toBe(true);
+    await returnFirst(150);
+    await blocker.query('commit');
+    const counted = own(await count, 2);
+    expect(counted.stops[0]!.loaded).toBe(true);
+    expect(own(await markStopLoaded({ userId: loaderId, depotId: 'Peliyagoda' }, second.tripId, body), 2).stops[0]!.loaded).toBe(true);
+    expect((await loader.ready(counted)).status).toBe(200);
+    freeze(180);
+    expect((await departure()).status).toBe(200);
+  } finally {
+    await blocker.query('rollback');
+    blocker.release();
+    await count?.catch(() => undefined);
+  }
+});
+
+it('B3 rejects equal-time ready facts that lack locked return provenance even if inserted later', async () => {
+  await published(); await load(1); await returnFirst(150);
+  const second = own(await loader.read(), 2), readyAt = depotInstant(THU, 150);
+  await db.update(trips).set({ status: 'ready', readyAt }).where(eq(trips.id, second.tripId));
+  await db.insert(auditLog).values({ actorId: loaderId, action: 'trip.ready', entity: 'trip', entityId: second.tripId,
+    after: { revision: second.revision, readyAt: readyAt.toISOString() } });
+  freeze(180);
+  expect(code(await departure())).toEqual([409, 'reload_required']);
 });
