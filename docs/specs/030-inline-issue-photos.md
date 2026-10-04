@@ -2,7 +2,7 @@
 
 Status: Ready. Baseline: c7b6651. Design: existing live problem cards and History photo viewer.
 
-The user confirmed photos load but asks to view them inside the app instead of a separate browser tab. History already has an in-app viewer; driver/shop issue cards currently call window.open. Keep the planner what-if and why explanations unchanged: the user asked what they mean, not to remove them.
+The user confirmed photos load but asks to view them inside the app instead of a separate browser tab. History already has an in-app viewer; driver/shop issue cards currently call window.open. Initial scope was photo viewing. Nabil subsequently approved compact receiving status and asked for understandable dispatcher workflows; the following added criteria supersede the initial copy-only hold on the new panels.
 
 ## Acceptance criteria
 - P1: Clicking View photo on a driver or shop issue opens an in-app viewer with labelled image, loading state, clear failure/retry and Close. No new tab/window or route navigation. Prefer existing viewer primitives rather than another photo transport/state implementation.
@@ -11,3 +11,12 @@ The user confirmed photos load but asks to view them inside the app instead of a
 - P4: Existing History proof viewing and issue decision actions keep working. Remove obsolete popup-only code/tests honestly; add meaningful focused regression checks for asynchronous ownership/cleanup and in-app rendering. No API/schema/contracts/dependencies or AI disclosure changes.
 
 One frontend batch, independent review and focused local desktop/phone browser proof. Full web tests, typecheck and production build. Backend is unchanged and covered by prior release verification; do not repeat the whole API suite absent a relevant change/failure. README must reflect the departure. Branch/PR may be pushed; no merge/deploy until Nabil authorizes this new change.
+
+## Added scope: dispatcher clarity after manual feedback
+- R1: Replace the long receiving dropdown with a compact Shop receiving status summary. Show counts for Ready, Unavailable and Not confirmed with current delivery date once. Unknown/unconfirmed never means closed; failure/loading must never look like zero confirmed counts.
+- R2: Allow shop-name search and clear status filters, count matches honestly, and keep all shops reachable. Default ordering puts unavailable first, then ready, then unconfirmed, with stable alphabetical order within each. Show at most six rows initially with explicit Show more/fewer. Keep the expanded results in a keyboard-accessible bounded scroll area (at most roughly320px/45dvh); Show more must not expand the document into pages. Opening/filtering must not scroll the whole page or hide the main Live day workflow.
+- R3: Use compact rows, not repeated nested cards. Preserve status, note and updated time. Unconfirmed rows say Not confirmed without repeating the full date and No declaration/advisory on every row. Explain once that managers update this and it is a guide, not a delivery gate. Keep stale/Last known, failed-read retry, empty and no-match states explicit. Preserve query ownership, live updates, reset/day/depot scoping and the driver's existing notice.
+- Q1: Make the scenario and reason controls understandable without explaining them verbally: clear action/outcome wording and brief purpose. Rename the bare why? chip to Plan reason while retaining actual reasons/decisions and existing popover semantics. Simplify scenario intro and labels but explicitly retain that it compares generated plans, may differ from saved draft and does not change the plan. No changes to planner ranking, reason facts, scenario reads, cancellation or feasibility checks.
+- R4: Verify desktop and390px layouts, populated and all-unconfirmed lists, search/filter/reset, Show more while the outer page stays bounded, and the dispatcher can return to their original task. One grouped review covers photo/status/copy after integration.
+
+Root owns spec and joined documentation. Photo builder owns live issue/viewer; separate status builder owns ReceivingListPanel and scoped helper/tests, ScenarioPanel presentation/tests, Why presentation and relevant expectation tests. No shared schema/API or global design changes. Preserve existing design tokens/fonts; user wants simpler workflow, not new decoration or a redesign of the whole app.
