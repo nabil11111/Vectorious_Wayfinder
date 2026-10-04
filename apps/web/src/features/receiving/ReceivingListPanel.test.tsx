@@ -6,7 +6,7 @@ const held = vi.hoisted(() => ({ data: undefined as ReceivingList | undefined, e
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: held.data, isError: held.error, isPending: held.pending, isFetching: false, refetch: vi.fn() }) }));
 vi.mock('@/features/auth/api', () => ({ useMe: () => ({ data: { id: 'dispatcher', depotId: 'Peliyagoda' } }) }));
 vi.mock('@/features/live/operations', () => ({ useOnline: () => held.online }));
-vi.mock('@/lib/clock', () => ({ useAppClock: () => ({ at: Date.parse('2026-06-25T11:30:00Z'), state: { day: 1 } }) }));
+vi.mock('@/lib/clock', async original => ({ ...await original<typeof import('@/lib/clock')>(), useAppClock: () => ({ at: Date.parse('2026-06-25T11:30:00Z'), state: { day: 1 } }) }));
 vi.mock('./api', () => ({ receivingListOptions: () => ({ queryKey: ['receiving', 'depot', 'dispatcher', 'Peliyagoda', '2026-06-25', 1] }), useFollowReceiving: vi.fn() }));
 vi.mock('react', async original => {
   const real = await original<typeof import('react')>();
@@ -42,4 +42,9 @@ it('labels cached failure/offline counts Last known and never uses a declaration
   held.online = false; expect(draw()).toContain('Last known');
   held.online = true; held.error = true; expect(draw()).toContain('Last known'); expect(draw()).toContain('Read again');
   held.error = false; held.data!.date = '2026-06-24'; const html = draw(); expect(html).toContain('Status unknown'); expect(html).not.toContain('Not confirmed: 12 shops');
+});
+
+it('keeps nonoperating cached reads explicitly last known after a failure', () => {
+  held.data = { date: null, depot: 'Peliyagoda', states: [] }; held.error = true;
+  const html = draw(); expect(html).toContain('Last known'); expect(html).toContain('Could not read'); expect(html).toContain('Read again'); expect(html).not.toContain('Ready: 0 shops');
 });

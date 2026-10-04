@@ -48,7 +48,7 @@ it('keeps dispatcher receiving list on the calendar date at 17:00 with named sho
   const q = client(dispatcher); const options = receivingListOptions(dispatcher, 'Peliyagoda', held.date, 1);
   q.setQueryData(options.queryKey, { date: held.date, depot: 'Peliyagoda', states: [{ ...held.state!, shopName: 'Fresh Nugegoda' }] });
   const html = draw(<ReceivingListPanel depot="Peliyagoda" />, q);
-  expect(html).toContain('Receiving readiness · Thu 25 Jun'); expect(html).toContain('Fresh Nugegoda'); expect(html).toContain('Rear dock.');
+  expect(html).toContain('Shop receiving status'); expect(html).toContain('Thu 25 Jun'); expect(html).toContain('Ready: 1 shops'); expect(html).toContain('View shops');
   expect(html).not.toContain('Fri 26 Jun');
 });
 

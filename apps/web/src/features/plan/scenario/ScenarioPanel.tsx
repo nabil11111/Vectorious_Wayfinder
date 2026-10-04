@@ -46,17 +46,17 @@ export function ScenarioPanel({ screen, stale, refreshing }: { screen: BoardScre
     return o.status !== 'planned' || o.status !== before?.status || o.vehicleIds.join(',') !== before.vehicleIds.join(',');
   });
   return <details className="mt-2 shrink-0 rounded-[12px] border bg-card px-4 py-3">
-    <summary className="cursor-pointer text-sm font-semibold">What if a vehicle is unavailable?</summary>
+    <summary className="cursor-pointer text-sm font-semibold">Compare without a vehicle</summary>
     <div className="mt-3 max-h-[55dvh] space-y-3 overflow-y-auto">
-      <p className="text-xs text-muted-foreground">Compare two generated plans for the same current demand. The generated baseline may differ from your saved draft. This preview does not change the saved plan.</p>
+      <p className="text-xs text-muted-foreground">See which deliveries would change if a vehicle cannot run. Compare two generated plans for the same current orders. The generated baseline may differ from your saved draft. This preview does not change the saved plan.</p>
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs font-semibold">Vehicle unavailable
-          <select aria-label="Vehicle unavailable" className="h-11 rounded-[10px] border bg-background px-3 text-sm" value={vehicle} onChange={(event) => setVehicle(event.target.value)}>
-            <option value="">Choose a working vehicle</option>
+        <label className="flex flex-col gap-1 text-xs font-semibold">Vehicle to leave out
+          <select aria-label="Vehicle to leave out" className="h-11 rounded-[10px] border bg-background px-3 text-sm" value={vehicle} onChange={(event) => setVehicle(event.target.value)}>
+            <option value="">Choose a vehicle</option>
             {board.vehicles.filter((v) => v.working).map((v) => <option key={v.id} value={v.id}>{v.id} · {v.temp === 'reefer' ? 'fridge' : 'dry'} {v.type}</option>)}
           </select>
         </label>
-        <Button variant="outline" className="h-11" disabled={!eligible || current?.busy} onClick={() => { void compare(); }}>{current?.busy ? 'Comparing…' : 'Compare plans'}</Button>
+        <Button variant="outline" className="h-11" disabled={!eligible || current?.busy} onClick={() => { void compare(); }}>{current?.busy ? 'Comparing…' : 'Show what changes'}</Button>
       </div>
       {screen.saving !== 'saved' || screen.acting || refreshing || stale ? <p role="status" className="text-xs text-muted-foreground">Wait for the board to finish saving and refreshing before comparing.</p> : null}
       {current?.error ? <p role="alert" className="text-sm text-destructive">{current.error} Refresh the board before trying again.</p> : null}
