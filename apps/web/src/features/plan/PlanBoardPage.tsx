@@ -299,7 +299,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         refreshing={refreshing}
       />
       <ScenarioPanel screen={screen} stale={stale} refreshing={refreshing} />
-      <PlanDnd screen={screen} index={index} change={change} undo={undo} onStartTrip={setDropped}>
+      <PlanDnd screen={screen} index={index} change={change} undo={undo} onStartTrip={setDropped} routeOf={groupOfTrip} shopOf={index.shop}>
       <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3.5 lg:grid-cols-[300px_minmax(0,1fr)_270px] xl:grid-cols-[360px_minmax(0,1fr)_330px]">
         <div className={cn('min-h-0 flex-col gap-4', tab === 'unplanned' ? 'flex' : 'hidden lg:flex')}>
           <OrderLists
@@ -307,6 +307,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
             index={index}
             places={places}
             open={open}
+            route={open ? groupOfTrip(keyOf(open)) : null}
             outlined={outlined}
             change={change}
             act={saver.act}

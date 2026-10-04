@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { GripVertical } from 'lucide-react';
-import type { DraftPlan } from '@wayfinder/contracts';
+import type { Brand, DraftPlan } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
 import type { BoardScreen, Undo } from '../board';
 import {
@@ -15,12 +15,14 @@ import type { Pick } from './crews';
 // once it has moved a few pixels, so a click and the rows' menus work as before, and the keyboard picks it up from its
 // handle with Space or Enter. A finished drag is the change its button makes, sent through the board's own change
 // with its Undo, and an order dropped in the empty middle opens the crew picker.
-export function PlanDnd({ screen, index, change, undo, onStartTrip, children }: {
+export function PlanDnd({ screen, index, change, undo, onStartTrip, routeOf, shopOf, children }: {
   screen: BoardScreen;
   index: BoardIndex;
   undo: () => void;
   change: (next: DraftPlan, said: Undo) => void;
   onStartTrip: (pick: Pick) => void;
+  routeOf: (key: string) => { brand: Brand; district: string } | null;
+  shopOf: (id: string) => { brand: Brand; district: string } | null;
   children: ReactNode;
 }) {
   const sensors = useSensors(
@@ -47,7 +49,7 @@ export function PlanDnd({ screen, index, change, undo, onStartTrip, children }: 
         onDragEnd={({ active, over }) => {
           setDragged(null);
           if (dropLocked(screen)) return;
-          landDrop(screen.draft, draggedOf(active), landingOf(over), { change, start: onStartTrip, called: index.called });
+          landDrop(screen.draft, draggedOf(active), landingOf(over), { change, start: onStartTrip, called: index.called, routeOf, shopOf });
         }}
       >
         {children}

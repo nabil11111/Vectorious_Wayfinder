@@ -28,6 +28,13 @@ export type Drop = { kind: 'change'; plan: DraftPlan; undo: Undo } | { kind: 'st
 export interface DragData { dragged: Dragged }
 export interface DropData { landing: Landing; name: string }
 
+// A trip stays in one district. With Mix brands off it also stays with one brand. An empty trip, or one with no
+// district yet, can take the first orders that land on it.
+export function fitsRoute(route: { brand: Brand; district: string } | null, mixBrands: boolean, shop: { brand: Brand; district: string }): boolean {
+  if (!route) return true;
+  return shop.district === route.district && (mixBrands || shop.brand === route.brand);
+}
+
 // Orders land on a trip's stops, its card or the empty middle. A stop lands among its own trip's stops, on a card or
 // back on Unplanned orders. Anything dropped anywhere else goes back.
 export function canLand(dragged: Dragged, landing: Landing): boolean {

@@ -12,6 +12,7 @@ import { demandLine } from './demand';
 import { PlanChoice } from './PlanChoice';
 import { DeferForm } from './DeferForm';
 import { movable, useLanding } from './dragging';
+import { fitsRoute } from './drops';
 import type { Dragged } from './drops';
 import { BRAND_ICON, ICON } from './icons';
 import { decisionShop, decisionTruck, groupKey, listed, ordersLine, type BoardIndex } from './lookup';
@@ -22,6 +23,12 @@ import { Why } from './Why';
 import { activeOrders, shopSummaries, summaryLine } from './shop-summary';
 
 const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
+
+// A chosen filter is ink with white words. The others stay white with black words.
+const filterChip = (on: boolean) => cn(
+  'inline-flex h-9 items-center rounded-[10px] border px-3 text-xs font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+  on ? 'border-transparent bg-secondary text-secondary-foreground' : 'border-border bg-card text-foreground hover:bg-muted',
+);
 
 interface ShopOrders { shop: BoardShop; orders: BoardOrder[] }
 interface Group { key: string; brand: Brand; district: string; shops: ShopOrders[]; count: number }
@@ -63,11 +70,13 @@ function orderDragged(order: BoardOrder, index: BoardIndex): Dragged | null {
 // The left column's upper card (Edit plan): the day's unplanned orders by brand and district, or as one list,
 // with the carried-over ones first and the deferred ones last, each deferred one with the planner's "why?". An order,
 // a shop's orders or a whole group can be dragged onto a trip, and a stop dropped here comes off its trip (spec 023).
-export function OrderLists({ screen, index, places, open, outlined, change, act, onCrew, onFindSlot, onJoin }: {
+export function OrderLists({ screen, index, places, open, route = null, outlined, change, act, onCrew, onFindSlot, onJoin }: {
   screen: BoardScreen;
   index: BoardIndex;
   places: Map<string, Place>;
   open: DraftTrip | null;
+  // The open trip's brand and district. Orders outside it are shown grey, and cannot be added to this trip.
+  route?: { brand: Brand; district: string } | null;
   outlined: string | null;
   change: (next: DraftPlan, said: Undo) => void;
   act?: Parameters<typeof PlanChoice>[0]['act'];
@@ -98,16 +107,22 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
     return true;
   });
   const carried = unplanned.filter((order) => order.carriedOver).sort(byWanted);
+  // While a trip is open, only its district fits, and only its brand unless Mix brands is on.
+  const onThisRoute = (shop: { brand: Brand; district: string } | null) => !open || !route || (shop !== null && fitsRoute(route, draft.mixBrands, shop));
   const groups = groupsOf(unplanned.filter((order) => !order.carriedOver), index)
     .sort((a, b) => sort === 'window'
       ? Math.min(...a.shops.map((row) => row.shop.windowClose)) - Math.min(...b.shops.map((row) => row.shop.windowClose)) || b.count - a.count
-      : b.count - a.count);
+      : b.count - a.count)
+    .sort((a, b) => Number(onThisRoute(b)) - Number(onThisRoute(a)));
   const deferred = draft.deferrals.flatMap((deferral) => {
     const order = index.order(deferral.orderId);
     return order ? [{ deferral, order }] : [];
   });
 
-  const add = open ? (orders: BoardOrder[]) => change(addOrders(draft, keyOf(open), orders), { line: `${ordersLine(index, orders.map((o) => o.id))} added to ${index.called(open)}`, tripKey: keyOf(open) }) : null;
+  const add = open ? (orders: BoardOrder[]) => {
+    if (orders.some((order) => !onThisRoute(index.shop(order.outletId)))) return;
+    change(addOrders(draft, keyOf(open), orders), { line: `${ordersLine(index, orders.map((o) => o.id))} added to ${index.called(open)}`, tripKey: keyOf(open) });
+  } : null;
   const doDefer = (deferrals: DraftDeferral[]) => {
     if (!canMove) return;
     change(defer(draft, deferrals), { line: `${ordersLine(index, deferrals.map((d) => d.orderId))} deferred`, tripKey: null });
@@ -132,30 +147,30 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
   // An order's row, with its grip when it can be dragged.
   const draggable = (order: BoardOrder, row: ReactNode) => {
     const dragged = orderDragged(order, index);
-    return dragged ? <DragRow id={`orders:order:${order.id}`} dragged={dragged} movable={canMove}>{row}</DragRow> : row;
+    return dragged ? <DragRow id={`orders:order:${order.id}`} dragged={dragged} movable={canMove && onThisRoute(index.shop(order.outletId))}>{row}</DragRow> : row;
   };
 
   return (
     <>
     <Column ref={landingRef} aria-label="Unplanned orders" className={cn('min-h-[360px] flex-1 lg:min-h-0', landingLook)}>
-      <ColumnHead icon={ICON.unplanned} title={`Unplanned orders · ${whole(unplanned.length)}`} className="px-3 pt-3.5 pb-2.5">
+      <ColumnHead icon={ICON.unplanned} title={`Unplanned orders · ${whole(unplanned.length)}`} className="pt-3.5 pr-3 pb-2.5 pl-5">
         <Pills tight label="Show the orders" value={view} onChange={setView} options={[{ value: 'groups', label: 'brand · district' }, { value: 'list', label: 'list' }]} />
       </ColumnHead>
-      <div className="space-y-2 px-3.5 pb-2">
+      <div className="space-y-2 pr-3.5 pb-2 pl-5">
         <label className="block text-sm font-semibold">
           Search shops or orders
           <input value={query} onChange={(event) => { setQuery(event.target.value); remember(board.day?.date, { view, query: event.target.value, need, sort }); }} className="mt-1 h-11 w-full rounded-[10px] border bg-card px-3 text-sm font-normal" />
         </label>
         <div className="flex flex-wrap gap-1.5">
           {([['all', 'All'], ['chilled', 'Chilled'], ['van', 'Van only'], ['carried', 'Waiting from earlier days']] as const).map(([value, label]) => (
-            <button key={value} type="button" aria-pressed={need === value} className={plainButton(`h-9 px-3 text-xs ${need === value ? 'bg-foreground text-background' : ''}`)} onClick={() => { setNeed(value); remember(board.day?.date, { view, query, need: value, sort }); }}>{label}</button>
+            <button key={value} type="button" aria-pressed={need === value} className={filterChip(need === value)} onClick={() => { setNeed(value); remember(board.day?.date, { view, query, need: value, sort }); }}>{label}</button>
           ))}
-          <button type="button" aria-pressed={sort === 'window'} className={plainButton(`h-9 px-3 text-xs ${sort === 'window' ? 'bg-foreground text-background' : ''}`)} onClick={() => { const next = sort === 'window' ? 'count' : 'window'; setSort(next); remember(board.day?.date, { view, query, need, sort: next }); }}>Earliest window first</button>
+          <button type="button" aria-pressed={sort === 'window'} className={filterChip(sort === 'window')} onClick={() => { const next = sort === 'window' ? 'count' : 'window'; setSort(next); remember(board.day?.date, { view, query, need, sort: next }); }}>Earliest window first</button>
           {(query || need !== 'all' || sort !== 'count') && <button type="button" className="h-9 px-2 text-xs font-semibold underline" onClick={() => { setQuery(''); setNeed('all'); setSort('count'); remember(board.day?.date, { view, query: '', need: 'all', sort: 'count' }); }}>Clear filters</button>}
         </div>
         <p className="text-xs text-muted-foreground">{whole(unplanned.length)} of {whole(waiting.length)} waiting</p>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-3.5">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto py-1 pr-3.5 pb-3.5 pl-5">
         {waiting.length === 0 && <p className="pt-1 text-xs text-muted-foreground">Every order is on a trip or deferred.</p>}
         {waiting.length > 0 && unplanned.length === 0 && <p className="pt-1 text-xs text-muted-foreground">Nothing matches these filters.</p>}
 
@@ -166,6 +181,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
                 <h3 className="text-xs leading-[15px] font-semibold text-warn-ink">Carried over · {whole(carried.length)}</h3>
                 {carried.map((order) => (
                   <Fragment key={order.id}>
+                    <div className={cn(!onThisRoute(index.shop(order.outletId)) && 'opacity-40')}>
                     {draggable(order, (
                       <OrderRow
                         order={order}
@@ -173,12 +189,13 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
                         line={carriedLine(order)}
                         summary={summary(order)}
                         disabled={!canMove}
-                        add={add}
+                        add={onThisRoute(index.shop(order.outletId)) ? add : null}
                         onDefer={() => deferOrders(order.id, [order])}
                         onJoin={onJoin}
                         extra={<Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
                       />
                     ))}
+                    </div>
                     {form(order.id)}
                   </Fragment>
                 ))}
@@ -188,16 +205,17 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
               const all = expanded.has(group.key);
               const shops = all ? group.shops : group.shops.slice(0, 3);
               const hidden = group.shops.slice(shops.length).reduce((n, row) => n + row.orders.length, 0);
+              const fits = onThisRoute(group);
               return (
                 <section
                   key={group.key}
                   id={`group-${group.key}`}
                   aria-label={`${group.brand} · ${group.district}`}
-                  className={cn('scroll-mt-2 rounded-[10px] border-[1.5px] border-l-4 px-2 pt-2.5 pb-1', outlined === group.key ? 'border-foreground' : 'border-transparent', group.brand === 'Fresh' ? 'border-l-fresh bg-fresh' : group.brand === 'Style' ? 'border-l-style bg-style' : 'border-l-tech bg-tech')}
+                  className={cn('scroll-mt-2 rounded-[10px] border-[1.5px] border-l-4 px-2 pt-2.5 pb-1', !fits && 'opacity-40', outlined === group.key ? 'border-foreground' : 'border-transparent', group.brand === 'Fresh' ? 'border-l-fresh bg-fresh' : group.brand === 'Style' ? 'border-l-style bg-style' : 'border-l-tech bg-tech')}
                 >
                   <DragRow
                     id={`orders:group:${group.key}`}
-                    movable={canMove}
+                    movable={canMove && fits}
                     dragged={{ kind: 'orders', orders: group.shops.flatMap((row) => row.orders), group: { brand: group.brand, district: group.district }, label: `${group.brand} · ${group.district}`, detail: countOf(group.count, 'order') }}
                   >
                     <div className="flex flex-wrap items-center gap-2 pl-1">
@@ -227,7 +245,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
                       <li key={shop.id} className="border-t py-2 pl-1">
                         <DragRow
                           id={`orders:shop:${group.key}:${shop.id}`}
-                          movable={canMove}
+                          movable={canMove && fits}
                           dragged={{ kind: 'orders', orders, group: { brand: group.brand, district: group.district }, label: shop.name, detail: ordersAmount(shop.brand, orders) }}
                         >
                           <Row
@@ -236,7 +254,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
                             below={<ShopSummary line={summary(orders[0]!)} />}
                             actions={(
                               <>
-                                {add && <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => add(orders)}>Add</Button>}
+                                {fits && add && <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => add(orders)}>Add</Button>}
                                 <Button variant="outline" disabled={!canMove} className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => deferOrders(`${group.key}:${shop.id}`, orders)}>Defer</Button>
                                 <RowMenu label={shop.name} items={[
                                   ...orders.filter((o) => o.splitFrom !== null).map((o) => ({ label: `Join ${orderAmount(shop.brand, o)} back`, onClick: () => onJoin(o) })),
@@ -260,8 +278,10 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
           </>
         ) : (
           <ul>
-            {[...unplanned].sort(byWanted).map((order) => (
-              <li key={order.id} className="border-t first:border-t-0">
+            {[...unplanned].sort(byWanted).map((order) => {
+              const fits = onThisRoute(index.shop(order.outletId));
+              return (
+              <li key={order.id} className={cn('border-t first:border-t-0', !fits && 'opacity-40')}>
                 {draggable(order, (
                   <OrderRow
                     order={order}
@@ -269,7 +289,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
                     line={order.carriedOver ? carriedLine(order) : lineOf(order, index)}
                     summary={summary(order)}
                     disabled={!canMove}
-                    add={add}
+                    add={fits ? add : null}
                     onDefer={() => deferOrders(order.id, [order])}
                     onJoin={onJoin}
                     extra={<Button variant="outline" className={plainButton('h-9 px-2.5 text-xs')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
@@ -277,7 +297,8 @@ export function OrderLists({ screen, index, places, open, outlined, change, act,
                 ))}
                 {form(order.id)}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
 

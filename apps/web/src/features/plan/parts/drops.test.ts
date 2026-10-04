@@ -2,7 +2,7 @@ import type { BoardOrder, DraftPlan } from '@wayfinder/contracts';
 import { expect, it } from 'vitest';
 import { addOrders, moveStop, takeOff } from '../draft';
 import { truckCalled } from '../words';
-import { canLand, dropOf, type Called, type Dragged, type Landing } from './drops';
+import { canLand, dropOf, fitsRoute, type Called, type Dragged, type Landing } from './drops';
 
 // Spec 023: every drop on the plan board is the change its button or menu makes, one change of the draft with a line
 // naming it for Undo (rule 1), and nothing here judges the plan: the checker does, after the drop (rule 2). The day is
@@ -70,6 +70,15 @@ it('spec 023 AC-3 a stop dropped on Unplanned orders comes off its trip, and on 
   const moved = addOrders(PLAN, 'VEH002-1', [{ id: uuid(1), outletId: 'OUT001' }, { id: uuid(11), outletId: 'OUT001' }]);
   expect(dropOf(PLAN, nugegoda, CARD, called)).toEqual({ kind: 'change', plan: moved, undo: { line: 'Fresh Nugegoda moved to Chaminda\'s dry truck', tripKey: 'VEH035-1' } });
   expect(moved.trips.map((t) => t.stops.map((s) => s.outletId))).toEqual([['OUT003', 'OUT002'], ['OUT051', 'OUT001']]);
+});
+
+it('a trip keeps one district, and one brand unless mixing is on', () => {
+  const colombo = { brand: 'Fresh' as const, district: 'Colombo' };
+  expect(fitsRoute(colombo, false, { brand: 'Fresh', district: 'Colombo' })).toBe(true);
+  expect(fitsRoute(colombo, false, { brand: 'Style', district: 'Colombo' })).toBe(false);
+  expect(fitsRoute(colombo, true, { brand: 'Style', district: 'Colombo' })).toBe(true);
+  expect(fitsRoute(colombo, true, { brand: 'Fresh', district: 'Galle' })).toBe(false);
+  expect(fitsRoute(null, false, { brand: 'Style', district: 'Galle' })).toBe(true);
 });
 
 it('spec 023 rule 2 lands anything anywhere it can go, and puts it back from anywhere else with nothing changed', () => {

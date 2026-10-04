@@ -47,8 +47,8 @@ const BOARD = boardWith(TRIPS);
 const INDEX = indexOf(BOARD);
 const screenOf = (board: PlanBoard, change: Partial<BoardScreen> = {}): BoardScreen => ({ board, draft: planOf(board), saving: 'saved', refused: null, acting: false, undo: null, history: { undo: null, redo: null }, ...change });
 
-const orderLists = (screen: BoardScreen, open: DraftTrip | null = null) => renderToStaticMarkup(
-  <OrderLists screen={screen} index={INDEX} places={placesOf(screen.draft)} open={open} outlined={null} change={() => undefined} onCrew={() => undefined} onFindSlot={() => undefined} onJoin={() => undefined} />,
+const orderLists = (screen: BoardScreen, open: DraftTrip | null = null, route: { brand: 'Fresh' | 'Style' | 'Tech'; district: string } | null = null) => renderToStaticMarkup(
+  <OrderLists screen={screen} index={INDEX} places={placesOf(screen.draft)} open={open} route={route} outlined={null} change={() => undefined} onCrew={() => undefined} onFindSlot={() => undefined} onJoin={() => undefined} />,
 );
 const tripPanel = (screen: BoardScreen) => renderToStaticMarkup(
   <TripPanel
@@ -74,6 +74,32 @@ it('spec 023 AC-6 lets nothing be dragged while the board holds still or the pla
   expect(handles(tripPanel(screenOf(published)))).toEqual([]);
   // The stop's number stays as it was.
   expect(tripPanel(holding)).toMatch(/<span class="[^"]*rounded-full[^"]*">1<\/span>/);
+});
+
+it('an open trip greys shops outside its district or brand and does not offer to add them', () => {
+  const day = boardWith(TRIPS);
+  day.orders.push({ ...day.orders[3]!, id: uuid(9), outletId: 'OUT099' });
+  day.shops.push({ ...day.shops[0]!, id: 'OUT099', name: 'Style Matara', brand: 'Style', district: 'Matara' });
+  const markup = renderToStaticMarkup(
+    <OrderLists screen={screenOf(day)} index={indexOf(day)} places={placesOf(planOf(day))} open={TRIPS[0]!} route={{ brand: 'Fresh', district: 'Colombo' }} outlined={null} change={() => undefined} onCrew={() => undefined} onFindSlot={() => undefined} onJoin={() => undefined} />,
+  );
+  const colombo = markup.slice(markup.indexOf('aria-label="Fresh · Colombo"'), markup.indexOf('aria-label="Style · Matara"'));
+  const matara = markup.slice(markup.indexOf('aria-label="Style · Matara"'), markup.indexOf('</section>', markup.indexOf('aria-label="Style · Matara"')));
+  expect(colombo).toContain('>Add<');
+  expect(colombo).not.toContain('opacity-40');
+  expect(matara).toContain('opacity-40');
+  expect(matara).not.toContain('>Add<');
+  expect(handles(markup)).toEqual(['Move Fresh · Colombo', 'Move Fresh Dehiwala']);
+});
+
+it('a drop onto an open trip stays in that trip\'s district and brand', () => {
+  const change = vi.fn();
+  const galle: Dragged = { kind: 'orders', orders: [BOARD.orders[2]!], group: { brand: 'Fresh', district: 'Galle' }, label: 'Fresh Galle Fort', detail: '12 cartons chilled' };
+  const routeOf = () => ({ brand: 'Fresh' as const, district: 'Colombo' });
+  landDrop(planOf(BOARD), galle, stopTwo, { change, start: () => undefined, called: INDEX.called, routeOf });
+  expect(change).not.toHaveBeenCalled();
+  landDrop(planOf(BOARD), dehiwala, stopTwo, { change, start: () => undefined, called: INDEX.called, routeOf });
+  expect(change).toHaveBeenCalledOnce();
 });
 
 it('spec 023 AC-4 the empty middle offers the build and a drop area in place of "Start a blank trip"', () => {
