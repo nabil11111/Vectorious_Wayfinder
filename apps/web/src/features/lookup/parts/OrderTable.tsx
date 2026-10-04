@@ -13,12 +13,12 @@ import { brandIcon, shopIcon } from './icons';
 // status is the order's current one, a separate fact, and says an order brought back from a closed shop (Q-46). Last 4 weeks names each listed day beside its truck.
 
 const COLUMNS = {
-  day: 'grid-cols-[20px_68px_minmax(150px,1fr)_48px_140px_50px_84px_96px_44px_minmax(84px,0.5fr)_40px]',
-  four_weeks: 'grid-cols-[20px_68px_minmax(150px,1fr)_48px_140px_50px_84px_132px_44px_minmax(84px,0.5fr)_40px]',
+  day: 'grid-cols-[20px_minmax(150px,1fr)_48px_140px_50px_84px_96px_44px_minmax(84px,0.5fr)_40px]',
+  four_weeks: 'grid-cols-[20px_minmax(150px,1fr)_48px_140px_50px_84px_132px_44px_minmax(84px,0.5fr)_40px]',
 } as const;
 // The narrowest each table may draw before its box scrolls: its columns, gaps and padding.
-const MIN_WIDTH = { day: 'min-w-[952px]', four_weeks: 'min-w-[988px]' } as const;
-const HEADS = ['Order', 'Shop', 'Wanted', 'Load', 'Temp', 'Window', 'Truck · stop', 'Arrive', 'Status', 'Deferred'];
+const MIN_WIDTH = { day: 'min-w-[876px]', four_weeks: 'min-w-[912px]' } as const;
+const HEADS = ['Shop', 'Wanted', 'Load', 'Temp', 'Window', 'Truck · stop', 'Arrive', 'Status', 'Deferred'];
 export type Range = keyof typeof COLUMNS;
 
 const STATUS_TONE: Partial<Record<OrderStatus, string>> = { deferred: 'text-warn-ink font-semibold', delivered: 'text-good', received: 'text-good' };
@@ -81,7 +81,6 @@ function OrderRow({ row, range, selected, onSelect }: { row: LookupOrderRow; ran
       )}
     >
       <span role="cell"><img src={shopIcon(row.outlet.brand)} alt="" className="size-5 object-contain" /></span>
-      <span role="cell" title={row.id} className="truncate font-mono text-muted-foreground">{row.id.slice(0, 8)}</span>
       <span role="cell" className="min-w-0">
         <button
           type="button"

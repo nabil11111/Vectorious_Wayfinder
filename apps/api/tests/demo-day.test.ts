@@ -95,7 +95,7 @@ function workingFridgeVehicles(tx: Tx, date: string) {
 
 const userId = async (tx: Tx, username: string) => (await tx.select().from(users).where(eq(users.username, username)))[0]!.id;
 
-// The tables the day lives in. Trips, stops and the orders on them are not seeded. People add them.
+// The tables the day lives in. Tuesday's plan has no trips. Wednesday's finished run is seeded, and Thursday's are not.
 const DAY_TABLES = ['demo_day', 'orders', 'order_lines', 'plans', 'deferrals', 'trips', 'stops', 'stop_orders', 'vehicle_days_off', 'fuel_log'];
 const NOTHING = Object.fromEntries(DAY_TABLES.map((table) => [table, 0]));
 // What clearing the day must never touch: the people, their sign-ins, the audit log and the booklet's data.
@@ -236,15 +236,20 @@ describe('the seeded day on an empty database', () => {
         ['OUT060', 'chilled', { 'fresh-chilled-carton': 39 }, TUE],
       ]);
 
-      // Peliyagoda's plans for Tuesday and Wednesday, which Ruwan sent at 17:00 on the day before. They hold
-      // only what Thursday needs, so they have no trips.
+      // Peliyagoda's plans for Tuesday and Wednesday, which Ruwan sent at 17:00 on the day before. Tuesday
+      // holds only the deferral. Wednesday has the two finished Colombo trips.
       const ruwan = await userId(tx, 'ruwan');
       const sent = await tx.select().from(plans).orderBy(plans.date);
       expect(sent.map((p) => [p.depotId, p.date, p.status, p.createdBy, p.publishedAt])).toEqual([
         ['Peliyagoda', TUE, 'published', ruwan, depotInstant(MON, 17 * 60)],
         ['Peliyagoda', WED, 'published', ruwan, depotInstant(TUE, 17 * 60)],
       ]);
-      expect(await tx.select().from(trips)).toEqual([]);
+      const ran = await tx.select({ date: plans.date, vehicleId: trips.vehicleId, status: trips.status }).from(trips)
+        .innerJoin(plans, eq(plans.id, trips.planId)).orderBy(trips.vehicleId);
+      expect(ran).toEqual([
+        { date: WED, vehicleId: 'VEH004', status: 'done' },
+        { date: WED, vehicleId: 'VEH006', status: 'done' },
+      ]);
 
       // Each deferral with the plan it is in and the order it is about: the shop, the date it wanted and its status.
       const why = await tx.select({
@@ -371,12 +376,13 @@ describe('the seeded day on an empty database', () => {
   it('AC-36 gives every row the same id and content each time it writes the day', async () => {
     await seeded(async (tx) => {
       const first = await everyRow(tx, { realTime: false });
-      // Peliyagoda's 104 orders and 142 lines from spec 008 and the 25 orders of one line each that spec 009 adds for
-      // OUT001, and Kandy's 64 orders and 87 lines from spec 020.
+      // Peliyagoda's 104 orders and 142 lines from spec 008, the 25 orders of one line each that spec 009 adds for
+      // OUT001, Wednesday's 7 received dry orders, and Kandy's 64 orders and 87 lines from spec 020.
       expect(await rowCounts(tx)).toEqual({
-        ...NOTHING, demo_day: 1, orders: 129 + 64, order_lines: 167 + 87, plans: 2, deferrals: 5, vehicle_days_off: 6, fuel_log: 111,
+        ...NOTHING, demo_day: 1, orders: 129 + 64 + 7, order_lines: 167 + 87 + 7, plans: 2, deferrals: 5,
+        trips: 2, stops: 7, stop_orders: 7, vehicle_days_off: 6, fuel_log: 111,
       });
-      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 129, lines: 167 }, Kandy: { orders: 64, lines: 87 } });
+      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 136, lines: 174 }, Kandy: { orders: 64, lines: 87 } });
 
       // What a reset does: the day is removed and written again.
       await clearDemoDay(tx);
@@ -546,15 +552,15 @@ describe('the seeded day of a shop with an account', () => {
       });
       expect(await linesOf(tx, dry!.id)).toEqual({ 'fresh-dry-carton': 6 });
       expect((await tx.select().from(orderLines).where(eq(orderLines.orderId, dry!.id))).map((l) => [l.loadedQty, l.deliveredQty, l.receivedQty])).toEqual([[null, null, 6]]);
-      // No plan of the seed has a trip, so the order has no delivery and counts for the day the shop wanted.
-      expect(await tx.select().from(stopOrders)).toEqual([]);
+      // Her Wednesday dry order never travelled, so it is not one of Wednesday's seeded stops.
+      expect(await tx.select().from(stopOrders).where(eq(stopOrders.orderId, dry!.id))).toEqual([]);
     });
   });
 
   it('AC-33 (spec 015) gives OUT001 25 received orders, the 24 of the twelve operating days before Wednesday received in full with a time on their day', async () => {
     await seeded(async (tx) => {
       const nadeesha = await userId(tx, 'nadeesha');
-      const received = (await ordersWithLoads(tx)).filter((o) => o.status === 'received');
+      const received = (await ordersWithLoads(tx)).filter((o) => o.status === 'received' && o.outletId === 'OUT001');
       expect([...new Set(received.map((o) => o.outletId))]).toEqual(['OUT001']);
       // A page of the Past list is 20, so there is a second one to load.
       expect(total(received)).toEqual({ orders: 25, units: 205, kg: 1414.5, m3: 7.585 });
@@ -591,8 +597,8 @@ describe('the seeded day of a shop with an account', () => {
         expect([o.date, depotDate(o.placedAt!), depotMinutes(o.placedAt!)]).toEqual([o.date, operating[operating.indexOf(o.date) - 1], 8 * 60 + 5]);
       }
       expect(depotDate(received.find((o) => o.date === MON)!.placedAt!)).toBe('2026-06-20');
-      const placedBy = await tx.select({ placedBy: orders.placedBy }).from(orders).where(eq(orders.status, 'received'));
-      expect([...new Set(placedBy.map((o) => o.placedBy))]).toEqual([nadeesha]);
+      const placedBy = await tx.select({ placedBy: orders.placedBy, outletId: orders.outletId }).from(orders).where(eq(orders.status, 'received'));
+      expect([...new Set(placedBy.filter((o) => o.outletId === 'OUT001').map((o) => o.placedBy))]).toEqual([nadeesha]);
     });
   });
 
@@ -713,7 +719,7 @@ describe('Kandy\'s day on an install seeded before spec 020', () => {
       const fresh = await everyRow(tx, { realTime: false });
       await withoutKandy(tx);
       const before = await everyRow(tx);
-      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 129, lines: 167 } });
+      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 136, lines: 174 } });
 
       expect(await addKandysDay(tx)).toBe(true);
 
@@ -721,7 +727,7 @@ describe('Kandy\'s day on an install seeded before spec 020', () => {
       // lines, the same as a fresh seed's.
       const after = await everyRow(tx);
       for (const table of DAY_TABLES) expect([table, after[table]]).toEqual([table, expect.arrayContaining(before[table]!)]);
-      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 129, lines: 167 }, Kandy: { orders: 64, lines: 87 } });
+      expect(await rowsByDepot(tx)).toEqual({ Peliyagoda: { orders: 136, lines: 174 }, Kandy: { orders: 64, lines: 87 } });
       expect(await everyRow(tx, { realTime: false })).toEqual(fresh);
 
       // Every later start finds them there and writes nothing.

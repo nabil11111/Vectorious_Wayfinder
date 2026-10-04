@@ -89,8 +89,17 @@ it('AC-1 AC-4 on a fresh install, Nadeesha\'s bell holds Wednesday\'s updates an
   // The demo day they belong to comes with them, so a browser keeps what was seen per day and a reset starts afresh.
   const [clock] = await db.select().from(demoDay);
   expect(NotificationList.parse((await nadeesha.get('/api/v1/notifications')).body).demoDay).toBe(clock!.day);
-  // Wednesday's seeded plan has no trucks, so it is nothing for the dock or a driver.
-  for (const who of [ruwan, kasun, dilshan, sarath, prasanna, admin]) expect(await updatesOf(who)).toEqual([]);
+  // Wednesday is a finished Colombo morning. Ruwan hears both trucks; Kasun hears the plan go out.
+  expect(await rows(ruwan)).toEqual([
+    '06:57 · Mahesh\'s reefer truck is back at the depot: 3 of 3 stops done',
+    '06:02 · Priyantha\'s reefer truck is back at the depot: 4 of 4 stops done',
+    '03:40 · Mahesh\'s reefer truck left the depot with 3 stops',
+    '03:30 · Priyantha\'s reefer truck left the depot with 4 stops',
+    '03:20 · Mahesh\'s reefer truck is loaded and ready: 33 of 33 on',
+    '03:10 · Priyantha\'s reefer truck is loaded and ready: 44 of 44 on',
+  ]);
+  expect(await rows(kasun)).toEqual(['Tue 23 Jun 17:00 · Wednesday\'s plan is out: 2 trucks to load']);
+  for (const who of [dilshan, sarath, prasanna, admin]) expect(await updatesOf(who)).toEqual([]);
 });
 
 it('AC-4 each walkthrough person\'s bell after each step of the walkthrough', async () => {
@@ -103,7 +112,16 @@ it('AC-4 each walkthrough person\'s bell after each step of the walkthrough', as
     'Tue 23 Jun 08:05 · Your order is placed: 12 chilled cartons for Wed 24 Jun',
     'Tue 23 Jun 08:05 · Your order is placed: 6 dry cartons for Wed 24 Jun',
   ]);
-  for (const who of [ruwan, kasun, dilshan]) expect(await updatesOf(who)).toEqual([]);
+  expect(await rows(ruwan)).toEqual([
+    '06:57 · Mahesh\'s reefer truck is back at the depot: 3 of 3 stops done',
+    '06:02 · Priyantha\'s reefer truck is back at the depot: 4 of 4 stops done',
+    '03:40 · Mahesh\'s reefer truck left the depot with 3 stops',
+    '03:30 · Priyantha\'s reefer truck left the depot with 4 stops',
+    '03:20 · Mahesh\'s reefer truck is loaded and ready: 33 of 33 on',
+    '03:10 · Priyantha\'s reefer truck is loaded and ready: 44 of 44 on',
+  ]);
+  expect(await rows(kasun)).toEqual(['Tue 23 Jun 17:00 · Wednesday\'s plan is out: 2 trucks to load']);
+  expect(await updatesOf(dilshan)).toEqual([]);
 
   // 2 to 6. Orders close at 16:00, and Ruwan sends Thursday's plan: VEH035 to Nugegoda and Wellawatte, Dilshan driving.
   // From 16:00 the day being worked is Thursday, so Wednesday's updates leave the bell.
@@ -253,7 +271,16 @@ it('AC-4 each walkthrough person\'s bell after each step of the walkthrough', as
     'Tue 23 Jun 08:05 · Your order is placed: 12 chilled cartons for Wed 24 Jun',
     'Tue 23 Jun 08:05 · Your order is placed: 6 dry cartons for Wed 24 Jun',
   ]);
-  for (const who of [ruwan, kasun, dilshan]) expect(await updatesOf(who)).toEqual([]);
+  expect(await rows(ruwan)).toEqual([
+    '06:57 · Mahesh\'s reefer truck is back at the depot: 3 of 3 stops done',
+    '06:02 · Priyantha\'s reefer truck is back at the depot: 4 of 4 stops done',
+    '03:40 · Mahesh\'s reefer truck left the depot with 3 stops',
+    '03:30 · Priyantha\'s reefer truck left the depot with 4 stops',
+    '03:20 · Mahesh\'s reefer truck is loaded and ready: 33 of 33 on',
+    '03:10 · Priyantha\'s reefer truck is loaded and ready: 44 of 44 on',
+  ]);
+  expect(await rows(kasun)).toEqual(['Tue 23 Jun 17:00 · Wednesday\'s plan is out: 2 trucks to load']);
+  expect(await updatesOf(dilshan)).toEqual([]);
 });
 
 it('A3 retains the ready-time loading count after a full refusal and a closed-shop return', async () => {

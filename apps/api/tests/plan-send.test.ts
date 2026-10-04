@@ -89,7 +89,8 @@ it('AC-26 sends atomically, saves the check and times, revises orders and announ
   const after = await db.select().from(orders);
   const on = new Set(b.plan.trips.flatMap((t) => t.stops.flatMap((s) => s.orderIds)));
   for (const o of b.orders) { const row = after.find((r) => r.id === o.id)!; expect(row.status).toBe(on.has(o.id) ? 'planned' : 'deferred'); expect(row.revision).toBe(before.find((r) => r.id === o.id)!.revision + 1); }
-  const timed = await db.select().from(stops).orderBy(stops.seq);
+  const sentTripIds = (await db.select({ id: trips.id }).from(trips).where(eq(trips.planId, sent.plan.id!))).map((t) => t.id);
+  const timed = await db.select().from(stops).where(inArray(stops.tripId, sentTripIds)).orderBy(stops.seq);
   expect(timed.map((s) => [s.plannedArrival, s.plannedDepart])).toEqual(b.check!.trips[0]!.times!.stops.map((s) => [s.arriveAt, s.leaveAt].map((n) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}:00`)));
   expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, sent.plan.id!), eq(auditLog.action, 'plan.sent')))).toHaveLength(1);
   expect(announce).toHaveBeenCalledWith({ topic: 'plans', depotId: 'Peliyagoda' }); expect(announce).toHaveBeenCalledWith({ topic: 'orders', depotId: 'Peliyagoda' });
@@ -123,7 +124,10 @@ it('AC-4 and AC-29 keep the sent board by date and carry its fuel into Friday', 
   expect(sent.plan.lockedReason).toBeNull();
   const next = PlanBoard.parse((await as.get('/api/v1/plans')).body); expect(next.day!.date).toBe('2026-06-26');
   expect(next.check!.vehicles.find((v) => v.vehicleId === 'VEH004')!.litresBefore).toBe(180.9);
-  const seed = PlanBoard.parse((await as.get('/api/v1/plans/2026-06-24')).body); expect([seed.check, seed.figures, seed.counts]).toEqual([null, null, null]);
+  const seed = PlanBoard.parse((await as.get('/api/v1/plans/2026-06-24')).body);
+  expect(seed.check?.ok).toBe(true);
+  expect(seed.counts).toMatchObject({ trips: 2, stops: 7, ordersOnTrips: 7, ordersDeferred: 4 });
+  expect(seed.figures).not.toBeNull();
 });
 
 it('AC-30 takes back a sent plan, restores earlier deferrals, and sends again without duplicate fuel', async () => {

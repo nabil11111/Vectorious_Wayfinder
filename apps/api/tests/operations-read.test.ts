@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { clearDemoDay, seedDemoDay } from '../src/db/demo-day';
-import { demoDay, fuelLog, issueLines, issues, orders, plans, stops, trips, users, vehicles } from '../src/db/schema';
+import { auditLog, demoDay, fuelLog, issueLines, issues, orders, plans, stops, trips, users, vehicles } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { announce } from '../src/lib/live';
 import * as board from '../src/plans/board';
@@ -143,8 +143,13 @@ it('AC-11 no remaining day keeps out trips and open issues', async () => {
   expect(day.earlierOut[0]!.groups[0]!.trips[0]!.openIssueIds).toHaveLength(1);
   expect((await ruwan.get('/api/v1/issues')).body.issues).toHaveLength(1);
 });
-it('AC-12 legacy seeded plan explicitly lacks movement detail', async () => {
+it('AC-12 a sent plan with no kept check lacks movement detail', async () => {
   freeze(WED, 900);
+  const recorded = await read();
+  expect(recorded).toMatchObject({ day: WED, plan: { detailRecorded: true }, counts: { tripsTotal: 2, stopsTotal: 7, stopsDone: 7, deferredOrders: 4 } });
+  await db.delete(auditLog).where(and(eq(auditLog.entityId, recorded.plan!.id), eq(auditLog.action, 'plan.sent')));
+  await db.update(plans).set({ sentCheck: null }).where(eq(plans.id, recorded.plan!.id));
+  await db.delete(trips).where(eq(trips.planId, recorded.plan!.id));
   const day = await read();
   expect(day).toMatchObject({ day: WED, plan: { detailRecorded: false }, groups: [], counts: { tripsTotal: 0, stopsTotal: 0, stopsDone: 0, deferredOrders: 4 } });
   const [trip] = await db.insert(trips).values({ planId: day.plan!.id, vehicleId: 'VEH035', tripNo: 1 }).returning();

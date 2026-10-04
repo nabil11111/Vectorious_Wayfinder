@@ -97,7 +97,9 @@ it('reads dated historical plans and validates the path date', async () => {
   const agent = actors.get('ruwan')!;
   const board = PlanBoard.parse((await agent.get('/api/v1/plans/2026-06-24')).body);
   expect(board.plan.status).toBe('published');
-  expect([board.check, board.figures, board.counts]).toEqual([null, null, null]);
+  expect(board.check?.ok).toBe(true);
+  expect(board.counts).toMatchObject({ trips: 2, stops: 7, ordersOnTrips: 7, ordersDeferred: 4 });
+  expect(board.figures).not.toBeNull();
   expect((await agent.get('/api/v1/plans/not-a-date')).status).toBe(400);
 });
 

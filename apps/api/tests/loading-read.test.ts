@@ -59,7 +59,10 @@ it("AC-2 answers the loader's day before any send, the day before until 16:00 an
   const before = await heldRows();
   expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', demoDay: originalClock.day, day: THU, plan: null, trucks: [], left: [] });
   freeze(WED, 15 * 60 + 59);
-  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', demoDay: originalClock.day, day: WED, plan: { id: demoId('plan', `${WED}:Peliyagoda`), revision: 0, publishedAt: depotInstant('2026-06-23', 17 * 60).toISOString(), publishedBy: null }, trucks: [], left: [] });
+  expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', demoDay: originalClock.day, day: WED, plan: { id: demoId('plan', `${WED}:Peliyagoda`), revision: 0, publishedAt: depotInstant('2026-06-23', 17 * 60).toISOString(), publishedBy: 'Ruwan' }, trucks: [], left: [
+    { tripId: demoId('trip', `${WED}:VEH004:1`), vehicleId: 'VEH004', tripNo: 1, driver: 'Priyantha', leftAt: depotInstant(WED, 3 * 60 + 30).toISOString() },
+    { tripId: demoId('trip', `${WED}:VEH006:1`), vehicleId: 'VEH006', tripNo: 1, driver: 'Mahesh', leftAt: depotInstant(WED, 3 * 60 + 40).toISOString() },
+  ] });
   freeze('2026-06-27', 16 * 60);
   expect(await loadingDay()).toEqual({ depot: 'Peliyagoda', demoDay: originalClock.day, day: null, plan: null, trucks: [], left: [] });
   expect(await heldRows()).toEqual(before);

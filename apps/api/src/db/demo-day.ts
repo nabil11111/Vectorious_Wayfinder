@@ -2,10 +2,12 @@ import { createHash } from 'node:crypto';
 import { DEMO_DAY, type Brand, type Temp } from '@wayfinder/contracts';
 import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { depotInstant, realNow } from '../lib/clock';
+import { checkPlan } from '../planning';
+import { readBoard } from '../plans/board';
 import { config } from '../lib/config';
 import { db, type Db, type Tx } from './client';
 import type { PRODUCTS } from './fixtures';
-import { calendarDays, deferrals, demoDay, fuelLog, orderLines, orders, outletReceiving, outlets, plans, users, vehicleDaysOff, vehicles } from './schema';
+import { auditLog, calendarDays, deferrals, demoDay, fuelLog, orderLines, orders, outletReceiving, outlets, plans, stopOrders, stops, trips, users, vehicleDaysOff, vehicles } from './schema';
 
 // The seeded delivery day (spec 008): Thu 25 Jun 2026 from Peliyagoda, written once in demo mode, and since spec 020
 // Kandy's orders for that Thursday too. Each later piece adds its own block of records to seedDemoDay, so a reset
@@ -82,9 +84,27 @@ const WAITED_ORDERS = [
     { plan: WED, code: 'no_reefer', reason: 'No fridge truck was left for Matara. Two were in the workshop.' },
   ] },
 ];
-// The sent plans those deferrals sit in. They hold only what Thursday needs, so they have no trips. Ruwan
-// sent each one at 17:00 on the day before.
+// The sent plans those deferrals sit in. Ruwan sent each one at 17:00 on the day before. Tuesday holds only
+// the deferral. Wednesday is a finished Colombo morning, seeded below, so History has a day to open.
 const SENT_PLANS = { dates: [TUE, WED], by: 'ruwan', sentAtMinutes: 17 * 60 };
+
+// Wednesday's finished run: two ambient trucks, dry cartons, every stop received inside its window. The drivers
+// are each truck's usual one, so Thursday's pairing does not move. Dilshan's truck is not among them.
+const WED_RUN: { vehicleId: string; driver: string; leaveAt: number; stops: { outletId: string; cartons: number; arrive: number; open: number; close: number }[] }[] = [
+  { vehicleId: 'VEH004', driver: 'priyantha', leaveAt: 3 * 60 + 30, stops: [
+    { outletId: 'OUT006', cartons: 10, arrive: 5 * 60 + 10, open: 3 * 60, close: 8 * 60 },
+    { outletId: 'OUT011', cartons: 12, arrive: 5 * 60 + 40, open: 3 * 60, close: 8 * 60 },
+    { outletId: 'OUT008', cartons: 8, arrive: 6 * 60 + 20, open: 5 * 60, close: 7 * 60 + 30 },
+    { outletId: 'OUT009', cartons: 14, arrive: 6 * 60 + 50, open: 4 * 60, close: 7 * 60 + 45 },
+  ] },
+  { vehicleId: 'VEH006', driver: 'mahesh', leaveAt: 3 * 60 + 40, stops: [
+    { outletId: 'OUT004', cartons: 11, arrive: 6 * 60, open: 5 * 60 + 30, close: 8 * 60 },
+    { outletId: 'OUT007', cartons: 9, arrive: 6 * 60 + 40, open: 5 * 60 + 30, close: 8 * 60 },
+    { outletId: 'OUT012', cartons: 13, arrive: 7 * 60 + 15, open: 5 * 60 + 30, close: 8 * 60 },
+  ] },
+];
+const UNLOAD_MIN = 15;
+const clockOf = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}:00`;
 
 // Vehicles in the workshop. On Thursday that leaves Peliyagoda 5 of its 7 fridge trucks and 1 of its 2
 // fridge vans, so the day is short of trips and not of space (D-26).
@@ -172,6 +192,81 @@ const orderKey = (o: SeedOrder) => `${o.wantedFor}:${o.outletId}:${o.temp}`;
 const orderId = (o: SeedOrder) => demoId('order', orderKey(o));
 const planId = (date: string) => demoId('plan', `${date}:${DEMO_DAY.depotId}`);
 
+// Wednesday's two trips, their stops and the kept times History reads. The audit is written once: a reset
+// clears the day and writes it again, and the audit log is kept, so a second seed finds the same row.
+async function writeWednesdayRun(tx: Tx, userId: (username: string) => string): Promise<void> {
+  const runs = WED_RUN.map((run) => {
+    const timed = run.stops.map((stop, index) => ({ ...stop, seq: index + 1, leave: stop.arrive + UNLOAD_MIN }));
+    const last = timed.at(-1)!;
+    const units = timed.reduce((sum, stop) => sum + stop.cartons, 0);
+    const backAt = last.leave + 45;
+    return { ...run, timed, last, units, backAt, readyAgainAt: backAt + 30, tripMin: last.leave - run.leaveAt };
+  });
+  const wednesday: SeedOrder[] = runs.flatMap((run) => run.timed.map((stop) => ({
+    outletId: stop.outletId, wantedFor: WED, temp: 'dry' as const, status: 'received' as const,
+    lines: [['fresh-dry-carton', stop.cartons]] as Line[],
+  })));
+  await tx.insert(orders).values(wednesday.map((order) => ({
+    id: orderId(order), outletId: order.outletId, deliveryDate: order.wantedFor, temp: order.temp, status: order.status,
+    placedAt: placedAt(order.wantedFor, numberOf(order.outletId)),
+    receivedAt: depotInstant(WED, runs.flatMap((run) => run.timed).find((stop) => stop.outletId === order.outletId)!.leave),
+    receiptSentAt: depotInstant(WED, runs.flatMap((run) => run.timed).find((stop) => stop.outletId === order.outletId)!.leave),
+  })));
+  await tx.insert(orderLines).values(wednesday.flatMap((order) => order.lines.map(([productId, quantity]) => ({
+    id: demoId('line', `${orderKey(order)}:${productId}`), orderId: orderId(order), productId, quantity,
+    loadedQty: quantity, deliveredQty: quantity, receivedQty: quantity,
+  }))));
+  for (const run of runs) {
+    const tripId = demoId('trip', `${WED}:${run.vehicleId}:1`);
+    await tx.insert(trips).values({
+      id: tripId, planId: planId(WED), vehicleId: run.vehicleId, driverId: userId(run.driver), tripNo: 1,
+      departAt: clockOf(run.leaveAt), status: 'done', readyAt: depotInstant(WED, run.leaveAt - 20),
+      leftAt: depotInstant(WED, run.leaveAt), backAt: depotInstant(WED, run.backAt), lastEventAt: depotInstant(WED, run.backAt),
+    });
+    await tx.insert(stops).values(run.timed.map((stop) => ({
+      id: demoId('stop', `${WED}:${run.vehicleId}:${stop.seq}`), tripId, seq: stop.seq, outletId: stop.outletId,
+      plannedArrival: clockOf(stop.arrive), plannedDepart: clockOf(stop.leave),
+      loadedAt: depotInstant(WED, run.leaveAt - 10), arrivedAt: depotInstant(WED, stop.arrive), doneAt: depotInstant(WED, stop.leave),
+      outcome: 'delivered' as const,
+    })));
+    await tx.insert(stopOrders).values(run.timed.map((stop) => ({
+      stopId: demoId('stop', `${WED}:${run.vehicleId}:${stop.seq}`),
+      orderId: orderId({ outletId: stop.outletId, wantedFor: WED, temp: 'dry', status: 'received', lines: [] }),
+    })));
+  }
+  // The kept check is the real checker's, so every truck still has its fuel line. A hand-written check that
+  // names only these two trucks makes the Wednesday board fail closed.
+  const { input } = await readBoard(tx, DEMO_DAY.depotId, WED, { at: depotInstant(TUE, SENT_PLANS.sentAtMinutes), demoDay: 1 });
+  if (!input) throw new Error('Wednesday has no plan for the checker.');
+  const check = checkPlan(input);
+  const blocked = check.problems.filter((problem) => problem.level === 'block');
+  if (blocked.length || check.trips.some((trip) => trip.times === null)) {
+    throw new Error(`Wednesday's seeded plan does not check: ${blocked.map((problem) => problem.message).join(' ')}`);
+  }
+  await tx.update(plans).set({ sentCheck: check }).where(eq(plans.id, planId(WED)));
+  for (const trip of check.trips) {
+    const times = trip.times!;
+    await tx.update(trips).set({
+      leftAt: depotInstant(WED, times.leaveAt), backAt: depotInstant(WED, times.backAt), lastEventAt: depotInstant(WED, times.backAt),
+    }).where(eq(trips.id, demoId('trip', `${WED}:${trip.vehicleId}:1`)));
+    for (const stop of times.stops) {
+      await tx.update(stops).set({
+        plannedArrival: clockOf(stop.arriveAt), plannedDepart: clockOf(stop.leaveAt),
+        arrivedAt: depotInstant(WED, stop.arriveAt), doneAt: depotInstant(WED, stop.leaveAt),
+      }).where(eq(stops.id, demoId('stop', `${WED}:${trip.vehicleId}:${stop.seq}`)));
+      await tx.update(orders).set({
+        receivedAt: depotInstant(WED, stop.leaveAt), receiptSentAt: depotInstant(WED, stop.leaveAt),
+      }).where(eq(orders.id, orderId({ outletId: stop.outletId, wantedFor: WED, temp: 'dry', status: 'received', lines: [] })));
+    }
+  }
+  const sentAudit = demoId('audit', `${WED}:Peliyagoda:sent`);
+  const [there] = await tx.select({ id: auditLog.id }).from(auditLog).where(eq(auditLog.id, sentAudit));
+  if (!there) await tx.insert(auditLog).values({
+    id: sentAudit, actorId: userId(SENT_PLANS.by), action: 'plan.sent', entity: 'plan', entityId: planId(WED),
+    before: { revision: 0, status: 'draft' }, after: { revision: 0, status: 'published' }, at: depotInstant(TUE, SENT_PLANS.sentAtMinutes),
+  });
+}
+
 // Thursday's placed orders of a depot's shops, by the rules at the top, and the depot's Tech orders as written out.
 function placedOrders(shops: { id: string; brand: Brand }[], techOrders: { outletId: string; lines: Line[] }[]): SeedOrder[] {
   const list: SeedOrder[] = [];
@@ -241,7 +336,7 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
     const fleet = await tx.select({ id: vehicles.id, weeklyFuelQuotaL: vehicles.weeklyFuelQuotaL }).from(vehicles)
       .where(eq(vehicles.depotId, DEMO_DAY.depotId)).orderBy(vehicles.id);
     const people = await tx.select({ id: users.id, username: users.username }).from(users)
-      .where(inArray(users.username, [DRAFT.by, SENT_PLANS.by]));
+      .where(inArray(users.username, [DRAFT.by, SENT_PLANS.by, ...WED_RUN.map((run) => run.driver)]));
     const userId = (username: string) => {
       const person = people.find((p) => p.username === username);
       if (!person) throw new Error(`The demo day needs the account "${username}", and it is not there.`);
@@ -287,6 +382,7 @@ export async function seedDemoDay(on: Db | Tx = db): Promise<boolean> {
       code: d.code,
       reason: d.reason,
     }))));
+    await writeWednesdayRun(tx, userId);
 
     // The workshop rows, and the fuel each vehicle used on the days it was out on the road.
     await tx.insert(vehicleDaysOff).values(WORKSHOP.flatMap((w) => w.dates.map((date) => ({ vehicleId: w.vehicleId, date, reason: w.reason }))));

@@ -88,8 +88,10 @@ it('AC-4 pairs Peliyagoda\'s drivers in staff ID order with its trucks in id ord
   expect(pairs(list)).toEqual(Object.fromEntries([
     ['VEH001', 'D-001'], ...Array.from({ length: 34 }, (_, i) => [veh(i + 2), [3, 5].includes(i + 2) ? null : staffId(i + 3)]), ['VEH036', null], ['VEH037', null], ['VEH038', null],
   ]));
-  // The seed's sent plans hold no trips, so no truck ran a district last time, and with no orders every truck fits.
-  expect(list.crews.every((crew) => crew.lastDistricts.length === 0 && !crew.ranHere && crew.fits && crew.misfits.length === 0)).toBe(true);
+  // Wednesday's finished run is the latest sent plan. Those two trucks ran Colombo; every other truck ran nowhere.
+  // With no orders asked, every truck still fits.
+  expect(list.crews.filter((crew) => crew.lastDistricts.length > 0).map((crew) => [crew.vehicleId, crew.lastDistricts]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toEqual([['VEH004', ['Colombo']], ['VEH006', ['Colombo']]]);
+  expect(list.crews.every((crew) => !crew.ranHere && crew.fits && crew.misfits.length === 0)).toBe(true);
   expect(list).toMatchObject({ orderIds: [], revision: 0, load: { kg: 0, m3: 0 } });
   expect(inPickerOrder(list)).toBe(true);
 });

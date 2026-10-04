@@ -1,9 +1,9 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
-import { demoDay, outlets, stops, trips } from '../src/db/schema';
+import { auditLog, demoDay, outlets, plans, stops, trips } from '../src/db/schema';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { driverStop } from './driver-plan';
 import { resetDay, signIn, THU, WED } from './loading-plan';
@@ -79,6 +79,11 @@ it('AC-1 a closed shop does not count', async () => {
 
 it('AC-1 a plan whose stop details were not recorded leaves every district delivered count unknown', async () => {
   freeze(WED, 900);
+  const recorded = await read();
+  expect(recorded.plan).toMatchObject({ detailRecorded: true });
+  await db.delete(auditLog).where(and(eq(auditLog.entityId, recorded.plan!.id), eq(auditLog.action, 'plan.sent')));
+  await db.update(plans).set({ sentCheck: null }).where(eq(plans.id, recorded.plan!.id));
+  await db.delete(trips).where(eq(trips.planId, recorded.plan!.id));
   const legacyDay = await read();
   expect(legacyDay.plan).toMatchObject({ detailRecorded: false });
   expect(legacyDay.map).toEqual(mapWith(0));

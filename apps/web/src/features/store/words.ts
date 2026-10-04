@@ -185,6 +185,8 @@ const whenOf = (moment: string, today: string) => {
   const day = depotDayOf(moment);
   return day === today ? clockTime(moment) : `${shortDay(day)} ${clockTime(moment)}`;
 };
+// "Wed 24 Jun 07:42", the day and the time, for a delivery a manager looks back on.
+const datedTime = (moment: string) => `${shortDay(depotDayOf(moment))} ${clockTime(moment)}`;
 
 const unitOf = (brand: Brand, n: number) => (n === 1 ? BRAND_UNIT[brand] : plural(BRAND_UNIT[brand]));
 
@@ -318,8 +320,8 @@ export const aboutDelivery = (delivery: Pick<StoreDelivery, 'vehicleId' | 'day'>
 
 const REFUSAL_WORDS: Record<RefusalReason, string> = { damaged: 'damaged', expired: 'expired', not_ordered: 'not ordered' };
 
-// "Delivered 03:38 · VEH035 · Dilshan"
-export const deliveredLine = (delivery: OrderDelivery) => [`Delivered ${clockTime(delivery.doneAt)}`, delivery.vehicleId, delivery.driver].filter(Boolean).join(' · ');
+// "Delivered Thu 25 Jun 03:38 · VEH035 · Dilshan"
+export const deliveredLine = (delivery: OrderDelivery) => [`Delivered ${datedTime(delivery.doneAt)}`, delivery.vehicleId, delivery.driver].filter(Boolean).join(' · ');
 
 // "1 short from the depot", "4 didn't fit on the truck", "2 refused, damaged"
 const shortParts = (delivery: OrderDelivery) => [
@@ -343,7 +345,8 @@ export const receivedWords = (receipt: OrderReceipt) =>
 // short" in yellow.
 export const receivedChip = (receipt: OrderReceipt, today: boolean): { label: string; tone: ChipTone } =>
   (today ? { label: `Received ${clockTime(receipt.at)}`, tone: 'good' } : { label: receivedWords(receipt), tone: receipt.short === 0 ? 'good' : 'warn' });
-export const receivedAtLine = (receipt: OrderReceipt) => `Received ${clockTime(receipt.at)}`;
-export const lateLine = (delivery: OrderDelivery) => `Arrived ${clockTime(delivery.arrivedAt)}, after your window`;
+// "Received Wed 24 Jun 07:42". The day is on the line, so a past card still says when it was once it leaves its group.
+export const receivedAtLine = (receipt: OrderReceipt) => `Received ${datedTime(receipt.at)}`;
+export const lateLine = (delivery: OrderDelivery) => `Arrived ${datedTime(delivery.arrivedAt)}, after your window`;
 export const nobodyLine = (delivery: OrderDelivery) => `Nobody at the shop at ${clockTime(delivery.arrivedAt)} · ${delivery.vehicleId}`;
 export const replacementForLine = (day: string) => `Replacement for ${shortDay(day)}`;

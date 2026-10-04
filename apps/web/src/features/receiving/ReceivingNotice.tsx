@@ -8,6 +8,6 @@ export function ReceivingNotice({ state, stale = false }: { state: ReceivingStat
   return <div className="mt-3 rounded-lg border px-3 py-2.5 text-sm">
     <p className="font-semibold">{stale ? 'Last known · ' : ''}{statusWords[state.status]} · {shortDay(state.date)}</p>
     {state.note && <p className="mt-1">{state.note}</p>}
-    <p className="mt-1 text-xs text-muted-foreground">{updated ? `Updated ${updated.day} ${updated.time}` : 'No declaration recorded'} · advisory</p>
+    <p className="mt-1 text-xs text-muted-foreground">{updated ? `Updated ${updated.day} ${updated.time}` : 'No declaration recorded'}</p>
   </div>;
 }

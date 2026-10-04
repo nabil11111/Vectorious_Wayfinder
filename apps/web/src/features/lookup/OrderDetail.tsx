@@ -68,8 +68,7 @@ export function OrderDetail({ row, anchor, onClose }: { row: LookupOrderRow; anc
         <h2 id={title} className="min-w-0 flex-1 text-[15px] leading-5 font-bold">{row.outlet.name}</h2>
         <CloseButton label={`Close ${row.outlet.name}`} onClick={onClose} />
       </div>
-      <p className="mt-2 font-mono text-[11px] leading-4 break-all text-muted-foreground">{row.id}</p>
-      <p className="font-mono text-[11px] leading-4 text-muted-foreground">{placedWords(row.placedAt)} · {wantedWords(row.wantedDate)}</p>
+      <p className="mt-2 font-mono text-[11px] leading-4 text-muted-foreground">{placedWords(row.placedAt)} · {wantedWords(row.wantedDate)}</p>
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         <Chip tone={row.broughtBack ? 'warn' : STATUS_TONE[row.status]}>{nowWords(row)}</Chip>
         {row.timesDeferred > 0 && <Chip tone={row.timesDeferred > 1 ? 'bad' : 'warn'}>{timesLong(row.timesDeferred)}</Chip>}

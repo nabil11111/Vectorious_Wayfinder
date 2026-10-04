@@ -73,9 +73,9 @@ it('AC-20 loader writes and their replay carry the same publication and locked g
   samePublication(await loader.ready(truck));
 });
 
-it('AC-20 legacy publication has no guessed publisher and reset generation is read afresh', async () => {
+it('AC-20 a recorded sender is named and reset generation is read afresh', async () => {
   freeze(WED, 15 * 60);
-  expect(await read()).toMatchObject({ demoDay: await generation(), plan: { publishedAt: depotInstant('2026-06-23', 17 * 60).toISOString(), publishedBy: null } });
+  expect(await read()).toMatchObject({ demoDay: await generation(), plan: { publishedAt: depotInstant('2026-06-23', 17 * 60).toISOString(), publishedBy: 'Ruwan' } });
   const before = await generation();
   await db.update(demoDay).set({ day: sql`${demoDay.day} + 1` });
   expect(await read()).toMatchObject({ demoDay: before + 1 });

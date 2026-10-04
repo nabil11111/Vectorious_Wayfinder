@@ -102,7 +102,7 @@ async function expectAudit(id: string, action: string) {
 it('AC-6 refuses Chaminda on Dilshan’s trip and foreign stops and lines with the named id and no changes', async () => {
   let trip = await ready({ withVeh004: true });
   await refused(driverWrite(trip, 'start', at(3 * 60 + 31).toISOString()), 400, 'unknown_record', { id: trip.tripId }, chaminda);
-  const foreign = (await db.select({ stop: stops }).from(stops).innerJoin(trips, eq(trips.id, stops.tripId)).where(eq(trips.vehicleId, 'VEH004')))[0]!.stop;
+  const foreign = (await db.select({ stop: stops }).from(stops).innerJoin(trips, eq(trips.id, stops.tripId)).innerJoin(plans, eq(plans.id, trips.planId)).where(and(eq(trips.vehicleId, 'VEH004'), eq(plans.date, THU))))[0]!.stop;
   await refused({ ...driverWrite(trip, 'arrive', at(3 * 60 + 34).toISOString(), 1), stopId: foreign.id }, 400, 'unknown_record', { id: foreign.id });
   const missing = randomUUID();
   await refused({ ...driverWrite(trip, 'start', at(3 * 60 + 31).toISOString()), tripId: missing }, 400, 'unknown_record', { id: missing });
@@ -137,7 +137,7 @@ it('AC-12 refuses a start before loading or while loading without changing anyth
 // AC-12/13 explicitly set the two trips' rows. Both use the seeded VEH004 stops and the plan's checked timings.
 async function twoReadyTrips(): Promise<[DriverTrip, DriverTrip]> {
   await ready({ withVeh004: true });
-  const first = (await db.select().from(trips).where(eq(trips.vehicleId, 'VEH004')))[0]!;
+  const first = (await db.select().from(trips).innerJoin(plans, eq(plans.id, trips.planId)).where(and(eq(trips.vehicleId, 'VEH004'), eq(plans.date, THU))))[0]!.trips;
   const plan = (await db.select().from(plans).where(eq(plans.id, first.planId)))[0]!;
   const check = PlanCheck.parse(plan.sentCheck);
   const checked = check.trips.find(trip => trip.vehicleId === 'VEH004')!;

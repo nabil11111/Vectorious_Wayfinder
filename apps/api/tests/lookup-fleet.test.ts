@@ -1,5 +1,5 @@
 import { PlanCheck } from '@wayfinder/contracts';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { expect, it, vi } from 'vitest';
 import { db } from '../src/db/client';
 import { fuelLog, plans, trips, vehicles } from '../src/db/schema';
@@ -26,7 +26,8 @@ it('AC-20 fleet uses the calendar day and counts active reefers, vans and days o
   expect(day).toMatchObject({ today: THU, summary: { active: 38, reefers: 9, vans: 4, recordedOut: 0, notRecordedOut: 0, activeOffToday: 3, activeWithoutOffToday: 35 } });
   expect(day.vehicles.filter(row => row.offReason).map(row => row.id).sort()).toEqual(['VEH003', 'VEH005', 'VEH036']);
   expect(day.vehicles.filter(row => row.type === 'van').every(row => row.group === 'vans')).toBe(true);
-  expect(day.vehicles.every(row => row.selectedTrip === null && row.recentTrips.length === 0)).toBe(true);
+  expect(day.vehicles.every(row => row.selectedTrip === null)).toBe(true);
+  expect(day.vehicles.filter(row => row.recentTrips.length > 0).map(row => row.id).sort()).toEqual(['VEH004', 'VEH006']);
   const groups = day.vehicles.map(row => row.group);
   expect(groups).toEqual([...groups].sort((a, b) => ['reefer_trucks', 'dry_trucks', 'vans'].indexOf(a) - ['reefer_trucks', 'dry_trucks', 'vans'].indexOf(b)));
 });
@@ -72,7 +73,7 @@ it('AC-22 archiving excludes only the header while keeping the vehicles fuel and
 });
 it('Q-42 not recorded out names only todays planned vehicles past their leave time, never one that went out and came back', async () => {
   await sendWalkthroughPlan(h, { withVeh004: true });
-  const tripOf = async (vehicleId: string) => (await db.select().from(trips).where(eq(trips.vehicleId, vehicleId)))[0]!;
+  const tripOf = async (vehicleId: string) => (await db.select({ trip: trips }).from(trips).innerJoin(plans, eq(plans.id, trips.planId)).where(and(eq(trips.vehicleId, vehicleId), eq(plans.date, THU))))[0]!.trip;
   const leaves = (await h.fleet()).vehicles.find(row => row.id === 'VEH004')!.todayTrips[0]!.leavesAt;
   const notOut = (day: Awaited<ReturnType<typeof h.fleet>>) => day.vehicles.filter(row => row.notRecordedOut).map(row => row.id);
   h.freeze(THU, 120);
@@ -92,12 +93,12 @@ it('Q-42 not recorded out names only todays planned vehicles past their leave ti
 it('AC-23 ledger fuel includes the full ISO week once and sent trips only supply km and links', async () => {
   h.freeze(THU, 150);
   const seed = await h.fleet();
-  expect(seed.summary.fuel).toMatchObject({ recordedCommitted: 6945, quota: 18600, remaining: 11655, recordedCommittedPct: 37, sentTrips: 0, plannedKm: 0 });
+  expect(seed.summary.fuel).toMatchObject({ recordedCommitted: 6945, quota: 18600, remaining: 11655, recordedCommittedPct: 37, sentTrips: 2, plannedKm: 68 });
   expect(seed.vehicles.find(row => row.id === 'VEH001')!.fuel).toMatchObject({ recordedCommitted: 300, quota: 340, remaining: 40, sentTrips: 0, plannedKm: 0 });
   expect(seed.summary.fuel!.days.map(row => row.dow)).toEqual([0, 1, 2, 3, 4, 5]);
   const sent = await sendWalkthroughPlan(h);
   const after = await h.fleet();
-  expect(after.summary.fuel).toMatchObject({ recordedCommitted: 6947.7, sentTrips: 1 });
+  expect(after.summary.fuel).toMatchObject({ recordedCommitted: 6947.7, sentTrips: 3 });
   expect(after.summary.fuel!.plannedKm).toBeGreaterThan(0);
   expect((await h.fleet()).summary.fuel).toEqual(after.summary.fuel);
   expect((await h.ruwan.post(`/api/v1/plans/${THU}/unsend`).send({ planId: sent.plan.id, revision: sent.plan.revision })).status).toBe(200);

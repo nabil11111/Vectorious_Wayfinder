@@ -225,7 +225,7 @@ describe('POST /demo/reset', () => {
   it('AC-40 leaves every table but the users, the sessions and the audit log exactly as the first seed wrote it: Peliyagoda\'s 129 orders and 167 order lines and Kandy\'s 64 and 87 are back and nothing else is left', async () => {
     const first = await everyTable();
     // Kandy's are spec 020's.
-    expect([first.orders?.length, first.order_lines?.length]).toEqual([129 + 64, 167 + 87]);
+    expect([first.orders?.length, first.order_lines?.length]).toEqual([129 + 64 + 7, 167 + 87 + 7]);
 
     // A reset of a day nobody has touched changes nothing but the clock's counters.
     expect((await reset('admin')).status).toBe(200);

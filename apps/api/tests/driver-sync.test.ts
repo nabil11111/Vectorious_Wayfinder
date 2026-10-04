@@ -160,8 +160,9 @@ it.each(['new', 'replayed'] as const)('AC-22 answers a %s write from one snapsho
   await ready({ withVeh004: true });
   // Another owned trip is still out. Its seeded Gampaha and Kandana loads are kept whole.
   const dilshanId = (await db.select().from(users).where(eq(users.username, 'dilshan')))[0]!.id;
+  const [thursdayTrip] = await db.select({ id: trips.id }).from(trips).innerJoin(plans, eq(plans.id, trips.planId)).where(and(eq(trips.vehicleId, 'VEH004'), eq(plans.date, THU)));
   const [second] = await db.update(trips).set({ driverId: dilshanId, status: 'ready', readyAt: new Date(at(150)) })
-    .where(eq(trips.vehicleId, 'VEH004')).returning();
+    .where(eq(trips.id, thursdayTrip!.id)).returning();
   const assigned = await db.select().from(stopOrders).innerJoin(stops, eq(stops.id, stopOrders.stopId)).where(eq(stops.tripId, second!.id));
   const ids = assigned.map(row => row.stop_orders.orderId);
   await db.update(orders).set({ status: 'loaded' }).where(inArray(orders.id, ids));
@@ -219,7 +220,8 @@ it('AC-23 binds an id to its time, stop, kind and trip, without applying the cha
   const day = await ready({ withVeh004: true });
   const own = driverTrip(day);
   const dilshanId = (await db.select().from(users).where(eq(users.username, 'dilshan')))[0]!.id;
-  const second = (await db.update(trips).set({ driverId: dilshanId, status: 'ready', readyAt: depotInstant(THU, 156) }).where(eq(trips.vehicleId, 'VEH004')).returning())[0]!;
+  const [thursdayTrip] = await db.select({ id: trips.id }).from(trips).innerJoin(plans, eq(plans.id, trips.planId)).where(and(eq(trips.vehicleId, 'VEH004'), eq(plans.date, THU)));
+  const second = (await db.update(trips).set({ driverId: dilshanId, status: 'ready', readyAt: depotInstant(THU, 156) }).where(eq(trips.id, thursdayTrip!.id)).returning())[0]!;
   const foreignStop = (await db.select().from(stops).where(eq(stops.tripId, second.id)))[0]!;
   let current = await apply(day, 'start', 211);
   const write = driverWrite(driverTrip(current), 'arrive', at(214), 1);
@@ -261,7 +263,8 @@ it('AC-23 binds a delivered proof to its exact photo and the account that applie
 it('AC-23 reserves an id once when different trips receive it concurrently', async () => {
   await ready({ withVeh004: true });
   const dilshanId = (await db.select().from(users).where(eq(users.username, 'dilshan')))[0]!.id;
-  await db.update(trips).set({ driverId: dilshanId, status: 'ready', readyAt: depotInstant(THU, 156) }).where(eq(trips.vehicleId, 'VEH004'));
+  const [thursdayTrip] = await db.select({ id: trips.id }).from(trips).innerJoin(plans, eq(plans.id, trips.planId)).where(and(eq(trips.vehicleId, 'VEH004'), eq(plans.date, THU)));
+  await db.update(trips).set({ driverId: dilshanId, status: 'ready', readyAt: depotInstant(THU, 156) }).where(eq(trips.id, thursdayTrip!.id));
   const day = await driver.read();
   const writeId = randomUUID();
   freeze(THU, 211);

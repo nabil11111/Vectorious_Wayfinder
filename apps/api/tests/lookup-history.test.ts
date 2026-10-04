@@ -132,8 +132,9 @@ it('AC-16 partial or inconsistent receipt evidence fails visibly instead of clai
   await db.update(orderLines).set({ receivedQty: 11 }).where(eq(orderLines.id, own[0]!.lineId));
   expect((await h.ruwan.get('/api/v1/lookup/history?date=' + THU)).status).toBe(500);
 });
-it('AC-17 seeded Tuesday and Wednesday publications have one and four deferrals with zero trips', async () => {
-  expect(await h.history()).toMatchObject({ date: WED, publishedDates: [WED, '2026-06-23'], counts: { trips: 0, stops: 0, deferred: 4, confirmations: 0, receivedOrders: 0, stages: { ordered: 0, loaded: { units: 0, known: 0, total: 0 } } }, trips: [] });
+it('AC-17 seeded Tuesday has one deferral and no trips, and Wednesday has four deferrals plus two finished trips', async () => {
+  expect(await h.history()).toMatchObject({ date: WED, publishedDates: [WED, '2026-06-23'], counts: { trips: 2, stops: 7, deferred: 4, confirmations: 7, receivedOrders: 7, delivered: 7, stages: { ordered: 77 } } });
+  expect((await h.history()).trips).toHaveLength(2);
   expect(await h.history('?date=2026-06-23')).toMatchObject({ counts: { trips: 0, deferred: 1 }, trips: [] });
   expect(await read()).toMatchObject({ date: THU, publication: null, counts: null, trips: [], deferrals: [] });
   h.freeze('2026-05-01', 600);

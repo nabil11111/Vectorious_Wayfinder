@@ -29,7 +29,7 @@ it('AC-4 AC-5 and AC-35 keep all five loaded orders through delivery and an unan
         stopId: trip.stops.find(stop => stop.outletId === row.outlet.id)!.id });
     }
     const range = await h.orders('?date=' + THU + '&range=four_weeks');
-    expect(range.summary).toMatchObject({ orders: 129, planned: 5, deferred: 100 });
+    expect(range.summary).toMatchObject({ orders: 136, planned: 12, deferred: 100 });
     expect(range.rows.filter(row => row.days.some(day => day.date === THU && day.assignment))).toHaveLength(5);
   };
   await check(5, 0);
@@ -114,7 +114,7 @@ it.each([
     expect(part.deferralHistory.filter(row => row.planId === sent.plan.id)).toEqual([{ ...oldDay.deferral!, planId: sent.plan.id, date: THU }]);
   }
   const range = await h.orders('?date=' + THU + '&range=four_weeks');
-  expect(range.summary).toMatchObject({ orders: 130, planned: 5, deferred: 100 });
+  expect(range.summary).toMatchObject({ orders: 137, planned: 12, deferred: 100 });
   for (const part of parts) expect(range.rows.find(row => row.id === part.id)!.days.find(day => day.date === THU)).toEqual(oldDay);
 });
 
@@ -139,12 +139,12 @@ it('AC-4 seeded delivery day keeps wanted and carried orders and its own publica
 });
 it('AC-5 four weeks unions delivery memberships once and includes received seed history', async () => {
   const before = await h.orders('?range=four_weeks');
-  expect(before).toMatchObject({ date: THU, from: '2026-05-29', summary: { orders: 127 } });
-  expect(before.rows.filter(row => row.status === 'received')).toHaveLength(25);
+  expect(before).toMatchObject({ date: THU, from: '2026-05-29', summary: { orders: 134 } });
+  expect(before.rows.filter(row => row.status === 'received')).toHaveLength(32);
   await sendWalkthroughPlan(h);
   const after = await h.orders('?range=four_weeks');
-  expect(after.summary).toMatchObject({ orders: 129, planned: 5, deferred: 100 });
-  expect(new Set(after.rows.map(row => row.id)).size).toBe(129);
+  expect(after.summary).toMatchObject({ orders: 136, planned: 12, deferred: 100 });
+  expect(new Set(after.rows.map(row => row.id)).size).toBe(136);
   expect(after.rows.find(row => row.wantedDate === WED && row.outlet.id === 'OUT001')!.days.map(day => day.date)).toEqual([WED, THU]);
 });
 it('AC-7 splitting counts leaves with original detail and one inherited deferral per plan, joining restores the original', async () => {
