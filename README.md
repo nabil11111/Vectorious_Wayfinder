@@ -272,8 +272,8 @@ Press **Reset the demo day** first if you walked the one above.
    make".
 4. **Ask why.** Under Done, open Priyantha's reefer truck, the Fresh · Matara trip. Its timeline runs from "Peliyagoda 03:30" to "back
    09:34", and pointing at Fresh Dickwella's dot shows "Stop 3 · Fresh Dickwella", "arrives 06:37 · leaves 06:52",
-   "window 03:00 to 08:00" and "39 cartons chilled". Press **why?** on Fresh Dickwella: "Rank 1: waited since Tuesday;
-   chilled; …". Press **why?** on a deferred order: its rank, the closest run the planner tried and when that run would
+   "window 03:00 to 08:00" and "39 cartons chilled". Press **Plan reason** on Fresh Dickwella: "Rank 1: waited since Tuesday;
+   chilled; …". Press **Plan reason** on a deferred order: its rank, the closest run the planner tried and when that run would
    have arrived, and "to decide".
 5. **An ordinary edit.** Open Wasantha's reefer van, the trip with Fresh Nugegoda's carried-over cartons. His name in
    the header is the driver menu: Dilshan's row says "drives VEH001 now; it will have no driver". Choose him: the
@@ -345,7 +345,7 @@ Anything we built differently from our Designathon submission, and why.
   rows retain their reason, Undo and Edit reason. A sent plan says **Withdraw plan and edit** and explains that
   loaders and drivers lose it until it is sent again; draft Back to edit remains navigation and loading locks still
   prevent withdrawal (spec 029). Added summary and action rows wrap within the existing responsive columns.
-- **"why?" gives the planner's reason for an order.** The design's why chips, which ask why the dispatcher changed
+- **Plan reason gives the planner's reason for an order.** The design's why chips, which ask why the dispatcher changed
   the suggestion, are not built (D-55).
 - **Building shows a moving bar,** since one request has no progress to report, and its line has no "16 windows to
   check".
@@ -393,7 +393,7 @@ Anything we built differently from our Designathon submission, and why.
   and for the suggested plan: replacing a draft, the line after a build, a refused build, and a plan ready with
   warnings.
 
-- **What if a vehicle is unavailable?** on the draft board compares two generated plans for the same outstanding
+- **Compare without a vehicle** on the draft board compares two generated plans for the same outstanding
   demand. Pick one working vehicle and choose Compare plans. Counts group split parts back into original orders;
   results show full/partial/deferred orders, shops waiting, trip fuel and real planner reasons. The generated baseline
   may differ from a hand-edited draft. This is a read-only preview with no Apply action or optimality claim.
@@ -401,7 +401,7 @@ Anything we built differently from our Designathon submission, and why.
 - **Receiving readiness** on the shop's Today page records Not confirmed, Ready to receive or Temporarily unavailable,
   with an optional note and update time for the current calendar day. Save readiness requires a connection. The driver's
   next-stop screen shows the declaration for that trip's day, labelled Last known when using a cached view; Live day
-  shows each shop's current-day declaration. Updates notify the assigned driver and authorized dispatcher. This is
+  shows a compact **Shop receiving status** summary with Ready, Unavailable and Not confirmed counts. View shops opens a searchable, filterable list with six initial rows; unavailable shops come first and Show more stays inside a bounded scrolling area. Notes, update times and Last known/error states remain visible without repeating large cards. Updates notify the assigned driver and authorized dispatcher. This is
   advisory: it describes receiving goods, not customer opening hours or proof that a driver arrived. It does not gate
   driver actions, carry yesterday forward or move to tomorrow at the order cutoff.
 
