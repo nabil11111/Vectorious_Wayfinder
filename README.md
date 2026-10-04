@@ -393,10 +393,11 @@ Anything we built differently from our Designathon submission, and why.
   and for the suggested plan: replacing a draft, the line after a build, a refused build, and a plan ready with
   warnings.
 
-- **Compare without a vehicle** on the draft board compares two generated plans for the same outstanding
-  demand. Pick one working vehicle and choose Compare plans. Counts group split parts back into original orders;
-  results show full/partial/deferred orders, shops waiting, trip fuel and real planner reasons. The generated baseline
-  may differ from a hand-edited draft. This is a read-only preview with no Apply action or optimality claim.
+- **Check affected deliveries** answers what happens if a truck cannot run. Pick the vehicle and choose
+  Show delivery impact. The preview starts with affected shops and separates newly waiting orders from orders
+  already waiting; moving an order to another truck is not described as a lost delivery. Detailed counts, fuel,
+  warnings and the planner's reasons remain available underneath. Both suggestions use today's orders and omit
+  manual draft edits. The saved plan stays unchanged; there is no Apply action or delivery guarantee.
 
 - **Receiving readiness** on the shop's Today page records Not confirmed, Ready to receive or Temporarily unavailable,
   with an optional note and update time for the current calendar day. Save readiness requires a connection. The driver's
