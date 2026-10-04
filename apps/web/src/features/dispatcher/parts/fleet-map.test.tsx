@@ -287,11 +287,11 @@ describe('the view switch and the chosen depot (spec 020)', () => {
   });
 });
 
-describe('the credit', () => {
-  it('AC-8 the card credits OpenStreetMap', () => {
+describe('the source line', () => {
+  it('the card says the routes are schematic and does not credit OpenStreetMap', () => {
     const markup = wide(card(dayWith([])));
     expect(markup).toContain('Schematic district routes · not GPS');
-    expect(markup).toMatch(/<a[^>]*href="https:\/\/www\.openstreetmap\.org\/copyright"[^>]*>© OpenStreetMap contributors<\/a>/);
+    expect(markup).not.toContain('OpenStreetMap');
   });
 });
 

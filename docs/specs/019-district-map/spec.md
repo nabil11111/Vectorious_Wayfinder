@@ -30,7 +30,7 @@ The design drew a replay of February's records; the app draws the live day (D-92
 
 | State | What shows |
 | --- | --- |
-| Normal | The card as the frame draws it (sizes, colours and positions from `map-fleet-overview.js`, the source of truth for this card): header "Live · 07:30", "Map view" and the view switch; "75 stores · 38 vehicles · 21 routes" and the "12 active" chip; the 340 x 280 map with the "Stores delivered" list beside it; the legend (Vehicle, Second trip, Warehouse, Shared route); "Schematic district routes · not GPS" with "© OpenStreetMap contributors" after it. |
+| Normal | The card as the frame draws it (sizes, colours and positions from `map-fleet-overview.js`, the source of truth for this card): header "Live · 07:30", "Map view" and the view switch; "75 stores · 38 vehicles · 21 routes" and the "12 active" chip; the 340 x 280 map with the "Stores delivered" list beside it; the legend (Vehicle, Second trip, Warehouse, Shared route); "Schematic district routes · not GPS". |
 | No plan yet, or nothing out | The same map with every line muted, no arrows, "0 active", and every district 0 of its shops. |
 | Loading | A grey block the card's size, with the rest of the dashboard's skeleton. |
 | Could not load | The dashboard's existing "Could not update" state covers it; the card keeps the last read it drew. |
@@ -88,8 +88,9 @@ shapes come from `apps/web/src/lib/map/fleet-map-shapes.ts` (`docs/map-data.md`)
   their own depot.
 - [x] AC-7 At 1440 wide the card shall sit beside Needs you as in the frame; below 1280 under it; at 390 wide the
   page shall not scroll sideways.
-- [x] AC-8 The card shall credit OpenStreetMap, and the README shall drop "No district map" from its departures and
-  list this spec's differences.
+- [x] AC-8 The card shall say "Schematic district routes · not GPS" and shall not show an OpenStreetMap credit.
+  The README shall drop "No district map" from its departures and list this spec's differences. The outline
+  source stays in `docs/map-data.md` (Nabil, 4 Oct).
 
 ## Out of scope
 Kandy's or both depots' live map, hover details on districts and trucks, real road routes and GPS positions.

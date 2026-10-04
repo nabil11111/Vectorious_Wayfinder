@@ -262,12 +262,11 @@ const RouteKey = ({ style }: { style?: CSSProperties }) => (
   <span aria-hidden="true" className="block shrink-0 bg-map-line" style={{ ...style, width: u(12), height: u(1) }} />
 );
 
-// The script's source line, with the credit the district outlines need (D-92, docs/map-data.md).
+// The routes are schematic district lines, not roads.
 function Source({ style, className, wrap = false }: { style?: CSSProperties; className?: string; wrap?: boolean }) {
   return (
     <p className={cn('text-map-muted', className)} style={{ ...type(8.5), ...(wrap ? { whiteSpace: 'normal' } : {}), ...style }}>
-      Schematic district routes · not GPS ·{' '}
-      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline underline-offset-2">© OpenStreetMap contributors</a>
+      Schematic district routes · not GPS
     </p>
   );
 }

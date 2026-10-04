@@ -384,7 +384,7 @@ app speaks those languages (Nabil, 1 Oct).
 training records at 07:30; that data never enters the repo, and a dispatcher needs today. The card keeps the
 frame's shapes, lines, arrows, labels and list, and takes its numbers from the operations read. Its view switch
 follows D-32: the dispatcher's own depot only. The district shapes are derived from geoBoundaries (OpenStreetMap,
-ODbL), so the card credits OpenStreetMap and `docs/map-data.md` names the source (Nabil, 1 Oct, spec 019).
+ODbL). The card does not show that credit; `docs/map-data.md` names the source (Nabil, 4 Oct, spec 019).
 
 **D-93 · 1 Oct · A dispatcher switches between the two depots.** The top bar's switch works as the design draws it:
 the dispatcher picks Peliyagoda or Kandy, and every page plans, answers and looks up that depot until they switch

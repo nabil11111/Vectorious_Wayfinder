@@ -486,7 +486,7 @@ Anything we built differently from our Designathon submission, and why.
   design drew a replay, so every number on it comes from the live read (D-92). Its Map view switch works for
   Peliyagoda, Kandy and Both as the top bar's does (D-93, D-96), and Both draws both depots' districts and trucks from
   the two depots' reads added up; districts and trucks have no hover details,
-  the active chip carries the design's lorry picture, and the card credits OpenStreetMap for the district outlines.
+  the active chip carries the design's lorry picture, and the caption says the routes are schematic, not GPS.
   Below 1280 wide it sits under Needs you, and below 640 its Stores delivered list goes under the map.
 - **One answer per problem:** "Decide" opens its card, where the design also draws Warn, Skip, Credit and Resend, and an
   answered row reads "Decided", never "Warned". There is no Undo.
