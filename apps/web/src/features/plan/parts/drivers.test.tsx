@@ -80,16 +80,15 @@ it('spec 026 AC-3 the open trip\'s header names the truck by its driver, whose n
     />,
   );
   expect(markup).toMatch(/<h2 class="[^"]*">Planning · <button[^>]*>Chaminda<\/button> · reefer truck · trip 2<\/h2>/);
-  expect(markup).toContain('6.8 t · 33.4 m³ · trip 2 of 2');
+  expect(markup).toContain('6.8 t · 33.4 m³ · VEH004 · trip 2 of 2');
 });
 
 it('spec 026 AC-3 View plan\'s rows name the truck by its driver, and by its kind and number with none', () => {
   const row = (vehicleId: string, driverName: string | null) => renderToStaticMarkup(
     <VehicleRow vehicleId={vehicleId} trips={BOARD.plan.trips.filter((t) => t.vehicleId === vehicleId)} driverName={driverName} index={indexOf(BOARD)} />,
   );
-  expect(row('VEH004', 'Chaminda')).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
-  expect(row('VEH004', 'Chaminda')).not.toContain('VEH004');
-  expect(row('VEH002', null)).toMatch(/<p class="[^"]*">reefer truck VEH002<\/p>/);
+  expect(row('VEH004', 'Chaminda')).toMatch(/<p class="[^"]*">Chaminda · reefer truck<span class="font-normal text-muted-foreground"> · VEH004<\/span><\/p>/);
+  expect(row('VEH002', null)).toMatch(/<p class="[^"]*">reefer truck VEH002<span class="text-warn-ink"> · No driver<\/span><\/p>/);
 });
 
 it('spec 026 AC-3 an early departure\'s title names its truck by its driver', () => {
@@ -137,17 +136,17 @@ it('spec 026 rule 2 a move is one change of the draft, with Undo putting the dri
 });
 
 it('L-07 says "trip 1 of 2" only when the truck has a second trip, and no count for its only trip', () => {
-  expect(tripPanel(BOARD, 'VEH004')).toMatch(/<p class="[^"]*">6\.8 t · 33\.4 m³<\/p>/);
+  expect(tripPanel(BOARD, 'VEH004')).toMatch(/<p class="[^"]*">6\.8 t · 33\.4 m³ · VEH004<\/p>/);
   expect(tripPanel(BOARD, 'VEH004')).not.toContain('of 2');
   const both = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
-  expect(tripPanel(both, 'VEH004')).toContain('6.8 t · 33.4 m³ · trip 1 of 2');
+  expect(tripPanel(both, 'VEH004')).toContain('6.8 t · 33.4 m³ · VEH004 · trip 1 of 2');
 });
 
 it('L-03 a View plan row for a truck\'s second trip alone says "· trip 2", as its card does', () => {
   const split = boardWith([trip('VEH004', CHAMINDA, 'OUT006', COLOMBO_ORDER), trip('VEH004', CHAMINDA, 'OUT051', GALLE_ORDER, 2)]);
   const row = (trips: DraftTrip[]) => renderToStaticMarkup(<VehicleRow vehicleId="VEH004" trips={trips} driverName="Chaminda" index={indexOf(split)} />);
-  expect(row([split.plan.trips[1]!])).toMatch(/<p class="[^"]*">Chaminda · reefer truck · trip 2<\/p>/);
-  expect(row([split.plan.trips[0]!])).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
+  expect(row([split.plan.trips[1]!])).toMatch(/<p class="[^"]*">Chaminda · reefer truck · trip 2<span class="font-normal text-muted-foreground"> · VEH004<\/span><\/p>/);
+  expect(row([split.plan.trips[0]!])).toMatch(/<p class="[^"]*">Chaminda · reefer truck<span class="font-normal text-muted-foreground"> · VEH004<\/span><\/p>/);
   // Both trips on one row are the truck's whole day.
-  expect(row(split.plan.trips)).toMatch(/<p class="[^"]*">Chaminda · reefer truck<\/p>/);
+  expect(row(split.plan.trips)).toMatch(/<p class="[^"]*">Chaminda · reefer truck<span class="font-normal text-muted-foreground"> · VEH004<\/span><\/p>/);
 });

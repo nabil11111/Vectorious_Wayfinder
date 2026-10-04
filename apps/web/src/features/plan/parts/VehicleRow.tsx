@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { DraftTrip, Problem } from '@wayfinder/contracts';
 import { cn } from '@/lib/utils';
-import { crewName, deferredOn, entranceAndWindow, figure, hhmm } from '../words';
+import { crewName, deferredOn, entranceAndWindow, figure, hhmm, litres, orderAmount } from '../words';
 import { vehicleIcon } from './icons';
 import type { BoardIndex } from './lookup';
 import { toneOf, type Tone } from './look';
@@ -34,7 +34,7 @@ export function VehicleRow({ vehicleId, trips, driverName, index }: { vehicleId:
     <li>
       <div className={cn('grid grid-cols-[22px_minmax(0,1fr)_22px] items-center gap-x-3 gap-y-1 rounded-lg px-2 py-[3px] xl:grid-cols-[22px_166px_206px_150px_116px_minmax(0,1fr)_22px]', blocked ? 'bg-bad-tint' : first ? 'bg-warn-tint' : '')}>
         {vehicle && <img src={vehicleIcon(vehicle)} alt="" className="size-[22px] object-contain" />}
-        <p className="min-w-0 truncate text-xs leading-[15px] font-semibold">{label}</p>
+        <p className="min-w-0 truncate text-xs leading-[15px] font-semibold">{label}{driverName ? vehicle && <span className="font-normal text-muted-foreground"> · {vehicle.id}</span> : <span className="text-warn-ink"> · No driver</span>}</p>
         {/* One chevron for both states, turned while the stops are open, as Done's cards draw it. */}
         <button type="button" aria-expanded={open} aria-label={open ? `Hide the stops of ${label}` : `Show the stops of ${label}`} onClick={() => setOpen(!open)} className="group col-start-3 row-start-1 flex size-[22px] items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 xl:col-start-7">
           <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-aria-expanded:rotate-180" />
@@ -61,6 +61,7 @@ export function VehicleRow({ vehicleId, trips, driverName, index }: { vehicleId:
           {checked.map(({ trip, check }) => (
             <div key={trip.tripNo} className="pb-1.5">
               {trips.length > 1 && <p className="pb-1 text-[11px] font-semibold text-muted-foreground">Trip {trip.tripNo}</p>}
+              {check?.times && <p className="pb-1 text-xs text-muted-foreground">Estimated fuel {litres(check.times.litres)}</p>}
               <ol className="grid gap-x-8 gap-y-1.5 xl:grid-cols-2">
                 {trip.stops.map((stop, i) => {
                   const shop = index.shop(stop.outletId);
@@ -71,6 +72,11 @@ export function VehicleRow({ vehicleId, trips, driverName, index }: { vehicleId:
                       <span className={cn('flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold', time?.late ? 'bg-bad text-white' : 'bg-muted')}>{i + 1}</span>
                       <span className={cn('font-mono', time?.late && 'text-bad')}>{time ? hhmm(time.arriveAt) : '--:--'}</span>
                       <span className="font-semibold">{shop?.name ?? stop.outletId}</span>
+                      {shop && <span>{shop.brand}</span>}
+                      <span>{stop.orderIds.flatMap((id) => {
+                        const order = index.order(id);
+                        return order && shop ? [order.load.needsReefer ? `${orderAmount(shop.brand, order)} · Chilled` : orderAmount(shop.brand, order)] : [];
+                      }).join(', ')}</span>
                       {carried && <Tag tone="warn" className="px-2 text-[10px] leading-[13px]">{deferredOn(carried)}</Tag>}
                       {shop && <span className="text-[10px] text-muted-foreground">{entranceAndWindow(shop, time?.windowOpen ?? shop.windowOpen, time?.windowClose ?? shop.windowClose)}</span>}
                       {time && time.waitMin > 0 && <Tag tone="warn" className="px-2 text-[10px] leading-[13px]">waits {time.waitMin} min</Tag>}

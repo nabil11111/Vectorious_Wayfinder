@@ -54,6 +54,9 @@
   --color-ink-line: var(--ink-line);
   --color-art-land: var(--art-land);
   --color-art-served: var(--art-served);
+  --color-fresh: var(--fresh);
+  --color-style: var(--style);
+  --color-tech: var(--tech);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -87,6 +90,9 @@
   --warn-ink: #8A6200;
   --warn-tint: #FDF4DC;
   --bad-tint: #FBE9E7;
+  --fresh: #E5F6EA;
+  --style: #F3E9FB;
+  --tech: #E6F1FB;
   --bad-ink: #AB3F2E;           /* an error line on white, such as a wrong staff ID or PIN */
   --info: #2E7DD7;
   --info-tint: #E9F2FC;

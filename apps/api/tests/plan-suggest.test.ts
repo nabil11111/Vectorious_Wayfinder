@@ -232,7 +232,7 @@ it('AC-3 keeps the suggestion as built on the board, through a save, a split and
   answered(await ruwan.post(`${URL}/join`).send({ ...ref(), orderId: big.id }));
   expect(board.plan.revision).toBe(4);
   expect(await stored()).toEqual(kept);
-  expect(board.suggestion).toEqual(first.suggestion);
+  expect(board.suggestion).toEqual({ ...first.suggestion, provenance: 'edited' });
 });
 
 it('AC-4 makes the planner\'s split as a hand split does and puts each part where the planner put it', async () => {

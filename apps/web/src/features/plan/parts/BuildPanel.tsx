@@ -10,6 +10,7 @@ import type { CrewRef } from '../draft';
 import { BUILD, BUILDING, buildingLine, KEEP_DRAFT, REPLACE_TITLE, replaceLine } from '../words';
 import { buildPlan, suggestionLine, type BuildAct } from './build';
 import { CrewMenu } from './CrewMenu';
+import { PlanChoice } from './PlanChoice';
 import type { Pick } from './crews';
 import { useLanding } from './dragging';
 import { ICON } from './icons';
@@ -17,7 +18,7 @@ import type { BoardIndex } from './lookup';
 import { orangeButton, plainButton } from './look';
 
 // The empty middle's drop area, in place of "Start a blank trip" (spec 023, with the trucks panel going in spec 026).
-const DROP_HERE = 'or drag an order here to start a trip';
+const DROP_HERE = 'or drag orders here to plan them';
 
 // The middle column with no trip open (Edit plan · empty and · building, spec 014): "Build the suggested plan" in
 // orange, and beside it, in place of "Start a blank trip", the place to drop an order to start its trip (spec 023).
@@ -85,9 +86,17 @@ export function BuildPanel({ screen, act, onBuilding, index, dropped, onCrew, on
         <Button className={orangeButton('h-11 px-6 text-sm')} disabled={screen.acting} focusableWhenDisabled onClick={press}>{BUILD}</Button>
         {/* While an order is dragged, the drag's outline takes the place of the area's own dashed line. */}
         <p ref={dropArea} className={cn('flex h-11 items-center rounded-[10px] border-[1.5px] border-dashed px-5 text-sm text-muted-foreground', middleLook ? 'border-transparent' : 'border-mute', middleLook)}>{DROP_HERE}</p>
-        {dropped && (
+        {dropped?.kind === 'start' && dropped.orders.length > 0 && (
+          <PlanChoice
+            screen={screen} index={index} orders={dropped.orders} act={act}
+            title={`Plan ${dropped.dropped ?? 'these orders'}`}
+            onCrew={(pick, crew) => onCrew(pick, crew)}
+            onClose={onDropClose}
+          />
+        )}
+        {dropped && dropped.kind === 'start' && dropped.orders.length === 0 && (
           <CrewMenu
-            screen={screen} index={index} pick={dropped} title={`Start a trip · ${dropped.kind === 'start' && dropped.dropped !== undefined ? dropped.dropped : ''}`}
+            screen={screen} index={index} pick={dropped} title="Create an empty trip. No orders will be added."
             anchor={dropArea} open onOpenChange={(open) => { if (!open) onDropClose(); }} onPick={(crew) => onCrew(dropped, crew)}
           />
         )}

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { ENDS_HISTORY, splitOrder, type BoardScreen, type Undo } from '../board';
 import { defer, keyOf, moveStop, planOf, sameTrip, setLeaveAt, takeOff, tripOf, type CrewRef } from '../draft';
 import { capital, countOf, cubic, figure, hhmm, litres, orderAmount, ordersAmount, tonnes, truckKind } from '../words';
+import { BRANDS, brandLabel } from './demand';
 import { removeTripChange, takeStopOffChange } from './changes';
 import { CrewMenu } from './CrewMenu';
 import type { Pick } from './crews';
@@ -31,7 +32,7 @@ type Act = (run: (date: string, ref: PlanRef) => Promise<PlanBoard>, done?: unde
 // The open trip (Edit plan): its vehicle, driver, brand, district and leaving time, the checker's figures, the
 // timeline with the trip's problems and their fixes, the stops in order, "+ Add a stop" and "Mark trip done".
 // The numbers are the last answer's, shown only while they are for the trip on screen.
-export function TripPanel({ screen, index, trip, group, change, act, onUndo, onCrew, onRemoved, onDone, onAddStop, onJoin }: {
+export function TripPanel({ screen, index, trip, group, change, act, onUndo, onCrew, onRemoved, onDone, onAddStop, onJoin, impact }: {
   screen: BoardScreen;
   index: BoardIndex;
   trip: DraftTrip;
@@ -44,6 +45,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
   onCrew: (pick: Pick, crew: CrewRef) => void;
   onRemoved: () => void;
   onDone: () => void;
+  impact?: string | null;
   onAddStop: () => void;
   onJoin: (order: BoardOrder) => void;
 }) {
@@ -108,12 +110,15 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
           </h2>
           {/* "trip 1 of 2" only while the truck runs a second trip too (L-07). */}
           <p className="mt-1 text-xs leading-[15px] text-muted-foreground">
-            {[vehicle && `${tonnes(vehicle.weightCapKg)} · ${cubic(vehicle.volumeCapM3)}`, twoTrips && `trip ${trip.tripNo} of 2`].filter(Boolean).join(' · ')}
+            {[vehicle && `${tonnes(vehicle.weightCapKg)} · ${cubic(vehicle.volumeCapM3)} · ${trip.vehicleId}`, times && `estimated fuel ${litres(times.litres)}`, twoTrips && `trip ${trip.tripNo} of 2`].filter(Boolean).join(' · ')}
           </p>
         </div>
         <div className="flex flex-wrap items-start justify-end gap-1.5">
-          {group && <Tag tone={group.brand === 'Fresh' ? 'good' : 'plain'} className="h-[23px]">{group.brand}</Tag>}
-          {group && <Tag className="h-[23px]">{group.district}</Tag>}
+          {(() => {
+            const brandText = brandLabel(BRANDS.filter((brand) => trip.stops.some((stop) => index.shop(stop.outletId)?.brand === brand))) || group?.brand;
+            const districtText = [...new Set(trip.stops.flatMap((stop) => index.shop(stop.outletId)?.district ?? []))].join(', ') || group?.district;
+            return <>{brandText && <Tag className="h-[23px]">{brandText}</Tag>}{districtText && <Tag className="h-[23px]">{districtText}</Tag>}</>;
+          })()}
           <LeaveField set={trip.leaveAt} usual={times?.leaveAt ?? null} onSet={leaveAt} />
         </div>
       </div>
@@ -121,9 +126,9 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
       <div className={cn('flex flex-wrap items-center gap-1.5 px-3.5 pt-3', !inStep && 'opacity-60')}>
         {figures && (
           <>
-            <Figure label="time" value={`${figure(figures.timePct)}%`} tone={toneOf(figures.timePct, false, has('over_time_budget'))} />
-            <Figure label="kg" value={`${figure(figures.kgPct)}%`} tone={toneOf(figures.kgPct, has('over_weight'))} />
-            <Figure label="m³" value={`${figure(figures.m3Pct)}%`} tone={toneOf(figures.m3Pct, has('over_volume'))} />
+            <Figure label="kg" value={check ? `${tonnes(check.load.kg)} / ${vehicle ? tonnes(vehicle.weightCapKg) : ''}` : `${figure(figures.kgPct)}%`} tone={toneOf(figures.kgPct, has('over_weight'))} />
+            <Figure label="m³" value={check ? `${cubic(check.load.m3)} / ${vehicle ? cubic(vehicle.volumeCapM3) : ''}` : `${figure(figures.m3Pct)}%`} tone={toneOf(figures.m3Pct, has('over_volume'))} />
+            <span className="text-xs text-muted-foreground">{figure(figures.kgPct)}% · {figure(figures.m3Pct)}%</span>
           </>
         )}
         {vehicle && <Figure label="fuel left" value={litres(vehicle.litresLeft)} tone={fuelTone(vehicle.fuelLeftPct, has('fuel_over_quota'))} />}
@@ -144,6 +149,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
         <Timeline times={times} depot={board.depot} shops={stopShops} problems={problems} onLeaveAt={leaveAt} />
       </div>
 
+      {impact && <p role="status" className="mx-3.5 mt-3 text-sm">{impact.startsWith('Checking') ? impact : `Effect of this change: ${impact}`}</p>}
       {undo && (
         <div role="status" className="mx-3.5 mt-3 flex items-center gap-3 rounded-[10px] bg-good-tint px-3.5 py-2.5">
           <p className="flex-1 text-xs leading-[15px] font-semibold text-good">{undo.line}</p>
@@ -188,7 +194,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
                 onJoin={onJoin}
               >
                 {form && stop.orderIds.includes(form.order.id) && (form.kind === 'split'
-                  ? <SplitForm order={form.order} brand={shop.brand} busy={screen.acting} onSplit={(keep) => split(form.order, keep)} onCancel={() => setForm(null)} />
+                  ? <SplitForm order={form.order} brand={shop.brand} busy={screen.acting} tripKg={check?.load.kg ?? null} tripM3={check?.load.m3 ?? null} capKg={vehicle?.weightCapKg ?? null} capM3={vehicle?.volumeCapM3 ?? null} onSplit={(keep) => split(form.order, keep)} onCancel={() => setForm(null)} />
                   : <DeferForm orders={[form.order]} index={index} code={form.order.lastDeferral?.code} reason={form.order.lastDeferral?.reason} onDefer={doDefer} onCancel={() => setForm(null)} />)}
               </StopRow>
             );
@@ -206,7 +212,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
 
       <div className="mt-auto flex items-center justify-between gap-3 px-3.5 pt-6 pb-3.5">
         <Button variant="outline" className={plainButton('h-9 px-4 text-[13px]')} onClick={() => { const removed = removeTripChange(draft, trip, index, true); change(removed.plan, removed.said); onRemoved(); }}>Remove trip</Button>
-        <Button variant="secondary" className={inkButton('h-9 px-6 text-[13px]')} onClick={onDone}>Mark trip done</Button>
+        <Button variant="secondary" className={inkButton('h-9 px-6 text-[13px]')} onClick={onDone}>Finish editing</Button>
       </div>
     </div>
   );

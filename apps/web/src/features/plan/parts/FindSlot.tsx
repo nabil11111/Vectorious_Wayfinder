@@ -56,9 +56,10 @@ export function FindSlot({ screen, index, orderId, change, onPut, onCrew, onClos
   const start: Pick = { kind: 'start', group: { brand: shop.brand, district: shop.district }, orders: [order], startWith: [order] };
   // Offers stand only for the saved draft they were worked out on: a change on its way hides them until it is saved.
   const current = saved && slots.data && slots.data.revision === board.plan.revision ? slots.data : null;
-  const put = (key: TripKey) => {
-    const trip = draft.trips.find((t) => keyOf(t) === key);
-    change(addOrders(draft, key, [order]), { line: `${shop.name} added to ${trip ? index.called(trip) : 'the trip'}`, tripKey: key });
+  const put = (slot: { vehicleId: string; tripNo: number; stopSeq: number; newStop: boolean }) => {
+    const key = keyOf(slot);
+    const trip = draft.trips.find((item) => keyOf(item) === key);
+    change(addOrders(draft, key, [order], slot.newStop ? slot.stopSeq - 1 : undefined), { line: `${shop.name} added to ${trip ? index.called(trip) : 'the trip'}`, tripKey: key });
     onPut(key);
   };
   const keepDeferred = (deferrals: DraftDeferral[]) => {
@@ -79,7 +80,7 @@ export function FindSlot({ screen, index, orderId, change, onPut, onCrew, onClos
         <Button variant="outline" className={plainButton('ml-auto h-8 px-4 text-xs')} onClick={onClose}>Close</Button>
       </div>
       <p className="mt-3 text-xs leading-[15px] text-muted-foreground">{facts.join(' · ')}</p>
-      <p className="mt-4 text-[11px] leading-[14px] text-muted-foreground">Tried on every trip of this plan</p>
+      <p className="mt-4 text-sm text-muted-foreground">Tried each place on every trip</p>
 
       <div className="mt-3 space-y-3">
         {slots.isError && !current ? (
@@ -95,14 +96,14 @@ export function FindSlot({ screen, index, orderId, change, onPut, onCrew, onClos
           </div>
         ) : current.slots.length > 0 ? (
           current.slots.map((slot, i) => (
-            <div key={`${slot.vehicleId}-${slot.tripNo}`} className="flex flex-wrap items-center gap-3 rounded-[12px] border-[1.5px] border-good bg-good-tint px-5 py-4">
+            <div key={`${slot.vehicleId}-${slot.tripNo}-${slot.stopSeq}`} className="flex flex-wrap items-center gap-3 rounded-[12px] border-[1.5px] border-good bg-good-tint px-5 py-4">
               <p className="min-w-0 flex-1 text-[15px] leading-5 font-semibold">
                 {crewOf(slot)} · stop {slot.stopSeq} · arrives {hhmm(slot.arriveAt)}
               </p>
               <Button
                 variant={i === 0 ? 'default' : 'outline'}
                 className={i === 0 ? orangeButton('h-9 px-5 text-[13px]') : plainButton('h-9 px-5 text-[13px]')}
-                onClick={() => put(keyOf(slot))}
+                onClick={() => put(slot)}
               >
                 Put it here
               </Button>

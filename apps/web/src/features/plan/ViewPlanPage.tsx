@@ -13,6 +13,7 @@ import { ApiRequestError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { acceptDecisions, boardKey, dayKey, sendPlan, unsendPlan, useBoard, useDayBoard, useOrdersFollow, usePlanSaver, writeOutsideBoard } from './board';
 import { ChecksPanel } from './parts/ChecksPanel';
+import { ComparePanel } from './parts/ComparePanel';
 import { Decisions } from './parts/Decisions';
 import { BRAND_ICON } from './parts/icons';
 import type { BoardIndex } from './parts/lookup';
@@ -20,7 +21,7 @@ import { checkItems, decisionsOf, indexOf } from './parts/lookup';
 import { inkButton, orangeButton, plainButton } from './parts/look';
 import { Column } from './parts/ui';
 import { VehicleRow } from './parts/VehicleRow';
-import { clockTime, countOf, figure, hhmm, sendDecisionsOpen, space, suggestedAt, viewPlanOf, whole } from './words';
+import { clockTime, countOf, hhmm, sendDecisionsOpen, space, suggestedAt, viewPlanOf, whole } from './words';
 
 const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 
@@ -57,7 +58,7 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
   const navigate = useNavigate();
   // The board's own day (rule 1), so another day's plan offers no Accept (spec 014).
   const current = useBoard();
-  const [busy, setBusy] = useState<'send' | 'unsend' | 'accept' | null>(null);
+  const [busy, setBusy] = useState<'send' | 'unsend' | 'accept' | 'compare' | null>(null);
   // Which accept is on its way: one decision's key, or 'all'.
   const [accepting, setAccepting] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
@@ -76,7 +77,7 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
   // A send, a back to edit and an accept wait for the board's save on its way and answer with the board. The board's
   // queue runs them when this is its day; any other day's plan, or this one after a reload, goes on its own, naming the
   // plan on screen.
-  const run = async (kind: 'send' | 'unsend' | 'accept', call: (day: string, ref: PlanRef) => Promise<PlanBoard>) => {
+  const run = async (kind: 'send' | 'unsend' | 'accept' | 'compare', call: (day: string, ref: PlanRef) => Promise<PlanBoard>) => {
     setBusy(kind);
     setRefused(null);
     const sentFor = workingFor(qc);
@@ -131,9 +132,9 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
     <div className="lg:-mt-2.5">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="text-xl leading-6 font-bold">{viewPlanOf(date)}</h1>
-        {board.suggestion && (
-          <span className="inline-flex h-7 items-center rounded-full border bg-card px-3 text-xs leading-[15px] font-semibold whitespace-nowrap">{suggestedAt(board.suggestion.builtAt)}</span>
-        )}
+        <span className="inline-flex h-7 items-center rounded-full border bg-card px-3 text-xs leading-[15px] font-semibold whitespace-nowrap">
+          {!board.suggestion || board.suggestion.provenance === 'manual' ? 'Manual plan' : board.suggestion.provenance === 'edited' ? 'Suggested, then edited' : `Suggested · ${suggestedAt(board.suggestion.builtAt)}`}
+        </span>
         <div className="flex flex-wrap items-center gap-2.5 sm:ml-auto">
           {back}
           {send}
@@ -143,6 +144,7 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
       {stale && <div className="mt-3">{stale}</div>}
       {refused && <p role="alert" className="mt-3 rounded-[10px] bg-bad-tint px-3 py-2 text-xs leading-[15px] font-semibold text-bad">{refused}</p>}
       {board.counts && <Counts counts={board.counts} />}
+      {board.plan.status === 'draft' && <ComparePanel board={board} act={async (call) => { await run('compare', call); return null; }} />}
       <div className="mt-3.5 grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
         <div className="order-2 space-y-3.5 lg:order-1">
           <Vehicles board={board} index={index} />
@@ -160,13 +162,14 @@ function ViewPlan({ date, board, fresh, stale }: { date: string; board: PlanBoar
 // hours, and fridge space.
 function Counts({ counts }: { counts: BoardCounts }) {
   const items: { number: string; label: string; tone?: string }[] = [
-    { number: `${whole(counts.ordersOnTrips)} / ${whole(counts.ordersDue)}`, label: 'orders placed' },
+    { number: `${whole(counts.originalFull)} of ${whole(counts.originalDue)}`, label: 'original orders fully covered' },
     ...(counts.ordersUnplanned > 0 ? [{ number: whole(counts.ordersUnplanned), label: 'unplanned', tone: 'text-warn-ink' }] : []),
     ...(counts.ordersDeferred > 0 ? [{ number: whole(counts.ordersDeferred), label: 'deferred' }] : []),
     { number: `${whole(counts.vehiclesUsed)} / ${whole(counts.vehiclesWorking)}`, label: `trucks · ${countOf(counts.trips, 'trip')}` },
     { number: `${whole(counts.stopsOnTime)} / ${whole(counts.stops)}`, label: 'windows met' },
-    { number: `${figure(counts.km)} km`, label: `${figure(counts.hoursOnRoad)} h on the road` },
-    { number: `${space(counts.fridgeM3Used)} / ${space(counts.fridgeM3Working)}`, label: 'm³ fridge space' },
+    { number: counts.planFuelL === null ? 'Unknown' : `${(Math.round(counts.planFuelL * 10) / 10).toFixed(1)} L`, label: 'estimated fuel' },
+    { number: counts.vehicleHours === null ? 'Unknown' : `${(Math.round(counts.vehicleHours * 10) / 10).toFixed(1)} h`, label: 'vehicle-hours' },
+    { number: `${space(counts.fridgePeakM3)} m³`, label: 'peak reefer load' },
   ];
   return (
     <dl className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-1.5 pl-1">
@@ -185,8 +188,10 @@ function Counts({ counts }: { counts: BoardCounts }) {
 // trips it has, and a row per vehicle. A vehicle whose trips go to two places shows under each.
 function Vehicles({ board, index }: { board: PlanBoard; index: BoardIndex }) {
   const place = (trip: DraftTrip) => {
-    const shop = trip.stops[0] ? index.shop(trip.stops[0].outletId) : null;
-    return shop ? { brand: shop.brand, district: shop.district } : null;
+    const brands = BRANDS.filter((brand) => trip.stops.some((stop) => index.shop(stop.outletId)?.brand === brand));
+    const district = trip.stops.flatMap((stop) => index.shop(stop.outletId)?.district ?? [])[0] ?? '';
+    if (brands.length === 0) return null;
+    return { brand: (brands.length > 1 ? null : brands[0]) as Brand | null, district, label: brands.length > 1 ? `Mixed · ${brands.join(' + ')}` : brands[0]! };
   };
   const sections = [...BRANDS, null].map((brand) => {
     const trips = board.plan.trips.filter((trip) => (place(trip)?.brand ?? null) === brand);
@@ -210,7 +215,7 @@ function Vehicles({ board, index }: { board: PlanBoard; index: BoardIndex }) {
       <Column key={brand ?? 'none'} className="px-3.5 pt-3 pb-2.5">
         <div className="flex items-center gap-3 pl-1">
           {brand && <img src={BRAND_ICON[brand]} alt="" className="size-[30px] object-contain" />}
-          <h2 className="text-[15px] leading-5 font-bold">{brand ?? 'No stop yet'}</h2>
+          <h2 className="text-[15px] leading-5 font-bold">{brand ?? (trips.some((trip) => (place(trip)?.label ?? '').startsWith('Mixed')) ? 'Mixed' : 'No stop yet')}</h2>
           <p className="text-[11px] leading-[14px] text-muted-foreground">{line}</p>
         </div>
         {districts.map((district) => {

@@ -8,6 +8,7 @@ import { HttpError } from '../lib/errors';
 import { CUTOFF_MINUTES } from '../orders/orderable-day';
 import { snapshot } from '../orders/store-orders';
 import { checkPlan, computeLoad, DEFAULT_SETTINGS, toMinutes, type PlanInput } from '../planning';
+import { coverageOf, fridgePeak, fuelFigures } from './outcomes';
 import type { Planner } from '../routes/plans';
 import { boardDay, dayMovedOn, LOADING_STARTED, percent } from './board-day';
 import { boardSuggestion } from './suggestion';
@@ -154,15 +155,24 @@ export async function readBoard(tx: Tx, depotId: string, date: string | null, mo
     }),
     // The plan's suggestion as built, each of its decisions judged on the cleaned draft (spec 014).
     suggestion: saved?.suggestion ? boardSuggestion(Suggestion.parse(saved.suggestion), draft) : null,
-    counts: check && { vehiclesUsed: new Set(draft.trips.map((t) => t.vehicleId)).size, vehiclesWorking: boardVehicles.filter((v) => v.working).length,
-      trips: draft.trips.length, ordersDue: boardOrders.length, ordersOnTrips: assigned.size, ordersDeferred: draft.deferrals.length,
-      ordersUnplanned: boardOrders.length - assigned.size - draft.deferrals.length,
-      fuelWeekPct: percent(sum(check.vehicles.map((v) => v.litresBefore + v.litresPlan)), sum(check.vehicles.map((v) => v.quotaL))),
-      fridgeM3Used: sum(check.trips.filter((t) => engineVehicles.find((v) => v.id === t.vehicleId)?.temp === 'reefer').map((t) => t.load.m3), 3),
-      fridgeM3Working: sum(boardVehicles.filter((v) => v.working && v.temp === 'reefer').map((v) => v.volumeCapM3), 3),
-      stops: draft.trips.reduce((n, t) => n + t.stops.length, 0), stopsOnTime: timings.flatMap((t) => t.stops).filter((s) => !s.late).length,
-      km: sum(timings.map((t) => t.km)), hoursOnRoad: sum(timings.map((t) => (t.backAt - t.leaveAt) / 60)),
-      drivers: new Set(draft.trips.flatMap((t) => t.driverId ? [t.driverId] : [])).size },
+    counts: check && (() => {
+      const used = new Set(draft.trips.map((t) => t.vehicleId));
+      const deferred = new Set(draft.deferrals.map((deferral) => deferral.orderId));
+      const covered = coverageOf(boardOrders, assigned, deferred);
+      const fuel = fuelFigures(check, used);
+      const reefers = new Set(boardVehicles.filter((vehicle) => vehicle.temp === 'reefer').map((vehicle) => vehicle.id));
+      return { vehiclesUsed: used.size, vehiclesWorking: boardVehicles.filter((v) => v.working).length,
+        trips: draft.trips.length, ordersDue: boardOrders.length, ordersOnTrips: assigned.size, ordersDeferred: draft.deferrals.length,
+        ordersUnplanned: boardOrders.length - assigned.size - draft.deferrals.length,
+        fuelWeekPct: percent(sum(check.vehicles.map((v) => v.litresBefore + v.litresPlan)), sum(check.vehicles.map((v) => v.quotaL))),
+        fridgeM3Used: sum(check.trips.filter((t) => engineVehicles.find((v) => v.id === t.vehicleId)?.temp === 'reefer').map((t) => t.load.m3), 3),
+        fridgeM3Working: sum(boardVehicles.filter((v) => v.working && v.temp === 'reefer').map((v) => v.volumeCapM3), 3),
+        fridgePeakM3: fridgePeak(check, reefers),
+        stops: draft.trips.reduce((n, t) => n + t.stops.length, 0), stopsOnTime: timings.flatMap((t) => t.stops).filter((s) => !s.late).length,
+        km: sum(timings.map((t) => t.km)), hoursOnRoad: sum(timings.map((t) => (t.backAt - t.leaveAt) / 60)),
+        drivers: new Set(draft.trips.flatMap((t) => t.driverId ? [t.driverId] : [])).size,
+        ...covered, planFuelL: fuel.fuelL, vehicleHours: fuel.vehicleHours, waitHours: fuel.waitHours };
+    })(),
   };
   return { board, input };
 }

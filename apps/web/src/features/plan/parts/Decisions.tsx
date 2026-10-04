@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import type { PlanBoard } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
@@ -21,9 +22,12 @@ export function Decisions({ board, index, canAccept, accepting, onAccept, classN
   onAccept: (keys: string[], which: string) => void;
   className?: string;
 }) {
+  const [showAccepted, setShowAccepted] = useState(false);
   const decisions = decisionsOf(board);
   if (decisions.length === 0) return null;
   const open = decisions.filter((decision) => decision.open);
+  const accepted = decisions.filter((decision) => !decision.open);
+  const shown = showAccepted ? decisions : open;
   const sent = board.plan.status === 'published';
   const busy = accepting !== null;
 
@@ -36,7 +40,7 @@ export function Decisions({ board, index, canAccept, accepting, onAccept, classN
         {open.length > 0 ? <Tag tone="warn">{openCount(open.length)}</Tag> : <Tag tone="good">Accepted</Tag>}
       </div>
       <ul className="mt-1.5">
-        {decisions.map((decision) => (
+        {shown.map((decision) => (
           <li key={decision.key} className="border-t py-[11px]">
             <p className="text-xs leading-4 font-semibold">{decisionTitle(decision, decisionShop(index, decision), decisionTruck(index, board.plan, decision))}</p>
             <p className="mt-1 text-[11px] leading-[15px] text-muted-foreground">{decision.reason}</p>
@@ -59,6 +63,11 @@ export function Decisions({ board, index, canAccept, accepting, onAccept, classN
           </li>
         ))}
       </ul>
+      {accepted.length > 0 && (
+        <button type="button" className="mt-2 text-sm font-semibold underline" onClick={() => setShowAccepted((value) => !value)}>
+          {showAccepted ? 'Hide accepted' : `Show ${accepted.length} accepted`}
+        </button>
+      )}
       {canAccept && open.length > 0 && (
         <Button className={orangeButton('mt-1 h-9 w-full text-[13px]')} disabled={busy} focusableWhenDisabled onClick={() => onAccept(open.map((decision) => decision.key), 'all')}>
           {accepting === 'all' ? 'Accepting…' : acceptAll(open.length)}

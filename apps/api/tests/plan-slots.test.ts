@@ -76,10 +76,11 @@ it('AC-24 finds OUT030 at stop 3 at 04:56 and refuses OUT060 with the first vehi
   const before = await held(); vi.mocked(announce).mockClear();
   const response = await search(carried('OUT030').id);
   expect(response.status).toBe(200);
-  expect(SlotSearch.parse(response.body)).toEqual({
-    orderId: carried('OUT030').id, revision: saved.plan.revision,
-    slots: [{ vehicleId: 'VEH004', tripNo: 1, stopSeq: 3, newStop: true, arriveAt: 296 }], refused: [],
-  });
+  const found = SlotSearch.parse(response.body);
+  expect(found).toMatchObject({ orderId: carried('OUT030').id, revision: saved.plan.revision, refused: [] });
+  expect(found.slots).toEqual(expect.arrayContaining([
+    expect.objectContaining({ vehicleId: 'VEH004', tripNo: 1, stopSeq: 3, newStop: true, arriveAt: 296 }),
+  ]));
   const noSlot = await search(carried('OUT060').id);
   expect(noSlot.status).toBe(200);
   expect(SlotSearch.parse(noSlot.body)).toEqual({
@@ -97,7 +98,9 @@ it('merges an order into the trip\'s existing stop for that shop', async () => {
   await save({ ...empty(), trips: [trip(['OUT026', 'OUT030', 'OUT028'])] });
   const response = await search(carried('OUT030').id);
   expect(response.status).toBe(200);
-  expect(SlotSearch.parse(response.body).slots).toEqual([{ vehicleId: 'VEH004', tripNo: 1, stopSeq: 2, newStop: false, arriveAt: 271 }]);
+  expect(SlotSearch.parse(response.body).slots).toEqual([
+    expect.objectContaining({ vehicleId: 'VEH004', tripNo: 1, stopSeq: 2, newStop: false, arriveAt: 271 }),
+  ]);
 });
 
 it('tries a deferred order on each trip after removing its draft deferral in the copy', async () => {
@@ -106,7 +109,9 @@ it('tries a deferred order on each trip after removing its draft deferral in the
   const before = await held();
   const response = await search(orderId);
   expect(response.status).toBe(200);
-  expect(SlotSearch.parse(response.body).slots).toHaveLength(1);
+  const slots = SlotSearch.parse(response.body).slots;
+  expect(slots.length).toBeGreaterThan(1);
+  expect(slots.some((slot) => slot.vehicleId === 'VEH004' && slot.newStop)).toBe(true);
   expect(await held()).toEqual(before);
 });
 
@@ -136,8 +141,9 @@ it('rejects missing, invalid, unknown and other-depot orders without writing', a
   expect(await held()).toEqual(before);
 });
 
-it('only searches unassigned carried-over orders of a draft', async () => {
-  expect(code(await search(board.orders.find((o) => !o.carriedOver)!.id))).toEqual([400, 'invalid_input']);
+it('searches any unassigned order, including one placed for this day', async () => {
+  const current = board.orders.find((o) => !o.carriedOver)!;
+  expect((await search(current.id)).status).toBe(200);
   const order = carried('OUT030');
   const saved = await save({ ...empty(), trips: [{ ...trip([]), stops: [{ outletId: order.outletId, orderIds: [order.id] }] }] });
   expect(code(await search(order.id))).toEqual([400, 'invalid_input']);
@@ -176,7 +182,7 @@ it('every offered slot can be saved when its shop already has ten small orders o
   for (const slot of result.slots) {
     const changed = structuredClone(saved.plan);
     const target = changed.trips.find((t) => t.vehicleId === slot.vehicleId && t.tripNo === slot.tripNo)!;
-    if (slot.newStop) target.stops.push({ outletId: 'OUT030', orderIds: [orderId] });
+    if (slot.newStop) target.stops.splice(slot.stopSeq - 1, 0, { outletId: 'OUT030', orderIds: [orderId] });
     else target.stops[slot.stopSeq - 1]!.orderIds.push(orderId);
     const applied = await as.put(`${URL}/draft`).send({ planId: saved.plan.id, revision: saved.plan.revision, plan: changed });
     expect(applied.status, JSON.stringify(applied.body)).toBe(200);

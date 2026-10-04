@@ -100,10 +100,12 @@ it('AC-1 lists the crews for Fresh Nugegoda\'s chilled order: the fridge van tha
   const list = await crews(THU, [NUGEGODA]);
   const order = board.orders.find((o) => o.id === NUGEGODA)!;
   expect(list).toMatchObject({ orderIds: [NUGEGODA], revision: 0, load: { kg: order.load.kg, m3: order.load.m3 } });
-  expect(list.crews[0]).toEqual({
+  expect(list.crews[0]).toMatchObject({
     vehicleId: 'VEH035', driverId: list.crews[0]!.driverId, type: 'van', temp: 'reefer', weightCapKg: 1040, volumeCapM3: 7,
     fuelLeftPct: board.vehicles.find((v) => v.id === 'VEH035')!.fuelLeftPct, readyAt: null, lastDistricts: [], ranHere: false, fits: true, misfits: [], unavailable: null,
+    readiness: 'ready',
   });
+  expect(crewOf(list, 'VEH001').readiness).toBe('cannot');
   expect(staffOf(list.crews[0]!)).toBe('D-036');
   // Nugegoda takes vans only, and the order needs a fridge: of the trucks that can be picked, only the fridge van fits.
   expect(list.crews.filter((crew) => crew.fits && crew.unavailable === null).map((crew) => crew.vehicleId)).toEqual(['VEH035']);

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { editable, type BoardScreen } from '../board';
 import { keyOf, planOf, sameTrip, tripOf, type TripKey } from '../draft';
 import { countOf, figure, hhmm, whole } from '../words';
+import { brandLabel, BRANDS } from './demand';
 import { removeTripChange } from './changes';
 import { DepotRow } from './DepotRow';
 import { BoardChange, BoardUndo, useLanding } from './dragging';
@@ -14,16 +15,14 @@ import { toneOf } from './look';
 import { RowMenu } from './OrderLists';
 import { ColumnHead, Figure } from './ui';
 
-const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
-
-// The right column (Edit plan, "Done · N trips"): every trip but the open one, a card each with its truck named by
+// The right column (Edit plan, planned trips): every trip but the open one, a card each with its truck named by
 // its driver, its brand and district, its stops and times and figures, opening to its stops. Its title opens the trip.
 export function DoneList({ screen, index, openKey, onOpen }: { screen: BoardScreen; index: BoardIndex; openKey: TripKey | null; onOpen: (key: TripKey) => void }) {
   const { draft } = screen;
-  const brandOf = (trip: DraftTrip) => (trip.stops[0] ? index.shop(trip.stops[0].outletId)?.brand : undefined);
+  const brandOf = (trip: DraftTrip) => brandLabel(BRANDS.filter((brand) => trip.stops.some((stop) => index.shop(stop.outletId)?.brand === brand)));
   const rank = (trip: DraftTrip) => {
     const brand = brandOf(trip);
-    return brand ? BRANDS.indexOf(brand) : BRANDS.length;
+    return brand.startsWith('Mixed') ? BRANDS.length : BRANDS.indexOf(brand as Brand);
   };
   const trips = draft.trips
     .filter((trip) => keyOf(trip) !== openKey)
@@ -31,7 +30,7 @@ export function DoneList({ screen, index, openKey, onOpen }: { screen: BoardScre
 
   return (
     <div className="flex flex-col px-3.5 pt-3.5 pb-3.5">
-      <ColumnHead icon={ICON.done} title={trips.length > 0 ? `Done · ${countOf(trips.length, 'trip')}` : 'Done · 0 trips'} />
+      <ColumnHead icon={ICON.done} title={trips.length > 0 ? `Planned trips · ${countOf(trips.length, 'trip')}` : 'Planned trips · 0'} />
       {trips.length === 0
         ? <p className="mt-3 text-xs text-muted-foreground">Nothing yet</p>
         : <ul className="mt-3">{trips.map((trip) => <DoneCard key={keyOf(trip)} screen={screen} index={index} trip={trip} onOpen={onOpen} />)}</ul>}
@@ -48,11 +47,11 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
   const problems = inStep ? index.problems(trip.vehicleId, trip.tripNo) : [];
   const has = (code: string) => problems.some((problem) => problem.code === code);
   const driver = index.driver(trip.driverId);
-  const shop = trip.stops[0] ? index.shop(trip.stops[0].outletId) : null;
-  // Two lines, as the frame has them: the truck named by its driver, "Chaminda · dry truck" (spec 026), or by its kind
-  // and number with "no driver" in the warning colour (spec 022), then the brand and district.
   const name = index.crew(trip);
-  const where = [shop?.brand, shop?.district].filter(Boolean).join(' · ');
+  const districts = [...new Set(trip.stops.flatMap((stop) => index.shop(stop.outletId)?.district ?? []))];
+  const brands = BRANDS.filter((brand) => trip.stops.some((stop) => index.shop(stop.outletId)?.brand === brand));
+  const where = [brandLabel(brands), districts.join(', ')].filter(Boolean).join(' · ');
+  const state = !driver ? 'No driver' : problems.some((problem) => problem.level === 'block') ? 'Needs attention' : inStep ? 'Ready' : 'Checking';
   const title = [name, !driver && 'no driver', where].filter(Boolean).join(' · ');
   // An order or a stop dropped on the card joins this trip at the end, and the drop's Undo line shows here (spec 023).
   const { setNodeRef: landingRef, look: landingLook } = useLanding(`card:${key}`, { kind: 'card', tripKey: key }, `the card of ${index.called(trip)}`);
@@ -76,6 +75,7 @@ function DoneCard({ screen, index, trip, onOpen }: { screen: BoardScreen; index:
           <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-aria-expanded:rotate-180" />
         </button>
       </div>
+      <p className={cn('mt-1 text-xs font-semibold', state === 'Ready' ? 'text-good' : state === 'No driver' || state === 'Needs attention' ? 'text-warn-ink' : 'text-muted-foreground')}>{state}</p>
       <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">
         {countOf(trip.stops.length, 'stop')}{times ? ` · ${hhmm(times.leaveAt)} to ${hhmm(times.backAt)}` : ''}
       </p>

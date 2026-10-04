@@ -344,6 +344,14 @@ Anything we built differently from our Designathon submission, and why.
   the dispatcher's six tabs fit the top bar.
 
 **The plan board and View plan**
+- **Planning a group shows a checked arrangement before anything is saved.** "Plan these orders" and dropping
+  those orders in the middle both preview who would carry them. A load that fits no single vehicle offers a
+  multi-vehicle arrangement, and a hard miss cannot be applied as if it were ready. "Create empty trip" adds no
+  orders. "Planned trips" and "Finish editing" only close the editor. View plan names a plan Suggested, Suggested
+  then edited, or Manual, and can compare the saved draft with a suggestion without replacing it until "Use
+  suggested plan". Mixed-brand trips are labelled from every stop. These screens depart from the frames' "Start a
+  trip", "Done" and "Mark trip done" so the words match what the dispatcher is deciding.
+
 - **Shop rows explain what remains in the current draft.** Available rows in both grouped and list views show
   active orders and explicitly named split parts on trips, waiting and deferred, including carried-over demand.
   Defer is a visible button for orders, shops, groups and trip-stop orders, using the existing reason form; deferred

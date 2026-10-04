@@ -47,7 +47,7 @@ export function BoardHeader({ screen, tab, working, onTab, openCount, unplannedC
   const tabs: { value: Tab; label: string }[] = [
     { value: 'unplanned', label: `Unplanned · ${whole(unplannedCount)}` },
     { value: 'planning', label: `Planning · ${openCount}` },
-    { value: 'done', label: doneCount > 0 ? `Done · ${whole(doneCount)} ${doneCount === 1 ? 'trip' : 'trips'}` : 'Done · 0' },
+    { value: 'done', label: doneCount > 0 ? `Planned trips · ${whole(doneCount)}` : 'Planned trips · 0' },
   ];
 
   // One line on a desktop: the day, the tabs, the saving and the counts, with Mix brands and View plan under them.
@@ -171,8 +171,8 @@ function Counts({ counts }: { counts: BoardCounts }) {
     [`${whole(counts.vehiclesUsed)} / ${whole(counts.vehiclesWorking)}`, 'trucks'],
     [whole(counts.trips), counts.trips === 1 ? 'trip' : 'trips'],
     [`${whole(counts.ordersOnTrips)} / ${whole(counts.ordersDue)}`, 'orders'],
-    [`${figure(counts.fuelWeekPct)}%`, 'fuel this week'],
-    [`${space(counts.fridgeM3Used)} / ${space(counts.fridgeM3Working)}`, 'm³ fridge space'],
+    [`${figure(counts.fuelWeekPct)}%`, 'of weekly fuel'],
+    [`${space(counts.fridgeM3Used)} m³`, 'reefer throughput'],
   ];
   return (
     <dl className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1 lg:ml-2.5">

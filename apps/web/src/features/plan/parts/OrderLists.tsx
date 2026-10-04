@@ -5,14 +5,17 @@ import { cn } from '@/lib/utils';
 import type { BoardScreen, Undo } from '../board';
 import { addOrders, defer, keyOf, undefer, type CrewRef, type Place } from '../draft';
 import { carriedLine, countOf, decisionTitle, deferGroup, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, shopLine, TO_DECIDE, whole } from '../words';
+import chilledIcon from '@/assets/icons/icon-chilled.png';
 import { CrewMenu } from './CrewMenu';
 import type { Pick } from './crews';
+import { demandLine } from './demand';
+import { PlanChoice } from './PlanChoice';
 import { DeferForm } from './DeferForm';
 import { movable, useLanding } from './dragging';
 import type { Dragged } from './drops';
 import { BRAND_ICON, ICON } from './icons';
 import { decisionShop, decisionTruck, groupKey, listed, ordersLine, type BoardIndex } from './lookup';
-import { plainButton } from './look';
+import { inkButton, plainButton } from './look';
 import { DragRow } from './PlanDnd';
 import { Column, ColumnHead, MenuItem, MenuPopup, MenuRoot, MenuTrigger, Pills, Tag } from './ui';
 import { Why } from './Why';
@@ -22,8 +25,7 @@ const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 
 interface ShopOrders { shop: BoardShop; orders: BoardOrder[] }
 interface Group { key: string; brand: Brand; district: string; shops: ShopOrders[]; count: number }
-// A group's "Start a trip": its orders give the crews read, and the trip starts empty (spec 026).
-const startOf = (group: Group): Pick => ({ kind: 'start', group: { brand: group.brand, district: group.district }, orders: group.shops.flatMap((row) => row.orders), startWith: [] });
+const emptyTrip = (group: Group): Pick => ({ kind: 'start', group: { brand: group.brand, district: group.district }, orders: [], startWith: [] });
 
 // The unplanned orders by brand and district, most orders first, each group's shops in id order.
 function groupsOf(orders: BoardOrder[], index: BoardIndex): Group[] {
@@ -61,28 +63,45 @@ function orderDragged(order: BoardOrder, index: BoardIndex): Dragged | null {
 // The left column's upper card (Edit plan): the day's unplanned orders by brand and district, or as one list,
 // with the carried-over ones first and the deferred ones last, each deferred one with the planner's "why?". An order,
 // a shop's orders or a whole group can be dragged onto a trip, and a stop dropped here comes off its trip (spec 023).
-export function OrderLists({ screen, index, places, open, outlined, change, onCrew, onFindSlot, onJoin }: {
+export function OrderLists({ screen, index, places, open, outlined, change, act, onCrew, onFindSlot, onJoin }: {
   screen: BoardScreen;
   index: BoardIndex;
   places: Map<string, Place>;
   open: DraftTrip | null;
   outlined: string | null;
   change: (next: DraftPlan, said: Undo) => void;
-  // A crew picked from a group's "Start a trip" (spec 026).
+  act?: Parameters<typeof PlanChoice>[0]['act'];
   onCrew: (pick: Pick, crew: CrewRef) => void;
   onFindSlot: (orderId: string) => void;
   onJoin: (order: BoardOrder) => void;
 }) {
   const { board, draft } = screen;
   const canMove = movable(screen);
-  const [view, setView] = useState<'groups' | 'list'>('groups');
+  const savedView = readView(board.day?.date);
+  const [view, setView] = useState<'groups' | 'list'>(savedView?.view ?? 'groups');
+  const [query, setQuery] = useState(savedView?.query ?? '');
+  const [need, setNeed] = useState<'all' | 'chilled' | 'van' | 'carried'>(savedView?.need ?? 'all');
+  const [sort, setSort] = useState<'count' | 'window'>(savedView?.sort ?? 'count');
+  const [planning, setPlanning] = useState<Group | null>(null);
   const [deferring, setDeferring] = useState<DeferTarget | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const summaries = shopSummaries(board.orders, draft);
   const summary = (order: BoardOrder) => summaryLine(summaries.get(order.outletId)!);
-  const unplanned = activeOrders(board.orders).filter((order) => !places.has(order.id));
+  const waiting = activeOrders(board.orders).filter((order) => !places.has(order.id));
+  const needle = query.trim().toLowerCase();
+  const unplanned = waiting.filter((order) => {
+    const shop = index.shop(order.outletId);
+    if (needle && !`${shop?.name ?? ''} ${order.lines.map((line) => line.name).join(' ')}`.toLowerCase().includes(needle)) return false;
+    if (need === 'chilled' && !order.load.needsReefer) return false;
+    if (need === 'van' && shop?.parking !== 'van_only') return false;
+    if (need === 'carried' && !order.carriedOver) return false;
+    return true;
+  });
   const carried = unplanned.filter((order) => order.carriedOver).sort(byWanted);
-  const groups = groupsOf(unplanned.filter((order) => !order.carriedOver), index);
+  const groups = groupsOf(unplanned.filter((order) => !order.carriedOver), index)
+    .sort((a, b) => sort === 'window'
+      ? Math.min(...a.shops.map((row) => row.shop.windowClose)) - Math.min(...b.shops.map((row) => row.shop.windowClose)) || b.count - a.count
+      : b.count - a.count);
   const deferred = draft.deferrals.flatMap((deferral) => {
     const order = index.order(deferral.orderId);
     return order ? [{ deferral, order }] : [];
@@ -117,12 +136,28 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
   };
 
   return (
+    <>
     <Column ref={landingRef} aria-label="Unplanned orders" className={cn('min-h-[360px] flex-1 lg:min-h-0', landingLook)}>
       <ColumnHead icon={ICON.unplanned} title={`Unplanned orders · ${whole(unplanned.length)}`} className="px-3 pt-3.5 pb-2.5">
         <Pills tight label="Show the orders" value={view} onChange={setView} options={[{ value: 'groups', label: 'brand · district' }, { value: 'list', label: 'list' }]} />
       </ColumnHead>
+      <div className="space-y-2 px-3.5 pb-2">
+        <label className="block text-sm font-semibold">
+          Search shops or orders
+          <input value={query} onChange={(event) => { setQuery(event.target.value); remember(board.day?.date, { view, query: event.target.value, need, sort }); }} className="mt-1 h-11 w-full rounded-[10px] border bg-card px-3 text-sm font-normal" />
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {([['all', 'All'], ['chilled', 'Chilled'], ['van', 'Van only'], ['carried', 'Waiting from earlier days']] as const).map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={need === value} className={plainButton(`h-9 px-3 text-xs ${need === value ? 'bg-foreground text-background' : ''}`)} onClick={() => { setNeed(value); remember(board.day?.date, { view, query, need: value, sort }); }}>{label}</button>
+          ))}
+          <button type="button" aria-pressed={sort === 'window'} className={plainButton(`h-9 px-3 text-xs ${sort === 'window' ? 'bg-foreground text-background' : ''}`)} onClick={() => { const next = sort === 'window' ? 'count' : 'window'; setSort(next); remember(board.day?.date, { view, query, need, sort: next }); }}>Earliest window first</button>
+          {(query || need !== 'all' || sort !== 'count') && <button type="button" className="h-9 px-2 text-xs font-semibold underline" onClick={() => { setQuery(''); setNeed('all'); setSort('count'); remember(board.day?.date, { view, query: '', need: 'all', sort: 'count' }); }}>Clear filters</button>}
+        </div>
+        <p className="text-xs text-muted-foreground">{whole(unplanned.length)} of {whole(waiting.length)} waiting</p>
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-3.5">
-        {unplanned.length === 0 && <p className="pt-1 text-xs text-muted-foreground">Every order is on a trip or deferred.</p>}
+        {waiting.length === 0 && <p className="pt-1 text-xs text-muted-foreground">Every order is on a trip or deferred.</p>}
+        {waiting.length > 0 && unplanned.length === 0 && <p className="pt-1 text-xs text-muted-foreground">Nothing matches these filters.</p>}
 
         {view === 'groups' ? (
           <>
@@ -158,7 +193,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                   key={group.key}
                   id={`group-${group.key}`}
                   aria-label={`${group.brand} · ${group.district}`}
-                  className={cn('scroll-mt-2 rounded-[10px] border-[1.5px] px-2 pt-2.5 pb-1', outlined === group.key ? 'border-foreground' : 'border-transparent')}
+                  className={cn('scroll-mt-2 rounded-[10px] border-[1.5px] border-l-4 px-2 pt-2.5 pb-1', outlined === group.key ? 'border-foreground' : 'border-transparent', group.brand === 'Fresh' ? 'border-l-fresh bg-fresh' : group.brand === 'Style' ? 'border-l-style bg-style' : 'border-l-tech bg-tech')}
                 >
                   <DragRow
                     id={`orders:group:${group.key}`}
@@ -167,17 +202,21 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                   >
                     <div className="flex flex-wrap items-center gap-2 pl-1">
                       <img src={BRAND_ICON[group.brand]} alt="" className="size-[22px] shrink-0 object-contain" />
-                      <h3 className="min-w-0 flex-1 truncate text-xs leading-[15px] font-semibold">{group.brand} · {group.district} · {whole(group.count)}</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-sm leading-5 font-semibold">{group.brand} · {group.district}</h3>
+                        <p className="text-xs leading-4 text-muted-foreground">{demandLine(group.shops.flatMap((row) => row.orders), (id) => index.shop(id))}</p>
+                      </div>
                       <div className="flex w-full flex-wrap justify-end gap-2">
-                      <Button variant="outline" disabled={!canMove} className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => deferOrders(group.key, group.shops.flatMap((row) => row.orders))}>{deferGroup(group.count)}</Button>
+                      <Button variant="outline" disabled={!canMove} className={plainButton('h-9 px-3 text-xs')} onClick={() => deferOrders(group.key, group.shops.flatMap((row) => row.orders))}>{deferGroup(group.count)}</Button>
+                      <Button className={inkButton('h-9 px-3 text-xs')} disabled={!canMove || !act} onClick={() => setPlanning(group)}>Plan these orders</Button>
                       <CrewMenu
                         screen={screen}
                         index={index}
-                        pick={startOf(group)}
-                        title={`Start a trip · ${group.brand} · ${group.district}`}
-                        trigger="Start a trip"
-                        triggerClassName={plainButton('h-[26px] px-3 text-[11px]')}
-                        onPick={(crew) => onCrew(startOf(group), crew)}
+                        pick={emptyTrip(group)}
+                        title={`Create an empty trip · ${group.brand} · ${group.district}. No orders will be added.`}
+                        trigger="Create empty trip"
+                        triggerClassName={plainButton('h-9 px-3 text-xs')}
+                        onPick={(crew) => onCrew(emptyTrip(group), crew)}
                       />
                       </div>
                     </div>
@@ -233,7 +272,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                     add={add}
                     onDefer={() => deferOrders(order.id, [order])}
                     onJoin={onJoin}
-                    extra={order.carriedOver && <Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
+                    extra={<Button variant="outline" className={plainButton('h-9 px-2.5 text-xs')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
                   />
                 ))}
                 {form(order.id)}
@@ -286,6 +325,21 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
         )}
       </div>
     </Column>
+    {planning && act && (
+      <PlanChoice
+        screen={screen}
+        index={index}
+        orders={planning.shops.flatMap((row) => row.orders)}
+        title={`Plan ${planning.brand} · ${planning.district}`}
+        act={act}
+        onCrew={(pick, crew) => {
+          setPlanning(null);
+          if (pick.kind === 'start') onCrew({ ...pick, group: { brand: planning.brand, district: planning.district } }, crew);
+        }}
+        onClose={() => setPlanning(null)}
+      />
+    )}
+    </>
   );
 }
 
@@ -314,11 +368,12 @@ function OrderRow({ order, title, line, summary, disabled, add, onDefer, onJoin,
         <p title={title} className="min-w-0 flex-1 truncate text-xs leading-[15px] font-semibold">{title}</p>
         {order.timesDeferred > 0 && <Tag tone={order.timesDeferred >= 2 ? 'bad' : 'warn'} className="px-2.5 text-[10px] leading-[13px]">{deferredTimes(order)}</Tag>}
       </div>
-      <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">{line}</p>
+      <p className="mt-1 text-xs leading-4 text-muted-foreground">{line}</p>
+      <OrderMarks order={order} />
       <ShopSummary line={summary} />
       <div className="mt-1.5 flex flex-wrap items-center justify-end gap-1.5">
         {extra}
-        {add && <Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => add([order])}>Add</Button>}
+        {add && <Button variant="outline" className={plainButton('h-9 px-2.5 text-xs')} onClick={() => add([order])}>Add to this trip</Button>}
         <Button variant="outline" disabled={disabled} className={plainButton('h-[26px] px-3 text-[11px]')} onClick={onDefer}>Defer</Button>
         <RowMenu label={title} items={[
           ...(order.splitFrom !== null ? [{ label: 'Join back', onClick: () => onJoin(order) }] : []),
@@ -340,6 +395,41 @@ function Row({ title, line, chip, below, actions }: { title: string; line: strin
       {chip}
       {actions && <div className="ml-auto flex flex-wrap items-center gap-1">{actions}</div>}
     </div>
+  );
+}
+
+interface SavedView { view: 'groups' | 'list'; query: string; need: 'all' | 'chilled' | 'van' | 'carried'; sort: 'count' | 'window' }
+
+function readView(date: string | undefined): SavedView | null {
+  if (!date || typeof sessionStorage === 'undefined') return null;
+  const raw = sessionStorage.getItem(`wf-plan-filters:${date}`);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<SavedView>;
+    if (typeof parsed.query !== 'string') return null;
+    return {
+      view: parsed.view === 'list' ? 'list' : 'groups',
+      query: parsed.query,
+      need: parsed.need === 'chilled' || parsed.need === 'van' || parsed.need === 'carried' ? parsed.need : 'all',
+      sort: parsed.sort === 'window' ? 'window' : 'count',
+    };
+  } catch (error) {
+    if (error instanceof SyntaxError) return null;
+    throw error;
+  }
+}
+
+function remember(date: string | undefined, view: SavedView) {
+  if (date && typeof sessionStorage !== 'undefined') sessionStorage.setItem(`wf-plan-filters:${date}`, JSON.stringify(view));
+}
+
+function OrderMarks({ order }: { order: BoardOrder }) {
+  if (!order.load.needsReefer && !order.carriedOver) return null;
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+      {order.load.needsReefer && <span className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-0.5 font-semibold"><img src={chilledIcon} alt="" className="size-4" />Chilled</span>}
+      {order.carriedOver && <span className="rounded-full bg-warn-tint px-2 py-0.5 font-semibold text-warn-ink">Waiting from an earlier day</span>}
+    </p>
   );
 }
 

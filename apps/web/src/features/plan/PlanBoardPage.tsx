@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { BoardOrder, Brand } from '@wayfinder/contracts';
+import type { BoardCounts, BoardOrder, Brand } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PickDepot } from '@/features/dispatcher/parts/PickDepot';
@@ -18,6 +18,7 @@ import { BoardHeader, type Tab } from './parts/BoardHeader';
 import { ScenarioPanel } from './scenario/ScenarioPanel';
 import { BuildPanel } from './parts/BuildPanel';
 import { crewChange, type Pick } from './parts/crews';
+import { impactLine } from './parts/impact';
 import { DoneList } from './parts/DoneList';
 import { FindSlot } from './parts/FindSlot';
 import { startOverChange } from './parts/changes';
@@ -113,7 +114,18 @@ type Middle = { kind: 'trip' } | { kind: 'slot'; orderId: string };
 
 function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardScreen; saver: Saver; stale: boolean; refreshing: boolean; onRefresh: () => void }) {
   const { board, draft } = screen;
-  const { change } = saver;
+  const { change: saveChange } = saver;
+  const noted = useRef<{ counts: BoardCounts; problems: number } | null>(null);
+  const [impact, setImpact] = useState<string | null>(null);
+  const change: Saver['change'] = (plan, said) => {
+    if (board.counts) noted.current = { counts: board.counts, problems: board.check?.problems.length ?? 0 };
+    saveChange(plan, said);
+  };
+  useEffect(() => {
+    if (!noted.current || !board.counts || screen.saving === 'saving' || screen.saving === 'retrying') return;
+    setImpact(impactLine(noted.current.counts, board.counts, { before: noted.current.problems, after: board.check?.problems.length ?? 0 }));
+    noted.current = null;
+  }, [board.counts, board.check, board.plan.revision, screen.saving]);
   const date = board.day!.date;
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -244,6 +256,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         onCrew={chooseCrew}
         onRemoved={() => openTrip(null)}
         onDone={() => openTrip(null)}
+        impact={screen.saving === 'saving' || screen.saving === 'retrying' ? 'Checking this change…' : impact}
         onAddStop={addStop}
         onJoin={(order) => { void join(order); }}
       />
@@ -296,16 +309,27 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
             open={open}
             outlined={outlined}
             change={change}
+            act={saver.act}
             onCrew={chooseCrew}
             onFindSlot={(orderId) => show({ kind: 'slot', orderId })}
             onJoin={(order) => { void join(order); }}
           />
         </div>
         <Column aria-label="Planning" className={cn('min-h-[420px] overflow-x-hidden overflow-y-auto lg:min-h-0', tab === 'planning' ? 'flex' : 'hidden lg:flex')}>{inMiddle}</Column>
-        <Column aria-label="Done" className={cn('overflow-x-hidden overflow-y-auto', tab === 'done' ? 'flex' : 'hidden lg:flex')}>
+        <Column aria-label="Planned trips" className={cn('overflow-x-hidden overflow-y-auto', tab === 'done' ? 'flex' : 'hidden lg:flex')}>
           <DoneList screen={screen} index={index} openKey={open ? keyOf(open) : null} onOpen={openTrip} />
         </Column>
       </div>
+      {open && tab === 'unplanned' && (
+        <div className="sticky bottom-0 z-20 flex items-center gap-3 border-t bg-card px-3 py-2 lg:hidden">
+          <p className="min-w-0 flex-1 text-sm font-semibold">{index.crew(open)}{(() => {
+            const load = index.trip(open.vehicleId, open.tripNo)?.load;
+            const cap = index.vehicle(open.vehicleId)?.weightCapKg;
+            return load && cap ? ` · ${(Math.round((cap - load.kg) / 100) / 10).toFixed(1)} t free` : '';
+          })()}</p>
+          <button type="button" className="h-11 shrink-0 rounded-md bg-foreground px-3 text-sm font-semibold text-background" onClick={() => setTab('planning')}>Back to trip</button>
+        </div>
+      )}
       </PlanDnd>
     </div>
   );

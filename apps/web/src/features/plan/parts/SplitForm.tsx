@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import type { BoardOrder, Brand } from '@wayfinder/contracts';
 import { Button } from '@/components/ui/button';
-import { orderAmount, whole } from '../words';
+import { cubic, tonnes, whole } from '../words';
 import { inkButton, plainButton } from './look';
 
 // Splitting, in place (spec 010, rule 8): a number per line of what stays on this stop. The first part takes those
 // numbers and keeps the order's place on its stop, and the second takes the rest and starts unplanned. The
 // server checks the split and writes both parts; the form only asks for something in each part.
-export function SplitForm({ order, brand, busy, onSplit, onCancel }: {
+export function SplitForm({ order, brand, busy, tripKg, tripM3, capKg, capM3, onSplit, onCancel }: {
   order: BoardOrder;
   brand: Brand;
   busy: boolean;
+  tripKg: number | null;
+  tripM3: number | null;
+  capKg: number | null;
+  capM3: number | null;
   onSplit: (keep: { productId: string; quantity: number }[]) => Promise<string | null>;
   onCancel: () => void;
 }) {
@@ -19,6 +23,9 @@ export function SplitForm({ order, brand, busy, onSplit, onCancel }: {
   const kept = (productId: string) => keep[productId] ?? 0;
   const inFirst = order.lines.some((line) => kept(line.productId) > 0);
   const inSecond = order.lines.some((line) => kept(line.productId) < line.quantity);
+  const units = order.lines.reduce((sum, line) => sum + line.quantity, 0);
+  const keptUnits = order.lines.reduce((sum, line) => sum + kept(line.productId), 0);
+  const share = units === 0 ? 0 : keptUnits / units;
 
   const submit = async () => {
     if (!inFirst || !inSecond) return setProblem('Leave something in each part.');
@@ -27,12 +34,14 @@ export function SplitForm({ order, brand, busy, onSplit, onCancel }: {
 
   return (
     <form className="mt-2 space-y-2.5 rounded-[10px] bg-muted p-3" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <p className="text-[11px] leading-[14px] font-semibold">Split the {orderAmount(brand, order)}: what stays on this stop</p>
+      <p className="text-sm font-semibold">Keep on this trip · {brand}. The rest goes back to unplanned.</p>
+      <p className="text-xs leading-4 text-muted-foreground">A split cannot be undone. The two parts replace this order.</p>
+      <p className="text-sm">This order is {tonnes(order.load.kg)} · {cubic(order.load.m3)}. By the units kept, about {tonnes(order.load.kg * share)} stays and {tonnes(order.load.kg * (1 - share))} goes back{tripKg !== null && capKg !== null ? `. This trip is ${tonnes(tripKg)} of ${tonnes(capKg)}${tripM3 !== null && capM3 !== null ? ` and ${cubic(tripM3)} of ${cubic(capM3)}` : ''} before the split` : ''}.</p>
       <ul className="space-y-1.5">
         {order.lines.map((line) => (
           <li key={line.productId}>
             <label className="flex items-center gap-2 text-xs">
-              <span className="min-w-0 flex-1 truncate">{line.name}</span>
+              <span className="min-w-0 flex-1 truncate">{line.name} · {line.quantity - kept(line.productId)} left unplanned</span>
               <input
                 type="text"
                 inputMode="numeric"

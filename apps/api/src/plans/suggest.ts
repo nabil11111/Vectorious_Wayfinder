@@ -36,7 +36,7 @@ export function plannerInputOf(board: PlanBoard, input: PlanInput): PlannerInput
 
 // The planner's input with each vehicle named by its driver (spec 026), which the planner gives every trip it builds on
 // the vehicle, so its sentences call the truck "Chaminda's dry truck". A vehicle with no driver goes by its kind and id.
-function withDrivers(input: PlannerInput, drivers: ReadonlyMap<string, string | null>, staff: readonly { id: string; name: string }[]): PlannerInput {
+export function withDrivers(input: PlannerInput, drivers: ReadonlyMap<string, string | null>, staff: readonly { id: string; name: string }[]): PlannerInput {
   return {
     ...input,
     vehicles: input.vehicles.map(({ driverName: _driverName, ...vehicle }) => {

@@ -47,7 +47,7 @@ it('L-18 says the suggestion\'s decisions only while the draft still holds it', 
     key: `late_order:00000000-0000-4000-8000-00000000000${n}`, kind: 'late_order' as const, reason: 'No fridge truck was left.', orderId: `00000000-0000-4000-8000-00000000000${n}`,
     vehicleId: null, tripNo: null, leaveAt: null, acceptedAt: null, open,
   });
-  const suggestion = { builtAt: '2026-06-24T10:31:00.000Z', choices: [], inDraft: true, decisions: [decision(1, true), decision(2, true), decision(3, false)] };
+  const suggestion = { builtAt: '2026-06-24T10:31:00.000Z', choices: [], inDraft: true, provenance: 'suggested' as const, decisions: [decision(1, true), decision(2, true), decision(3, false)] };
   expect(suggestionLine(suggestion)).toEqual({ at: 'Suggested plan · 16:01', open: 2, toMake: '2 decisions to make' });
   expect(suggestionLine({ ...suggestion, decisions: [decision(3, false)] })).toMatchObject({ open: 0, toMake: 'no decisions to make' });
   expect(suggestionLine({ ...suggestion, inDraft: false, decisions: [decision(1, false), decision(2, false)] })).toBeNull();

@@ -1,6 +1,6 @@
-import type { BoardOrder, Brand, Crew, CrewList, DraftPlan, PlanBoard } from '@wayfinder/contracts';
+import { readinessOf, type BoardOrder, type Brand, type Crew, type CrewList, type DraftPlan, type PlanBoard } from '@wayfinder/contracts';
 import type { Undo } from '../board';
-import { freeTripNo, keyOf, planOf, sameDraft, startTrip, swapTruck, tripOf, type CrewRef, type TripKey } from '../draft';
+import { freeTripNo, keyOf, planOf, sameDraft, setLeaveAt, startTrip, swapTruck, tripOf, type CrewRef, type TripKey } from '../draft';
 import { countOf, crewName, cubic, hhmm, span, tonnes } from '../words';
 import { movesLine } from './drivers';
 import type { BoardIndex } from './lookup';
@@ -13,7 +13,7 @@ import type { BoardIndex } from './lookup';
 // from Find a slot or an order dropped in the empty middle (the trip starts with that order); or another truck for an
 // open trip. dropped names what a drop started the trip with, for the trip's Undo line (spec 023).
 export type Pick =
-  | { kind: 'start'; group: { brand: Brand; district: string } | null; orders: BoardOrder[]; startWith: BoardOrder[]; dropped?: string }
+  | { kind: 'start'; group: { brand: Brand; district: string } | null; orders: BoardOrder[]; startWith: BoardOrder[]; dropped?: string; leaveAt?: number | null }
   | { kind: 'swap'; key: TripKey };
 
 // The orders the crews are read for: the group's or the dropped ones, or the open trip's.
@@ -46,7 +46,18 @@ const withoutMoved = (pick: Pick, plan: DraftPlan): DraftPlan => (pick.kind === 
 
 // A crew's row: "Chaminda · dry truck · 7.2 t · 38 m³", what matters under it, and what a pick would leave a truck
 // without (rule 2). A truck in the workshop or on two trips cannot be picked.
-export interface CrewRow { vehicleId: string; driverId: string | null; title: string; line: string; warning: string | null; disabled: boolean }
+export interface CrewRow {
+  vehicleId: string;
+  driverId: string | null;
+  title: string;
+  badge: string;
+  line: string;
+  detail: string;
+  history: string | null;
+  warning: string | null;
+  disabled: boolean;
+  leaveAt: number | null;
+}
 
 const list = new Intl.ListFormat('en-GB');
 
@@ -70,34 +81,52 @@ function misfitWords(crew: Crew, load: CrewList['load'], index: BoardIndex): str
   return words;
 }
 
+const badgeOf = (readiness: ReturnType<typeof readinessOf>, allocating: boolean) => {
+  if (!allocating) return 'Available';
+  if (readiness === 'ready') return 'Ready for these orders';
+  if (readiness === 'attention') return 'Needs attention';
+  return 'Cannot take these orders';
+};
+
+export function crewSections(rows: CrewRow[]) {
+  const unavailable = rows.filter((row) => row.disabled);
+  const open = rows.filter((row) => !row.disabled);
+  return { suggested: open.slice(0, 1), other: open.slice(1), unavailable };
+}
+
 export function crewRows(read: CrewList, pick: Pick, plan: DraftPlan, index: BoardIndex): CrewRow[] {
   const moving = pick.kind === 'swap' ? tripOf(plan, pick.key) : null;
   const left = withoutMoved(pick, plan);
+  const allocating = read.orderIds.length > 0;
   return read.crews.filter((crew) => crew.vehicleId !== moving?.vehicleId).map((crew) => {
     const driver = index.driver(crew.driverId);
     const title = `${crewName({ id: crew.vehicleId, type: crew.type, temp: crew.temp }, driver?.name ?? null)} · ${tonnes(crew.weightCapKg)} · ${cubic(crew.volumeCapM3)}`;
     const tripNo = freeTripNo(left, crew.vehicleId);
-    // The draft on screen can be a save ahead of the read, so a truck it already runs twice is off too.
+    const history = crew.lastDistricts.length > 0 && read.historyDate
+      ? `On previous published plan · ${read.historyDate} · ${list.format(crew.lastDistricts)}`
+      : null;
     if (crew.unavailable || tripNo === null) {
-      const why = crew.unavailable?.kind === 'workshop' ? `in the workshop: ${crew.unavailable.reason.toLowerCase()}` : 'on two trips already';
-      return { vehicleId: crew.vehicleId, driverId: crew.driverId, title, line: why, warning: null, disabled: true };
+      const why = crew.unavailable?.kind === 'workshop' ? `In the workshop: ${crew.unavailable.reason.toLowerCase()}` : 'On two trips already';
+      return { vehicleId: crew.vehicleId, driverId: crew.driverId, title, badge: 'Unavailable', line: why, detail: why, history, warning: null, disabled: true, leaveAt: null };
     }
-    // When a second trip is ready, from the read, unless its misfit has said so already.
-    const ready = tripNo === 2 && !crew.misfits.some((m) => m.code === 'ready_late') ? crew.readyAt ?? undefined : undefined;
-    const line = [
-      ...(read.orderIds.length > 0 ? (crew.fits ? ['fits'] : misfitWords(crew, read.load, index)) : []),
-      ...(tripNo === 2 ? [`trip 2${ready !== undefined ? ` · ready ${hhmm(ready)}` : ''}`] : []),
-      ...(crew.lastDistricts.length > 0 ? [`ran ${list.format(crew.lastDistricts)} last time`] : []),
-      `fuel ${crew.fuelLeftPct}% left`,
-    ].join(' · ');
-    // Every driver the pick displaces, said before the press (rule 2).
+    const readiness = readinessOf(crew, allocating);
+    const reasons = misfitWords(crew, read.load, index);
+    const binding = crew.why || reasons[0] || (allocating ? 'Can take this load' : 'No orders will be added');
+    const fuel = crew.quotaLeftL !== null && crew.quotaLeftL !== undefined ? `${crew.quotaLeftL} L quota left after` : `fuel ${crew.fuelLeftPct}% left`;
+    const load = allocating ? `${tonnes(read.load.kg)} of ${tonnes(crew.weightCapKg)} · ${cubic(read.load.m3)} of ${cubic(crew.volumeCapM3)}` : '';
+    const ready = tripNo === 2 && readiness !== 'cannot' && crew.readyAt !== null ? `trip 2, ready ${hhmm(crew.readyAt)}` : tripNo === 2 ? 'trip 2' : '';
+    const line = [binding, load, ready, fuel].filter(Boolean).join(' · ');
     const made = crewChange(pick, plan, { vehicleId: crew.vehicleId, driverId: crew.driverId }, index, null);
     const moved = made ? displaced(plan, made.plan, crew) : { left: [], off: [] };
     const warning = [
       ...moved.left.map((vehicleId) => `${driver?.name ?? 'The driver'} ${movesLine(vehicleId)}`),
       ...moved.off.map(({ driverId, vehicleId }) => `${index.driver(driverId)?.name ?? 'A driver'} drives ${vehicleId} now and will be taken off it`),
     ].join('. ');
-    return { vehicleId: crew.vehicleId, driverId: crew.driverId, title, line, warning: warning || null, disabled: false };
+    return {
+      vehicleId: crew.vehicleId, driverId: crew.driverId, title, badge: badgeOf(readiness, allocating), line,
+      detail: [...reasons, ...(crew.advisories ?? [])].join('. ') || binding, history, warning: warning || null,
+      disabled: allocating && readiness === 'cannot', leaveAt: crew.leaveAt,
+    };
   });
 }
 
@@ -105,7 +134,8 @@ export function crewRows(read: CrewList, pick: Pick, plan: DraftPlan, index: Boa
 // of the draft with one Undo, whose line names the crew and any truck the driver left. open is the trip open on the
 // board when the crew is picked. null when the truck runs two trips already.
 export function crewChange(pick: Pick, plan: DraftPlan, crew: CrewRef, index: BoardIndex, open: TripKey | null): { plan: DraftPlan; key: TripKey; undo: Undo } | null {
-  const made = pick.kind === 'start' ? startTrip(plan, crew, pick.startWith) : swapTruck(plan, pick.key, crew);
+  const started = pick.kind === 'start' ? startTrip(plan, crew, pick.startWith) : swapTruck(plan, pick.key, crew);
+  const made = started && pick.kind === 'start' && pick.leaveAt != null ? { ...started, plan: setLeaveAt(started.plan, started.key, pick.leaveAt) } : started;
   const trip = made ? tripOf(made.plan, made.key) : null;
   if (!made || !trip) return null;
   const truck = index.called({ ...trip, tripNo: 1 });

@@ -13,7 +13,13 @@ import { Column, Tag } from './ui';
 // tag shows (spec 014): accepting a decision changes nothing the checker says.
 export function ChecksPanel({ board, className }: { board: PlanBoard; className?: string }) {
   const sent = board.plan.status === 'published';
-  const items = checkItems(board.check?.problems ?? []);
+  const items = [
+    ...board.plan.trips.filter((trip) => trip.driverId === null).map((trip) => ({
+      key: `driver-${trip.vehicleId}-${trip.tripNo}`, level: 'warn' as const,
+      title: `${trip.vehicleId} has no driver`, fix: 'Choose a driver before sending.', trip: `${trip.vehicleId}-${trip.tripNo}`,
+    })),
+    ...checkItems(board.check?.problems ?? []),
+  ];
   const blockers = items.filter((item) => item.level === 'block').length;
   const title = sent && board.plan.sentAt ? `Sent ${clockTime(board.plan.sentAt)}` : items.length > 0 ? `Checks · ${whole(items.length)}` : 'Checks · all clear';
   const deciding = board.suggestion?.decisions.some((decision) => decision.open) ?? false;
@@ -36,8 +42,8 @@ export function ChecksPanel({ board, className }: { board: PlanBoard; className?
               <p className={cn('text-xs leading-4 font-semibold', item.level === 'block' ? 'text-bad' : 'text-warn-ink')}>{item.title}</p>
               {item.fix && <p className="mt-1 text-[11px] leading-[15px] text-muted-foreground">{item.fix}</p>}
               {!sent && (
-                <Link to={item.trip ? `/dispatcher/plan?trip=${item.trip}` : '/dispatcher/plan'} className={plainButton('mt-2 h-7 px-3.5 text-[11px]')}>
-                  Open in edit
+                <Link to={item.trip ? `/dispatcher/plan?trip=${item.trip}` : '/dispatcher/plan'} className={plainButton('mt-2 h-11 px-3.5 text-sm')}>
+                  {item.trip ? 'Open this trip' : 'Open the orders'}
                 </Link>
               )}
             </li>

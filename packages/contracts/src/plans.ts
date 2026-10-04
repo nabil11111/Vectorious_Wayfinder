@@ -150,6 +150,8 @@ export const BoardSuggestion = z.object({
   builtAt: Moment,
   choices: z.array(SuggestionChoice).max(300),
   inDraft: z.boolean(),
+  // suggested: the draft is still that build. edited: some of it remains. manual: none of it remains.
+  provenance: z.enum(['suggested', 'edited', 'manual']).default('manual'),
   decisions: z.array(SuggestionDecision.extend({ open: z.boolean() })).max(700),
 });
 export type BoardSuggestion = z.infer<typeof BoardSuggestion>;
@@ -228,11 +230,24 @@ export const BoardCounts = z.object({
   fuelWeekPct: z.number(),
   fridgeM3Used: z.number(),
   fridgeM3Working: z.number(),
+  // The fullest trip of each refrigerated vehicle, added up. fridgeM3Used adds every trip, so a second trip
+  // counts the same space again.
+  fridgePeakM3: z.number().default(0),
   stops: z.number().int(),
   stopsOnTime: z.number().int(),
   km: z.number(),
   hoursOnRoad: z.number(),
   drivers: z.number().int(),
+  // Original orders, so a split does not change how many shops' orders were covered.
+  originalDue: z.number().int().default(0),
+  originalFull: z.number().int().default(0),
+  originalPart: z.number().int().default(0),
+  originalDeferred: z.number().int().default(0),
+  originalWaiting: z.number().int().default(0),
+  // Estimated litres for the trips that were timed. null when a trip cannot be timed.
+  planFuelL: z.number().nullable().default(null),
+  vehicleHours: z.number().nullable().default(null),
+  waitHours: z.number().nullable().default(null),
 });
 export type BoardCounts = z.infer<typeof BoardCounts>;
 
@@ -276,7 +291,13 @@ export type PlanBoard = z.infer<typeof PlanBoard>;
 export const SlotSearch = z.object({
   orderId: z.uuid(),
   revision: z.number().int().min(0),
-  slots: z.array(z.object({ vehicleId: z.string(), tripNo: z.number().int(), stopSeq: z.number().int().min(1), newStop: z.boolean(), arriveAt: Minutes })),
+  slots: z.array(z.object({
+    vehicleId: z.string(), tripNo: z.number().int(), stopSeq: z.number().int().min(1), newStop: z.boolean(), arriveAt: Minutes,
+    // How this place was chosen, and the extra litres and minutes against the trip as it stands.
+    basis: z.string().default(''),
+    fuelL: z.number().nullable().default(null),
+    addedMin: z.number().int().nullable().default(null),
+  })),
   refused: z.array(z.object({ vehicleId: z.string(), tripNo: z.number().int(), problem: Problem })),
 });
 export type SlotSearch = z.infer<typeof SlotSearch>;
@@ -295,7 +316,24 @@ export type CrewQuery = z.infer<typeof CrewQuery>;
 // ready again only after every window of the orders closes (L-04); or that its trip would reach a shop of the orders
 // after the shop's window closes, by the checker's timeline (L-17). The order or shop it is about, as the checker's
 // problem names it, or null; and for arrives_late, the minutes after the window it arrives, as the checker counts them.
-export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only', 'ready_late', 'arrives_late'] as const;
+export const CREW_MISFITS = ['over_weight', 'over_volume', 'needs_reefer', 'van_only', 'ready_late', 'arrives_late', 'fuel_over_quota'] as const;
+const HARD_MISFITS = new Set<string>(['over_weight', 'over_volume', 'needs_reefer', 'van_only', 'ready_late', 'fuel_over_quota']);
+
+// What a crew can do with the orders it was read for. A fixable late arrival is attention, not a ban.
+export function readinessOf(crew: {
+  misfits: { code: string }[];
+  advisories?: string[];
+  driverId: string | null;
+  unavailable: unknown;
+  leaveAt?: number | null;
+}, allocating: boolean): 'ready' | 'attention' | 'cannot' {
+  if (crew.unavailable) return 'cannot';
+  const late = crew.misfits.some((misfit) => misfit.code === 'arrives_late');
+  const hard = crew.misfits.some((misfit) => HARD_MISFITS.has(misfit.code));
+  if (hard || (late && crew.leaveAt == null)) return 'cannot';
+  if (allocating && (crew.driverId === null || (crew.advisories?.length ?? 0) > 0 || late)) return 'attention';
+  return 'ready';
+}
 export const CrewMisfit = z.object({ code: z.enum(CREW_MISFITS), orderId: z.uuid().nullable(), outletId: z.string().nullable(), lateMin: z.number().int().min(0).optional() });
 export type CrewMisfit = z.infer<typeof CrewMisfit>;
 
@@ -317,10 +355,17 @@ export const Crew = z.object({
   // The districts it ran on the depot's latest sent plan, and whether one of them is a district of the orders.
   lastDistricts: z.array(z.string()),
   ranHere: z.boolean(),
-  // It takes the orders by weight and volume, has a fridge for a chilled one, and can reach every shop. A crew that does
-  // not fit can still be picked: the checker judges the trip (spec 007).
+  // It takes the orders by weight, volume, fridge, access and fuel, and can reach every shop on time. A time that a
+  // checked departure would fix stays selectable. The checker still judges the saved trip.
   fits: z.boolean(),
   misfits: z.array(CrewMisfit),
+  readiness: z.enum(['ready', 'attention', 'cannot']).default('ready'),
+  // One sentence for the card, then the checker's own warnings. leaveAt is a departure that would meet the windows.
+  why: z.string().default(''),
+  advisories: z.array(z.string()).default([]),
+  leaveAt: Minutes.nullable().default(null),
+  tripFuelL: z.number().nullable().default(null),
+  quotaLeftL: z.number().nullable().default(null),
   // Why it cannot be picked: in the workshop on the day, for the workshop's reason, or on two trips already. null when it can.
   unavailable: z.discriminatedUnion('kind', [z.object({ kind: z.literal('workshop'), reason: z.string() }), z.object({ kind: z.literal('two_trips') })]).nullable(),
 });
@@ -333,9 +378,94 @@ export const CrewList = z.object({
   orderIds: z.array(z.uuid()),
   revision: z.number().int().min(0),
   load: z.object({ kg: z.number(), m3: z.number() }),
+  // The date of the published plan the districts come from, or null when this depot has none.
+  historyDate: z.string().nullable().default(null),
   crews: z.array(Crew),
 });
 export type CrewList = z.infer<typeof CrewList>;
+
+// ── A checked arrangement for the orders the dispatcher selected ───────────────────────────────────────────────
+
+const KeepLine = z.object({ productId: z.string(), quantity: z.number().int().min(0) });
+export const ArrangeRequest = withRef({ orderIds: z.array(z.uuid()).min(1).max(300) });
+export type ArrangeRequest = z.infer<typeof ArrangeRequest>;
+export const ApplyArrangeRequest = withRef({ orderIds: z.array(z.uuid()).min(1).max(300), fingerprint: z.string().min(1).max(20000) });
+export type ApplyArrangeRequest = z.infer<typeof ApplyArrangeRequest>;
+
+export const ArrangementCrew = z.object({
+  vehicleId: z.string(),
+  driverId: z.uuid().nullable(),
+  tripNo: z.number().int().min(1).max(2),
+  newTrip: z.boolean(),
+  orderIds: z.array(z.uuid()),
+  shops: z.array(z.string()),
+  kg: z.number(),
+  m3: z.number(),
+  weightCapKg: z.number(),
+  volumeCapM3: z.number(),
+  refrigerated: z.boolean(),
+  leaveAt: z.number().int().nullable(),
+  backAt: z.number().int().nullable(),
+  fuelL: z.number().nullable(),
+  quotaLeftL: z.number().nullable(),
+  why: z.string(),
+});
+export type ArrangementCrew = z.infer<typeof ArrangementCrew>;
+
+export const Arrangement = z.object({
+  revision: z.number().int().min(0),
+  orderIds: z.array(z.uuid()),
+  fingerprint: z.string(),
+  summary: z.string(),
+  singleVehicle: z.boolean(),
+  crews: z.array(ArrangementCrew),
+  waiting: z.array(z.object({ orderId: z.uuid(), shop: z.string(), reason: z.string() })),
+  splits: z.array(z.object({
+    orderId: z.uuid(),
+    keep: z.array(KeepLine),
+    keptOrderId: z.string(),
+    remainderOrderId: z.string(),
+    remainderWaiting: z.boolean(),
+  })),
+});
+export type Arrangement = z.infer<typeof Arrangement>;
+
+// ── Your plan beside a suggestion for the same demand ──────────────────────────────────────────────────────────
+
+export const PlanOutcome = z.object({
+  originalDue: z.number().int(),
+  originalFull: z.number().int(),
+  originalPart: z.number().int(),
+  originalDeferred: z.number().int(),
+  originalWaiting: z.number().int(),
+  vehicles: z.number().int(),
+  trips: z.number().int(),
+  stops: z.number().int(),
+  stopsOnTime: z.number().int(),
+  fuelL: z.number().nullable(),
+  km: z.number().nullable(),
+  vehicleHours: z.number().nullable(),
+  blockers: z.number().int(),
+  warnings: z.number().int(),
+  driversMissing: z.number().int(),
+});
+export type PlanOutcome = z.infer<typeof PlanOutcome>;
+
+export const PlanComparison = z.object({
+  revision: z.number().int().min(0),
+  demandKey: z.string(),
+  fingerprint: z.string(),
+  summary: z.string(),
+  fuelDeltaL: z.number().nullable(),
+  current: PlanOutcome,
+  suggested: PlanOutcome.nullable(),
+  changes: z.array(z.object({ shop: z.string(), detail: z.string() })).max(40),
+  canApply: z.boolean(),
+  unavailable: z.string().nullable(),
+});
+export type PlanComparison = z.infer<typeof PlanComparison>;
+export const ApplyCompareRequest = withRef({ demandKey: z.string().min(1).max(200000), fingerprint: z.string().min(1).max(200000) });
+export type ApplyCompareRequest = z.infer<typeof ApplyCompareRequest>;
 
 // ── Refusals ────────────────────────────────────────────────────────────────────────────────────────────────────
 

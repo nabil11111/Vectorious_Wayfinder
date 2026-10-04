@@ -80,7 +80,7 @@ it('spec 023 AC-4 the empty middle offers the build and a drop area in place of 
   const empty = boardWith([]);
   const markup = renderToStaticMarkup(<MemoryRouter><BuildPanel screen={screenOf(empty)} act={async () => null} onBuilding={() => undefined} index={indexOf(empty)} dropped={null} onCrew={() => undefined} onDropClose={() => undefined} /></MemoryRouter>);
   expect(markup).toContain('>Build the suggested plan</button>');
-  expect(markup).toContain('or drag an order here to start a trip');
+  expect(markup).toContain('or drag orders here to plan them');
   expect(markup).not.toContain('Start a blank trip');
 });
 
@@ -192,7 +192,7 @@ it('spec 023 AC-5 shows the Undo line of a drop on a trip\'s card in that card',
 
 it('spec 026 AC-1 opens the crew picker as a dropdown from a group\'s "Start a trip" and from "Swap truck"', () => {
   const menuButton = (name: string) => new RegExp(`<button[^>]*aria-haspopup="menu"[^>]*>${name}</button>`);
-  expect(orderLists(screenOf(BOARD))).toMatch(menuButton('Start a trip'));
+  expect(orderLists(screenOf(BOARD))).toContain('Plan these orders');
   expect(tripPanel(screenOf(BOARD))).toMatch(menuButton('Swap truck'));
 });
 

@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type {
-  AcceptDecisionsRequest, CrewList, DraftPlan, JoinOrderRequest, Me, PlanBoard, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
+  AcceptDecisionsRequest, ApplyArrangeRequest, ApplyCompareRequest, ArrangeRequest, Arrangement, CrewList, DraftPlan, JoinOrderRequest, Me, PlanBoard, PlanComparison, PlanRef, SavePlanRequest, SlotSearch, SplitOrderRequest, SuggestPlanRequest,
 } from '@wayfinder/contracts';
 import { meKey, workingFor } from '@/features/auth/api';
 import { reasonOf } from '@/features/store/words';
@@ -72,6 +72,16 @@ export const fetchCrews = async (date: string, orderIds: string[]) => {
   await writing;
   return api<CrewList>(`/plans/${date}/crews?orders=${orderIds.map(encodeURIComponent).join(',')}`);
 };
+export const fetchArrangement = async (date: string, body: ArrangeRequest) => {
+  await writing;
+  return api<Arrangement>(`/plans/${date}/arrange`, { method: 'POST', json: body });
+};
+export const applyArrangement = (date: string, body: ApplyArrangeRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/arrange/apply`, { method: 'POST', json: body, depot }));
+export const fetchComparison = async (date: string) => {
+  await writing;
+  return api<PlanComparison>(`/plans/${date}/compare`, { method: 'POST', json: {} });
+};
+export const applyComparison = (date: string, body: ApplyCompareRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/compare/apply`, { method: 'POST', json: body, depot }));
 
 // Every write answers with the whole board, as the GET does.
 export const saveDraft = (date: string, body: SavePlanRequest) => write((depot) => api<PlanBoard>(`/plans/${date}/draft`, { method: 'PUT', json: body, depot }));

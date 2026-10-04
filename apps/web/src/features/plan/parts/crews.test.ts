@@ -38,8 +38,12 @@ const INDEX = indexOf(BOARD);
 const DRAFT = planOf(BOARD);
 const crew = (vehicleId: string, driverId: string | null, change: Partial<Crew> = {}): Crew => {
   const v = BOARD.vehicles.find((x) => x.id === vehicleId)!;
-  return { vehicleId, driverId, type: v.type, temp: v.temp, weightCapKg: v.weightCapKg, volumeCapM3: v.volumeCapM3, fuelLeftPct: v.fuelLeftPct, readyAt: null,
-    lastDistricts: [], ranHere: false, fits: true, misfits: [], unavailable: null, ...change };
+  return {
+    vehicleId, driverId, type: v.type, temp: v.temp, weightCapKg: v.weightCapKg, volumeCapM3: v.volumeCapM3, fuelLeftPct: v.fuelLeftPct, readyAt: null,
+    lastDistricts: [], ranHere: false, fits: true, misfits: [], ...change,
+    readiness: change.readiness ?? 'ready', why: change.why ?? '', advisories: change.advisories ?? [], leaveAt: change.leaveAt ?? null,
+    tripFuelL: change.tripFuelL ?? null, quotaLeftL: change.quotaLeftL ?? null, unavailable: change.unavailable ?? null,
+  };
 };
 // Fresh Dehiwala's order dropped in the empty middle: a chilled order for a van-only shop.
 const DROPPED: Pick = { kind: 'start', group: { brand: 'Fresh', district: 'Colombo' }, orders: [BOARD.orders[2]!], startWith: [BOARD.orders[2]!], dropped: 'Fresh Dehiwala' };
@@ -53,27 +57,32 @@ const LIST = CrewList.parse({
   ],
 });
 
-it('AC-1 reads each crew as "Wasantha · reefer van · 1.0 t · 7 m³", with what matters for the orders under it, in the read\'s order', () => {
-  expect(crewRows(LIST, DROPPED, DRAFT, INDEX)).toEqual([
-    { vehicleId: 'VEH035', driverId: WASANTHA, title: 'Wasantha · reefer van · 1.0 t · 7 m³', line: 'fits · ran Colombo last time · fuel 62% left', warning: null, disabled: false },
-    { vehicleId: 'VEH001', driverId: DILSHAN, title: 'Dilshan · reefer truck · 5.5 t · 26.4 m³', line: 'cannot reach Fresh Dehiwala: van only · trip 2 · fuel 62% left', warning: null, disabled: false },
-    { vehicleId: 'VEH011', driverId: CHAMINDA, title: 'Chaminda · dry truck · 7.2 t · 38 m³', line: 'cannot reach Fresh Dehiwala: van only · no fridge for the chilled order · trip 2 · ran Galle last time · fuel 62% left', warning: null, disabled: false },
-    { vehicleId: 'VEH005', driverId: null, title: 'reefer truck VEH005 · 6.8 t · 33.4 m³', line: 'in the workshop: brake service', warning: null, disabled: true },
+it('AC-1 reads each crew as "Wasantha · reefer van · 1.0 t · 7 m³", and a hard miss cannot be chosen', () => {
+  const rows = crewRows(LIST, DROPPED, DRAFT, INDEX);
+  expect(rows.map((row) => [row.vehicleId, row.title, row.badge, row.disabled])).toEqual([
+    ['VEH035', 'Wasantha · reefer van · 1.0 t · 7 m³', 'Ready for these orders', false],
+    ['VEH001', 'Dilshan · reefer truck · 5.5 t · 26.4 m³', 'Cannot take these orders', true],
+    ['VEH011', 'Chaminda · dry truck · 7.2 t · 38 m³', 'Cannot take these orders', true],
+    ['VEH005', 'reefer truck VEH005 · 6.8 t · 33.4 m³', 'Unavailable', true],
   ]);
+  expect(rows[0]!.line).toContain('Can take this load');
+  expect(rows[1]!.detail).toContain('cannot reach Fresh Dehiwala: van only');
+  expect(rows[2]!.detail).toContain('no fridge for the chilled order');
+  expect(rows[3]!.line).toBe('In the workshop: brake service');
 });
 
 it('AC-1 shows too heavy and too big against the truck\'s own limits, and greys a truck on two trips', () => {
   const heavy = { ...LIST, load: { kg: 7600, m3: 41.2 }, crews: [crew('VEH011', CHAMINDA, { fits: false, misfits: [{ code: 'over_weight', orderId: null, outletId: null }, { code: 'over_volume', orderId: null, outletId: null }] }), crew('VEH001', DILSHAN, { unavailable: { kind: 'two_trips' } })] };
-  expect(crewRows(heavy, DROPPED, DRAFT, INDEX).map((row) => [row.line, row.disabled])).toEqual([
-    ['too heavy: 7.6 t of 7.2 t · too big: 41.2 m³ of 38 m³ · trip 2 · fuel 62% left', false],
-    ['on two trips already', true],
+  expect(crewRows(heavy, DROPPED, DRAFT, INDEX).map((row) => [row.disabled, row.detail.includes('too heavy: 7.6 t of 7.2 t'), row.line])).toEqual([
+    [true, true, expect.stringContaining('too heavy')],
+    [true, false, 'On two trips already'],
   ]);
-  // Every chilled order without a fridge is counted once, and a van-only shop named once.
+  // Every chilled order without a fridge is counted once, and a van-only shop named once. The detail keeps it; the row cannot be chosen.
   const many = { ...LIST, crews: [crew('VEH011', CHAMINDA, { fits: false, misfits: [
     { code: 'van_only', orderId: null, outletId: 'OUT005' }, { code: 'needs_reefer', orderId: DEHIWALA, outletId: 'OUT005' },
     { code: 'van_only', orderId: null, outletId: 'OUT005' }, { code: 'needs_reefer', orderId: FORT, outletId: 'OUT006' },
   ] })] };
-  expect(crewRows(many, DROPPED, DRAFT, INDEX)[0]!.line).toBe('cannot reach Fresh Dehiwala: van only · no fridge for 2 chilled orders · trip 2 · fuel 62% left');
+  expect(crewRows(many, DROPPED, DRAFT, INDEX)[0]).toMatchObject({ disabled: true, detail: 'cannot reach Fresh Dehiwala: van only. no fridge for 2 chilled orders' });
 });
 
 it('rule 2 says before the press when the crew\'s driver drives another truck, which will have no driver', () => {
@@ -113,7 +122,7 @@ it('rule 1 picks for the group\'s orders, the dropped ones, or the trip\'s, and 
   expect(pickOrders({ kind: 'swap', key: 'VEH011-1' }, DRAFT, INDEX)).toEqual([BOARD.orders[0]]);
   const full = { ...DRAFT, trips: [...DRAFT.trips, trip('VEH011', CHAMINDA, 'OUT006', uuid(7), 2)] };
   expect(crewChange(DROPPED, full, { vehicleId: 'VEH011', driverId: CHAMINDA }, INDEX, null)).toBeNull();
-  expect(crewRows({ ...LIST, crews: [crew('VEH011', CHAMINDA)] }, DROPPED, full, INDEX)[0]).toMatchObject({ line: 'on two trips already', disabled: true });
+  expect(crewRows({ ...LIST, crews: [crew('VEH011', CHAMINDA)] }, DROPPED, full, INDEX)[0]).toMatchObject({ line: 'On two trips already', disabled: true });
 });
 
 // Review of 026: a crews read is offered only for the draft it was read from, and a pick names every driver it moves.
@@ -141,10 +150,11 @@ it('L-04 says when a second trip is ready, and that it is after every window clo
     crew('VEH001', DILSHAN, { readyAt: 418 }),
     crew('VEH011', CHAMINDA, { readyAt: 498, fits: false, misfits: [{ code: 'ready_late', orderId: null, outletId: null }] }),
   ] };
-  expect(crewRows(ready, DROPPED, DRAFT, INDEX).map((row) => row.line)).toEqual([
-    'fits · trip 2 · ready 06:58 · fuel 62% left',
-    'ready 08:18, after every window closes · trip 2 · fuel 62% left',
-  ]);
+  const rows = crewRows(ready, DROPPED, DRAFT, INDEX);
+  expect(rows[0]).toMatchObject({ badge: 'Ready for these orders', disabled: false });
+  expect(rows[0]!.line).toContain('trip 2, ready 06:58');
+  expect(rows[1]).toMatchObject({ badge: 'Cannot take these orders', disabled: true });
+  expect(rows[1]!.detail).toContain('ready 08:18, after every window closes');
 });
 
 it('L-17 says a crew whose trip would reach a shop after its window does not fit, and by how much', () => {
@@ -153,10 +163,11 @@ it('L-17 says a crew whose trip would reach a shop after its window does not fit
     crew('VEH035', WASANTHA, { fits: false, misfits: [{ code: 'arrives_late', orderId: null, outletId: 'OUT005', lateMin: 40 }] }),
     crew('VEH011', CHAMINDA, { readyAt: 418, fits: false, misfits: [{ code: 'arrives_late', orderId: null, outletId: 'OUT005', lateMin: 0 }] }),
   ] };
-  expect(crewRows(late, DROPPED, DRAFT, INDEX).map((row) => row.line)).toEqual([
-    'reaches Fresh Dehiwala 1 h 51 min after its window · trip 2 · ready 06:58 · fuel 62% left',
-    'reaches Fresh Dehiwala 40 min after its window · fuel 62% left',
-    // A Fresh shop reached at 08:00 is late with no minutes past its window to count.
-    'reaches Fresh Dehiwala too late for its window · trip 2 · ready 06:58 · fuel 62% left',
+  const rows = crewRows(late, DROPPED, DRAFT, INDEX);
+  expect(rows.every((row) => row.disabled)).toBe(true);
+  expect(rows.map((row) => row.detail)).toEqual([
+    'reaches Fresh Dehiwala 1 h 51 min after its window',
+    'reaches Fresh Dehiwala 40 min after its window',
+    'reaches Fresh Dehiwala too late for its window',
   ]);
 });

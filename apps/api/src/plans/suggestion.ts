@@ -107,11 +107,23 @@ function holdsAny(suggested: DraftPlan, draft: DraftPlan): boolean {
 
 // The suggestion as the board answers it, each decision judged on the board's draft, and whether the draft still holds
 // any of it. The saved draft stays here.
+const shapeOf = (plan: DraftPlan) => JSON.stringify({
+  mixBrands: plan.mixBrands,
+  trips: [...plan.trips].sort((a, b) => a.vehicleId.localeCompare(b.vehicleId) || a.tripNo - b.tripNo).map((trip) => ({
+    vehicleId: trip.vehicleId, tripNo: trip.tripNo, driverId: trip.driverId, leaveAt: trip.leaveAt,
+    stops: trip.stops.map((stop) => ({ outletId: stop.outletId, orderIds: stop.orderIds })),
+  })),
+  deferrals: [...plan.deferrals].map((deferral) => [deferral.orderId, deferral.code, deferral.reason]).sort(),
+});
+
 export function boardSuggestion(stored: Suggestion, draft: DraftPlan): BoardSuggestion {
+  const held = holdsAny(stored.plan, draft);
+  const same = shapeOf(stored.plan) === shapeOf(draft);
   return {
     builtAt: stored.builtAt,
     choices: stored.choices,
-    inDraft: holdsAny(stored.plan, draft),
+    inDraft: held,
+    provenance: same ? 'suggested' : held ? 'edited' : 'manual',
     decisions: stored.decisions.map((decision) => ({ ...decision, open: decisionOpen(decision, stored.plan, draft) })),
   };
 }

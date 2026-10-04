@@ -1,10 +1,12 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import { depotCallerOf, requireDepot, requireRole, type DepotCaller } from '../middleware/auth';
-import { AcceptDecisionsRequest, PlanScenarioRequest, BOTH_DEPOTS, JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, SuggestPlanRequest, UnsendPlanRequest } from '@wayfinder/contracts';
+import { AcceptDecisionsRequest, ApplyArrangeRequest, ApplyCompareRequest, ArrangeRequest, PlanScenarioRequest, BOTH_DEPOTS, JoinOrderRequest, PlanBoard, SavePlanRequest, SendPlanRequest, SlotQuery, SplitOrderRequest, SuggestPlanRequest, UnsendPlanRequest } from '@wayfinder/contracts';
 import { HttpError } from '../lib/errors';
 import { CrewQuery } from '@wayfinder/contracts';
 import { getBoard } from '../plans/board';
 import { previewPlanScenario } from '../plans/scenario';
+import { applyArrangement, previewArrangement } from '../plans/arrange';
+import { applyComparison, previewComparison } from '../plans/compare';
 import { findCrews } from '../plans/crews';
 import { saveDraft } from '../plans/draft';
 import { joinOrder, splitOrder } from '../plans/split';
@@ -45,3 +47,7 @@ plansRouter.post('/:date/suggest', async (req, res) => { res.json(await suggestP
 plansRouter.post('/:date/decisions', async (req, res) => { res.json(await acceptDecisions(plannerOf(req), dateOf(req), AcceptDecisionsRequest.parse(req.body))); });
 
 plansRouter.post('/:date/scenario', async (req, res) => { res.json(await previewPlanScenario(plannerOf(req), dateOf(req), PlanScenarioRequest.parse(req.body))); });
+plansRouter.post('/:date/arrange', async (req, res) => { res.json(await previewArrangement(plannerOf(req), dateOf(req), ArrangeRequest.parse(req.body))); });
+plansRouter.post('/:date/arrange/apply', async (req, res) => { res.json(await applyArrangement(plannerOf(req), dateOf(req), ApplyArrangeRequest.parse(req.body))); });
+plansRouter.post('/:date/compare', async (req, res) => { res.json(await previewComparison(plannerOf(req), dateOf(req))); });
+plansRouter.post('/:date/compare/apply', async (req, res) => { res.json(await applyComparison(plannerOf(req), dateOf(req), ApplyCompareRequest.parse(req.body))); });

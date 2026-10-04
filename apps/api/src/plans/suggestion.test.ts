@@ -71,9 +71,10 @@ describe('when a decision is open', () => {
       decisions: [early, { ...late, acceptedAt: ACCEPTED }, waited] };
     const draft = edited((plan) => { plan.trips[0]!.leaveAt = 210; });
     expect(boardSuggestion(stored, draft)).toEqual({
-      builtAt: BUILT, choices: stored.choices, inDraft: true,
+      builtAt: BUILT, choices: stored.choices, inDraft: true, provenance: 'edited',
       decisions: [{ ...early, open: false }, { ...late, acceptedAt: ACCEPTED, open: false }, { ...waited, open: true }],
     });
+    expect(boardSuggestion(stored, suggested).provenance).toBe('suggested');
   });
 
   it('L-18 says whether the draft still holds anything of the suggestion: an order on the truck it gave it, or one it deferred', () => {
