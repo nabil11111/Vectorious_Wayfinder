@@ -57,6 +57,8 @@ describe('GET /api/v1/admin/vehicles', () => {
       temp: 'reefer',
       weightCapKg: 5510,
       volumeCapM3: 26.4,
+      fuelType: 'diesel',
+      kmPerL: 4.7,
       weeklyFuelQuotaL: 340,
       depotId: 'Peliyagoda',
       archivedAt: null,

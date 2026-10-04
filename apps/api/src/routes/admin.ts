@@ -6,6 +6,7 @@ import { auditLog, outlets, products, vehicles } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import { announce } from '../lib/live';
 import { requireRole } from '../middleware/auth';
+import { adminRecordRoutes } from './admin-records';
 
 export const adminRouter = Router();
 
@@ -15,6 +16,8 @@ const vehicleColumns = {
   temp: vehicles.temp,
   weightCapKg: vehicles.weightCapKg,
   volumeCapM3: vehicles.volumeCapM3,
+  fuelType: vehicles.fuelType,
+  kmPerL: vehicles.kmPerL,
   weeklyFuelQuotaL: vehicles.weeklyFuelQuotaL,
   depotId: vehicles.depotId,
   archivedAt: vehicles.archivedAt,
@@ -27,6 +30,8 @@ function toAdminVehicle(row: {
   temp: AdminVehicle['temp'];
   weightCapKg: number;
   volumeCapM3: string;
+  fuelType: string;
+  kmPerL: string;
   weeklyFuelQuotaL: number;
   depotId: string;
   archivedAt: Date | null;
@@ -37,6 +42,8 @@ function toAdminVehicle(row: {
     temp: row.temp,
     weightCapKg: row.weightCapKg,
     volumeCapM3: Number(row.volumeCapM3),
+    fuelType: row.fuelType,
+    kmPerL: Number(row.kmPerL),
     weeklyFuelQuotaL: row.weeklyFuelQuotaL,
     depotId: row.depotId,
     archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
@@ -238,3 +245,5 @@ adminRouter.post('/products/:id/archive', async (req, res) => {
   announce({ topic: 'admin' });
   res.json(archived);
 });
+
+adminRecordRoutes(adminRouter);

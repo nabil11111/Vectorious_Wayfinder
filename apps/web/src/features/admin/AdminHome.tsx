@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router';
 import { AppShell, ComingNext, type NavItem } from '@/components/layout/AppShell';
 import { OutletsPage } from './OutletsPage';
 import { ProductsPage } from './ProductsPage';
+import { UsersPage } from './UsersPage';
 import { VehiclesPage } from './VehiclesPage';
 
 export const ADMIN_NAV: NavItem[] = [
@@ -15,7 +16,7 @@ export function AdminHome() {
   return (
     <AppShell nav={ADMIN_NAV}>
       <Routes>
-        <Route index element={<ComingNext title="Users" what="Add, edit and archive accounts." />} />
+        <Route index element={<UsersPage />} />
         <Route path="vehicles" element={<VehiclesPage />} />
         <Route path="outlets" element={<OutletsPage />} />
         <Route path="products" element={<ProductsPage />} />
