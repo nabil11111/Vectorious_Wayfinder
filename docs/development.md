@@ -13,6 +13,10 @@ npm run dev                  # API on :3000, web app on :5173
 Use Node.js 22 or newer for local development. After pulling migrations, run
 `npm run db:migrate && npm run db:seed`; Docker runs both at startup.
 
+Compose builds the current checkout on startup, reusing unchanged build layers. If an older checkout's
+container reports a missing `password_hash` column, run `docker compose up --build -d app` to replace the
+old app image. Keep the database volume; this error does not require resetting your data.
+
 For checks, run `npm run typecheck`, `npm test` and `npm run build`. API tests change and reset data: point
 `DATABASE_URL` at a separate migrated and seeded test database before running them. Do not use the database
 of an active demo or QA session. Offline reload needs the built app served over HTTPS or localhost; the Vite
@@ -39,4 +43,3 @@ The API validates its settings in `apps/api/src/lib/config.ts`.
 | `PORT` | API port outside Docker; defaults to 3000 |
 | `SESSION_TTL_HOURS` | Session lifetime; defaults to 12 hours |
 | `LOG_LEVEL`, `WEB_DIST` | Optional logging level and path to the built web app |
-

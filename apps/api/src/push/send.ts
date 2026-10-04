@@ -42,10 +42,11 @@ function hears(user: { id: string; role: string; depotId: string | null; outletI
   return user.depotId !== null && user.depotId === change.depotId;
 }
 
-// The signed-in account as the bell will be read for a push. A dispatcher's tab can be showing the other
-// depot; the push still follows the depot on the account, which is the one this reader uses.
-export function accountReader(user: { id: string; role: string; depotId: string | null; outletId: string | null }): Reader | null {
+// A dispatcher hears the depot that changed, independently of the depot currently open in a tab.
+// Other roles stay scoped to their own account. Without a change, use the account's home depot.
+export function accountReader(user: { id: string; role: string; depotId: string | null; outletId: string | null }, changedDepot?: string): Reader | null {
   if (user.role === 'store_manager' && user.outletId) return { role: 'store_manager', userId: user.id, outletId: user.outletId };
+  if (user.role === 'dispatcher' && changedDepot) return { role: 'dispatcher', userId: user.id, depotId: changedDepot };
   if ((user.role === 'dispatcher' || user.role === 'loader' || user.role === 'driver') && user.depotId) {
     return { role: user.role, userId: user.id, depotId: user.depotId };
   }
@@ -76,7 +77,7 @@ async function sendChange(change: Announcement): Promise<void> {
     // row.id is the subscription. The person is userId; hears and the bell both key off that.
     const user = { id: row.userId, role: row.role, depotId: row.depotId, outletId: row.outletId };
     if (!hears(user, change)) continue;
-    const reader = accountReader(user);
+    const reader = accountReader(user, change.depotId);
     if (!reader) continue;
     const fresh = (await getNotifications(reader)).items.filter((item) => !row.pushedIds.includes(item.id));
     if (!fresh.length) continue;
@@ -84,7 +85,16 @@ async function sendChange(change: Announcement): Promise<void> {
     let drop = false;
     for (const item of fresh) {
       try {
-        await deliverImpl(row, { title: 'Wayfinder', body: item.line, tag: item.id, link: item.link });
+        let body = item.line;
+        let link = item.link;
+        if (reader.role === 'dispatcher') {
+          const target = new URL(link, 'https://wayfinder.invalid');
+          const depot = target.searchParams.get('depot') ?? reader.depotId;
+          target.searchParams.set('depot', depot);
+          link = `${target.pathname}${target.search}`;
+          body = `${depot} · ${body}`;
+        }
+        await deliverImpl(row, { title: 'Wayfinder', body, tag: item.id, link });
         sent.push(item.id);
       } catch (error) {
         if (gone(error)) drop = true;

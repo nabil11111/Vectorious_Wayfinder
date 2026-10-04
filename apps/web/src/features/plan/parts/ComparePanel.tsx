@@ -22,7 +22,7 @@ export function ComparePanel({ board, act }: { board: PlanBoard; act: Act }) {
   });
   if (board.plan.status !== 'draft' || !date) return null;
   const stale = compare.data !== undefined && compare.data.revision !== board.plan.revision;
-  const useSuggested = async () => {
+  const acceptSuggestion = async () => {
     const found = compare.data;
     if (!found || stale || !found.canApply) return;
     setApplying(true);
@@ -84,7 +84,7 @@ export function ComparePanel({ board, act }: { board: PlanBoard; act: Act }) {
               <div className="mt-3 flex flex-wrap gap-2">
                 {stale
                   ? <Button variant="outline" className={plainButton('h-11 px-4 text-sm')} onClick={() => { void compare.refetch(); }}>Compare again</Button>
-                  : <Button className={orangeButton('h-11 px-4 text-sm')} disabled={!compare.data.canApply || applying} onClick={() => { void useSuggested(); }}>{applying ? 'Applying…' : 'Use suggested plan'}</Button>}
+                  : <Button className={orangeButton('h-11 px-4 text-sm')} disabled={!compare.data.canApply || applying} onClick={() => { void acceptSuggestion(); }}>{applying ? 'Applying…' : 'Use suggested plan'}</Button>}
               </div>
               {compare.data.suggested && !compare.data.canApply && !stale && <p className="mt-2 text-sm text-muted-foreground">This suggestion is not ready to apply. It may be missing a driver or still blocked.</p>}
               {problem && <p role="alert" className="mt-2 text-sm font-semibold text-bad">{problem}</p>}

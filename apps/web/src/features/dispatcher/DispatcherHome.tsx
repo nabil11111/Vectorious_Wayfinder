@@ -1,7 +1,9 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router';
+import { useEffect, useRef } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { AppShell, type NavItem } from '@/components/layout/AppShell';
 import { useMe } from '@/features/auth/api';
 import { Bell } from '@/features/live/Bell';
+import { followDepotLink } from '@/features/notifications/link';
 import { LiveDayPage } from '@/features/live/LiveDayPage';
 import { PlanBoardPage } from '@/features/plan/PlanBoardPage';
 import { ViewPlanPage } from '@/features/plan/ViewPlanPage';
@@ -10,7 +12,7 @@ import { HistoryPage } from '@/features/lookup/HistoryPage';
 import { FleetPage } from '@/features/lookup/FleetPage';
 import { DashboardPage } from './DashboardPage';
 import { DepotSwitch } from './DepotSwitch';
-import { useFollowSwitches, usePressedDepot } from './depots';
+import { useFollowSwitches, usePressedDepot, useSwitchDepot } from './depots';
 import { SwitchingSkeleton } from './parts/SwitchingSkeleton';
 import { scopeName } from './scope';
 
@@ -37,7 +39,15 @@ export function DispatcherHome() {
   const pressed = usePressedDepot();
   useFollowSwitches();
   // The dashboard, the plan board's three columns and Live day use the whole width of a large screen, as their frames do.
-  const { pathname } = useLocation();
+  const { pathname, search, key } = useLocation();
+  const navigate = useNavigate();
+  const { choose, switching } = useSwitchDepot(depot ?? '');
+  const consumedLink = useRef<string | null>(null);
+  const linkKey = `${me?.id}:${key}`;
+  useEffect(() => {
+    if (consumedLink.current === linkKey) return;
+    if (followDepotLink(`${pathname}${search}`, depot, switching, choose, (path) => { void navigate(path, { replace: true }); })) consumedLink.current = linkKey;
+  }, [pathname, search, depot, switching, choose, navigate, linkKey]);
   const wide = pathname === '/dispatcher' || pathname === '/dispatcher/' || pathname.startsWith('/dispatcher/plan') || pathname.startsWith('/dispatcher/live') || ['/dispatcher/orders', '/dispatcher/history', '/dispatcher/fleet'].includes(pathname);
 
   return (

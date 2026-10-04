@@ -67,6 +67,8 @@ Bell updates are derived from recorded orders, trips and issues. Read state is k
 and demo day. Optional web push stores each browser subscription in `push_subscriptions` and sends through
 the browser's push service. It needs configured VAPID keys, permission and a successful subscription; permission
 alone does not establish delivery to a suspended page.
+Dispatcher push reads the depot that changed and includes its name and a scoped link. Subscribing marks
+existing updates from both depots as seen, and opening a push uses the normal guarded depot switch.
 
 ## Security basics
 

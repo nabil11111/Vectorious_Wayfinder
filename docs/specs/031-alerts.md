@@ -28,6 +28,7 @@ Nabil, 4 Oct. After Peliyagoda's plan is sent, Ruwan can leave Kandy unplanned a
 - [ ] When the same is true in the other direction, the warning shall name the depot that was not sent.
 - [ ] When sounds are on, a new update shall play the clip for its tone. When sounds are off, it shall not.
 - [ ] When a signed-in person stores a push subscription, a later update of theirs shall be handed to the push sender once, and an endpoint the browser has dropped shall be forgotten.
+- [x] A dispatcher shall receive updates from either depot. Subscribing shall mark existing updates in both depots as seen, and a pushed link shall open the correct depot while preserving its issue or trip target.
 
 ## Out of scope
 

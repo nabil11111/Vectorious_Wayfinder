@@ -20,7 +20,8 @@ docker compose up
 ```
 
 Open [localhost:3000](http://localhost:3000). The first start builds the app, migrates the database and seeds
-120 outlets, 60 vehicles, demo accounts and a delivery day for both depots. Later starts keep your data.
+120 outlets, 60 vehicles, demo accounts and a delivery day for both depots. Later starts check the build
+against the current source and keep your data.
 
 No `.env` file is needed for the defaults. Copy [.env.example](.env.example) to `.env` to change the demo PINs,
 database settings or proxy configuration. `DEMO_MODE=true` enables the seeded day and shared clock.
@@ -50,9 +51,10 @@ Use a phone-sized window for the loader and driver.
 
 1. **Place an order — `S-001`.** Open the draft for Fresh Nugegoda and place its 8 chilled and 4 dry cartons.
 2. **Plan — `P-001`.** Move the clock to **Orders closed, 16:00** and open the Plan board. Drag Nugegoda into
-   the empty middle and pick **Wasantha's reefer van**. Add Nugegoda's 12 carried-over chilled cartons and
+   the empty middle, review the checked preview and choose **Use this arrangement** for Wasantha's reefer van.
+   Add Nugegoda's 12 carried-over chilled cartons and
    both Wellawatte orders. Keep Nugegoda first and Wellawatte second.
-3. **Explain what waits.** Defer the remaining orders with a reason. Mark the trip done, open **View plan**
+3. **Explain what waits.** Defer the remaining orders with a reason. Choose **Finish editing**, open **View plan**
    and send it. This small walkthrough serves 5 orders and defers 99; the suggested planner below handles the full day.
 4. **Load — `L-001`.** Move the clock to **Loading, Thu 02:30**. Start VEH035 and load Wellawatte first
    (94 cartons). On Nugegoda, flag its dry line as short: 3 of 4 cartons available.
@@ -94,6 +96,6 @@ district averages, clear-road travel times and fixed unloading allowances. The d
 - Added read-only vehicle-unavailable comparisons and dated shop readiness declarations.
 - Every sent trip needs a driver; second trips wait for return and reloading. A placed order cannot be edited.
 - Driver handover and shop receipt are separate records. No signatures, call buttons or automatic credits.
-- The planner explains its decisions; it does not record a reason for every manual edit or compare edits to the original suggestion.
+- The planner explains its decisions. Manual edits have no reason log; a saved draft can be compared with a new suggestion.
 
 [Full design departures and reasons](docs/design-departures.md).

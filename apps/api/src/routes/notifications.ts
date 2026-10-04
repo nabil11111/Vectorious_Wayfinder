@@ -2,7 +2,7 @@ import { PushKey, PushSubscriptionRequest, PushUnsubscribeRequest, type Me } fro
 import { and, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db/client';
-import { pushSubscriptions, users } from '../db/schema';
+import { depots, pushSubscriptions, users } from '../db/schema';
 import { config } from '../lib/config';
 import { HttpError } from '../lib/errors';
 import { readDepotOf, requireRole } from '../middleware/auth';
@@ -30,11 +30,15 @@ notificationsRouter.get('/push-key', requireRole(), (_req, res) => {
 notificationsRouter.put('/push', requireRole(), async (req, res) => {
   const user = req.user!;
   const body = PushSubscriptionRequest.parse(req.body);
-  // The account's own depot, not the depot this tab is showing. Later pushes read the account the same way,
-  // so turning alerts on while the dispatcher is on the other depot does not repeat the day.
+  // Dispatchers receive both depots, so mark existing updates in both as seen before subscribing.
+  // Changing the tab's depot must neither replay an old update nor hide a new one from the other depot.
   const [account] = await db.select({ role: users.role, depotId: users.depotId, outletId: users.outletId }).from(users).where(eq(users.id, user.id));
   const reader = account ? accountReader({ id: user.id, role: account.role, depotId: account.depotId, outletId: account.outletId }) : null;
-  const pushedIds = reader ? (await getNotifications(reader)).items.map((item) => item.id) : [];
+  const readers: Reader[] = account?.role === 'dispatcher'
+    ? (await db.select({ id: depots.id }).from(depots)).map(({ id }) => ({ role: 'dispatcher', userId: user.id, depotId: id }))
+    : reader ? [reader] : [];
+  const existing = await Promise.all(readers.map(getNotifications));
+  const pushedIds = [...new Set(existing.flatMap((list) => list.items.map((item) => item.id)))];
   await db.insert(pushSubscriptions).values({ userId: user.id, endpoint: body.endpoint, p256dh: body.keys.p256dh, auth: body.keys.auth, pushedIds })
     .onConflictDoUpdate({
       target: pushSubscriptions.endpoint,

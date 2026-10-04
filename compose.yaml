@@ -19,6 +19,8 @@ services:
 
   app:
     build: .
+    # Rebuild from the checkout so an older image cannot run against newer migrations.
+    pull_policy: build
     depends_on:
       db:
         condition: service_healthy

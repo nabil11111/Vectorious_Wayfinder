@@ -136,13 +136,13 @@ describe('every shop\'s account and Kandy\'s staff (spec 020)', () => {
     expect(DEMO_USERS).toHaveLength(42 + 117 + 21 + 1);
   });
 
-  it('AC-1 lists every account in docs/accounts.md with its staff ID, name, role and shop or depot, and no other', async () => {
+  it('AC-1 lists every account in docs/accounts.md with its staff ID, name, role, shop or depot and default PIN, and no other', async () => {
     const doc = readFileSync(fileURLToPath(new URL('../../../docs/accounts.md', import.meta.url)), 'utf8');
-    const listed = [...doc.matchAll(/^\| `([A-Z]-\d{3})` \| ([^|]+?) \| ([^|]+?) \| ([^|]+?) \|$/gm)].map(([, staffId, name, role, where]) => [staffId!, name!, role!, where!]);
+    const listed = [...doc.matchAll(/^\| `([A-Z]-\d{3})` \| ([^|]+?) \| ([^|]+?) \| ([^|]+?) \| `(\d{4})` \|$/gm)].map(([, staffId, name, role, where, pin]) => [staffId!, name!, role!, where!, pin!]);
     const shopNames = new Map((await db.select({ id: outlets.id, name: outlets.name }).from(outlets)).map((shop) => [shop.id, shop.name]));
     const whereOf = (account: (typeof DEMO_USERS)[number]) =>
       (account.outlet ? `${shopNames.get(account.outlet)} (${account.outlet})` : account.depot ? `${account.depot} depot` : 'Everything');
-    const expected = DEMO_USERS.map((account) => [account.staffId, account.displayName, ROLE_NAMES[account.role], whereOf(account)]);
+    const expected = DEMO_USERS.map((account) => [account.staffId, account.displayName, ROLE_NAMES[account.role], whereOf(account), account.role === 'admin' ? '9024' : '1234']);
     const byStaffId = (rows: string[][]) => [...rows].sort((a, b) => a[0]!.localeCompare(b[0]!));
     expect(byStaffId(listed)).toEqual(byStaffId(expected));
   });

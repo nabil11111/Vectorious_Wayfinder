@@ -18,20 +18,16 @@ pace, so the clock times below are what the demo clock shows.
 3. **The dispatcher plans.** Sign in as Ruwan (`P-001`) and open the Plan board: "Plan for Thu 25 Jun", 104 unplanned
    orders, 4 of them carried over from earlier plans (Fresh Dickwella, deferred twice, first), and 35 working
    trucks with 3 in the workshop. The seeded day is short of fridge trucks on purpose.
-4. **A trip.** Drag Fresh Nugegoda's row from the Fresh · Colombo group into the empty middle. The crew picker opens
-   there: a truck and its driver on each row, "Wasantha · reefer van · 1.0 t · 7 m³" first with "fits · fuel 53% left",
-   the only crew that fits (Nugegoda and Wellawatte take vans only, and the chilled cartons need a fridge). The
-   trucks after it say why they may not fit, such as "cannot reach Fresh Nugegoda: van only", and the three in the
-   workshop come last, greyed. Pick Wasantha: the trip opens as "Planning · Wasantha · reefer van" with Nugegoda's two
-   new orders, and "Fresh Nugegoda added to Wasantha's reefer van" with **Undo**. (The group's **Start a trip** opens
-   the same picker for all of Colombo's orders.) Add Nugegoda's 12 carried-over chilled cartons from Carried over,
-   and Wellawatte. The trip leaves 04:36, reaches Fresh Nugegoda at 05:00 and Fresh Wellawatte at 05:24, and is back
-   at 06:10. Every change is saved and checked at once. Undo in the header (or Ctrl+Z) takes the last change back, its
-   tooltip naming it, such as "Undo: Fresh Wellawatte added to Wasantha's reefer van", and Redo (Ctrl+Shift+Z) makes it
-   again.
+4. **A trip.** Drag Fresh Nugegoda's row from Fresh · Colombo into the empty middle. A checked arrangement
+   opens before anything is saved. Review Wasantha's reefer van, its load, times and fuel, then press
+   **Use this arrangement**. Nugegoda needs a van, and its chilled cartons need refrigeration. Other vehicles
+   are listed with their constraints. The group's **Plan these orders** checks the whole group instead.
+   Add Nugegoda's 12 carried-over chilled cartons from Carried over, then both Wellawatte orders. Keep
+   Nugegoda first and Wellawatte second. The trip leaves at 04:36, reaches Nugegoda at 05:00 and Wellawatte
+   at 05:24, and returns at 06:10. Each saved change is checked. **Undo** takes back an edit; **Redo** restores it.
 5. **Everything else waits, with a reason.** Defer each other group from its ⋮ menu with a reason the shop will
    read, such as "No fridge truck was left for Colombo.", until nothing is unplanned.
-6. **Send.** Mark the trip done and open **View plan**: 5 of 104 orders on 1 trip, 99 deferred, checks all
+6. **Send.** Choose **Finish editing** and open **View plan**: 5 of 104 orders on 1 trip, 99 deferred, checks all
    clear. Send the plan to loaders and drivers.
 7. **The shop sees it.** As Nadeesha (`S-001`), the bell in the top bar has a red count. Press it: a small pop-up (a sheet
    from the bottom on a phone) lists her updates, newest first, and its top row reads "Thursday's delivery is planned:

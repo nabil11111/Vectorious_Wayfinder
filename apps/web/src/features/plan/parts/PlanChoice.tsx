@@ -48,7 +48,7 @@ export function PlanChoice({ screen, index, orders, title, act, onCrew, onClose 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const useArrangement = async () => {
+  const acceptArrangement = async () => {
     const found = arrangement.data;
     if (!found) return;
     setApplying(true);
@@ -125,7 +125,7 @@ export function PlanChoice({ screen, index, orders, title, act, onCrew, onClose 
               </div>
             )}
             {arrangement.data.splits.length > 0 && <p className="mt-2 text-sm text-muted-foreground">A split cannot be undone. The rest of the order goes back to unplanned.</p>}
-            <Button className={orangeButton('mt-3 h-11 px-5 text-sm')} disabled={applying || arrangement.data.crews.length === 0} onClick={() => { void useArrangement(); }}>
+            <Button className={orangeButton('mt-3 h-11 px-5 text-sm')} disabled={applying || arrangement.data.crews.length === 0} onClick={() => { void acceptArrangement(); }}>
               {applying ? 'Applying…' : 'Use this arrangement'}
             </Button>
             {problem && <p role="alert" className="mt-2 text-sm font-semibold text-bad">{problem}</p>}

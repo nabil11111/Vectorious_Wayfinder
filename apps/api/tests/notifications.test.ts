@@ -1,10 +1,10 @@
-import { NotificationList, PlanBoard, type Notification } from '@wayfinder/contracts';
+import { NotificationList, PlanBoard, StoreReceiving, type Notification } from '@wayfinder/contracts';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
 import { and, eq, inArray } from 'drizzle-orm';
-import { demoDay, orderLines, orders, outlets, plans, pushSubscriptions } from '../src/db/schema';
+import { auditLog, demoDay, orderLines, orders, outlets, plans, pushSubscriptions } from '../src/db/schema';
 import { pushFor, setDeliverForTests, type PushPayload } from '../src/push/send';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { answeredTrip, driverScreen, driverStop, driverTrip, driverWrite } from './driver-plan';
@@ -51,11 +51,13 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await resetDay();
+  await db.delete(auditLog).where(eq(auditLog.action, 'receiving.updated'));
   await initClock();
   freeze(WED, 15 * 60);
 });
 afterAll(async () => {
   await resetDay();
+  await db.delete(auditLog).where(eq(auditLog.action, 'receiving.updated'));
   await db.update(demoDay).set(originalClock);
   testClock.at = '';
   setClockForTests(null);
@@ -469,6 +471,38 @@ it('spec 031 pushes a new update once and forgets a subscription the browser dro
   } finally {
     setDeliverForTests(null);
     await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  }
+});
+
+it('pushes the other depot to the dispatcher once, scopes its link, and does not replay it on subscription', async () => {
+  const sent: { endpoint: string; payload: PushPayload }[] = [];
+  const endpoint = 'https://push.example/dispatcher-kandy';
+  const loaderEndpoint = 'https://push.example/loader-peliyagoda';
+  const body = (at: string) => ({ endpoint: at, keys: { p256dh: 'key', auth: 'auth' } });
+  const kandyShop = agent();
+  await signIn(kandyShop, 'arun');
+  setDeliverForTests(async (sub, payload) => { sent.push({ endpoint: sub.endpoint, payload }); });
+  try {
+    expect((await ruwan.put('/api/v1/notifications/push').send(body(endpoint))).status).toBe(204);
+    expect((await kasun.put('/api/v1/notifications/push').send(body(loaderEndpoint))).status).toBe(204);
+    const held = StoreReceiving.parse((await kandyShop.get('/api/v1/store/receiving')).body);
+    expect((await kandyShop.put('/api/v1/store/receiving').send({
+      date: held.date, demoDay: held.demoDay, revision: held.state!.revision, status: 'ready', note: '',
+    })).status).toBe(200);
+    await pushFor({ topic: 'receiving', depotId: 'Kandy', outletId: 'OUT076' });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ endpoint, payload: {
+      body: 'Kandy · Fresh Katukele · Ready to receive', link: '/dispatcher/live?depot=Kandy',
+    } });
+    await pushFor({ topic: 'receiving', depotId: 'Kandy', outletId: 'OUT076' });
+    expect(sent).toHaveLength(1);
+    // Registering again marks existing updates in both depots as already seen.
+    expect((await ruwan.put('/api/v1/notifications/push').send(body(endpoint))).status).toBe(204);
+    await pushFor({ topic: 'receiving', depotId: 'Kandy', outletId: 'OUT076' });
+    expect(sent).toHaveLength(1);
+  } finally {
+    setDeliverForTests(null);
+    await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.endpoint, [endpoint, loaderEndpoint]));
   }
 });
 
