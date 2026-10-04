@@ -118,10 +118,10 @@ it('spec 026 rule 2 choosing a driver who drives another vehicle moves him, and 
   expect(driversIn(setDriver(DAY, 'VEH001', null))).toEqual([['VEH001', 1, null], ['VEH001', 2, null], ['VEH035', 1, SANJEEWA], ['VEH004', 1, CHAMINDA]]);
 });
 
-it('spec 026 rule 2 the menu lets every driver be chosen and says before the press who moves: "drives VEH001 now; it will have no driver"', () => {
+it('spec 026 rule 2 the menu lets every driver be chosen and says before the press who moves: "drives VEH001 now. It will have no driver"', () => {
   expect(driverRows(DAY, 'VEH035', BOARD.drivers, SANJEEWA)).toEqual([
-    { id: CHAMINDA, name: 'Chaminda', chosen: false, movesFrom: 'VEH004', note: 'drives VEH004 now; it will have no driver' },
-    { id: DILSHAN, name: 'Dilshan', chosen: false, movesFrom: 'VEH001', note: 'drives VEH001 now; it will have no driver' },
+    { id: CHAMINDA, name: 'Chaminda', chosen: false, movesFrom: 'VEH004', note: 'drives VEH004 now. It will have no driver' },
+    { id: DILSHAN, name: 'Dilshan', chosen: false, movesFrom: 'VEH001', note: 'drives VEH001 now. It will have no driver' },
     { id: SANJEEWA, name: 'Sanjeewa', chosen: true, movesFrom: null, note: null },
   ]);
 });

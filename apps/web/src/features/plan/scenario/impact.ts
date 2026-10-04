@@ -23,7 +23,7 @@ export function scenarioImpact(result: PlanScenario) {
     if (coverage[after.status] < coverage[before.status]) {
       kind = before.status === 'planned' ? 'new_waiting' : 'more_waiting';
       explanation = before.status === 'partial' ? 'More goods on an already partly covered order would wait.'
-        : after.status === 'partial' ? 'Only part of this order could be delivered; some goods would wait.'
+        : after.status === 'partial' ? 'Only part of this order could be delivered. Some goods would wait.'
           : 'This order would wait, with no delivery suggested.';
     } else if (coverage[after.status] > coverage[before.status]) {
       kind = 'improved';
@@ -64,7 +64,7 @@ export function impactHeadline(impact: ReturnType<typeof scenarioImpact>, vehicl
   switch (impact.kind) {
     case 'worse': return `More goods would wait without ${vehicle}.`;
     case 'improved': return 'Some orders could receive more goods.';
-    case 'mixed': return 'Some orders could receive more goods; others would have more waiting.';
+    case 'mixed': return 'Some orders could receive more goods. Others would have more waiting.';
     case 'reassigned': return 'Orders stay fully or partly planned as before, using different trucks.';
     case 'empty': return 'No orders to compare.';
     case 'unchanged': return 'The same orders are planned or waiting, using the same trucks.';

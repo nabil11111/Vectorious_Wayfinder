@@ -87,12 +87,12 @@ export const onOfUnits = (truck: LoadingTruck) => `${whole(truck.on.units)} of $
 
 // A trip whose vehicle is still out on an earlier one (Q-26), as the API words it: "out on trip 1 · back by 06:38" in its
 // row, or "out on trip 1 · was due back 06:38" once that time has passed, and on its load page "VEH057 is out on trip 1
-// · back by 06:38. Put the cartons ready on the dock; they go on when it is back.", in the brand's units, and "units"
+// · back by 06:38. Put the cartons ready on the dock. They go on when it is back.", in the brand's units, and "units"
 // when the trip mixes brands.
 type OutOn = NonNullable<LoadingTruck['outOn']>;
 export const outOnWords = (outOn: OutOn) => outOn.words;
 export const outOnLine = (truck: Pick<LoadingTruck, 'vehicleId' | 'brand'> & { outOn: OutOn | null }) => (truck.outOn
-  ? `${truck.vehicleId} is ${outOnWords(truck.outOn)}. Put the ${truck.brand ? UNIT_WORD[truck.brand][1] : 'units'} ready on the dock; they go on when it is back.`
+  ? `${truck.vehicleId} is ${outOnWords(truck.outOn)}. Put the ${truck.brand ? UNIT_WORD[truck.brand][1] : 'units'} ready on the dock. They go on when it is back.`
   : null);
 
 // A line of a stop: "12 cartons chilled" for Fresh, and "10 boxes · Folded clothing" or "2 pallets of 8 ·
@@ -234,7 +234,7 @@ export function receivedOf(issue: Pick<Issue, 'lines' | 'stop' | 'reason'>) {
     const said = lineReason(issue, line);
     const goods = brand === 'Fresh' ? `${of} ${whole(handed)} ${line.temp} ${handed === 1 ? line.unit : plural(line.unit)}` : `${of} ${amountOf(handed, line.unit)} · ${line.name}`;
     return said ? `${goods}, ${whole(line.counted)} ${said}` : goods;
-  }).join('; ');
+  }).join('. ');
 }
 
 // What a report says of one of its lines (Q-40): its own reason, or a report kept before lines had reasons its one.

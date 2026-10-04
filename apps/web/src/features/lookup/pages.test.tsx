@@ -261,7 +261,7 @@ it('Q-44 History\'s header gives loaded and handed over so far, and counts the l
     received: { units: null, known: 9, total: 163, missing: 154, soFar: 310 } };
   const { text } = draw(<HistoryPage />, `/dispatcher/history?date=${THU}`, [[lookupKey('history', held.me, 'Peliyagoda', { date: THU }), read]]);
   expect(text).toContain('8 ordered 4,031 loaded so far 3,990 handed over so far 0 short from the depot');
-  expect(text).toContain('Not recorded yet: loaded and handed over (130 of 163 lines); received (154 of 163 lines)');
+  expect(text).toContain('Not recorded yet: loaded and handed over (130 of 163 lines). Received (154 of 163 lines)');
   expect(text).not.toContain('33 of 163');
 });
 

@@ -5,9 +5,9 @@ import { setDriver, vehicleOfDriver, type TripKey } from '../draft';
 // The driver menu's rows and what choosing one does (rule 6, spec 022), a driver from another vehicle moving here
 // (spec 026, rule 2).
 
-// "drives VEH004 now; it will have no driver": what a driver on another vehicle's row says before the press, after
+// "drives VEH004 now. It will have no driver": what a driver on another vehicle's row says before the press, after
 // their name. The crew picker says it the same way.
-export const movesLine = (vehicleId: string) => `drives ${vehicleId} now; it will have no driver`;
+export const movesLine = (vehicleId: string) => `drives ${vehicleId} now. It will have no driver`;
 
 // A driver in the menu: chosen when it drives this vehicle, and with the other vehicle it drives, which choosing it
 // leaves with no driver. Every row can be chosen.

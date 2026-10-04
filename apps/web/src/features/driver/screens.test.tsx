@@ -325,7 +325,7 @@ describe('Q-29 checking in trip 1 when trip 2 is to come', () => {
   it('opens trip 2\'s Today\'s trip with trip 1\'s close on top and trip 1\'s hand-back card under it', () => {
     const text = tripTwoToday(veh057trip2());
     expect(text).toContain('Trip 1 closed · 4 of 4 stops · all records sent · checked in 03:56');
-    expect(text).toContain('Still on the truck 39 cartons for Mulgampola, nobody at the shop. Hand them in; they go on the next run. The 4 chilled cartons for Mahaiyawa never left the depot.');
+    expect(text).toContain('Still on the truck 39 cartons for Mulgampola, nobody at the shop. Hand them in. They go on the next run. The 4 chilled cartons for Mahaiyawa never left the depot.');
     expect(text.indexOf('Trip 1 closed')).toBeLessThan(text.indexOf('Still on the truck'));
     expect(text.indexOf('Still on the truck')).toBeLessThan(text.indexOf('Thu 25 Jun · trip 2'));
     expect(text).toContain('Not loaded yet');
@@ -472,13 +472,13 @@ describe('the hand-back card says it for one carton and them for more', () => {
 
   it('says it for one', () => {
     expect(card(1)).toBe('1 chilled carton refused at Kotahena. Hand it to the depot check. '
-      + '1 carton for Wellawatte, nobody at the shop. Hand it in; it goes on the next run. '
+      + '1 carton for Wellawatte, nobody at the shop. Hand it in. It goes on the next run. '
       + '1 carton for Dehiwala, nobody at the shop. The depot decides what happens to it.');
   });
 
   it('says them for more', () => {
     expect(card(2)).toBe('2 chilled cartons refused at Kotahena. Hand them to the depot check. '
-      + '2 cartons for Wellawatte, nobody at the shop. Hand them in; they go on the next run. '
+      + '2 cartons for Wellawatte, nobody at the shop. Hand them in. They go on the next run. '
       + '2 cartons for Dehiwala, nobody at the shop. The depot decides what happens to them.');
   });
 });

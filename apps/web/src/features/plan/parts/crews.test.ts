@@ -88,7 +88,7 @@ it('AC-1 shows too heavy and too big against the truck\'s own limits, and greys 
 it('rule 2 says before the press when the crew\'s driver drives another truck, which will have no driver', () => {
   // Dilshan's crew on VEH035: he drives VEH001 now, which keeps its trip.
   const moving = { ...LIST, crews: [crew('VEH035', DILSHAN)] };
-  expect(crewRows(moving, DROPPED, DRAFT, INDEX)[0]!.warning).toBe('Dilshan drives VEH001 now; it will have no driver');
+  expect(crewRows(moving, DROPPED, DRAFT, INDEX)[0]!.warning).toBe('Dilshan drives VEH001 now. It will have no driver');
   // Swapping VEH001's only trip onto his crew leaves VEH001 with no trip, so nothing is left without him.
   const swap: Pick = { kind: 'swap', key: 'VEH001-1' };
   expect(crewRows(moving, swap, DRAFT, INDEX)[0]!.warning).toBeNull();
@@ -131,7 +131,7 @@ it('rule 2 names every driver a pick displaces, the truck\'s own driver too', ()
   const now = { ...DRAFT, trips: [trip('VEH001', CHAMINDA, 'OUT006', FORT), trip('VEH002', DILSHAN, 'OUT051', GALLE)] };
   const old = { ...LIST, crews: [crew('VEH001', DILSHAN)] };
   expect(crewRows(old, DROPPED, now, INDEX)[0]!.warning)
-    .toBe('Dilshan drives VEH002 now; it will have no driver. Chaminda drives VEH001 now and will be taken off it');
+    .toBe('Dilshan drives VEH002 now. It will have no driver. Chaminda drives VEH001 now and will be taken off it');
   expect(crewChange(DROPPED, now, { vehicleId: 'VEH001', driverId: DILSHAN }, INDEX, null)!.undo.line)
     .toBe('Fresh Dehiwala added to the second trip of Dilshan\'s reefer truck. VEH002 has no driver now. Chaminda is off VEH001 now.');
 });

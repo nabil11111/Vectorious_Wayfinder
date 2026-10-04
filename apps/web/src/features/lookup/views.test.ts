@@ -85,7 +85,7 @@ it('Fleet words keep an over quota, a zero quota and an unknown week apart, and 
   // The day's stages not recorded yet count the lines not recorded: 130 of 163, not the 33 that are (Q-44).
   const day = (known: number, soFar: number) => ({ units: null, known, total: 163, missing: 163 - known, soFar });
   expect(unrecordedWords([['loaded', day(33, 1200)], ['handed over', day(33, 1150)], ['received', day(9, 300)], ['refused', { units: 0, known: 163, total: 163, missing: 0, soFar: 0 }]]))
-    .toBe('Not recorded yet: loaded and handed over (130 of 163 lines); received (154 of 163 lines)');
+    .toBe('Not recorded yet: loaded and handed over (130 of 163 lines). Received (154 of 163 lines)');
 });
 
 it('History draws its timeline from even depot hours around every kept and recorded time', () => {

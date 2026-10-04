@@ -32,5 +32,6 @@ export function impactLine(before: BoardCounts, after: BoardCounts, problems?: {
     else if (changed === -1) parts.push('1 problem cleared');
     else if (changed < -1) parts.push(`${Math.abs(changed)} problems cleared`);
   }
-  return parts.length > 0 ? parts.join('; ') : 'No change in coverage, trips or estimated fuel';
+  const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+  return parts.length > 0 ? parts.map(sentence).join('. ') : 'No change in coverage, trips or estimated fuel';
 }

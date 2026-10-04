@@ -158,7 +158,11 @@ export function unrecordedWords(stages: [string, HistoryMeasure][]) {
   }
   if (groups.size === 0) return null;
   const listed = (labels: string[]) => (labels.length === 1 ? labels[0]! : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`);
-  return `Not recorded yet: ${[...groups].map(([coverage, labels]) => `${listed(labels)} (${coverage})`).join('; ')}`;
+  const said = [...groups].map(([coverage, labels], index) => {
+    const text = `${listed(labels)} (${coverage})`;
+    return index === 0 ? text : text.charAt(0).toUpperCase() + text.slice(1);
+  });
+  return `Not recorded yet: ${said.join('. ')}`;
 }
 
 // A line's count, or a dash when that stage was not recorded for it.

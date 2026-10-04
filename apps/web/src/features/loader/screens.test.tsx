@@ -344,15 +344,15 @@ const veh035 = () => veh038([], { tripId: '0b000000-0000-4000-8000-000000000035'
 describe('Q-26 a second trip whose vehicle is still out on its first', () => {
   it('names the trip it is out on and when it is back, from the API\'s figures, in the brand\'s units', () => {
     expect(outOnWords(secondTrip().outOn!)).toBe('out on trip 1 · back by 06:38');
-    expect(outOnLine(secondTrip())).toBe('VEH038 is out on trip 1 · back by 06:38. Put the cartons ready on the dock; they go on when it is back.');
-    expect(outOnLine(secondTrip({ brand: 'Style' }))).toBe('VEH038 is out on trip 1 · back by 06:38. Put the boxes ready on the dock; they go on when it is back.');
-    expect(outOnLine(secondTrip({ brand: null }))).toBe('VEH038 is out on trip 1 · back by 06:38. Put the units ready on the dock; they go on when it is back.');
+    expect(outOnLine(secondTrip())).toBe('VEH038 is out on trip 1 · back by 06:38. Put the cartons ready on the dock. They go on when it is back.');
+    expect(outOnLine(secondTrip({ brand: 'Style' }))).toBe('VEH038 is out on trip 1 · back by 06:38. Put the boxes ready on the dock. They go on when it is back.');
+    expect(outOnLine(secondTrip({ brand: null }))).toBe('VEH038 is out on trip 1 · back by 06:38. Put the units ready on the dock. They go on when it is back.');
   });
 
   it('says when the first trip was due back once that time has passed, as the API words it', () => {
     const late = secondTrip({ outOn: { tripNo: 1, backBy: '2026-06-25T01:08:00.000Z', words: 'out on trip 1 · was due back 06:38' } });
     expect(outOnWords(late.outOn!)).toBe('out on trip 1 · was due back 06:38');
-    expect(outOnLine(late)).toBe('VEH038 is out on trip 1 · was due back 06:38. Put the cartons ready on the dock; they go on when it is back.');
+    expect(outOnLine(late)).toBe('VEH038 is out on trip 1 · was due back 06:38. Put the cartons ready on the dock. They go on when it is back.');
   });
 
   it('says so in its Today\'s trucks row in place of when it leaves', () => {
@@ -368,7 +368,7 @@ describe('Q-26 a second trip whose vehicle is still out on its first', () => {
 
   it('says so at the top of its load page, and still lets it start', () => {
     const html = truckPage(secondTrip());
-    expect(html).toContain('VEH038 is out on trip 1 · back by 06:38. Put the cartons ready on the dock; they go on when it is back.');
+    expect(html).toContain('VEH038 is out on trip 1 · back by 06:38. Put the cartons ready on the dock. They go on when it is back.');
     expect(html.indexOf('VEH038 is out on trip 1')).toBeLessThan(html.indexOf('Load in this order'));
     const start = [...html.matchAll(/<button[^>]*>Start loading VEH038 trip 2<\/button>/g)].map(([tag]) => tag);
     expect(start.length).toBeGreaterThan(0);

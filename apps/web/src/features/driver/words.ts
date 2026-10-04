@@ -273,7 +273,7 @@ export function handBack(trip: DriverTrip, figures: Figures) {
     }
     if (counts.notDelivered > 0) {
       const one = counts.notDelivered === 1;
-      const next = problem?.decision === 'bring_back' ? (one ? 'Hand it in; it goes on the next run.' : 'Hand them in; they go on the next run.')
+      const next = problem?.decision === 'bring_back' ? (one ? 'Hand it in. It goes on the next run.' : 'Hand them in. They go on the next run.')
         : `The depot decides what happens to ${one ? 'it' : 'them'}.`;
       lines.push(`${unitsWords(brand, counts.notDelivered)} for ${place}, nobody at the shop. ${next}`);
     }

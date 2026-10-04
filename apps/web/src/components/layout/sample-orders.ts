@@ -46,18 +46,18 @@ export function canOrderLine(depot: SampleOrdersPreview['depots'][number]): stri
   return `${depot.canOrder} of ${depot.depotId}'s ${count(depot.shops, 'shop')} ${depot.canOrder === 1 ? 'has' : 'have'} not ordered yet.`;
 }
 
-// What a press did at one depot: "Placed 10 orders from 10 shops at Peliyagoda; 65 shops already had an order or a
+// What a press did at one depot: "Placed 10 orders from 10 shops at Peliyagoda. 65 shops already had an order or a
 // draft.", or with top-ups "Placed 25 orders at Peliyagoda: 10 from shops that hadn't ordered, 15 top-ups."
 export function sampleAnswer(depot: SampleOrdersDepot, deliveryDate: string): string {
   if (depot.topUpIds.length) {
     return `Placed ${count(depot.orders, 'order')} at ${depot.depotId}: ${depot.newOrders} from shops that hadn't ordered, ${count(depot.topUpIds.length, 'top-up')}.`;
   }
   const had = `${count(depot.alreadyHad, 'shop')} already had an order or a draft`;
-  const cannot = depot.cannotOrder ? `; ${count(depot.cannotOrder, 'shop')} had no account or nothing to order` : '';
+  const cannot = depot.cannotOrder ? `. ${count(depot.cannotOrder, 'shop')} had no account or nothing to order` : '';
   if (!depot.orders) {
     return depot.cannotOrder
       ? `Nothing was placed at ${depot.depotId}: ${had}${cannot}.`
       : `Every shop at ${depot.depotId} already has an order or a draft for ${dayWords(deliveryDate)}. Nothing was placed.`;
   }
-  return `Placed ${count(depot.orders, 'order')} from ${count(depot.outletIds.length, 'shop')} at ${depot.depotId}${depot.alreadyHad ? `; ${had}` : ''}${cannot}.`;
+  return `Placed ${count(depot.orders, 'order')} from ${count(depot.outletIds.length, 'shop')} at ${depot.depotId}${depot.alreadyHad ? `. ${had}` : ''}${cannot}.`;
 }

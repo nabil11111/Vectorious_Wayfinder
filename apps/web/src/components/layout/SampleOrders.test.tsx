@@ -93,7 +93,7 @@ describe('the panel (AC-13)', () => {
       { depotId: 'Kandy', orders: 10, newOrders: 2, outletIds: ['OUT090', 'OUT120'], topUpIds: Array(8).fill('OUT076'), alreadyHad: 43, cannotOrder: 0 },
     ] };
     const html = view({ result });
-    expect(text(html)).toBe('Sample shop orders Placed 10 orders from 10 shops at Peliyagoda; 65 shops already had an order or a draft. '
+    expect(text(html)).toBe('Sample shop orders Placed 10 orders from 10 shops at Peliyagoda. 65 shops already had an order or a draft. '
       + 'Placed 10 orders at Kandy: 2 from shops that hadn\'t ordered, 8 top-ups. Done');
     expect(html.match(/role="status"/g)).toHaveLength(2);
   });
@@ -102,10 +102,10 @@ describe('the panel (AC-13)', () => {
 describe('the answer line', () => {
   const depot = { depotId: 'Peliyagoda', orders: 41, newOrders: 41, outletIds: Array(25).fill('OUT'), topUpIds: [] as string[], alreadyHad: 3, cannotOrder: 0 };
   it('says how many orders from how many shops and how many already had one', () => {
-    expect(sampleAnswer(depot, '2026-06-25')).toBe('Placed 41 orders from 25 shops at Peliyagoda; 3 shops already had an order or a draft.');
-    expect(sampleAnswer({ ...depot, orders: 1, outletIds: ['OUT015'], alreadyHad: 1 }, '2026-06-25')).toBe('Placed 1 order from 1 shop at Peliyagoda; 1 shop already had an order or a draft.');
+    expect(sampleAnswer(depot, '2026-06-25')).toBe('Placed 41 orders from 25 shops at Peliyagoda. 3 shops already had an order or a draft.');
+    expect(sampleAnswer({ ...depot, orders: 1, outletIds: ['OUT015'], alreadyHad: 1 }, '2026-06-25')).toBe('Placed 1 order from 1 shop at Peliyagoda. 1 shop already had an order or a draft.');
     expect(sampleAnswer({ ...depot, alreadyHad: 0 }, '2026-06-25')).toBe('Placed 41 orders from 25 shops at Peliyagoda.');
-    expect(sampleAnswer({ ...depot, cannotOrder: 2 }, '2026-06-25')).toBe('Placed 41 orders from 25 shops at Peliyagoda; 3 shops already had an order or a draft; 2 shops had no account or nothing to order.');
+    expect(sampleAnswer({ ...depot, cannotOrder: 2 }, '2026-06-25')).toBe('Placed 41 orders from 25 shops at Peliyagoda. 3 shops already had an order or a draft. 2 shops had no account or nothing to order.');
   });
 
   it('counts the top-ups apart when the free shops ran out', () => {
@@ -118,7 +118,7 @@ describe('the answer line', () => {
   it('says so when nothing was placed', () => {
     expect(sampleAnswer({ ...depot, orders: 0, outletIds: [], alreadyHad: 75 }, '2026-06-25')).toBe('Every shop at Peliyagoda already has an order or a draft for Thu 25 Jun. Nothing was placed.');
     expect(sampleAnswer({ ...depot, orders: 0, outletIds: [], alreadyHad: 74, cannotOrder: 1 }, '2026-06-25'))
-      .toBe('Nothing was placed at Peliyagoda: 74 shops already had an order or a draft; 1 shop had no account or nothing to order.');
+      .toBe('Nothing was placed at Peliyagoda: 74 shops already had an order or a draft. 1 shop had no account or nothing to order.');
     expect(canOrderLine({ depotId: 'Kandy', shops: 45, canOrder: 0 })).toBe('Every shop at Kandy has ordered already.');
     expect(canOrderLine({ depotId: 'Kandy', shops: 45, canOrder: 1 })).toBe("1 of Kandy's 45 shops has not ordered yet.");
   });
