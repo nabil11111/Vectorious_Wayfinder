@@ -53,3 +53,15 @@ it('uses honest, plain headlines for unchanged, improved, mixed and reassigned r
   expect(headline([order('1', 'planned'), order('2', 'deferred')], [order('1', 'deferred'), order('2', 'planned')])).toContain('others would have more waiting');
   expect(headline([order('1', 'partial')], [order('1', 'partial', ['VEH002'])])).toBe('Orders stay fully or partly planned as before, using different trucks.');
 });
+it('puts newly waiting shops before improvements and truck-only changes even when reassigned rows arrive first', () => {
+  const value = result(
+    [order('1', 'planned'), order('2', 'partial'), order('3', 'deferred'), order('4', 'planned'), order('5', 'partial')],
+    [order('1', 'planned', ['VEH002']), order('2', 'partial', ['VEH002']), order('3', 'planned', ['VEH002']), order('4', 'deferred'), order('5', 'deferred')],
+  );
+  const impact = scenarioImpact(value);
+  expect(impact.affected.map(row => row.after.shopName)).toEqual(['Shop 4', 'Shop 5', 'Shop 3', 'Shop 1', 'Shop 2']);
+  expect(impact.affected.map(row => row.kind)).toEqual(['new_waiting', 'more_waiting', 'improved', 'reassigned', 'reassigned']);
+  expect(impact.rows.map(row => row.after.orderId)).toEqual(['1', '2', '3', '4', '5']);
+  expect(value.scenario.orders.map(row => row.orderId)).toEqual(['1', '2', '3', '4', '5']);
+  expect(impact.newWaiting).toBe(1); expect(impact.moreWaiting).toBe(1); expect(impact.improved).toBe(1); expect(impact.reassigned).toBe(2);
+});
