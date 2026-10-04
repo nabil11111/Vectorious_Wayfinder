@@ -25,6 +25,7 @@ import { historyKey, openAfter, pressOf } from './parts/history-keys';
 import { ICON } from './parts/icons';
 import { groupKey, indexOf } from './parts/lookup';
 import { OrderLists } from './parts/OrderLists';
+import { activeOrders } from './parts/shop-summary';
 import { PlanDnd } from './parts/PlanDnd';
 import { TripPanel } from './parts/TripPanel';
 import { plainButton } from './parts/look';
@@ -272,7 +273,7 @@ function Board({ screen, saver, stale, refreshing, onRefresh }: { screen: BoardS
         working={working}
         onTab={setTab}
         openCount={open ? 1 : 0}
-        unplannedCount={board.orders.filter((order) => !places.has(order.id)).length}
+        unplannedCount={activeOrders(board.orders).filter((order) => !places.has(order.id)).length}
         doneCount={draft.trips.length - (open ? 1 : 0)}
         change={change}
         retry={saver.retry}

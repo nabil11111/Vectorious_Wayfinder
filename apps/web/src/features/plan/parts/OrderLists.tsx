@@ -16,6 +16,7 @@ import { plainButton } from './look';
 import { DragRow } from './PlanDnd';
 import { Column, ColumnHead, MenuItem, MenuPopup, MenuRoot, MenuTrigger, Pills, Tag } from './ui';
 import { Why } from './Why';
+import { activeOrders, shopSummaries, summaryLine } from './shop-summary';
 
 const BRANDS: Brand[] = ['Fresh', 'Style', 'Tech'];
 
@@ -73,10 +74,13 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
   onJoin: (order: BoardOrder) => void;
 }) {
   const { board, draft } = screen;
+  const canMove = movable(screen);
   const [view, setView] = useState<'groups' | 'list'>('groups');
   const [deferring, setDeferring] = useState<DeferTarget | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const unplanned = board.orders.filter((order) => !places.has(order.id));
+  const summaries = shopSummaries(board.orders, draft);
+  const summary = (order: BoardOrder) => summaryLine(summaries.get(order.outletId)!);
+  const unplanned = activeOrders(board.orders).filter((order) => !places.has(order.id));
   const carried = unplanned.filter((order) => order.carriedOver).sort(byWanted);
   const groups = groupsOf(unplanned.filter((order) => !order.carriedOver), index);
   const deferred = draft.deferrals.flatMap((deferral) => {
@@ -86,6 +90,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
 
   const add = open ? (orders: BoardOrder[]) => change(addOrders(draft, keyOf(open), orders), { line: `${ordersLine(index, orders.map((o) => o.id))} added to ${index.called(open)}`, tripKey: keyOf(open) }) : null;
   const doDefer = (deferrals: DraftDeferral[]) => {
+    if (!canMove) return;
     change(defer(draft, deferrals), { line: `${ordersLine(index, deferrals.map((d) => d.orderId))} deferred`, tripKey: null });
     setDeferring(null);
   };
@@ -95,6 +100,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
       index={index}
       code={deferring.code}
       reason={deferring.reason}
+      disabled={!canMove}
       onDefer={doDefer}
       onCancel={() => setDeferring(null)}
     />
@@ -103,7 +109,6 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
     const last = orders.length === 1 ? orders[0]!.lastDeferral : null;
     setDeferring({ key, orders, code: last?.code, reason: last?.reason });
   };
-  const canMove = movable(screen);
   const { setNodeRef: landingRef, look: landingLook } = useLanding('unplanned', { kind: 'unplanned' }, 'Unplanned orders');
   // An order's row, with its grip when it can be dragged.
   const draggable = (order: BoardOrder, row: ReactNode) => {
@@ -131,6 +136,8 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                         order={order}
                         title={titleOf(order, index)}
                         line={carriedLine(order)}
+                        summary={summary(order)}
+                        disabled={!canMove}
                         add={add}
                         onDefer={() => deferOrders(order.id, [order])}
                         onJoin={onJoin}
@@ -158,10 +165,11 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                     movable={canMove}
                     dragged={{ kind: 'orders', orders: group.shops.flatMap((row) => row.orders), group: { brand: group.brand, district: group.district }, label: `${group.brand} · ${group.district}`, detail: countOf(group.count, 'order') }}
                   >
-                    <div className="flex items-center gap-2 pl-1">
+                    <div className="flex flex-wrap items-center gap-2 pl-1">
                       <img src={BRAND_ICON[group.brand]} alt="" className="size-[22px] shrink-0 object-contain" />
                       <h3 className="min-w-0 flex-1 truncate text-xs leading-[15px] font-semibold">{group.brand} · {group.district} · {whole(group.count)}</h3>
-                      <RowMenu label={`${group.brand} · ${group.district}`} items={[{ label: deferGroup(group.count), onClick: () => deferOrders(group.key, group.shops.flatMap((row) => row.orders)) }]} />
+                      <div className="flex w-full flex-wrap justify-end gap-2">
+                      <Button variant="outline" disabled={!canMove} className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => deferOrders(group.key, group.shops.flatMap((row) => row.orders))}>{deferGroup(group.count)}</Button>
                       <CrewMenu
                         screen={screen}
                         index={index}
@@ -171,6 +179,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                         triggerClassName={plainButton('h-[26px] px-3 text-[11px]')}
                         onPick={(crew) => onCrew(startOf(group), crew)}
                       />
+                      </div>
                     </div>
                   </DragRow>
                   {form(group.key)}
@@ -185,11 +194,12 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                           <Row
                             title={`${placeOf(shop)} · ${ordersAmount(shop.brand, orders)}`}
                             line={[shopLine(shop), ...orders.filter((o) => o.splitFrom !== null).map(partLine)].join(' · ')}
+                            below={<ShopSummary line={summary(orders[0]!)} />}
                             actions={(
                               <>
                                 {add && <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => add(orders)}>Add</Button>}
+                                <Button variant="outline" disabled={!canMove} className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => deferOrders(`${group.key}:${shop.id}`, orders)}>Defer</Button>
                                 <RowMenu label={shop.name} items={[
-                                  { label: orders.length > 1 ? `Defer ${countOf(orders.length, 'order')}` : 'Defer', onClick: () => deferOrders(`${group.key}:${shop.id}`, orders) },
                                   ...orders.filter((o) => o.splitFrom !== null).map((o) => ({ label: `Join ${orderAmount(shop.brand, o)} back`, onClick: () => onJoin(o) })),
                                 ]} />
                               </>
@@ -218,6 +228,8 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                     order={order}
                     title={titleOf(order, index)}
                     line={order.carriedOver ? carriedLine(order) : lineOf(order, index)}
+                    summary={summary(order)}
+                    disabled={!canMove}
                     add={add}
                     onDefer={() => deferOrders(order.id, [order])}
                     onJoin={onJoin}
@@ -244,7 +256,7 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                     <Row
                       title={title}
                       line={deferral.reason}
-                      below={(choice || decisions.length > 0) && (
+                      below={<><ShopSummary line={summary(order)} />{(choice || decisions.length > 0) && (
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           {decisions.some((decision) => decision.open) && <Tag tone="warn">{TO_DECIDE}</Tag>}
                           {choice && (
@@ -256,14 +268,16 @@ export function OrderLists({ screen, index, places, open, outlined, change, onCr
                             />
                           )}
                         </div>
-                      )}
+                      )}</>}
                       actions={(
                         <>
                           <button type="button" className="text-[11px] font-semibold underline underline-offset-2" onClick={() => change(undefer(draft, order.id), { line: `${ordersLine(index, [order.id])} back in Unplanned`, tripKey: null })}>Undo</button>
+                          <Button variant="outline" disabled={!canMove} className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => setDeferring({ key: `deferred:${order.id}`, orders: [order], code: deferral.code, reason: deferral.reason })}>Edit reason</Button>
                           {order.splitFrom !== null && <RowMenu label={title} items={[{ label: 'Join back', onClick: () => onJoin(order) }]} />}
                         </>
                       )}
                     />
+                    {form(`deferred:${order.id}`)}
                   </li>
                 );
               })}
@@ -289,8 +303,9 @@ const lineOf = (order: BoardOrder, index: BoardIndex) => {
 
 // One order on a row of its own, a carried-over one or one in the list: two lines, with how often it was deferred
 // on the right of the first and what can be done on the right of the second.
-function OrderRow({ order, title, line, add, onDefer, onJoin, extra }: {
+function OrderRow({ order, title, line, summary, disabled, add, onDefer, onJoin, extra }: {
   order: BoardOrder; title: string; line: string; add: ((orders: BoardOrder[]) => void) | null;
+  summary: string; disabled: boolean;
   onDefer: () => void; onJoin: (order: BoardOrder) => void; extra?: ReactNode;
 }) {
   return (
@@ -299,12 +314,13 @@ function OrderRow({ order, title, line, add, onDefer, onJoin, extra }: {
         <p title={title} className="min-w-0 flex-1 truncate text-xs leading-[15px] font-semibold">{title}</p>
         {order.timesDeferred > 0 && <Tag tone={order.timesDeferred >= 2 ? 'bad' : 'warn'} className="px-2.5 text-[10px] leading-[13px]">{deferredTimes(order)}</Tag>}
       </div>
-      <div className="mt-1 flex items-center gap-1.5">
-        <p title={line} className="min-w-0 flex-1 truncate text-[11px] leading-[14px] text-muted-foreground">{line}</p>
+      <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">{line}</p>
+      <ShopSummary line={summary} />
+      <div className="mt-1.5 flex flex-wrap items-center justify-end gap-1.5">
         {extra}
         {add && <Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => add([order])}>Add</Button>}
+        <Button variant="outline" disabled={disabled} className={plainButton('h-[26px] px-3 text-[11px]')} onClick={onDefer}>Defer</Button>
         <RowMenu label={title} items={[
-          { label: 'Defer', onClick: onDefer },
           ...(order.splitFrom !== null ? [{ label: 'Join back', onClick: () => onJoin(order) }] : []),
         ]} />
       </div>
@@ -315,16 +331,20 @@ function OrderRow({ order, title, line, add, onDefer, onJoin, extra }: {
 // A row's two lines and what goes under them, with a chip and actions on the right.
 function Row({ title, line, chip, below, actions }: { title: string; line: string; chip?: ReactNode; below?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex items-start gap-2">
-      <div className="min-w-0 flex-1">
+    <div className="flex flex-wrap items-start gap-2">
+      <div className="min-w-0 flex-1 basis-40">
         <p className="text-xs leading-[15px] font-semibold">{title}</p>
         {line && <p className="mt-1 text-[11px] leading-[14px] text-muted-foreground">{line}</p>}
         {below}
       </div>
       {chip}
-      {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
+      {actions && <div className="ml-auto flex flex-wrap items-center gap-1">{actions}</div>}
     </div>
   );
+}
+
+function ShopSummary({ line }: { line: string }) {
+  return <p className="mt-1.5 text-[11px] leading-4 font-medium text-foreground">{line}</p>;
 }
 
 // "⋮": what else can be done with a row.
