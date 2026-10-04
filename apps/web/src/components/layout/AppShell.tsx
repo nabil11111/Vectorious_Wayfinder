@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { Link, NavLink } from 'react-router';
+import { useRef, useState, type ReactNode } from 'react';
+import { Link, NavLink, useLocation } from 'react-router';
 import type { Role } from '@wayfinder/contracts';
 import dispatcherIcon from '@/assets/icons/icon-person-dispatcher.png';
 import driverIcon from '@/assets/icons/icon-person-driver.png';
@@ -23,6 +23,20 @@ const isHome = (to: string) => to.split('/').filter(Boolean).length === 1;
 
 // The design's picture of each role, drawn round beside the name. The admin has none, so takes the dispatcher's.
 const AVATAR: Record<Role, string> = { store_manager: storeManagerIcon, dispatcher: dispatcherIcon, loader: loaderIcon, driver: driverIcon, admin: dispatcherIcon };
+
+// The page under the bar. A new address starts the fade again by swapping the animation's name. A phone that asks
+// for less motion gets the page with no fade.
+function Page({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const path = useRef(pathname);
+  const step = useRef(0);
+  if (path.current !== pathname) {
+    path.current = pathname;
+    step.current += 1;
+  }
+  const reduce = typeof window.matchMedia !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return <div className="page-in" style={reduce ? undefined : { animationName: step.current % 2 === 0 ? 'page-in-a' : 'page-in-b' }}>{children}</div>;
+}
 
 // One shell for every role, matching the Figma top bars. Below 1024 wide the nav becomes bottom tabs; from 1024 it
 // sits in the top bar (dispatcher, shop on a desktop), where the dispatcher's six tabs need the room. The plan board
@@ -93,7 +107,7 @@ export function AppShell({ nav = [], place, bar, bell, status, wide = false, chi
           <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-bad">Sign-out could not be confirmed.</p><p className="mt-1 text-sm text-bad">{logoutFailure.message}</p></div>
           <Button variant="outline" disabled={logout.isPending} onClick={() => { logout.signOut(); }}>Try again</Button>
         </div>}
-        {children}
+        <Page>{children}</Page>
       </main>
 
       {nav.length > 0 && (

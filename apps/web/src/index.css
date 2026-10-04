@@ -165,3 +165,20 @@
   --map-track: #EDF1EF;         /* a district's bar */
   --map-bar: #63A28B;           /* the bar's delivered part */
 }
+
+/* A short fade as a page or tab opens. Two names, so a new address can start the same fade again. The end of the
+   fade sets no transform: a dialog opened on the page still covers the screen. A phone that asks for less motion
+   gets neither name. */
+@keyframes page-in-a {
+  from { opacity: 0; translate: 0 4px; }
+  to { opacity: 1; }
+}
+@keyframes page-in-b {
+  from { opacity: 0; translate: 0 4px; }
+  to { opacity: 1; }
+}
+.page-in {
+  animation-duration: 180ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: backwards;
+}
