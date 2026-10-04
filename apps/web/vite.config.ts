@@ -9,6 +9,8 @@ export default defineConfig({
     // Keep the built app for a cold offline load. API answers always come from the server.
     registerType: 'prompt',
     injectRegister: false,
+    // public/manifest.json is the installable one, linked from index.html. A second manifest from the plugin
+    // would replace it and Chrome would only offer a shortcut.
     manifest: false,
     devOptions: { enabled: false },
     workbox: {
