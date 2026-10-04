@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import type { AdminVehicle } from '@wayfinder/contracts';
+import type { AdminOutlet, AdminProduct, AdminVehicle } from '@wayfinder/contracts';
 import { db } from '../db/client';
-import { auditLog, vehicles } from '../db/schema';
+import { auditLog, outlets, products, vehicles } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import { announce } from '../lib/live';
 import { requireRole } from '../middleware/auth';
@@ -82,6 +82,159 @@ adminRouter.post('/vehicles/:id/archive', async (req, res) => {
     return after;
   });
   // Once it is committed, every open admin screen fetches its lists again (D-21).
+  announce({ topic: 'admin' });
+  res.json(archived);
+});
+
+const outletColumns = {
+  id: outlets.id,
+  name: outlets.name,
+  brand: outlets.brand,
+  district: outlets.district,
+  depotId: outlets.depotId,
+  dockType: outlets.dockType,
+  parking: outlets.parking,
+  windowOpen: outlets.windowOpen,
+  windowClose: outlets.windowClose,
+  archivedAt: outlets.archivedAt,
+};
+
+function clock(value: string) {
+  return value.slice(0, 5);
+}
+
+function toAdminOutlet(row: {
+  id: string;
+  name: string;
+  brand: AdminOutlet['brand'];
+  district: string;
+  depotId: string;
+  dockType: AdminOutlet['dockType'];
+  parking: AdminOutlet['parking'];
+  windowOpen: string;
+  windowClose: string;
+  archivedAt: Date | null;
+}): AdminOutlet {
+  return {
+    id: row.id,
+    name: row.name,
+    brand: row.brand,
+    district: row.district,
+    depotId: row.depotId,
+    dockType: row.dockType,
+    parking: row.parking,
+    windowOpen: clock(row.windowOpen),
+    windowClose: clock(row.windowClose),
+    archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
+  };
+}
+
+adminRouter.get('/outlets', async (_req, res) => {
+  const rows = await db.select(outletColumns).from(outlets).orderBy(asc(sql`(${outlets.archivedAt} is not null)`), asc(outlets.id));
+  res.json(rows.map(toAdminOutlet));
+});
+
+adminRouter.post('/outlets/:id/archive', async (req, res) => {
+  const id = req.params.id;
+  const actorId = req.user?.id;
+  if (!id || !actorId) throw new HttpError(401, 'signed_out', 'Please sign in.');
+
+  const archived = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(outlets)
+      .set({ archivedAt: sql`now()` })
+      .where(and(eq(outlets.id, id), isNull(outlets.archivedAt)))
+      .returning(outletColumns);
+    if (!row) {
+      const [existing] = await tx.select({ id: outlets.id }).from(outlets).where(eq(outlets.id, id));
+      if (!existing) throw new HttpError(404, 'not_found', 'No outlet with that id.');
+      throw new HttpError(409, 'already_archived', 'That outlet is already archived.');
+    }
+    const after = toAdminOutlet(row);
+    const before: AdminOutlet = { ...after, archivedAt: null };
+    await tx.insert(auditLog).values({
+      actorId,
+      action: 'outlet.archived',
+      entity: 'outlet',
+      entityId: id,
+      before,
+      after,
+    });
+    return after;
+  });
+  announce({ topic: 'admin' });
+  res.json(archived);
+});
+
+const productColumns = {
+  id: products.id,
+  name: products.name,
+  brand: products.brand,
+  unit: products.unit,
+  kgPerUnit: products.kgPerUnit,
+  m3PerUnit: products.m3PerUnit,
+  temp: products.temp,
+  needsTailLift: products.needsTailLift,
+  archivedAt: products.archivedAt,
+};
+
+function toAdminProduct(row: {
+  id: string;
+  name: string;
+  brand: AdminProduct['brand'];
+  unit: string;
+  kgPerUnit: string;
+  m3PerUnit: string;
+  temp: AdminProduct['temp'];
+  needsTailLift: boolean;
+  archivedAt: Date | null;
+}): AdminProduct {
+  return {
+    id: row.id,
+    name: row.name,
+    brand: row.brand,
+    unit: row.unit,
+    kgPerUnit: Number(row.kgPerUnit),
+    m3PerUnit: Number(row.m3PerUnit),
+    temp: row.temp,
+    needsTailLift: row.needsTailLift,
+    archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
+  };
+}
+
+adminRouter.get('/products', async (_req, res) => {
+  const rows = await db.select(productColumns).from(products).orderBy(asc(sql`(${products.archivedAt} is not null)`), asc(products.id));
+  res.json(rows.map(toAdminProduct));
+});
+
+adminRouter.post('/products/:id/archive', async (req, res) => {
+  const id = req.params.id;
+  const actorId = req.user?.id;
+  if (!id || !actorId) throw new HttpError(401, 'signed_out', 'Please sign in.');
+
+  const archived = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(products)
+      .set({ archivedAt: sql`now()` })
+      .where(and(eq(products.id, id), isNull(products.archivedAt)))
+      .returning(productColumns);
+    if (!row) {
+      const [existing] = await tx.select({ id: products.id }).from(products).where(eq(products.id, id));
+      if (!existing) throw new HttpError(404, 'not_found', 'No product with that id.');
+      throw new HttpError(409, 'already_archived', 'That product is already archived.');
+    }
+    const after = toAdminProduct(row);
+    const before: AdminProduct = { ...after, archivedAt: null };
+    await tx.insert(auditLog).values({
+      actorId,
+      action: 'product.archived',
+      entity: 'product',
+      entityId: id,
+      before,
+      after,
+    });
+    return after;
+  });
   announce({ topic: 'admin' });
   res.json(archived);
 });
