@@ -13,7 +13,7 @@ it('says what an edit changed, and does not treat a split as more service', () =
   expect(impactLine(counts(), counts({ originalFull: 3, trips: 2, planFuelL: 14.5 }))).toBe(
     'One more original order fully covered. One additional trip. Fuel estimate up 2.5 L',
   );
-  expect(impactLine(counts(), counts())).toBe('fuel estimate unchanged');
+  expect(impactLine(counts(), counts())).toBe('Fuel estimate unchanged');
   expect(impactLine(counts({ vehicleHours: 2 }), counts({ vehicleHours: 2.36 }), { before: 1, after: 2 })).toBe('Fuel estimate unchanged. Vehicle-hours up 0.4. 1 new problem');
-  expect(impactLine(counts({ planFuelL: null }), counts({ planFuelL: 4 }))).toContain('fuel estimate not available yet');
+  expect(impactLine(counts({ planFuelL: null }), counts({ planFuelL: 4 }))).toContain('Fuel estimate not available yet');
 });

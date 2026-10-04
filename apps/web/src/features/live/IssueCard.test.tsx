@@ -93,7 +93,7 @@ describe('Q-40 a shop\'s report gives each line its own reason, and its note', (
   it('shows each line received with its reason, and the note, on Live day\'s card', () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><IssueCard issue={TECH_REPORT} depot="Kandy" answering={ANSWERING} time /></QueryClientProvider>);
     expect(html).toContain('<h3 class="text-[15px] leading-5 font-bold">1 crate of 2 damaged, 1 pallet missing</h3>');
-    expect(html).toMatch(/Received<\/dt><dd[^>]*>1 of 2 crates of 2 · Refrigerators, 1 damaged; 1 of 2 pallets · Small appliances, 1 missing</);
+    expect(html).toMatch(/Received<\/dt><dd[^>]*>1 of 2 crates of 2 · Refrigerators, 1 damaged. 1 of 2 pallets · Small appliances, 1 missing</);
     expect(html).toMatch(/Note<\/dt><dd[^>]*>The crate door is dented</);
   });
 });

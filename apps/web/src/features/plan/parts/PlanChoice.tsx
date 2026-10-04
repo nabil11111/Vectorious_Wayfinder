@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { reasonOf } from '@/features/store/words';
 import { applyArrangement, fetchArrangement, refOf, useCrews, type BoardScreen, type Undo } from '../board';
 import { planOf, sameDraft, type CrewRef } from '../draft';
-import { cubic, hhmm, litres, tonnes, whole } from '../words';
+import { cubic, hhmm, litres, reasonWords, tonnes, whole } from '../words';
 import { crewRows, crewSections, crewsFor, type Pick } from './crews';
 import { demandLine } from './demand';
 import type { BoardIndex } from './lookup';
@@ -120,7 +120,7 @@ export function PlanChoice({ screen, index, orders, title, act, onCrew, onClose 
               <div className="mt-3">
                 <h3 className="text-sm font-bold">Still waiting</h3>
                 <ul className="mt-1 space-y-1 text-sm">
-                  {arrangement.data.waiting.map((item) => <li key={item.orderId}>{item.shop}: {item.reason}</li>)}
+                  {arrangement.data.waiting.map((item) => <li key={item.orderId}>{item.shop}: {reasonWords(item.reason)}</li>)}
                 </ul>
               </div>
             )}

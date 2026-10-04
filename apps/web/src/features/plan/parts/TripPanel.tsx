@@ -184,7 +184,7 @@ export function TripPanel({ screen, index, trip, group, change, act, onUndo, onC
                 last={i === trip.stops.length - 1}
                 drag={{
                   id: stopIds[i]!, movable: canMove, name: `stop ${i + 1} of ${index.called(trip)}`,
-                  dragged: { kind: 'stop', tripKey: key, index: i, label: shop.name, brand: shop.brand }, landing: { kind: 'stops', tripKey: key, at: i },
+                  dragged: { kind: 'stop', tripKey: key, index: i, label: shop.name, brand: shop.brand, chilled: orders.some((order) => order.load.needsReefer) }, landing: { kind: 'stops', tripKey: key, at: i },
                 }}
                 onMove={(by) => change(moveStop(draft, key, i, by), { line: `Stops ${Math.min(i, i + by) + 1} and ${Math.max(i, i + by) + 1} swapped`, tripKey: key })}
                 onTakeStopOff={() => { const off = takeStopOffChange(draft, trip, i, index); change(off.plan, off.said); }}

@@ -99,9 +99,70 @@ export function shopLine(shop: BoardShop) {
 // against, which for a mall shop is the part its mall is open.
 export const entranceAndWindow = (shop: BoardShop, open: number, close: number) => `${ENTRANCE[shop.dockType]} · ${hhmm(open)} to ${hhmm(close)}`;
 
+const BECAUSE: Record<string, string> = {
+  'the only run that could carry these goods': 'It was the only truck that could carry this order.',
+  'only usable run': 'It was the only truck that could carry this order.',
+  'keeps fridge trucks free': 'That leaves a refrigerated truck free for chilled goods.',
+  'keeps vans free': 'That leaves a van free for shops that need one.',
+  'uses a first run before a second': 'It uses the first trip before starting a second.',
+  'first run preferred': 'It uses the first trip before starting a second.',
+  'keeps the usual leaving times': 'It keeps the usual leaving time.',
+  'usual leaving times': 'It keeps the usual leaving time.',
+  'more volume broke the tie': 'It had more room than the other trucks that could take it.',
+  'more space': 'It had more room than the other trucks that could take it.',
+  'more weight capacity broke the tie': 'It can carry more weight than the other trucks that could take it.',
+  'higher weight limit': 'It can carry more weight than the other trucks that could take it.',
+  'uses less fuel per kilometre': 'It uses less fuel per kilometre.',
+  'less fuel per km': 'It uses less fuel per kilometre.',
+  'shares a stop to free a run': 'It shares a stop so another truck can be freed.',
+  'shares a stop': 'It shares a stop so another truck can be freed.',
+  'takes a run freed for it': 'It takes a trip that was freed for it.',
+  'freed run': 'It takes a trip that was freed for it.',
+  'moved to free a run': 'It was moved so another truck could be freed.',
+  'parts rebalanced so both go': 'The order was divided so both parts could go.',
+  'rebalanced': 'The order was divided so both parts could go.',
+};
+
+const nth = (n: number) => {
+  const teen = n % 100;
+  const end = teen >= 11 && teen <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${end}`;
+};
+const truckWords = (name: string) => name.replaceAll('reefer truck', 'refrigerated truck').replaceAll('reefer van', 'refrigerated van');
+const because = (why: string | undefined) => (why && why !== 'fills an existing run' && why !== 'fills existing run' && why !== 'within its capacity, receiving hours and fuel' ? BECAUSE[why] ?? '' : '');
+
+// The planner stores a reason as a list of facts. The screen says the same facts in a sentence.
+export function reasonWords(reason: string): string {
+  const parts = reason.split('; ').map((part) => part.trim()).filter(Boolean);
+  const head = /^Rank (\d+): (new order|waited since .+)$/.exec(parts[0] ?? '');
+  if (!head) return reason.replaceAll('; ', ' · ');
+  const temp = parts[1] === 'chilled' || parts[1] === 'dry' ? parts[1] : null;
+  const rest = parts.slice(temp ? 2 : 1);
+  const placeAt = rest.findIndex((part) => / (closes|due|by) \d{2}:\d{2}$/.test(part));
+  const place = placeAt >= 0 ? /^(.*) (closes|due|by) (\d{2}:\d{2})$/.exec(rest[placeAt]!) : null;
+  const after = placeAt >= 0 ? rest.slice(placeAt + 1) : rest;
+  const tripAt = after.findIndex((part) => /^(joined |on |new )/.test(part));
+  const notes = (tripAt >= 0 ? after.slice(0, tripAt) : after).join(', ');
+  const placement = tripAt >= 0 ? after.slice(tripAt).join('; ') : '';
+  const shop = place?.[1] ?? 'the shop';
+  const since = head[2] === 'new order' ? null : head[2]!.replace('waited since ', '');
+  const goods = temp === 'dry' ? 'order of dry goods' : 'chilled order';
+  const opening = since ? `${temp === 'dry' ? 'Order of dry goods' : 'Chilled order'} for ${shop}, waiting since ${since}.` : `New ${goods} for ${shop}.`;
+  const time = !place ? '' : place[2] === 'closes' ? `The shop closes at ${place[3]}.` : `It has to arrive by ${place[3]}.`;
+  const limits = [notes.includes('vans only') ? 'The shop takes vans only.' : '', notes.includes('mall slot') ? 'It can only be delivered while the mall is open.' : ''].filter(Boolean).join(' ');
+  const joined = /^(?:joined|on) (.+) on (its run|its second trip) to ([^,]+?)(?:, (.+))?$/.exec(placement);
+  const started = /^(new run|new second trip) on (.+) to ([^,]+?)(?:, (.+))?$/.exec(placement);
+  const trip = joined
+    ? `Added to ${truckWords(joined[1]!)}${joined[2] === 'its second trip' ? ' on its second trip' : ''}, which was already going to ${joined[3]}. ${because(joined[4])}`.trim()
+    : started
+      ? `It starts a ${started[1] === 'new second trip' ? 'second' : 'new'} trip on ${truckWords(started[2]!)} to ${started[3]}. ${because(started[4])}`.trim()
+      : placement ? truckWords(placement) : '';
+  return [opening, time, limits, trip, `The planner placed it ${nth(Number(head[1]))}.`].filter(Boolean).join(' ');
+}
+
 // A carried-over order: "wanted Wed 24 Jun · No fridge truck was left for Matara."
 export const carriedLine = (order: BoardOrder) =>
-  [`wanted ${shortDay(order.deliveryDate)}`, order.lastDeferral?.reason].filter(Boolean).join(' · ');
+  [`wanted ${shortDay(order.deliveryDate)}`, order.lastDeferral ? reasonWords(order.lastDeferral.reason) : null].filter(Boolean).join(' · ');
 // "deferred 2×", red from two.
 export const deferredTimes = (order: BoardOrder) => `deferred ${order.timesDeferred}×`;
 // On a stop, the weekday it was wanted: "deferred Wed".

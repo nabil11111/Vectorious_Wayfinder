@@ -49,7 +49,7 @@ export function PlanDnd({ screen, index, change, undo, onStartTrip, routeOf, sho
         onDragEnd={({ active, over }) => {
           setDragged(null);
           if (dropLocked(screen)) return;
-          landDrop(screen.draft, draggedOf(active), landingOf(over), { change, start: onStartTrip, called: index.called, routeOf, shopOf });
+          landDrop(screen.draft, draggedOf(active), landingOf(over), { change, start: onStartTrip, called: index.called, routeOf, shopOf, vehicleOf: index.vehicle });
         }}
       >
         {children}

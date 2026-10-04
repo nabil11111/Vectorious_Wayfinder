@@ -1,5 +1,5 @@
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
-import { acceptedNote, TO_DECIDE } from '../words';
+import { acceptedNote, reasonWords, TO_DECIDE } from '../words';
 import { Tag } from './ui';
 
 // One of the planner's reasons, under what it is about: an order of the stop ("39 cartons chilled"), or nothing more
@@ -28,7 +28,7 @@ export function Why({ title, reasons, decisions = [], align = 'end' }: { title: 
           {reasons.map((item) => (
             <li key={item.key}>
               {item.about && <p className="text-[11px] leading-[14px] font-semibold text-muted-foreground">{item.about}</p>}
-              <p className="text-xs leading-[16px] text-pretty">{item.reason}</p>
+              <p className="text-xs leading-[16px] text-pretty">{reasonWords(item.reason)}</p>
             </li>
           ))}
         </ul>

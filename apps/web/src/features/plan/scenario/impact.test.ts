@@ -50,7 +50,7 @@ it('uses honest, plain headlines for unchanged, improved, mixed and reassigned r
   expect(headline([], [])).toBe('No orders to compare.');
   expect(headline([order('1', 'partial')], [order('1', 'partial')])).toBe('The same orders are planned or waiting, using the same trucks.');
   expect(headline([order('1', 'deferred')], [order('1', 'planned')])).toBe('Some orders could receive more goods.');
-  expect(headline([order('1', 'planned'), order('2', 'deferred')], [order('1', 'deferred'), order('2', 'planned')])).toContain('others would have more waiting');
+  expect(headline([order('1', 'planned'), order('2', 'deferred')], [order('1', 'deferred'), order('2', 'planned')])).toContain('Others would have more waiting');
   expect(headline([order('1', 'partial')], [order('1', 'partial', ['VEH002'])])).toBe('Orders stay fully or partly planned as before, using different trucks.');
 });
 it('puts newly waiting shops before improvements and truck-only changes even when reassigned rows arrive first', () => {

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardScreen, Undo } from '../board';
 import { addOrders, defer, keyOf, undefer, type CrewRef, type Place } from '../draft';
-import { carriedLine, countOf, decisionTitle, deferGroup, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, shopLine, TO_DECIDE, whole } from '../words';
+import { carriedLine, countOf, decisionTitle, deferGroup, deferredTimes, orderAmount, ordersAmount, partLine, placeOf, reasonWords, shopLine, TO_DECIDE, whole } from '../words';
 import chilledIcon from '@/assets/icons/icon-chilled.png';
 import { CrewMenu } from './CrewMenu';
 import type { Pick } from './crews';
@@ -108,7 +108,11 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
   });
   const carried = unplanned.filter((order) => order.carriedOver).sort(byWanted);
   // While a trip is open, only its district fits, and only its brand unless Mix brands is on.
+  // A dry truck cannot take a chilled order, including one deferred earlier for lack of a fridge.
   const onThisRoute = (shop: { brand: Brand; district: string } | null) => !open || !route || (shop !== null && fitsRoute(route, draft.mixBrands, shop));
+  const truck = open ? index.vehicle(open.vehicleId) : null;
+  const canCarry = (order: BoardOrder) => !order.load.needsReefer || !truck || truck.temp === 'reefer';
+  const fitsOrder = (order: BoardOrder) => onThisRoute(index.shop(order.outletId)) && canCarry(order);
   const groups = groupsOf(unplanned.filter((order) => !order.carriedOver), index)
     .sort((a, b) => sort === 'window'
       ? Math.min(...a.shops.map((row) => row.shop.windowClose)) - Math.min(...b.shops.map((row) => row.shop.windowClose)) || b.count - a.count
@@ -120,8 +124,9 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
   });
 
   const add = open ? (orders: BoardOrder[]) => {
-    if (orders.some((order) => !onThisRoute(index.shop(order.outletId)))) return;
-    change(addOrders(draft, keyOf(open), orders), { line: `${ordersLine(index, orders.map((o) => o.id))} added to ${index.called(open)}`, tripKey: keyOf(open) });
+    const kept = orders.filter(fitsOrder);
+    if (kept.length === 0) return;
+    change(addOrders(draft, keyOf(open), kept), { line: `${ordersLine(index, kept.map((o) => o.id))} added to ${index.called(open)}`, tripKey: keyOf(open) });
   } : null;
   const doDefer = (deferrals: DraftDeferral[]) => {
     if (!canMove) return;
@@ -147,7 +152,7 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
   // An order's row, with its grip when it can be dragged.
   const draggable = (order: BoardOrder, row: ReactNode) => {
     const dragged = orderDragged(order, index);
-    return dragged ? <DragRow id={`orders:order:${order.id}`} dragged={dragged} movable={canMove && onThisRoute(index.shop(order.outletId))}>{row}</DragRow> : row;
+    return dragged ? <DragRow id={`orders:order:${order.id}`} dragged={dragged} movable={canMove && fitsOrder(order)}>{row}</DragRow> : row;
   };
 
   return (
@@ -181,7 +186,7 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
                 <h3 className="text-xs leading-[15px] font-semibold text-warn-ink">Carried over · {whole(carried.length)}</h3>
                 {carried.map((order) => (
                   <Fragment key={order.id}>
-                    <div className={cn(!onThisRoute(index.shop(order.outletId)) && 'opacity-40')}>
+                    <div className={cn(!fitsOrder(order) && 'opacity-40')}>
                     {draggable(order, (
                       <OrderRow
                         order={order}
@@ -189,7 +194,7 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
                         line={carriedLine(order)}
                         summary={summary(order)}
                         disabled={!canMove}
-                        add={onThisRoute(index.shop(order.outletId)) ? add : null}
+                        add={fitsOrder(order) ? add : null}
                         onDefer={() => deferOrders(order.id, [order])}
                         onJoin={onJoin}
                         extra={<Button variant="outline" className={plainButton('h-[22px] px-2.5 text-[11px]')} onClick={() => onFindSlot(order.id)}>Find a slot</Button>}
@@ -206,6 +211,7 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
               const shops = all ? group.shops : group.shops.slice(0, 3);
               const hidden = group.shops.slice(shops.length).reduce((n, row) => n + row.orders.length, 0);
               const fits = onThisRoute(group);
+              const groupCarry = group.shops.every((row) => row.orders.every(canCarry));
               return (
                 <section
                   key={group.key}
@@ -215,7 +221,7 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
                 >
                   <DragRow
                     id={`orders:group:${group.key}`}
-                    movable={canMove && fits}
+                    movable={canMove && fits && groupCarry}
                     dragged={{ kind: 'orders', orders: group.shops.flatMap((row) => row.orders), group: { brand: group.brand, district: group.district }, label: `${group.brand} · ${group.district}`, detail: countOf(group.count, 'order') }}
                   >
                     <div className="flex flex-wrap items-center gap-2 pl-1">
@@ -241,11 +247,13 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
                   </DragRow>
                   {form(group.key)}
                   <ul className="mt-1.5">
-                    {shops.map(({ shop, orders }) => (
-                      <li key={shop.id} className="border-t py-2 pl-1">
+                    {shops.map(({ shop, orders }) => {
+                      const rowFits = fits && orders.some(canCarry);
+                      return (
+                      <li key={shop.id} className={cn('border-t py-2 pl-1', !rowFits && 'opacity-40')}>
                         <DragRow
                           id={`orders:shop:${group.key}:${shop.id}`}
-                          movable={canMove && fits}
+                          movable={canMove && rowFits && orders.every(canCarry)}
                           dragged={{ kind: 'orders', orders, group: { brand: group.brand, district: group.district }, label: shop.name, detail: ordersAmount(shop.brand, orders) }}
                         >
                           <Row
@@ -254,7 +262,7 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
                             below={<ShopSummary line={summary(orders[0]!)} />}
                             actions={(
                               <>
-                                {fits && add && <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => add(orders)}>Add</Button>}
+                                {rowFits && add && <Button variant="outline" className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => add(orders)}>Add</Button>}
                                 <Button variant="outline" disabled={!canMove} className={plainButton('h-[26px] px-3 text-[11px]')} onClick={() => deferOrders(`${group.key}:${shop.id}`, orders)}>Defer</Button>
                                 <RowMenu label={shop.name} items={[
                                   ...orders.filter((o) => o.splitFrom !== null).map((o) => ({ label: `Join ${orderAmount(shop.brand, o)} back`, onClick: () => onJoin(o) })),
@@ -265,7 +273,8 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
                         </DragRow>
                         {form(`${group.key}:${shop.id}`)}
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                   {hidden > 0 && (
                     <button type="button" className="mb-1.5 pl-1 text-[11px] text-muted-foreground hover:text-foreground" onClick={() => setExpanded(new Set([...expanded, group.key]))}>
@@ -279,7 +288,7 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
         ) : (
           <ul>
             {[...unplanned].sort(byWanted).map((order) => {
-              const fits = onThisRoute(index.shop(order.outletId));
+              const fits = fitsOrder(order);
               return (
               <li key={order.id} className={cn('border-t first:border-t-0', !fits && 'opacity-40')}>
                 {draggable(order, (
@@ -315,7 +324,7 @@ export function OrderLists({ screen, index, places, open, route = null, outlined
                   <li key={order.id} className="border-t px-1 py-2">
                     <Row
                       title={title}
-                      line={deferral.reason}
+                      line={reasonWords(deferral.reason)}
                       below={<><ShopSummary line={summary(order)} />{(choice || decisions.length > 0) && (
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           {decisions.some((decision) => decision.open) && <Tag tone="warn">{TO_DECIDE}</Tag>}

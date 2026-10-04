@@ -92,6 +92,17 @@ it('an open trip greys shops outside its district or brand and does not offer to
   expect(handles(markup)).toEqual(['Move Fresh · Colombo', 'Move Fresh Dehiwala']);
 });
 
+it('a dry truck does not offer a chilled order that was left for a fridge', () => {
+  const day = boardWith(TRIPS);
+  day.vehicles[0]!.temp = 'ambient';
+  const markup = renderToStaticMarkup(
+    <OrderLists screen={screenOf(day)} index={indexOf(day)} places={placesOf(planOf(day))} open={TRIPS[0]!} route={{ brand: 'Fresh', district: 'Colombo' }} outlined={null} change={() => undefined} onCrew={() => undefined} onFindSlot={() => undefined} onJoin={() => undefined} />,
+  );
+  const colombo = markup.slice(markup.indexOf('aria-label="Fresh · Colombo"'), markup.indexOf('</section>', markup.indexOf('aria-label="Fresh · Colombo"')));
+  expect(colombo).toContain('opacity-40');
+  expect(colombo).not.toContain('>Add<');
+});
+
 it('a drop onto an open trip stays in that trip\'s district and brand', () => {
   const change = vi.fn();
   const galle: Dragged = { kind: 'orders', orders: [BOARD.orders[2]!], group: { brand: 'Fresh', district: 'Galle' }, label: 'Fresh Galle Fort', detail: '12 cartons chilled' };
@@ -100,6 +111,9 @@ it('a drop onto an open trip stays in that trip\'s district and brand', () => {
   expect(change).not.toHaveBeenCalled();
   landDrop(planOf(BOARD), dehiwala, stopTwo, { change, start: () => undefined, called: INDEX.called, routeOf });
   expect(change).toHaveBeenCalledOnce();
+  change.mockClear();
+  landDrop(planOf(BOARD), dehiwala, stopTwo, { change, start: () => undefined, called: INDEX.called, routeOf, vehicleOf: () => ({ temp: 'ambient' }) });
+  expect(change).not.toHaveBeenCalled();
 });
 
 it('spec 023 AC-4 the empty middle offers the build and a drop area in place of "Start a blank trip"', () => {

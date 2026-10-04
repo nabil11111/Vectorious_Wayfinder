@@ -9,6 +9,7 @@ import { useAppClock } from '@/lib/clock';
 import { refOf, type BoardScreen } from '../board';
 import { scenarioIdentity } from './identity';
 import { ScenarioReader } from './reader';
+import { reasonWords } from '../words';
 import { impactHeadline, scenarioImpact } from './impact';
 
 const figures: [keyof ScenarioSummary, string][] = [
@@ -87,7 +88,7 @@ export function ScenarioPanel({ screen, stale, refreshing }: { screen: BoardScre
               {([[`With ${result.excludedVehicleId} available`, row.before], [`Without ${result.excludedVehicleId}`, row.after]] as const).map(([label, order]) => <div key={label} className="pt-1">
                 <p className="font-semibold">{label}: {order.status === 'planned' ? 'Fully covered' : order.status === 'partial' ? 'Partly covered' : 'Waiting'}</p>
                 <p className="text-muted-foreground">Trucks: {order.vehicleIds.join(', ') || 'none suggested'}</p>
-                {order.reasons.map((reason, index) => <p key={index} className="text-muted-foreground">{reason}</p>)}
+                {order.reasons.map((reason, index) => <p key={index} className="text-muted-foreground">{reasonWords(reason)}</p>)}
               </div>)}
             </li>)}</ul>
           </div>

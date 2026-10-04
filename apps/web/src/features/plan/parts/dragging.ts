@@ -51,11 +51,19 @@ export const landingOf = (over: Over | null) => (over?.data.current as DropData 
 type Route = { brand: Brand; district: string };
 
 // A drop onto a trip that already has a district stays in that district, and on one brand unless Mix brands is on.
-function onThisRoute(plan: DraftPlan, dragged: Dragged, landing: Landing, routeOf: (key: string) => Route | null, shopOf?: (id: string) => Route | null): boolean {
+function truckTemp(plan: DraftPlan, landing: Landing, vehicleOf?: (id: string) => { temp: string } | null) {
+  if (landing.kind !== 'stops' && landing.kind !== 'card') return null;
+  const trip = plan.trips.find((item) => `${item.vehicleId}-${item.tripNo}` === landing.tripKey);
+  return trip && vehicleOf ? vehicleOf(trip.vehicleId)?.temp ?? null : null;
+}
+
+function onThisRoute(plan: DraftPlan, dragged: Dragged, landing: Landing, routeOf: (key: string) => Route | null, shopOf?: (id: string) => Route | null, vehicleOf?: (id: string) => { temp: string } | null): boolean {
   if (landing.kind !== 'stops' && landing.kind !== 'card') return true;
   const route = routeOf(landing.tripKey);
-  if (dragged.kind === 'orders') return fitsRoute(route, plan.mixBrands, dragged.group);
+  const dry = truckTemp(plan, landing, vehicleOf) === 'ambient';
+  if (dragged.kind === 'orders') return fitsRoute(route, plan.mixBrands, dragged.group) && !(dry && dragged.orders.some((order) => order.load.needsReefer));
   if (dragged.kind === 'stop' && landing.kind === 'card' && landing.tripKey !== dragged.tripKey) {
+    if (dry && dragged.chilled) return false;
     const outletId = plan.trips.find((trip) => `${trip.vehicleId}-${trip.tripNo}` === dragged.tripKey)?.stops[dragged.index]?.outletId;
     const shop = outletId && shopOf ? shopOf(outletId) : null;
     return shop ? fitsRoute(route, plan.mixBrands, shop) : true;
@@ -69,9 +77,10 @@ export function landDrop(plan: DraftPlan, dragged: Dragged | undefined, landing:
   called: Called;
   routeOf?: (key: string) => Route | null;
   shopOf?: (id: string) => Route | null;
+  vehicleOf?: (id: string) => { temp: string } | null;
 }) {
   if (!dragged || !landing) return;
-  if (apply.routeOf && !onThisRoute(plan, dragged, landing, apply.routeOf, apply.shopOf)) return;
+  if (apply.routeOf && !onThisRoute(plan, dragged, landing, apply.routeOf, apply.shopOf, apply.vehicleOf)) return;
   const drop = dropOf(plan, dragged, landing, apply.called);
   if (drop?.kind === 'change') apply.change(drop.plan, drop.undo);
   else if (drop?.kind === 'start') apply.start(drop.pick);

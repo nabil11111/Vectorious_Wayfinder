@@ -11,7 +11,7 @@ import type { Pick } from './crews';
 // names it in the Undo line and the announcements, and detail says more on the card that follows the pointer.
 export type Dragged =
   | { kind: 'orders'; orders: BoardOrder[]; group: { brand: Brand; district: string }; label: string; detail: string }
-  | { kind: 'stop'; tripKey: TripKey; index: number; label: string; brand: Brand };
+  | { kind: 'stop'; tripKey: TripKey; index: number; label: string; brand: Brand; chilled?: boolean };
 
 // Where it can land: the open trip's stops at place `at` (before the stop there, or after the last when `at` is their
 // number), a trip's card in Done, the Unplanned orders column, or the empty middle.
