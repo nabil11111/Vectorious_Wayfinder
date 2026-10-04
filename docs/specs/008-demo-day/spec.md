@@ -1,6 +1,6 @@
 # 008 · The demo day: clock, live updates and the seeded day
 
-**Status:** Done  ·  **Owner:**  ·  **Design:** the time in the top bar of every role's screens (Shop · Today, Loader · Today's trucks, Driver · Today's trip). The demo control has no frame. It is a judge's tool and is listed as a departure.
+**Status:** Done  ·  **Design:** the time in the top bar of every role's screens (Shop · Today, Loader · Today's trucks, Driver · Today's trip). The demo control has no frame. It is a judge's tool and is listed as a departure.
 
 ## Why
 The booklet asks for "at least one realistic delivery day so the walkthrough works on a fresh installation" and a

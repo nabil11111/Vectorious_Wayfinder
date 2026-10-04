@@ -1,5 +1,8 @@
 # 020 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 - Migration `0010_depot_switch`: `sessions.depot_id text references depots(id)`, nullable (null: the user's own depot).
 - Seed: the new accounts in `DEMO_USERS` (`apps/api/src/db/fixtures.ts`), a fixed list of given names, no randomness;

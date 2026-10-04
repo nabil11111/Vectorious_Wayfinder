@@ -1,6 +1,6 @@
 # 004 · Admin: vehicles
 
-**Status:** Done  ·  **Owner:**  ·  **Design:** admin list pattern (Dispatcher · Fleet table style)
+**Status:** Done  ·  **Design:** admin list pattern (Dispatcher · Fleet table style)
 
 ## Why
 The super admin manages master data. Rows are archived rather than deleted, because old plans still point at

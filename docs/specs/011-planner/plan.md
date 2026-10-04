@@ -1,5 +1,8 @@
 # 011 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 None. No migration or shared request shape. The caller supplies 010's eligible orders and 008's availability
 and fuel history. The engine returns proposed splits without changing the shop's records.

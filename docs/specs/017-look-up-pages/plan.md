@@ -1,5 +1,8 @@
 # 017 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 **None.** No new table, column, migration, seed data, retained daily aggregate, receipt id, forecast, vehicle hire
 or booking record. The three aggregate endpoints and A8's proof endpoint are GETs. This PR changes only this spec's documents and the three spec

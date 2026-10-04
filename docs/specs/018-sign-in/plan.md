@@ -1,5 +1,8 @@
 # 018 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 Migration `0009_sign_in`:
 - `users.staff_id text unique`, `users.pin_hash text`: nullable only because rows seeded before this spec have

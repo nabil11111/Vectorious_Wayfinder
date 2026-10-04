@@ -1,5 +1,8 @@
 # 008 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 One migration, `demo-day`, with `apps/api/src/db/schema/demo.ts`, by the lead. No other table changes.
 

@@ -1,5 +1,8 @@
 # 019 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 None. The read uses `outlets` (the depot's active shops by district) and the current plan's stops it already reads.
 

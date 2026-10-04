@@ -1,6 +1,8 @@
 # 012 · Loading
 
-**Status:** Done, with two open questions at the bottom  ·  **Owner:**  ·  **Design:** Loader · Today's trucks (tablet and phone), · next truck and · loading; Loader · Load a truck (tablet and phone) and · all on; Loader · Flag a problem (tablet and phone); Loader · Truck ready; and the right-hand column of Dispatcher · Live day · issue open, · issue open · decision sent and · Live day · loading.
+> Current scope: Submission hardening now requires trip one to return before trip two can load. Loader photo attachments remain outside the build; driver and shop photos are supported separately.
+
+**Status:** Done  ·  **Design:** Loader · Today's trucks (tablet and phone), · next truck and · loading; Loader · Load a truck (tablet and phone) and · all on; Loader · Flag a problem (tablet and phone); Loader · Truck ready; and the right-hand column of Dispatcher · Live day · issue open, · issue open · decision sent and · Live day · loading.
 
 Piece A3 of [the map](../000-map.md). It starts where spec 010 ends, with a sent plan whose trips are `planned`. The
 clock, live updates and the seeded day are spec 008's, and every load comes from spec 007's calculator.
@@ -351,7 +353,7 @@ are examples.
 3. Every stop has its own row, where the design joins the last two ("stops 2, 1").
 4. A stop lists its lines. For Fresh these are the drawn chilled and dry rows, and Style and Tech lines also name the
    item ("10 boxes · Folded clothing").
-5. The flag has no photo until open question 1 is settled.
+5. The flag has no photo until design question 1 is settled.
 6. The load figure is what is on the truck so far.
 7. The dispatcher answers a loader's flag with "Go short" or "Load it all" and "Send to loader" (D-37), and there is no
    "Undo" (A7). The design draws answers only for the driver's problems.
@@ -363,7 +365,7 @@ are examples.
 11. States the design lacks: no plan out, nothing to load, every truck loaded, no day left, a truck not on the list,
     waiting for the answer, saving, not saved, refused, and nothing needs you.
 
-## Open questions
+## Design questions recorded during the build
 1. **A photo on the flag now, or with the driver's proof photos?** The flag frame has a Photo button, and storing
    photos (D-22) is A4's work anyway. Our pick: with A4. The flag gets its photo in a small task once A4's photo store
    is in, and until then the README lists it as a departure.

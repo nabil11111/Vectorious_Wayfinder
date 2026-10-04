@@ -1,5 +1,8 @@
 # 009 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 No new table. One migration, written by the lead after spec 008's.
 

@@ -1,5 +1,8 @@
 # 015 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 One migration, `receipt`, written by the lead in T0 once spec 013 is merged, because A5 reads the driver's stops, handed
 over counts, problems and photos, and sends through the driver's queue.
@@ -234,7 +237,7 @@ draw it without the day: for a receipt, the delivery as the form showed it.
   to driver and shop" on the refusal and closed-shop cards and "Dilshan and the shop told" in their green lines (T6), and
   the driver's line for a refusal answered with replacements (T6). Spec 013's departure 6 shrinks in the README at T7.
 - **Spec 012.** `issuesOf` reads the report's fields and the replacement, `issueListOf` adds `replaceOn` (T3), and
-  `IssueCard` draws the report (T6). The loader's answers stay as they are (open question 4).
+  `IssueCard` draws the report (T6). The loader's answers stay as they are (design question 4).
 - **Spec 010 and spec 014.** Nothing changes. Their splits, by hand and by the planner, already give each part
   `split_from`, which the cards follow, and their joins give the original back.
 - **Spec 009.** `StoreOrder` and its card grow (rule 11). The next order's `placed` leaves out replacements and their

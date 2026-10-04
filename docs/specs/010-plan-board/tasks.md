@@ -1,11 +1,14 @@
 # 010 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 One pull request per task. The API tasks write their tests from the criteria first (D-07).
 
 - [x] **T0 · Shared parts** · lead, on `nabil/plan-board` cut from `main` once shop orders is merged there. The
   migration and schema, `packages/contracts/src/plans.ts`, `split` in `ORDER_STATUSES` with its `statusChip` case,
   `TRIP_STATUSES`, `leaveAt` on `Problem`, an empty `routes/plans.ts` with the role and depot checks mounted as
-  `/plans`, a top bar slot and a full-width page in `AppShell`, the icons, the driver accounts of open point 1 in the
+  `/plans`, a top bar slot and a full-width page in `AppShell`, the icons, the driver accounts of design question 1 in the
   seed, D-28 to D-33 in `docs/decisions.md`, and the Out of scope line of spec 009.
 - [x] **T1 · The board's day and reading the board** (AC-1, AC-5, AC-7 to AC-9) · after T0.
   Files: `apps/api/src/plans/board-day.ts` and its test, `plans/board.ts`, the two GETs in `routes/plans.ts`, and

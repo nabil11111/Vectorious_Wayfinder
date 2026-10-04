@@ -1,6 +1,8 @@
 # 025 · Notifications for every role
 
-**Status:** Ready  ·  **Owner:** Claude builders (T1 server, T2 screens)  ·  **Design:** the bell in every role's
+> Current scope: Spec 031 extends this with sounds and server web push. Server push requires VAPID configuration and a successful browser subscription.
+
+**Status:** Done  ·  **Owner:** Claude builders (T1 server, T2 screens)  ·  **Design:** the bell in every role's
 top bar, with its red count (Dispatcher frames, `53:11540`; Loader, Driver and Shop frames). No frame draws what the
 bell opens, so the pop-up follows the style guide's card, its 3D icons and the app's popover.
 

@@ -1,5 +1,8 @@
 # 007 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 Each task is one pull request and names the criteria it closes. Tests are written from the criteria first and
 seen to fail, then the code is written (D-07).
 

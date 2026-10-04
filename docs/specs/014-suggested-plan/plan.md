@@ -1,5 +1,8 @@
 # 014 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 One migration, `suggested-plan`, written by the lead in T0.
 
@@ -137,7 +140,7 @@ gave it.
 - The shop reads the planner's deferral sentence once the plan is sent (spec 010, rule 7). Spec 011 writes it for the
   shop, and the dispatcher can reword any of them.
 - A build deletes the parts of this draft's splits and makes new ones, so a shop's Orders list shows new parts after
-  each build. Shops see parts before sending anyway (spec 010, open point 2).
+  each build. Shops see parts before sending anyway (spec 010, design question 2).
 - The board's answer grows by the suggestion's choices and decisions, about 30 KB on the seeded day on top of spec
   010's 100 KB. Fine for one dispatcher and one process (D-01).
 - The planner runs inside the transaction that holds the depot's lock. At its benchmarked times, a loader's start or a

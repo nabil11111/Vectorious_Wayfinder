@@ -1,6 +1,8 @@
 # 017 · The dispatcher's look-up pages
 
-**Status:** Done, with the questions and our picks below · **Owner:** lead joins API and screens · **Design:**
+> Current scope: Submission hardening updates the History dialog and proof viewer. The excluded forecasts, booking and replay remain outside the build.
+
+**Status:** Done  · **Owner:** lead joins API and screens · **Design:**
 Dispatcher · Orders; Dispatcher · History; Dispatcher · Fleet. The two next-six-weeks frames are excluded below.
 
 Piece A8 of [the map](../000-map.md), **the first piece cut if time runs short**. This is a documents-only draft.
@@ -326,7 +328,7 @@ rather than consumption; **no Next 6 weeks view, no forecast and no hiring** (`1
 No frame states plus contained table scrolling below 1024. The calendar ends 28 Jun: a substitute 42-date view
 would leave 38 dates unknown, so it is cut too. This spec PR does not claim those screens are already built.
 
-## Open questions
+## Design questions recorded during the build
 These picks incorporate the lead's review decisions; builders use them unless Nabil changes the scope.
 
 1. **Is A8 worth building before the deadline? Our pick:** only after the joined four-role/offline journey and A7

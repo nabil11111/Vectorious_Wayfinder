@@ -1,5 +1,8 @@
 # 020 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 - [x] T0 · Shared parts, pushed on their own before T2 starts: migration `0010_depot_switch` and `sessions.depot_id`,
   `SwitchDepotRequest`, the middleware and the `PUT /api/v1/me/depot` route, and every new account in `DEMO_USERS`
   with `docs/accounts.md`, so everything compiles and every test passes. · Claude server builder (the lead hands it the

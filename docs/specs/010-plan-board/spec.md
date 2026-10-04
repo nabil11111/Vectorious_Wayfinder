@@ -1,6 +1,8 @@
 # 010 · Plan board
 
-**Status:** Done, with two open points at the bottom  ·  **Owner:**  ·  **Design:** Dispatcher · Edit plan, Edit plan · empty and View plan, and the in-screen states Edit plan · blank trip, leaves 03:15, stops swapped, find a slot · Mon and · Tue, View plan · ready to send and View plan · sent.
+> Current scope: This is the original manual-board spec. Specs 020–027 add depot switching, crews, drag and drop and history; 029 changes deferral and withdrawal. Submission hardening requires a driver at Send.
+
+**Status:** Done  ·  **Design:** Dispatcher · Edit plan, Edit plan · empty and View plan, and the in-screen states Edit plan · blank trip, leaves 03:15, stops swapped, find a slot · Mon and · Tue, View plan · ready to send and View plan · sent.
 
 Piece A2 of [the map](../000-map.md). The frames are exported in `tech-triathlon-ops/design/export`. Every rule a plan must
 keep is the plan checker's (spec 007), and the clock, live updates and seeded day are spec 008's.
@@ -349,7 +351,7 @@ View plan's Checks.
 8. States the design lacks: orders still open, no day left, deferring, splitting, saving, not saved and refused.
 9. View plan says "h on the road" where the design says "h driving", because the figure includes unloading.
 
-## Open points
+## Design questions recorded during the build
 1. **A driver account per vehicle?** The design names a driver on every truck, and the seed has one at Peliyagoda. The
    lead's pick, with Nabil: T0 seeds one per working Peliyagoda vehicle, local names on the demo password. The rules
    keep the driver optional, so a no changes only the seed. The walkthrough puts `dilshan` on VEH035 either way.

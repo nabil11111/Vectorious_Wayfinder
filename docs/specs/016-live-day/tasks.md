@@ -1,5 +1,8 @@
 # 016 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 One pull request per task, from the lead's integration branch after T0. Tests first (D-07); each task names its
 criteria in [plan.md](plan.md). This document assigns future implementation; the spec PR changes documents only.
 

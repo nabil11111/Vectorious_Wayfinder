@@ -1,6 +1,8 @@
 # 014 · The suggested plan
 
-**Status:** Done, with two open questions at the bottom  ·  **Owner:**  ·  **Design:** Dispatcher · Edit plan · empty, Edit plan and View plan, and the in-screen states Edit plan · building, View plan · ready to send and View plan · sent.
+> Current scope: Crew selection and undo history are extended by 022, 026 and 027. Submission hardening adds the separate read-only vehicle-unavailable comparison.
+
+**Status:** Done  ·  **Design:** Dispatcher · Edit plan · empty, Edit plan and View plan, and the in-screen states Edit plan · building, View plan · ready to send and View plan · sent.
 
 Piece B4 of [the map](../000-map.md), after the planner itself ([011](../011-planner/spec.md)). This spec puts the planner on
 spec 010's board: one button builds the day's plan, every order says why it went where it went, the dispatcher makes the
@@ -12,7 +14,7 @@ The booklet, page 11: "You may use automatic allocation, assisted planning, or m
 approach you choose, the system must produce an allocation that respects the operating constraints and identifies
 deferred orders." Page 3: "When demand exceeds capacity, they must decide which orders to defer and explain the
 consequences." Planning and allocation is a fifth of the marks, and a judge tries it with one button. Spec 011's
-`buildSuggestedPlan` plans a whole day and explains it, but nothing on the board calls it yet.
+`buildSuggestedPlan` plans a whole day and explains it. This spec connects it to the board.
 
 ## What it does
 Once the next day's orders close at 16:00, the dispatcher presses "Build the suggested plan". The server plans every
@@ -39,7 +41,7 @@ These are in `docs/decisions.md`.
 - **D-54 · The planner's decisions are accepted before the plan is sent.** Leaving early, an order that waited waiting
   again and a late order waiting are the dispatcher's calls (D-10, D-11, D-19), and a checker warning is not consent
   (spec 011). An edit that changes the planner's choice ends its decision.
-- **D-55 · "why?" shows the planner's reason for an order** (our pick, until Nabil answers, open question 1). A judge
+- **D-55 · "why?" shows the planner's reason for an order** (D-55, design question 1). A judge
   and a dispatcher must be able to ask why an order went where it did. The design's chips that ask why the dispatcher
   changed the suggestion are not built, because a deferral already carries its reason (spec 010, rule 7).
 
@@ -89,7 +91,7 @@ are depot time.
    shop, temperature, wanted day, note, placed time and placer. Each part goes exactly where the planner's plan puts
    it: the first on the trip it chose, and the second on another trip when the planner found one for it whole or once
    it shared the two parts out again (spec 011, AC-13), or deferred with the planner's reason. The shop sees both parts at once, as for a hand split (spec
-   010, open point 2). *A test raises OUT001's carried-over order from 12 to 180 chilled cartons. Only VEH035 can take
+   010, design question 2). *A test raises OUT001's carried-over order from 12 to 180 chilled cartons. Only VEH035 can take
    it, and 1,242 kg is over its 1,040, so the planner splits it: 150 cartons (1,035 kg, 5.55 m³) go on VEH035 trip 1
    and the other 30 on VEH035 trip 2, which reaches Fresh Nugegoda at 06:34. All its goods go, so there is no
    `waited_again`. Building again joins the two parts back first and splits the order the same way, into two new
@@ -273,7 +275,7 @@ depend on the judge's pace, so the clock times are examples.
 - **The "Swap stops 5 and 6" advice**: a route change the checker does not propose.
 - **Find a slot's day tabs, "Try Tue 29" and "Plan first on VEH019"**: a deferred order gets no new date (spec 010,
   rule 7).
-- **On View plan: the switch between "Suggested plan" and "As edited"** (open question 2), **Suggestions with "Send
+- **On View plan: the switch between "Suggested plan" and "As edited"** (design question 2), **Suggestions with "Send
   ahead" and "Skip", "spare space · send ahead?", "swap to VEH001", "What the 3 fixes change" and "Apply all 3 fixes"**:
   the planner plans one day and proposes no fixes to a draft, and the checker's own fixes are already on the board.
 - **Planning only what is unplanned, keeping hand-made trips**: the planner builds a whole day (spec 011).
@@ -293,7 +295,7 @@ The README lists these at T3.
 6. States the design lacks: replacing a draft, the middle's line after a build, a refused build, and a plan ready with
    warnings.
 
-## Open questions
+## Design questions recorded during the build
 1. **What does "why?" answer?** Our pick (D-55): the planner's reason for an order. The design's chips record why the
    dispatcher changed the suggestion, which a deferral's own reason already covers for an order left out.
 2. **View plan's switch between the suggested and the edited plan?** Our pick: not now. It needs a second checked board

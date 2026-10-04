@@ -5,17 +5,23 @@ live updates, so there is one address, one deploy and nothing to keep in sync be
 
 ```mermaid
 flowchart LR
-    subgraph Phone / tablet / desktop browser
+    subgraph browser["Phone / tablet / desktop browser"]
       W[React web app<br/>role screens]
+      Q[(IndexedDB<br/>driver actions and shop receipts)]
+      SW[Service worker<br/>built app cache and push]
+      W <--> Q
+      SW -. offline app shell .-> W
     end
     W -- "HTTPS /api/v1 (JSON, session cookie)" --> A
     A -- "/api/v1/events: what changed" --> W
-    subgraph Node process
+    subgraph server["Node process"]
       A[Express API<br/>auth, roles, validation] --> S[Domain services<br/>orders, planning, loading, delivery]
       A -. serves built files .-> W
       K[The app's clock] --> S
     end
     S --> D[(PostgreSQL<br/>reference data, orders, plans, audit)]
+    A --> P[Browser push service<br/>optional VAPID configuration]
+    P --> SW
     C[data/shared CSVs<br/>from the booklet] -- seed on start --> D
 ```
 
@@ -24,38 +30,61 @@ flowchart LR
 | Part | Where | Job |
 | --- | --- | --- |
 | Web app | `apps/web` | React + Vite, Tailwind with shadcn/ui (Base UI). One app, a route group per role. Phone-first for shop, loader and driver; desktop for dispatcher. |
-| API | `apps/api` | Express 5. Checks the session and role on every request and validates every input with Zod. |
+| API | `apps/api` | Express 5. Protected routes check the session, role and record scope; Zod validates request shapes. Health and sign-in are public. |
 | Contracts | `packages/contracts` | Zod schemas both sides import, so the web app and API cannot disagree about a request's shape. |
 | Database | `apps/api/src/db` | Drizzle schema, committed SQL migrations in `apps/api/drizzle`, idempotent seed. |
 
 ## The clock
 
-Every time a person sees comes from one clock in the API (`apps/api/src/lib/clock.ts`), never from a device
+Delivery-day times come from one clock in the API (`apps/api/src/lib/clock.ts`), never from a device
 (D-18). In demo mode it runs from the seeded day, and the demo control moves it forward a part of the day at a
 time. It is kept in the `demo_day` row, so a restart or a second browser sees the same time. Screens ask for it
-once and count the seconds themselves. A test fails if any other file reads the system time.
+and advance the displayed time locally between reads. Session expiry, PIN lockouts and retry timing use real
+time, so moving the demo clock does not change security limits. The clock tests enforce the allowed boundaries.
 
 ## Live updates
 
 After a change is committed, the API announces what changed (`orders`, `plans`, `clock` and so on) on a
 server-sent event stream, `GET /api/v1/events` (D-21). Each open screen hears only what is its business, by
 role, depot or outlet, and fetches the data again itself. The stream carries no data, so a screen that missed
-an announcement is only as stale as its next fetch, and each screen also refetches every minute.
+an announcement recovers through refetching. Reconnecting invalidates cached queries, and regular refetches
+provide a fallback. This event bus lives in the Node process; it is not a multi-instance message broker.
+
+## Offline work and photos
+
+The built web app has a service worker that caches the app files, not API responses. Driver work and shop
+receipts keep their own account-bound data and queued writes in IndexedDB. On reconnect, the queue retries
+writes with stable IDs; the server records applied writes in `driver_writes` so a retry cannot count twice.
+The server still checks identity, revision and trip state before accepting an action. Loading, planning and
+receiving-readiness edits require a connection.
+
+Driver proof photos and shop report photos are stored as JPEG bytes in PostgreSQL. The photo and its delivery
+or issue commit together. Authorized viewers fetch the bytes through the API and display temporary object URLs.
+
+## Notifications
+
+Bell updates are derived from recorded orders, trips and issues. Read state is kept in the browser per account
+and demo day. Optional web push stores each browser subscription in `push_subscriptions` and sends through
+the browser's push service. It needs configured VAPID keys, permission and a successful subscription; permission
+alone does not establish delivery to a suspended page.
 
 ## Security basics
 
-- Passwords hashed with Argon2. Sessions are random tokens in an httpOnly, SameSite cookie; only a hash of the
+- Staff IDs and four-digit PINs are used for sign-in; PINs are hashed with Argon2. Sessions use random tokens
+  in an httpOnly, SameSite cookie, marked Secure over HTTPS; only a hash of the
   token is stored.
-- Role check on every route (`requireRole`); admin can open everything.
-- Rate limits: 300 requests a minute per address on the API, 10 sign-in attempts per 15 minutes.
+- Protected routes use `requireRole` plus outlet/depot checks. Admin passes the role guard, but still needs
+  the scope required by a depot or outlet route.
+- Rate limits: 300 requests a minute per address on the API, excluding the live stream; 10 failed sign-ins
+  per 15 minutes per address. Five consecutive wrong PINs lock a staff ID for 15 minutes.
 - Writes must be JSON, which blocks cross-site form posts. Helmet sets the usual security headers.
 - Logs record method, path and status only, never cookies or bodies.
 
 ## How a change gets in
 
-Spec, branch, pull request, a review by someone who did not write it, CI passes (typecheck, fresh migrate and
-seed, schema matches migrations, tests, build), merge. `main` is always deployable. The full loop is in
-`docs/specs/README.md`.
+The process is spec, branch, pull request, independent review, passing CI, then merge. CI checks types, a fresh
+migration and seed, schema/migration agreement, tests and build. The full loop is in
+[the spec guide](specs/README.md).
 
 ## Read-only planning comparisons
 

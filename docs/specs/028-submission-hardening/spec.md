@@ -1,7 +1,8 @@
 # 028 · Submission hardening and clearer handoffs
 
-Status: building. Baseline: 1f41125. This spec groups related changes for one independent review per batch,
-not per individual fix. Existing specs and design tokens apply except for the explicit changes here.
+Status: Implemented. This spec records the submission fixes and workflow additions built from baseline 1f41125.
+It is separate from [028 sample orders](../028-sample-orders.md). Existing specs and design tokens apply
+except for the changes here. The checks below define acceptance; they are not a fresh QA report.
 
 ## Scope and priorities
 
@@ -60,7 +61,7 @@ No admin expansion, Datathon integration, new routing service, or new driver pro
   until acknowledged. Preserve already-working retry/reload/identity separation and test regressions.
 - D3: Reproduce reported sign-out hang and old-trip flash before changing code; record non-reproductions honestly.
 
-## E · Shop ready to receive (shared schema/contracts supplied by lead)
+## E · Shop ready to receive
 
 - E1: Store manager may set Not confirmed / Ready to receive / Temporarily unavailable for their own delivery
   day, with a short optional receiving note. Use app clock and explicit day; no automatic yesterday carryover.
@@ -72,7 +73,7 @@ No admin expansion, Datathon integration, new routing service, or new driver pro
 - E5: Use existing role/depot/outlet checks, revision checks and reset/session rules. Independent outlets/days
   cannot overwrite one another. Tests cover authorization, day rollover, clear/reset and stale writes.
 
-## F · Bounded what-if comparison (after feasibility check)
+## F · Read-only vehicle-unavailable comparison
 
 - F1: Dispatcher previews the same eligible snapshot with and without one selected vehicle. Read-only scenarios
   never change orders, splits, assignments, fuel usage or the saved plan. Only before publication/loading.
@@ -82,14 +83,14 @@ No admin expansion, Datathon integration, new routing service, or new driver pro
   generated baseline if it differs from the manually edited plan. Show checked feasibility and errors honestly.
 - F4: No Apply, in-flight rerouting, optimality claims, invented forecasts, or new AI dependency in this scope.
 - F5: Reuse the existing planner/checker and enforce dispatcher/depot access. Abort or invalidate changed-snapshot
-  results. Timebox proof of feasibility before committing to building the UI.
+  results.
 
 ## Verification and release
 
-Business-rule regression tests are committed before implementation. Each builder runs focused checks; integration
-runs typecheck, full API/web tests against its own disposable DB, build, lint and migration-drift check.
-One independent review covers the joined A–D batch; another covers E–F, with corrections rechecked in batches.
-An independent GPT-6.1 Sol low-reasoning agent uses the built-in browser against a dedicated local QA database,
-phone and desktop viewports. Browser tests must not reseed the test runner DB or the shared Railway instance.
-No browser capability is assumed: offline/camera/network tests not supported by the tool are explicitly unverified.
-PRs and branches may be pushed, but main merge/deploy wait for Nabil. Leave AI disclosure untouched until finalization.
+Use focused regression tests for the changed behavior and run integration checks against a disposable test
+database. The repository CI runs typecheck, fresh migration and seed, migration-drift checks, tests and build.
+Browser QA uses a separate database and checks the four-role journey at phone and desktop sizes. Record
+offline, camera and network cases as unverified when the test environment cannot exercise them.
+
+Implementation is separate from approval to merge or deploy. The contribution split and review process are
+recorded in [the AI disclosure](../../ai-disclosure.md).

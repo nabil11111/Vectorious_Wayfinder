@@ -1,5 +1,8 @@
 # 013 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 One pull request per task. The API tasks, and T0's functions, write their tests from the criteria first (D-07).
 
 - [x] **T0 · Shared parts** · lead, on `nabil/driver` brought up to date with `main` once spec 012 is merged there, because
@@ -54,5 +57,5 @@ Nobody but the lead touches `packages/contracts`, `apps/api/src/db`, `apps/api/d
 `AppShell.tsx` or `app/router.tsx`, and nobody touches `features/plan`, `features/store` or `features/loader`. A builder
 who needs a change there stops and asks. A test file signs in once per account.
 
-Not in this piece: the loader's flag photo (spec 012, open question 1). Once A4 is joined it is a small task on `photos`,
+Not in this piece: the loader's flag photo (spec 012, design question 1). Once A4 is joined it is a small task on `photos`,
 with the flag's problem id.

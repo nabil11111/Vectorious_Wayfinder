@@ -1,5 +1,8 @@
 # 025 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 - [x] T1 · Server: `GET /api/v1/notifications` for every role, derived from existing records (AC-1), with the seeded
   day's updates pinned for the walkthrough people (AC-4). API tests first. · Claude server builder
 - [x] T2 · Screens: the bell and its pop-up for every role, the toast and the system notification with its permission

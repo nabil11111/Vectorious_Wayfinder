@@ -1,6 +1,6 @@
 # 003 · Outlet names
 
-**Status:** Done  ·  **Owner:**  ·  **Design:** every screen that names a shop (Fresh Nugegoda, Fresh Koggala, …)
+**Status:** Done  ·  **Design:** every screen that names a shop (Fresh Nugegoda, Fresh Koggala, …)
 
 ## Why
 `outlets.csv` has ids but no names, so the seed calls them "Fresh Colombo 1". The designs use real places.

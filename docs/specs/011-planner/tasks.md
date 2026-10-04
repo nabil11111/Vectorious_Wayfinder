@@ -1,5 +1,8 @@
 # 011 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 Each task is one pull request. One builder does T1 to T4 in order after T0. For each task, write and commit the
 criterion tests first, run them and record their failure, then implement and rerun them (D-07).
 

@@ -1,6 +1,8 @@
 # 026 · Crews: a truck and its driver picked as one, and trucks named by their drivers
 
-**Status:** Ready  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`) and Edit plan ·
+> Current scope: Submission hardening requires a driver on every sent trip. A draft may still have an unassigned vehicle.
+
+**Status:** Done  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`) and Edit plan ·
 empty (`78:67860`). This spec departs from both on purpose: the "Unassigned trucks" panel goes.
 
 ## Why

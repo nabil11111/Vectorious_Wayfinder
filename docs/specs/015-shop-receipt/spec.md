@@ -1,6 +1,6 @@
 # 015 · The shop's receipt
 
-**Status:** Done, with five open questions at the bottom  ·  **Owner:**  ·  **Design:** Shop · Confirm delivery; Shop · Short delivery · receipt pending sync; Shop · Receipt sent; Shop · Help; the received cards of Shop · Today, Shop · Today · desktop, Shop · Orders · Past and Shop · Orders · desktop; and the right-hand column of Dispatcher · Live day · issue open and · issue open · decision sent.
+**Status:** Done  ·  **Design:** Shop · Confirm delivery; Shop · Short delivery · receipt pending sync; Shop · Receipt sent; Shop · Help; the received cards of Shop · Today, Shop · Today · desktop, Shop · Orders · Past and Shop · Orders · desktop; and the right-hand column of Dispatcher · Live day · issue open and · issue open · decision sent.
 
 Pieces A5 and A6 of [the map](../000-map.md): the shop confirms what arrived and reports what is short or damaged, and
 the receipt waits on the shop's phone when there is no signal (D-43). It starts where spec 013 ends, with Dilshan's
@@ -28,17 +28,17 @@ for Friday.
 ## Decisions
 These are in `docs/decisions.md`.
 - **D-56 · The shop confirms each delivery whole, one stop's orders at once, and counts against what the driver handed
-  over** (our pick, open question 1). The orders of a stop arrive together, and a carton short from the depot or refused
+  over** (our pick, design question 1). The orders of a stop arrive together, and a carton short from the depot or refused
   at the door was reported where it was found, so the receipt shows those and asks only what the shop counts.
 - **D-57 · A receipt is saved on the shop's phone first and sent once, through the driver's queue: one table of applied
   phone writes, one store, sender and signal on the phone, the same time rule with the handover as its lower bound, and a
   view function of its own in the contracts. A receipt waiting or refused on the phone shows from the phone's own copy of
-  it, and in the shop's area only Deliveries waits for the tab that owns the queue** (our pick for the tabs, open question
+  it, and in the shop's area only Deliveries waits for the tab that owns the queue** (our pick for the tabs, design question
   5). One way to keep a write safe without a signal is easier to get right than two, a receipt the depot turned down must
   stay where the shop can read and clear it even after its delivery is gone, and the shop's other screens keep working
   online in any tab, as spec 009 built them.
 - **D-58 · A receipt with anything missing, damaged or not cold is a problem of kind `receipt`, answered once from Live
-  day's "Needs you" with "Send N replacements" or "No replacement"** (our pick for the second answer, open question 3).
+  day's "Needs you" with "Send N replacements" or "No replacement"** (our pick for the second answer, design question 3).
   The dispatcher decides every problem in one place (D-36), reporting a carton does not replace it, and the depot may
   have none to send.
 - **D-59 · "Send N replacements" places a new order for the shop, one per temperature, and another for each 999 units
@@ -50,7 +50,7 @@ These are in `docs/decisions.md`.
   product between them, so the shop can confirm everything it is sent. A part of a split replacement is still a
   replacement, through the link every part keeps to its original (D-30). This takes over the replacements half of D-48's
   last sentence. Writing cartons off is still not built.
-- **D-60 · "Still cold on arrival? No" is a report even when every carton is there** (our pick, open question 2). Warm
+- **D-60 · "Still cold on arrival? No" is a report even when every carton is there** (our pick, design question 2). Warm
   chilled goods are the depot's to know about, and an answer that reaches nobody would make the question decoration.
 - **D-61 · A receipt is kept on the orders it covers: each line's received count, and on each order when the shop
   confirmed, when the receipt reached the depot and, for a chilled order, whether it arrived cold.** Every shop card reads
@@ -494,7 +494,7 @@ carton is spec 012's.
   "Delivery help"; and on Live day "Next · Fresh Nugegoda · 1 carton short · Open next", "Drops and events" ("short 1,
   reported") and "Undo".
 - **A8:** the dispatcher's look-up of receipts in History and Orders.
-- **Open question 4:** a replacement for cartons short from the depot. The loader's answers stay "Go short" and "Load it
+- **Design question 4:** a replacement for cartons short from the depot. The loader's answers stay "Go short" and "Load it
   all" (D-37), and the shop sees "1 short from the depot" and can order it again.
 - **Not planned:** a signature (none is drawn), changing a receipt once it is in, writing
   cartons off and "shop credited, claim opened", "Tuesday works for me" and a new date for a deferred order (spec 009),
@@ -525,7 +525,7 @@ carton is spec 012's.
     confirm, not accepted, sign in again, could not save, could not load, another tab, not on your list, and the shop's
     cards for a delivery not yet confirmed, nobody at the shop, the depot's answers and a replacement.
 
-## Open questions
+## Design questions recorded during the build
 1. **What does the shop count against: what it ordered, or what the driver handed over?** The frame says "12 expected" for
    a 12-carton order, but in our data a carton can be short from the depot or refused at the door, and both were already
    reported. Our pick: what the driver handed over, with the earlier differences shown under the line (D-56). Counting

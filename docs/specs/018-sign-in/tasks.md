@@ -1,5 +1,8 @@
 # 018 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 - [x] T0 · Shared parts, pushed on their own before T2 starts: migration `0009_sign_in` and the `users` columns,
   `LoginRequest` and `Me.staffId`, the two error codes, `staffId` on every fixture account, `SEED_PIN` and
   `SEED_ADMIN_PIN`, a plain staff ID and PIN sign-in, the shared test sign-in helper and the test files that use it,

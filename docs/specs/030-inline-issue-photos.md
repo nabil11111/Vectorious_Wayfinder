@@ -1,6 +1,6 @@
 # 030 · View issue photos in place
 
-Status: Ready. Baseline: c7b6651. Design: existing live problem cards and History photo viewer.
+Status: Done. Baseline: c7b6651. Design: existing live problem cards and History photo viewer.
 
 The user confirmed photos load but asks to view them inside the app instead of a separate browser tab. History already has an in-app viewer; driver/shop issue cards currently call window.open. Initial scope was photo viewing. Nabil subsequently approved compact receiving status and asked for understandable dispatcher workflows; the following added criteria supersede the initial copy-only hold on the new panels.
 

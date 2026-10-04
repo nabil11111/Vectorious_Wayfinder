@@ -1,6 +1,6 @@
 # 027 · Undo, redo and starting over on the plan board
 
-**Status:** In progress  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`). The design
+**Status:** Done  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`). The design
 draws no undo, redo or start-over, so this spec adds them to its header and rows.
 
 ## Why

@@ -1,5 +1,8 @@
 # 017 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 This PR is documents only. These tasks implement A8 **only if it survives the cut line**. T0 starts after 016
 is merged and the joined four-role/offline journey and A7 checks pass. Orders and Fleet require merged 013;
 History's confirmations and replacements additionally wait for merged 015. That extra gate does not hold up

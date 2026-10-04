@@ -1,5 +1,8 @@
 # 010 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 One migration, `plan-board`, written by the lead in T0.
 
@@ -14,7 +17,7 @@ One migration, `plan-board`, written by the lead in T0.
 
 `trips.depart_at` stays the time the dispatcher set, empty for the usual time, and `stops.planned_arrival` and
 `planned_depart` are written at sending. The migration adds the enum value without using it, as Postgres requires.
-T0's seed change is open point 1's driver accounts. A reset removes plans, parts and fuel rows (spec 008).
+T0's seed change is design question 1's driver accounts. A reset removes plans, parts and fuel rows (spec 008).
 
 ## Contracts
 The lead writes these into `packages/contracts/src/plans.ts`. A time of day is minutes after midnight on the plan's

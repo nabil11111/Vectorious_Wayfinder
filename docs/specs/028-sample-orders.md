@@ -1,6 +1,6 @@
 # 028 · Sample shop orders from the demo control
 
-**Status:** In progress  ·  **Owner:** Claude builder  ·  **Design:** none. The demo control has no frame (spec 008),
+**Status:** Done  ·  **Owner:** Claude builder  ·  **Design:** none. The demo control has no frame (spec 008),
 and this adds one item and one small panel to it, built from the style guide's buttons.
 
 ## Why

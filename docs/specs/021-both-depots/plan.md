@@ -1,5 +1,8 @@
 # 021 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 Migration `0011_both_depots`: `sessions.all_depots boolean not null default false`. When it is true the session is on
 Both, and `depot_id` is null. A new sign-in creates a session with neither set, so it starts at the dispatcher's own

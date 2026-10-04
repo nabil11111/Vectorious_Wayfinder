@@ -1,6 +1,8 @@
 # 013 · The driver
 
-**Status:** Done, with three open questions at the bottom  ·  **Owner:**  ·  **Design:** Driver · Today's trip, · Next stop, · Unload, · Proof, · photo preview, · delivery saved locally, · No signal, · connection restored, · Something's wrong · refused and · shop closed, · Next stop · after refusal and · after no answer, · Trip done, · Trip done · refused and · shop closed, · Day done, the offline and last stop variants of Unload, Proof and delivery saved locally, and the right-hand column of Dispatcher · Live day · issue open and · issue open · decision sent.
+> Current scope: Spec 015 adds replacements, 025 adds the driver bell, and submission hardening adds second-trip reload checks. These extend the original driver scope below.
+
+**Status:** Done  ·  **Design:** Driver · Today's trip, · Next stop, · Unload, · Proof, · photo preview, · delivery saved locally, · No signal, · connection restored, · Something's wrong · refused and · shop closed, · Next stop · after refusal and · after no answer, · Trip done, · Trip done · refused and · shop closed, · Day done, the offline and last stop variants of Unload, Proof and delivery saved locally, and the right-hand column of Dispatcher · Live day · issue open and · issue open · decision sent.
 
 Piece A4 of [the map](../000-map.md), with the driver's no-signal screens the map first put in A6 (D-43). It starts where
 spec 012 ends, with a truck marked `ready` and its loaded counts written. The clock, live updates and the seeded day are
@@ -119,7 +121,7 @@ trip, the trip bar and Trip done alike.
    delivered · 39 handed back".*
 3. **Starting.** "Start trip" makes a `ready` trip `out` at the time kept. It is offered only on a ready trip, and a
    vehicle's two trips are never out at once: a start takes the depot's lock, so two starts of one vehicle's trips go one
-   after the other and the second finds the first out. The leaving time is the plan's, not a gate (open question 1).
+   after the other and the second finds the first out. The leaving time is the plan's, not a gate (design question 1).
    *Dilshan starts at 03:31, 1 h 5 min before 04:36.*
 4. **A stop.** The next stop is the first unfinished stop in plan order among those not sent back, and the stops sent back
    by "Try again" come after them, in the order they were sent back. An arrival or a save at any other stop is refused
@@ -485,7 +487,7 @@ Friday's plan while Thursday's stop 2 stays closed.
   arrival estimates), and the bell's count on the driver's phone. Spec 016 built the timelines, counts and events; the
   truck shown offline, "Watching" by presence, delays, estimates, "Undo" and the driver's bell count stay out.
 - **A8:** History, where every stop keeps its receipt and photo, and the attempts the audit log keeps.
-- **Spec 012, open question 1:** the loader's flag photo. It can use `photos` with the flag's problem id in a small task
+- **Spec 012, design question 1:** the loader's flag photo. It can use `photos` with the flag's problem id in a small task
   after this piece.
 - **Not planned:** "Call the shop", the "Called the shop · 2 tries, no answer" row and "Call Prasanna" (the data has no
   phone numbers, D-40), "Get a signature instead", "dock 2" (D-40), the "Damaged", "Wrong item" and "Cannot reach" chips,
@@ -519,10 +521,10 @@ Friday's plan while Thursday's stop 2 stays closed.
 ## Known limits
 1. **The server checks a photo's structure and never decodes the picture.** It takes a file that starts `FF D8`, ends `FF
    D9`, is at most 500 KB and whose frame header gives at most 2000 px a side. The phone makes every photo from a canvas,
-   so a real one always decodes. A file made to pass the check without decoding would show as a broken picture on the
-   dispatcher's card and harm nothing else.
+   so a real one always decodes. A file made to pass the check without decoding can pass these structural checks but still fail to decode in the
+   dispatcher's viewer.
 
-## Open questions
+## Design questions recorded during the build
 1. **May the driver start before the trip's leaving time?** The demo clock starts the road at 03:30 and VEH035 leaves at
    04:36, so without it a judge waits an hour. A real driver leaving early reaches a shop before its window and waits
    there. Our pick: yes, as built. The dispatcher chose the time (D-19), and the app records when the truck really left.

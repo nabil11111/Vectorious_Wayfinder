@@ -1,6 +1,6 @@
 # 031 · The other depot, a sound, and a background alert
 
-**Status:** In progress  ·  **Owner:** lead  ·  **Design:** no frame. The bell's pop-up is already ours (D-99).
+**Status:** Done  ·  **Owner:** lead  ·  **Design:** no frame. The bell's pop-up is already ours (D-99).
 
 ## Why
 

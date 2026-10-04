@@ -1,6 +1,6 @@
 # 029 · Clearer planner decisions
 
-Status: Ready. Baseline: 0326a1b. Owner: lead plus scoped builder and independent reviewer.
+Status: Done. Baseline: 0326a1b. Owner: lead plus scoped builder and independent reviewer.
 Design: existing dispatcher Edit plan / View plan frames, tokens and responsive layout from specs 010, 023, 026 and 027. This is one grouped usability batch.
 
 ## Why and scope

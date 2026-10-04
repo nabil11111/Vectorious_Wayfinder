@@ -1,5 +1,8 @@
 # 012 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 One pull request per task. The API tasks write their tests from the criteria first (D-07).
 
 - [x] **T0 · Shared parts** · lead, on `nabil/loading` brought up to date with `main` once spec 010 is merged there,

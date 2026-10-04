@@ -1,5 +1,8 @@
 # 007 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 None. A vehicle's `available` and `litresUsedThisWeek` come from spec 008's tables, read by A2.
 

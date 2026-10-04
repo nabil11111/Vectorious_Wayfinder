@@ -1,21 +1,44 @@
 # AI tool disclosure
 
-The booklet asks which work was AI-assisted, which was not, and how we used the tools. Add an entry when
-the work happens, not at the end.
+Claude Code and Cursor wrote most of the code, including almost all of the frontend. We wrote the planning
+engine and some of the other code ourselves. Almost all the decisions were ours, including the business
+rules, architecture and design changes.
 
-## Tools used
+## How we used the tools
 
-| Tool | Used for |
-| --- | --- |
-| Claude Code | Scaffolding, schema drafting, docs, tests, reviews |
-| Codex | Technical proposal draft, reviews |
+- Claude Code and Cursor helped build the app. Claude also helped with the database schema, seed data,
+  sign-in, Docker setup, CI, specifications and documentation.
+- Codex did most of the code reviews. It reviewed both AI-written code and code we wrote ourselves. It
+  also helped draft the technical proposal and this disclosure.
+- We had already completed the designs before the Hackathon build. We used the Figma MCP to read those
+  designs and pull images and other assets for the UI.
+- AI wrote all the automated tests. We also used Grokbot and Codex to test the app through their built-in
+  browsers.
 
-## Log
+## How we built from specs
 
-| Date | Who | Area | What the AI did | What we did ourselves |
-| --- | --- | --- | --- | --- |
-| 28 Sep | Nabil | Technical proposal | Codex drafted it; Claude reviewed it against the booklet | Chose the stack (Drizzle, Express, Railway, shadcn), decided scope and what stays out |
-| 29 Sep | Nabil | Foundation | Claude wrote the workspace, schema, seed, sign-in, Docker, CI and docs from our decisions | Set the data model rules, security requirements and development process; reviewed the result |
-| 30 Sep | Nabil | Security fixes | Codex reviewed the foundation; Claude wrote the fixes and the tests for them | Chose what to fix first, decided how the demo accounts, admin password and proxy setting should work; reviewed the result |
-| 30 Sep | Nabil | Build process and map | Claude proposed the build loop and wrote it up with the decision log and a draft map of the build | Set what the process had to do (finish in four days, split work between agents, review before merging), approved the loop, and decides the open points in the map |
-| 30 Sep | Nabil | Spec 007, plan checker | Claude wrote the spec and worked every example out from the shared data files | Made the planning decisions it rests on: one real timeline per vehicle, which rules are hard and which are defaults, splitting orders, leaving times and the fuel week |
+We worked spec first. The Figma designs covered how the screens should look. The specs covered how the app
+should behave. AI helped write the specs from our decisions.
+
+1. We mapped the build into smaller features. Each spec named the screens, the inputs and outputs, and
+   the acceptance criteria: what had to work before we could call it done. Larger features also had a
+   plan and a task list. Decisions made along the way went into a decision log.
+2. We defined the shared database tables and API request shapes before splitting the work. Each task had
+   its own branch and a clear list of files it could change.
+3. AI wrote tests from the acceptance criteria. For business rules, our process required the tests to be
+   written before the implementation.
+4. The builder worked from the spec. Codex did most of the reviews, checking the code against those same
+   criteria and looking for security and data mistakes. The reviewer was separate from the builder.
+5. Before merging, the process called for type checks, tests, a build and manual screen checks, including
+   phone layouts against Figma. Review findings went back for fixes and another check.
+
+The process is in [docs/specs/README.md](specs/README.md), alongside the feature specs.
+
+## What we did ourselves
+
+We wrote the planning engine, decided how the business rules should work, chose the architecture and made
+the design changes. AI helped draft proposals and specifications, but we made the decisions about what to
+build and how it should behave.
+
+We did our own manual QA across the app, alongside the browser QA done by Grokbot and Codex. The automated
+tests were AI-written, the team's own testing was manual.

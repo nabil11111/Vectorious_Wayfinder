@@ -1,6 +1,6 @@
 # 007 · Plan checker: load, timeline and rules
 
-**Status:** Done  ·  **Owner:**  ·  **Design:** no screens of its own. Its numbers show on Dispatcher · Edit plan and View plan, Shop · New orders and Loader · Load a truck.
+**Status:** Done  ·  **Design:** no screens of its own. Its numbers show on Dispatcher · Edit plan and View plan, Shop · New orders and Loader · Load a truck.
 
 Pieces B1 to B3 of [the map](../000-map.md). It replaces specs 001 and 002. It checks a plan and does not
 build one: that is the planner (B4), which gets its own spec.
@@ -179,7 +179,7 @@ vehicle. Bad input is not a plan problem: the engine throws an error that names 
 - Building a plan, dividing an order into two parts (D-17), reading from the database, saving a plan and the
   endpoints. They belong to B4 and A2. To the checker each part of a split order is simply an order.
 - Traffic, monsoon and unloading that grows with the size of the order. The engine uses the supplied
-  clear-road figures only. Using the Datathon's predictions is parked in `docs/ideas.md`.
+  clear-road figures only. Datathon predictions are outside this build.
 - A screen to change the settings, and the 4 PM cut-off, which belongs to placing an order (spec 009).
 
 ## What comes next

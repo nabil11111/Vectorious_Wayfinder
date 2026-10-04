@@ -1,5 +1,8 @@
 # 014 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 One pull request per task. The API task writes its tests from the criteria first (D-07).
 
 - [x] **T0 · Shared parts** · lead, on a branch cut from `main` once PR #15 (spec 011) is merged there, with this

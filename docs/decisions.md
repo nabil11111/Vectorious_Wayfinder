@@ -1,7 +1,9 @@
 # Decisions
 
 The choices that shape Wayfinder, oldest first: what we chose and why. When a decision changes, a new entry
-says so. Open questions sit at the bottom of [the map](specs/000-map.md).
+says so. Earlier entries are historical, not parallel rules for the current app. For example, D-90 replaces
+password sign-in with staff ID/PIN, D-93/D-96 add depot switching and Both, and D-104 requires drivers at Send.
+Use the [README](../README.md), [feature index](specs/README.md) and later decisions for current behavior.
 
 **D-01 · 28 Sep · One app and one database.** One Node process serves the web app and the API, with one
 Postgres. One address, one deploy, nothing to keep in sync. We overbuilt last year and did not finish.

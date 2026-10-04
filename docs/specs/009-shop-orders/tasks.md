@@ -1,5 +1,8 @@
 # 009 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 One pull request per task. The API tasks write their tests from the criteria first (D-07).
 
 - [x] **T0 · Shared parts** · lead. The migration in `plan.md`, the shapes and error codes in

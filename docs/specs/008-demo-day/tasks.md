@@ -1,5 +1,8 @@
 # 008 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 Each task is one pull request. For the API and the seed, tests come first and are seen to fail (D-07), one per
 criterion with its number in the name. Server files are under `apps/api/src`, tests under `apps/api/tests`.
 

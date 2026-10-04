@@ -1,10 +1,20 @@
 # Specs
 
-We build Wayfinder spec first. Every feature starts here, before any code. The flow follows the spec, plan,
-tasks shape used by GitHub Spec Kit and Amazon Kiro.
+We build Wayfinder spec first. Every feature starts here, before any code. Larger features use a spec,
+an implementation plan and a task list.
 
-Start with [the map](000-map.md). It lists every piece of the build in order, what the pieces share, and what
-we cut first if time runs short.
+Start with [the map](000-map.md) for the feature groups and shared rules. The table below indexes the specs.
+
+## Reading these records
+
+These files record how the features were designed and built. Plans and task lists retain their original build
+sequence; they are not a new work queue. Acceptance-criteria checkboxes define the checks, not a current QA
+report. A Done status records implementation, not a claim that every device or failure path has been retested.
+
+Later specs can extend or replace earlier behavior. In particular, depot switching (020–021), crews (026),
+notifications (025 and 031) and submission hardening supersede parts of the original role specs. The
+[README](../../README.md) describes the current walkthrough and [design departures](../design-departures.md).
+The two existing 028 documents are distinguished by their names: sample orders and submission hardening.
 
 ## How a piece gets built
 
@@ -30,7 +40,7 @@ A builder can be a teammate or a coding agent working from the spec. The rules a
    it. They check the code against each acceptance criterion, not against taste, and look for security and
    data mistakes. A finding that is real gets a failing test first, then the fix.
 7. **Merge.** The pull request says what changed, how it was checked and how it works. CI must be green.
-   Nabil merges. `main` is always deployable.
+   Nabil merges after the checks pass.
 
 ## Done means
 
@@ -51,11 +61,12 @@ A builder can be a teammate or a coding agent working from the spec. The rules a
 Acceptance criteria are written as "When …, the system shall …", so each one maps to one test.
 
 The Figma file is the spec for how screens look. These files are the spec for how the system behaves. New
-ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
+features need a team decision and a scoped spec before implementation. Speculative product ideas are kept
+outside this submission repository.
 
 | Spec | Feature | Status |
 | --- | --- | --- |
-| [000](000-map.md) | The map: every piece, in build order | Ready |
+| [000](000-map.md) | Feature map and shared rules | Reference |
 | [003](003-outlet-names.md) | Outlet names | Done |
 | [004](004-admin-vehicles.md) | Admin: vehicles | Done |
 | [005](005-admin-outlets.md) | Admin: outlets | Done |
@@ -78,10 +89,11 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [022](022-trip-times-and-drivers/spec.md) | The trip's depot times, each stop's times on hover, and every trip's driver | Done |
 | [023](023-plan-drag/spec.md) | Planning by drag and drop | Done |
 | [024](024-checker-words/spec.md) | The plan checker in plain words | Done |
-| [025](025-notifications/spec.md) | Notifications for every role | In progress |
-| [026](026-crews/spec.md) | Crews: a truck and its driver picked as one | In progress |
-| [027](027-plan-history/spec.md) | Undo, redo and starting over on the plan board | In progress |
-| [028](028-sample-orders.md) | Sample shop orders from the demo control | In progress |
-| [029](029-planner-usability.md) | Planner shop progress, visible deferral and explicit withdrawal | In progress |
-| [030](030-inline-issue-photos.md) | Inline issue photos and compact dispatcher status controls | In progress |
-| [031](031-alerts.md) | The other depot's unsent plan, open-app sounds, and a background push | In progress |
+| [025](025-notifications/spec.md) | Notifications for every role | Done |
+| [026](026-crews/spec.md) | Crews: a truck and its driver picked as one | Done |
+| [027](027-plan-history/spec.md) | Undo, redo and starting over on the plan board | Done |
+| [028](028-sample-orders.md) | Sample shop orders from the demo control | Done |
+| [028 hardening](028-submission-hardening/spec.md) | Submission fixes, receiving readiness and read-only delivery-impact comparison | Implemented |
+| [029](029-planner-usability.md) | Planner shop progress, visible deferral and explicit withdrawal | Done |
+| [030](030-inline-issue-photos.md) | Inline issue photos and compact dispatcher status controls | Done |
+| [031](031-alerts.md) | The other depot's unsent plan, open-app sounds, and a background push | Done |

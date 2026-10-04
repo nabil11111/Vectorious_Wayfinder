@@ -1,5 +1,8 @@
 # 012 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 One migration, `loading`, written by the lead in T0 once spec 010's is in.
 

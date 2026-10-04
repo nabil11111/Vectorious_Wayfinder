@@ -1,5 +1,8 @@
 # 013 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 One migration, `driver`, written by the lead in T0 once spec 012 is merged, because A4 reads its loaded counts, its
 problems and its locks.
@@ -235,7 +238,7 @@ A loader's flag is answered as spec 012 has it, with no trip lock.
   `loading` only, typed `LoadingIssue`, with spec 012's loading and issues tests green after the contracts change (AC-7).
   `lib/day-lock.ts` gains the clock read on demand, which spec 012's writes do not need. Its ready, and spec 010's send
   and unsend, also announce `driver` (T1). `issuesOf` and `decideIssue` handle the driver's kinds (T4), and `IssueCard`
-  draws them (T7). Its open question 1, the flag's photo, can use `photos`.
+  draws them (T7). Its design question 1, the flag's photo, can use `photos`.
 - **Spec 008.** Its out-of-scope line gives "the time on a phone with no signal" to A6. This piece builds it in
   `lib/clock.ts`, and the lead updates the line at the join.
 - **Spec 009.** Nothing changes. The shop's cards show `delivered` as spec 009 draws it, and a closed shop's orders brought

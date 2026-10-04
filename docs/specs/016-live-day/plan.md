@@ -1,5 +1,8 @@
 # 016 · Plan
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 ## Data changes
 **None.** No new table, column, migration, seed, event log or acknowledgment record. The only new endpoint is a GET.
 The loader's comparison lives in tab-scoped `sessionStorage`; the server remains the authority for starting loading.

@@ -1,5 +1,8 @@
 # 026 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 - [ ] T1 · The crew picker (one pick for truck and driver, sorted by fit, district last run and fuel; the workshop's
   and fully used trucks last with reasons), the usual driver from the latest sent plan, the trucks panel removed and
   Unplanned orders at full height, and the README (AC-1, AC-2, AC-4, AC-5). Built after spec 023 on top of it, and it

@@ -1,5 +1,7 @@
 # 022 · The trip's depot times, each stop's times on hover, and every trip's driver
 
+> Current scope: Submission hardening supersedes optional driver assignment at publication: a draft can omit a driver, but Send cannot.
+
 **Status:** Done  ·  **Owner:** Claude builder  ·  **Design:** Dispatcher · Edit plan (`66:48982`): the open trip's
 timeline in the middle column, and Done's trip cards on the right ("VEH004 · Ruwan · Fresh · Colombo").
 

@@ -1,5 +1,8 @@
 # 023 · Tasks
 
+> Build record: this describes the original implementation sequence. See the [spec guide](../README.md)
+> for current status and the later specs that supersede parts of this work.
+
 - [x] T1 · Drag and drop on the plan board with `@dnd-kit/core` and `@dnd-kit/sortable`: orders onto trips, cards and
   trucks, trucks into the middle, stops up and down and off their trip, the empty middle's drop area, keyboard
   dragging and its announcements. Every drop goes through the same draft change and checker as its button. Web tests

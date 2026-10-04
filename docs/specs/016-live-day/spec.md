@@ -1,6 +1,8 @@
 # 016 · Watching the day
 
-**Status:** Done, with open questions and our picks below · **Owner:** · **Design:** Dispatcher · Dashboard, Live day,
+> Current scope: Spec 019 adds the district map, 025 and 031 add notifications, and submission hardening adds receiving readiness and separates actionable problems from trips being watched.
+
+**Status:** Done  · **Design:** Dispatcher · Dashboard, Live day,
 Live day · loading, Live day · issue open, both Live day · decision sent states, Loader · Plan changed and Today's trucks · plan changed.
 
 Piece A7 of [the map](../000-map.md). [008](../008-demo-day/spec.md) supplies the clock and live updates,
@@ -342,7 +344,7 @@ D-70 also departs from `150:81067`, which draws a truck change while another tru
 only compares publications changed before **any** loading begins, without dock/reason/partial-unload claims.
 The whole-trip move is one row/bell 1 as in `85:71921`; the loader badge stays after Got it as the prototype shows.
 
-## Open questions
+## Design questions recorded during the build
 1. **May A7 change trucks after loading has begun?** Our pick: no for this build (D-70). It needs new commands that
    preserve goods already counted and changes to the existing locks. We explicitly defer the earlier A7 promise.
 2. **Does Live day change to tomorrow at 16:00?** Our pick: yes, with the loader/driver day, retaining older out trips

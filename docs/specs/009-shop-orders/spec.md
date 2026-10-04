@@ -1,6 +1,8 @@
 # 009 · Shop orders
 
-**Status:** Done, with one open point at the bottom  ·  **Owner:**  ·  **Design:** the shop's frames for Today, New orders (Fresh, Style, Tech), Orders, Orders placed and Help, on a phone and a desktop
+> Current scope: Shop receipt behavior is completed in spec 015; sign-in and account coverage are updated by 018 and 020. The README describes the current full journey.
+
+**Status:** Done  ·  **Design:** the shop's frames for Today, New orders (Fresh, Style, Tech), Orders, Orders placed and Help, on a phone and a desktop
 
 Piece A1 of [the map](../000-map.md). The frames are exported in `tech-triathlon-ops/design/export`.
 
@@ -34,7 +36,7 @@ fits the style guide. Loading is the style guide's "Loading · skeleton", on the
 |  | Saving, not saved, changed elsewhere | No frame | The footer ends with "saving…", or "not saved · trying again" in the warning colour, and the numbers stay. A draft changed on another device reloads with one line that says so. |
 |  | Day closed | No frame | A yellow line: "Orders for Thu 25 Jun closed at 16:00. This order is now for Fri 26 Jun." The title shows the new day. |
 |  | Placing, could not place, no open day | No frame | "Placing…" cannot be tapped twice. A refusal shows its reason in red above the button. With no open day there is one card and no form. |
-| Orders placed `/store/orders/placed` | Two orders | Shop · Orders placed | "Your 2 orders are placed", "Requested for Thursday, 25 June.", a row per line, the chip "Waiting for the delivery plan", "The depot has received both requests. We'll let you know when delivery dates and times are confirmed.", "Orders for Thursday close at 16:00 today." (open point 1), the orange "Back to Today" and "Submission confirmation · 15:05". |
+| Orders placed `/store/orders/placed` | Two orders | Shop · Orders placed | "Your 2 orders are placed", "Requested for Thursday, 25 June.", a row per line, the chip "Waiting for the delivery plan", "The depot has received both requests. We'll let you know when delivery dates and times are confirmed.", "Orders for Thursday close at 16:00 today." (design question 1), the orange "Back to Today" and "Submission confirmation · 15:05". |
 |  | One order, nothing placed | No frame | "Your order is placed" and "The depot has received your request.", with a row per item for Style and Tech. With nothing placed the screen goes to Orders. |
 | Orders `/store/orders` | Open | Shop · Orders | "Orders", the plain "+ New order", "2 open orders", the Open and Past tabs and a card per open order. |
 |  | Past | Shop · Orders · Past | "Wed 24 Jun and earlier · newest first", a heading per day, and at the end "Older orders load as you scroll". |
@@ -181,7 +183,7 @@ the rows of the table above. Screens get a written click-through at 390 and 1440
 - The new date on a "Date changed" card, "… works for me", Shop · Deferred date accepted and "plan updated 16:10":
   A5 may add them. A deferred order gets no new date; it waits for the next plan, where it comes first (spec 010).
   The dispatcher's view of orders: A8.
-- Changing or withdrawing a placed order (open point 1), and drafts with no signal.
+- Changing or withdrawing a placed order (design question 1), and drafts with no signal.
 - Ordering further ahead than the next open day, or a fixed weekly day for Style. The data has no schedule.
 
 ## Departures from the design
@@ -192,7 +194,7 @@ the rows of the table above. Screens get a written click-through at 390 and 1440
 4. States the design lacks: nothing started, empty, could not load, not saved, day closed, no open day.
 5. After placing, Today keeps the date and shop name as its header. The frame has the plain title "Today".
 
-## Open points
+## Design questions recorded during the build
 1. **Can a placed order be changed before the cut-off?** The confirmation frame says "Edits close at 16:00
    today", but no frame shows how. Our pick, and what this spec builds: not in this build. The shop can place
    another order for the same day until 16:00. Edits would need a "Change order" path, a cancel, and a
