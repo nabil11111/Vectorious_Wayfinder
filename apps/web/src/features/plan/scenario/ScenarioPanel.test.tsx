@@ -26,11 +26,13 @@ const preview: PlanScenario = {
   scenario: { summary: { totalOrders: 1, fullyPlanned: 0, partiallyPlanned: 0, deferred: 1, shopsFullyPlanned: 0, shopsWithWaiting: 1, vehicles: 0, trips: 0, fuelLitres: 0, repeatedDeferrals: 1 }, orders: [{ orderId: 'original', outletId: 'OUT001', shopName: 'Fresh Nugegoda', status: 'deferred', waitedBefore: true, vehicleIds: [], reasons: ['The real scenario planner reason.'] }], check: { ok: true, problems: [], trips: [], vehicles: [] } },
 };
 const render = (stale = false, refreshing = false, s = screen) => renderToStaticMarkup(<ScenarioPanel screen={s} stale={stale} refreshing={refreshing} />);
-it('F2 labels the generated baseline and displays checked original demand, real reasons, fuel and changes without Apply', () => {
+it('S2 leads with delivery impact and keeps real figures/reasons in collapsed plain-language details', () => {
   held.value = { identity: scenarioIdentity(screen, me, 'Peliyagoda', 1, held.vehicle, false)!, value: preview };
   const html = render();
-  for (const text of ['Generated baseline', 'Orders partly planned', 'Shops fully planned', 'Shops with waiting goods', 'Trip fuel (L)', '2.3', 'Previously waiting orders', 'Fresh Nugegoda', 'planned → deferred', 'real baseline planner reason', 'real scenario planner reason', 'Split parts count together']) expect(html).toContain(text);
-  expect(html).not.toContain('Apply'); expect(html).not.toContain('optimal');
+  for (const text of ['More goods would wait', 'Fresh Nugegoda', 'Newly waiting', '1', 'Delivery details and reasons', 'Counts and fuel', '2.3', 'real baseline planner reason', 'real scenario planner reason']) expect(html).toContain(text);
+  expect(html).not.toContain('Generated baseline'); expect(html).not.toContain('checker warnings'); expect(html).not.toContain('planned → deferred'); expect(html).not.toContain('original demand');
+  expect(html).not.toContain('<table'); expect(html).not.toContain('Apply'); expect(html).not.toContain('optimal');
+  expect(html.indexOf('More goods would wait')).toBeLessThan(html.indexOf('Counts and fuel'));
 });
 it('F5 immediately hides stale, refreshing, changed-input and unsaved results', () => {
   held.value = { identity: scenarioIdentity(screen, me, 'Peliyagoda', 1, held.vehicle, false)!, value: preview };
@@ -40,7 +42,18 @@ it('F5 immediately hides stale, refreshing, changed-input and unsaved results', 
   }
 });
 
-it('Q1 explains the preview action and keeps the generated baseline and saved-plan caveats', () => {
+it('S1 explains the operational question without technical comparison labels', () => {
   held.value = null; const html = render();
-  for (const text of ['Compare without a vehicle', 'See which deliveries would change', 'Vehicle to leave out', 'Show what changes', 'generated plans', 'may differ from your saved draft', 'does not change the saved plan']) expect(html).toContain(text);
+  for (const text of ['See which deliveries are affected', 'Vehicle that cannot run', 'Show delivery impact']) expect(html).toContain(text);
+  expect(html).not.toContain('generated plans'); expect(html).not.toContain('Generated baseline');
+});
+it('S3 states manual edits are excluded and the saved plan is unchanged', () => {
+  held.value = { identity: scenarioIdentity(screen, me, 'Peliyagoda', 1, held.vehicle, false)!, value: preview };
+  const html = render();
+  for (const text of ['Both suggestions use today', 'manual changes', 'saved plan stays unchanged', 'max-h-[min(320px,45dvh)]', 'Things to review']) expect(html).toContain(text);
+});
+it('S4 hides an old result after the chosen vehicle changes', () => {
+  held.vehicle = 'VEH001'; held.value = { identity: scenarioIdentity(screen, me, 'Peliyagoda', 1, held.vehicle, false)!, value: preview };
+  held.vehicle = 'VEH002'; const html = render(); held.vehicle = 'VEH001';
+  expect(html).not.toContain('Fresh Nugegoda'); expect(html).not.toContain('More goods would wait');
 });
