@@ -7,7 +7,7 @@ export const DEPOT_TIME_ZONE = 'Asia/Colombo';
 
 // The demo day (D-18): orders close on Wed 24 Jun 2026 for delivery on Thu 25 Jun 2026. The clock starts at
 // the first part and waits at the end of each one until someone moves it on (D-25).
-export const DEMO_PARTS = ['ordering', 'planning', 'loading', 'on_the_road', 'delivered'] as const;
+export const DEMO_PARTS = ['ordering', 'planning', 'loading', 'on_the_road', 'first_windows', 'some_open', 'most_open', 'delivered'] as const;
 export const DemoPart = z.enum(DEMO_PARTS);
 export type DemoPart = z.infer<typeof DemoPart>;
 
@@ -20,6 +20,9 @@ export const DEMO_DAY = {
     { key: 'planning', label: 'Orders closed', at: '2026-06-24T16:00:00+05:30' },
     { key: 'loading', label: 'Loading', at: '2026-06-25T02:30:00+05:30' },
     { key: 'on_the_road', label: 'Trucks leave', at: '2026-06-25T03:30:00+05:30' },
+    { key: 'first_windows', label: 'First windows', at: '2026-06-25T05:00:00+05:30' },
+    { key: 'some_open', label: 'Some shops open', at: '2026-06-25T06:30:00+05:30' },
+    { key: 'most_open', label: 'Most shops open', at: '2026-06-25T07:30:00+05:30' },
     { key: 'delivered', label: 'Morning deliveries done', at: '2026-06-25T08:30:00+05:30' },
   ],
   // The clock stops here in the last part.

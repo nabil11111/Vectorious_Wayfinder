@@ -17,7 +17,7 @@ starts its query keys with its topic, announces a change after saving it, and ad
 | --- | --- |
 | Clock running | The app's time in depot time, such as 15:18, on the right of a desktop's top bar. Beside it the chip "Demo · Wed 24 Jun". |
 | Clock waiting | The time stays on the part's last minute, such as 15:59. A small yellow dot on the chip. The open control says "The clock waits here. Go to the next part when you are ready." |
-| Control open | "Demo day" and one line: "Wed 24 Jun 2026, 15:18. The app runs on its own clock so you can walk a whole delivery day." The five parts with their times, the current one marked. The orange button "Next: Orders closed, 16:00", which names the day when that changes: "Next: Loading, Thu 02:30". Under it the plain button "Reset the demo day". A sheet from the bottom on a phone, a small panel under the chip on a desktop, built from the style guide's chip, sheet and buttons. |
+| Control open | "Demo day" and one line: "Wed 24 Jun 2026, 15:18. The app runs on its own clock so you can walk a whole delivery day." The parts of the day with their times, the current one marked. The orange button "Next: Orders closed, 16:00", which names the day when that changes: "Next: Loading, Thu 02:30". Under it the plain button "Reset the demo day". A sheet from the bottom on a phone, a small panel under the chip on a desktop, built from the style guide's chip, sheet and buttons. |
 | Moving | The orange button says "Moving…" and cannot be tapped twice. |
 | Last part | No orange button. One line: "The demo day is over. Reset to start again." |
 | Asking before a reset | "Reset the demo day? Every order, plan and delivery made in this demo is removed, and the day starts again on Wednesday at 15:00. Everyone using the demo is affected." The buttons "Reset the day" and "Keep going". |
@@ -34,7 +34,10 @@ starts its query keys with its topic, announces a change after saving it, and ad
 | Orders open | `ordering` | Wed 24 Jun, 15:00 | Shops place orders for Thursday. The clock starts here. |
 | Orders closed | `planning` | Wed 24 Jun, 16:00 | The dispatcher plans Thursday. |
 | Loading | `loading` | Thu 25 Jun, 02:30 | The loader loads the trucks. |
-| Trucks leave | `on_the_road` | Thu 25 Jun, 03:30 | Drivers deliver. |
+| Trucks leave | `on_the_road` | Thu 25 Jun, 03:30 | Drivers leave. The early shops are still shut. |
+| First windows | `first_windows` | Thu 25 Jun, 05:00 | The first shops can take a delivery. |
+| Some shops open | `some_open` | Thu 25 Jun, 06:30 | More windows are open and some are still shut. |
+| Most shops open | `most_open` | Thu 25 Jun, 07:30 | Most of the morning windows are open. |
 | Morning deliveries done | `delivered` | Thu 25 Jun, 08:30 | Shops confirm what arrived. Style and Tech trucks are still out. |
 
 - **Running and waiting (D-18, D-25).** The clock runs at real speed inside a part and waits at its end until
@@ -130,7 +133,7 @@ gets `available` from `vehicle_days_off` and `litresUsedThisWeek` from `fuel_log
   shall fail. *`new Date()` with nothing in the brackets in a route file fails the test run.*
 - [ ] **AC-14** The time on screen. For each role, on a phone and a desktop, the top bar shows the app's time and
   the chip "Demo · Wed 24 Jun". With the laptop on another time zone and a wrong time, both stay the same.
-- [ ] **AC-15** Tapping the chip shows the five parts and times, the current one marked, and an orange button
+- [ ] **AC-15** Tapping the chip shows the parts of the day and their times, the current one marked, and an orange button
   naming the next part and time. Reset asks first. The last part has no orange button, demo mode off no chip.
 - [ ] **AC-16** Someone else's move. With two browsers signed in as different roles, a move or a reset in one
   changes the time in the other within a second, shows the one-line message and loads every list again.

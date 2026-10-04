@@ -34,7 +34,8 @@ The same Thursday has Kandy's orders too, 64 from its 45 shops by the same rules
 
 The app runs on its own clock, the same for every screen, starting on Wednesday 24 June at 15:00 with orders
 open. The demo control in the top bar moves the whole app to the next part of the day (orders close at 16:00,
-loading at 02:30, trucks leave at 03:30, delivered by 08:30) and can reset the day to the seed. Every open
+loading at 02:30, trucks leave at 03:30, first windows at 05:00, some shops open at 06:30, most shops open at
+07:30, delivered by 08:30) and can reset the day to the seed. Every open
 screen follows at once. `DEMO_MODE=false` runs on the real clock with no seeded day.
 An install seeded before the shop's receipt keeps its old shop history until **Reset the demo day** is pressed once.
 While orders are open, the dispatcher's demo control also has **Add sample shop orders**: 10 shops, 25 shops or every
@@ -179,7 +180,7 @@ are what the demo clock shows.
     delivered · photo" in its events, and after the refusal the Dashboard's **Decide** opens the problem's card on Live
     day, where "Send to driver" turns the truck's row to "Decided".
 
-19. **The shop confirms.** Move the demo clock on to "Delivered by 08:30". As Nadeesha (`S-001`) on a phone, Today shows her three
+19. **The shop confirms.** Move the demo clock on through "First windows, Thu 05:00", "Some shops open, Thu 06:30" and "Most shops open, Thu 07:30" to "Morning deliveries done, Thu 08:30". As Nadeesha (`S-001`) on a phone, Today shows her three
     Thursday orders "Delivered", the dry one "3 of 4 delivered · 1 short from the depot". Open **Deliveries**: "Confirm
     delivery", each line against what the driver handed over (12 and 8 chilled, 3 dry with "1 short from the depot"), and
     "Still cold on arrival?" with Yes. On the first card press − once: "1 carton missing", and beside it "What's wrong?"

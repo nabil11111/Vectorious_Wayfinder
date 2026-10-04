@@ -131,12 +131,15 @@ describe('the demo clock, worked out from the stored row and the real time', () 
     }
   });
 
-  it('AC-3 waits at the end of each of the five parts of the day', () => {
+  it('AC-3 waits at the end of each part of the day', () => {
     const parts = [
       ['ordering', wed('15:00'), wed('15:59:59'), 'planning'],
       ['planning', wed('16:00'), thu('02:29:59'), 'loading'],
       ['loading', thu('02:30'), thu('03:29:59'), 'on_the_road'],
-      ['on_the_road', thu('03:30'), thu('08:29:59'), 'delivered'],
+      ['on_the_road', thu('03:30'), thu('04:59:59'), 'first_windows'],
+      ['first_windows', thu('05:00'), thu('06:29:59'), 'some_open'],
+      ['some_open', thu('06:30'), thu('07:29:59'), 'most_open'],
+      ['most_open', thu('07:30'), thu('08:29:59'), 'delivered'],
       ['delivered', thu('08:30'), thu('23:59:59'), undefined],
     ] as const;
     for (const [part, starts, waitsAt, next] of parts) {
@@ -298,12 +301,15 @@ describe('POST /demo/clock/next', () => {
 
   it('AC-4 goes one part at a time through the day', async () => {
     await setClock(wed('15:00'));
-    const day = [['planning', wed('16:00')], ['loading', thu('02:30')], ['on_the_road', thu('03:30')], ['delivered', thu('08:30')]] as const;
+    const day = [
+      ['planning', wed('16:00')], ['loading', thu('02:30')], ['on_the_road', thu('03:30')],
+      ['first_windows', thu('05:00')], ['some_open', thu('06:30')], ['most_open', thu('07:30')], ['delivered', thu('08:30')],
+    ] as const;
     for (const [revision, [part, starts]] of day.entries()) {
       const res = await pressNext('loader', revision);
       expect([res.status, res.body.part, res.body.now, res.body.revision]).toEqual([200, part, starts, revision + 1]);
     }
-    expect((await getClock('loader')).body).toMatchObject({ part: 'delivered', revision: 4 });
+    expect((await getClock('loader')).body).toMatchObject({ part: 'delivered', revision: 7 });
   });
 
   it('AC-5 refuses an older revision with the clock as it is now and changes nothing: Ruwan and Kasun both see revision 3', async () => {
@@ -349,7 +355,7 @@ describe('POST /demo/clock/next', () => {
   });
 
   it('AC-5 calls an older revision stale in the last part too, so that screen still gets the clock as it is', async () => {
-    await setClock(thu('03:30'), 0, 7);
+    await setClock(thu('07:30'), 0, 7);
     await pressNext('dispatcher', 7);
     const res = await pressNext('loader', 7);
     expect([res.status, res.body.error.code]).toEqual([409, 'stale_clock']);
