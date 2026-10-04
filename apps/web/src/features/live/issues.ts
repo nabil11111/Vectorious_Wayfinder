@@ -1,10 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { queryOptions, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import type { DecideIssueRequest, DecideIssueResponse, Issue, IssueDecision, IssueList } from '@wayfinder/contracts';
-import { workingFor } from '@/features/auth/api';
+import type { DecideIssueRequest, DecideIssueResponse, Issue, IssueDecision, IssueList, Me } from '@wayfinder/contracts';
+import { meKey, workingFor } from '@/features/auth/api';
 import { ANSWER_WITHIN_MS, fetchAgain, worthRetrying } from '@/features/loader/loading';
 import { reasonOf } from '@/features/store/words';
-import { api, apiBytes, forDepot } from '@/lib/api';
+import { readPhoto } from '@/features/lookup/api';
+import { CLOSED, photoLoader, type PhotoView } from '@/features/lookup/queries';
+import { clockKey, type HeldClock } from '@/lib/clock';
+import { api, forDepot } from '@/lib/api';
 
 // What needs the dispatcher (spec 012, plan.md "The screen"): Live day's column and the bell read GET /issues under
 // ['issues'], so the live stream's issues message fetches it again on every dispatcher page (spec 008). Each read names
@@ -48,27 +51,51 @@ export interface Answering {
   decide: (issue: Issue, decision: IssueDecision) => void;
 }
 
-// A problem's photo in a tab of its own (spec 013). Its bytes come the shared way, which names the depot the tab shows
-// (D-95), so a tab that fell behind hears the session moved, and the read names the problem's own depot (spec 021). The
-// tab is opened at the press, before the bytes arrive, since a browser lets only a press open one, and the photo's
-// address is given back once it has had time to open. It answers the line to show when the photo could not be opened,
-// or null. Once signal aborts, because the card that asked went away with a sign-out or a depot switch, its answer is
-// dropped, so an old session's 401 signs nobody out.
-export const PHOTO_TAB_BLOCKED = 'The browser kept the photo from opening in a new tab.';
-const PHOTO_KEPT_MS = 60_000;
-export async function openIssuePhoto(issue: Pick<Issue, 'id'>, depot: string, signal?: AbortSignal): Promise<string | null> {
-  const tab = window.open('', '_blank');
-  if (!tab) return PHOTO_TAB_BLOCKED;
-  try {
-    const jpeg = await apiBytes(forDepot(`/issues/${encodeURIComponent(issue.id)}/photo`, depot), { signal });
-    const address = URL.createObjectURL(jpeg);
-    tab.location.href = address;
-    window.setTimeout(() => URL.revokeObjectURL(address), PHOTO_KEPT_MS);
-    return null;
-  } catch (error) {
-    tab.close();
-    return signal?.aborted ? null : reasonOf(error);
-  }
+// An issue's photo uses History's byte loader and viewer. The account, selected session depot and demo generation
+// own it; the issue depot still names the record on Both. Observe ownership directly so an old response cannot emit
+// a 401/depot event in the gap before React unmounts the card after a switch or reset.
+const photoOwner = (qc: QueryClient) => JSON.stringify([workingFor(qc), qc.getQueryData<HeldClock>(clockKey)?.day ?? null]);
+export function issuePhotoViewer(qc: QueryClient, issue: Pick<Issue, 'id' | 'raisedAt' | 'kind'> & { stop: Pick<Issue['stop'], 'shopName'> }, depot: string, onChange: (view: PhotoView) => void, owner = photoOwner(qc)) {
+  let invalid = workingFor(qc) === null;
+  const current = () => !invalid && owner === photoOwner(qc);
+  const loader = photoLoader({
+    read: (photo, signal) => readPhoto(photo, depot, signal),
+    toUrl: (jpeg) => URL.createObjectURL(jpeg),
+    revoke: (url) => URL.revokeObjectURL(url),
+  }, onChange);
+  const checkOwner = () => {
+    if (!current()) { invalid = true; loader.close(); }
+  };
+  return {
+    get view() { return current() ? loader.view : CLOSED; },
+    // The issue and its photo are recorded together at the same write time.
+    open: () => { if (current()) loader.open({ kind: 'issue', issueId: issue.id, takenAt: issue.raisedAt }, `${issue.kind === 'receipt' ? 'Shop' : 'Driver'} photo · ${issue.stop.shopName}`); },
+    close: loader.close,
+    retry: () => { if (current()) loader.retry(); },
+    broken: loader.broken,
+    watch: () => {
+      const stop = qc.getQueryCache().subscribe(checkOwner);
+      checkOwner();
+      return () => { stop(); loader.close(); };
+    },
+  };
+}
+
+// Only the photo state is replaced. Opening/closing a photo never remounts the card's chosen answer.
+export function useIssuePhoto(issue: Issue, depot: string) {
+  const qc = useQueryClient();
+  const { data: me } = useQuery<Me | null>({ queryKey: meKey, enabled: false });
+  const { data: clock } = useQuery<HeldClock>({ queryKey: clockKey, enabled: false });
+  const owner = JSON.stringify([me ? `${me.id} ${me.depotId}` : null, clock?.day ?? null]);
+  const { id, raisedAt, kind, stop: { shopName } } = issue;
+  type Controller = ReturnType<typeof issuePhotoViewer>;
+  const [held, setHeld] = useState<{ controller: Controller; view: PhotoView } | null>(null);
+  const controller = useMemo(() => {
+    const next = issuePhotoViewer(qc, { id, raisedAt, kind, stop: { shopName } }, depot, (view) => setHeld({ controller: next, view }), owner);
+    return next;
+  }, [qc, id, raisedAt, kind, shopName, depot, owner]);
+  useEffect(() => controller.watch(), [controller]);
+  return { ...controller, view: held?.controller === controller ? controller.view : CLOSED };
 }
 
 // On both depots together (spec 021) each depot's part of Live day shows only its own answers: the green line of the

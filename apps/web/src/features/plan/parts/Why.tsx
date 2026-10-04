@@ -8,7 +8,7 @@ export interface WhyReason { key: string; about?: string; reason: string }
 // One of the planner's decisions about a deferred order, by its title.
 export interface WhyDecision { key: string; title: string; acceptedAt: string | null }
 
-// "why?" (spec 014, D-55): a chip on each stop of the open trip and on each deferred order, opening the planner's
+// "Plan reason" (spec 014, D-55): a chip on each stop of the open trip and on each deferred order, opening the planner's
 // reason for each of the stop's orders, or for the deferred order with its decisions, "to decide" in the warning
 // colour or "✓ accepted 16:08". Every word in it is the planner's or the board's. No frame draws it, so it takes the
 // style guide's chip and the board's popover.
@@ -17,10 +17,10 @@ export function Why({ title, reasons, decisions = [], align = 'end' }: { title: 
   return (
     <Popover>
       <PopoverTrigger
-        aria-label={`Why: ${title}`}
-        className="inline-flex h-[21px] shrink-0 items-center rounded-full bg-muted px-2.5 text-[11px] leading-[15px] font-semibold text-muted-foreground outline-none hover:bg-border hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-popup-open:bg-secondary data-popup-open:text-secondary-foreground"
+        aria-label={`Plan reason: ${title}`}
+        className="inline-flex min-h-[21px] shrink-0 items-center rounded-sm px-1 text-[11px] leading-[15px] text-muted-foreground underline decoration-muted-foreground/50 underline-offset-2 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-popup-open:text-foreground"
       >
-        why?
+        Plan reason
       </PopoverTrigger>
       <PopoverContent align={align} sideOffset={6} className="w-80 max-w-[calc(100vw-32px)] gap-0 p-3.5 text-left">
         <PopoverTitle className="text-xs leading-[15px] font-semibold">{title}</PopoverTitle>
