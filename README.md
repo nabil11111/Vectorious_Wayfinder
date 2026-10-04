@@ -406,6 +406,9 @@ Anything we built differently from our Designathon submission, and why.
   driver actions, carry yesterday forward or move to tomorrow at the order cutoff.
 
 **Loading and Live day**
+- **Driver and shop issue photos open inside the card,** using History's labelled photo viewer with loading, retry,
+  Close and Escape. Closing restores the View photo button's focus and keeps the chosen issue answer. Account/depot
+  changes, a demo reset or leaving the card cancel older reads and release the image; Both still reads the issue's depot.
 - **One list of trucks in leaving order,** with no "Wave 1 · 03:30" and "Wave 2 · 08:30" tabs, no dock numbers and no
   call buttons: every trip has its own leaving time (D-19), and the data has no docks or phone numbers (D-40).
 - **The day line** has no shift name, and the place reads "Peliyagoda dock".

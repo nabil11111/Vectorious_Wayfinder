@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { LOADING_DECISIONS, type Issue, type IssueDecision, type LoadingDecision } from '@wayfinder/contracts';
 import storeManager from '@/assets/icons/icon-person-store-manager.png';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import {
   REPORT_QUESTION, reportPlace, reportReplacementLine, reportSentLine, reportTitle, sendReplacementsTitle,
 } from '@/features/loader/words';
 import { cn } from '@/lib/utils';
-import { openIssuePhoto, useReplaceOn, type Answering } from './issues';
+import { PhotoViewer } from '@/features/lookup/PhotoViewer';
+import { useIssuePhoto, useReplaceOn, type Answering } from './issues';
 import {
   answeredLine, atTheDock, driverAnswers, driverIssuePlace, driverIssueTitle, driverQuestion, driverRaised, stillOnLabel, stillOnValue,
 } from './words';
@@ -71,27 +72,15 @@ function FlagCard({ issue, answering, time, className }: CardProps) {
   );
 }
 
-// The photo of a driver's problem or a shop's report, opened in a tab of its own from bytes fetched the shared way, which
-// names the depot the tab shows (D-95) and the problem's depot (spec 021). A photo that could not be opened says why
-// beside the link.
-function PhotoLink({ issue, depot }: { issue: Issue; depot: string }) {
-  const [problem, setProblem] = useState<string | null>(null);
-  // A photo still on its way when the card goes (a sign-out, a depot switch) is dropped, so a late answer from the old
-  // session cannot sign out whoever signs in next.
-  const onItsWay = useRef<AbortController | null>(null);
-  useEffect(() => () => onItsWay.current?.abort(), []);
-  const open = () => {
-    setProblem(null);
-    onItsWay.current?.abort();
-    const asked = new AbortController();
-    onItsWay.current = asked;
-    void openIssuePhoto(issue, depot, asked.signal).then((line) => { if (!asked.signal.aborted) setProblem(line); });
-  };
+// A full-width viewer below the facts keeps the photo and its Close button readable on a narrow issue card.
+function IssuePhoto({ issue, depot }: { issue: Issue; depot: string }) {
+  const viewer = useIssuePhoto(issue, depot);
+  const open = viewer.view.status !== 'closed';
   return (
-    <>
-      <button type="button" onClick={open} className="font-semibold text-foreground underline underline-offset-2">Open</button>
-      {problem && <span role="alert" className="ml-1.5 text-bad">{problem}</span>}
-    </>
+    <div className="mt-2.5">
+      <button type="button" onClick={viewer.open} aria-expanded={open} aria-controls={`photo-${issue.id}`} className="rounded-sm text-xs font-semibold text-foreground underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50">View photo</button>
+      <div id={`photo-${issue.id}`}><PhotoViewer viewer={viewer} className="mt-2.5" /></div>
+    </div>
   );
 }
 
@@ -117,7 +106,6 @@ function DriverCard({ issue, depot, answering, time, className }: CardProps) {
   const rows: { label: string; value: ReactNode }[] = [
     ...(issue.kind === 'refused' ? [{ label: 'Driver', value: driverRaised(issue) }] : []),
     ...(issue.note ? [{ label: 'Note', value: issue.note }] : []),
-    ...(issue.hasPhoto ? [{ label: 'Photo', value: <PhotoLink issue={issue} depot={depot} /> }] : []),
     ...(issue.kind === 'refused' ? [{ label: 'At the dock', value: atTheDock(issue) }] : []),
     { label: stillOnLabel(issue), value: stillOnValue(issue) },
   ];
@@ -129,6 +117,8 @@ function DriverCard({ issue, depot, answering, time, className }: CardProps) {
       <dl className="mt-[9px] space-y-1 text-[11px] leading-[14px]">
         {rows.map((row, i) => <Row key={row.label} label={row.label} value={row.value} first={i === 0} />)}
       </dl>
+
+      {issue.hasPhoto && <IssuePhoto issue={issue} depot={depot} />}
 
       <Answers issue={issue} question={driverQuestion(issue)} options={options} choice={choice} onChoose={setPicked} busy={answering.sending !== null} />
       <Send issue={issue} answering={answering} choice={choice} label="Send to driver and shop" />
@@ -160,7 +150,6 @@ function ReportCard({ issue, depot, answering, time, className }: CardProps) {
     ...(issue.cold !== null ? [{ key: 'cold', label: 'Cold on arrival', value: coldWords(issue.cold) }] : []),
     // The shop's own words with its report (Q-40).
     ...(issue.note ? [{ key: 'note', label: 'Note', value: issue.note }] : []),
-    ...(issue.hasPhoto ? [{ key: 'photo', label: 'Photo', value: <PhotoLink issue={issue} depot={depot} /> }] : []),
   ];
   return (
     <article aria-label={reportTitle(issue)} className={className}>
@@ -170,6 +159,8 @@ function ReportCard({ issue, depot, answering, time, className }: CardProps) {
       <dl className="mt-[9px] space-y-1 text-[11px] leading-[14px]">
         {rows.map((row, i) => <Row key={row.key} label={row.label} value={row.value} first={i === 0} />)}
       </dl>
+
+      {issue.hasPhoto && <IssuePhoto issue={issue} depot={depot} />}
 
       <Answers issue={issue} question={REPORT_QUESTION} options={options} choice={choice} onChoose={setPicked} busy={answering.sending !== null} />
       <Send issue={issue} answering={answering} choice={choice} label="Send to shop" />
