@@ -119,6 +119,36 @@ it('AC-3 shows a system alert only when the tab is hidden and alerts are allowed
   expect(alertInBackground(C, open)).toBe(false);
 });
 
+it('shows through the service worker when the page cannot construct a Notification', async () => {
+  const open = vi.fn();
+  const showNotification = vi.fn(() => Promise.resolve());
+  browser('granted', true);
+  class Illegal {
+    static permission: NotificationPermission = 'granted';
+    constructor() { throw new TypeError('Illegal constructor. Use ServiceWorkerRegistration.showNotification() instead.'); }
+  }
+  vi.stubGlobal('Notification', Illegal);
+  vi.stubGlobal('navigator', { serviceWorker: { getRegistration: () => Promise.resolve({ showNotification }) } });
+  expect(() => alertInBackground(C, open)).not.toThrow();
+  expect(alertInBackground(C, open)).toBe(true);
+  await Promise.resolve();
+  expect(showNotification).toHaveBeenCalledWith('Wayfinder', { body: 'Line c', tag: 'c', data: { link: '/store/orders' } });
+  expect(open).not.toHaveBeenCalled();
+});
+
+it('stays up when a hidden tab cannot construct a Notification and has no worker', () => {
+  const open = vi.fn();
+  class Illegal {
+    static permission: NotificationPermission = 'granted';
+    constructor() { throw new TypeError('Illegal constructor. Use ServiceWorkerRegistration.showNotification() instead.'); }
+  }
+  vi.stubGlobal('Notification', Illegal);
+  vi.stubGlobal('document', { visibilityState: 'hidden' });
+  vi.stubGlobal('navigator', {});
+  expect(alertInBackground(C, open)).toBe(false);
+  expect(open).not.toHaveBeenCalled();
+});
+
 it('AC-3 asks only from the pop-up\'s button, and its words follow the browser\'s answer', async () => {
   browser('default', false);
   expect(alertsState()).toBe('ask');

@@ -58,16 +58,38 @@ async function subscribeForPush(): Promise<void> {
   await api('/notifications/push', { method: 'PUT', json: { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } } });
 }
 
+// A phone that has registered the worker throws on `new Notification()` and tells the page to use the worker. The
+// worker's own click handler opens the link. A browser with no worker still uses the page constructor.
+function showOnPage(Browser: typeof Notification, item: Update, open: (link: string) => void): boolean {
+  try {
+    const alert = new Browser('Wayfinder', { body: item.line, tag: item.id });
+    alert.onclick = () => {
+      window.focus();
+      open(item.link);
+      alert.close();
+    };
+    return true;
+  } catch (error) {
+    console.warn('Could not show the background alert.', error);
+    return false;
+  }
+}
+
 // One update as a system alert, when the tab is hidden and alerts are on. Its tag is the update's id, so two tabs show it
-// once. A press brings the tab forward at the update's place. Says whether it showed.
+// once. A press brings the tab forward at the update's place. Says whether it showed. A failure stays off the screen.
 export function alertInBackground(item: Update, open: (link: string) => void): boolean {
   const browser = browserNotification();
   if (!browser || browser.permission !== 'granted' || document.visibilityState !== 'hidden') return false;
-  const alert = new browser('Wayfinder', { body: item.line, tag: item.id });
-  alert.onclick = () => {
-    window.focus();
-    open(item.link);
-    alert.close();
-  };
+  const pending = typeof navigator === 'undefined' ? undefined : navigator.serviceWorker?.getRegistration?.();
+  if (!pending) return showOnPage(browser, item, open);
+  void pending.then((worker) => {
+    if (!worker) {
+      showOnPage(browser, item, open);
+      return;
+    }
+    return worker.showNotification('Wayfinder', { body: item.line, tag: item.id, data: { link: item.link } });
+  }).catch((error) => {
+    console.warn('Could not show the background alert.', error);
+  });
   return true;
 }
