@@ -39,3 +39,8 @@ it('F5 immediately hides stale, refreshing, changed-input and unsaved results', 
     expect(html).not.toContain('Fresh Nugegoda'); expect(html).not.toContain('The real scenario planner reason'); expect(html).toContain('disabled');
   }
 });
+
+it('Q1 explains the preview action and keeps the generated baseline and saved-plan caveats', () => {
+  held.value = null; const html = render();
+  for (const text of ['Compare without a vehicle', 'See which deliveries would change', 'Vehicle to leave out', 'Show what changes', 'generated plans', 'may differ from your saved draft', 'does not change the saved plan']) expect(html).toContain(text);
+});
