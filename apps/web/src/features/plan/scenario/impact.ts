@@ -8,6 +8,9 @@ export type DeliveryChange = {
 };
 const coverage = { planned: 2, partial: 1, deferred: 0 } as const;
 const trucks = (order: ScenarioOrder) => [...order.vehicleIds].sort().join(',');
+const urgency: Record<DeliveryChange['kind'], number> = {
+  new_waiting: 0, more_waiting: 0, improved: 1, reassigned: 2, still_waiting: 3, unchanged: 3,
+};
 
 /** Compare coverage categories, not quantities: the response has no per-order split amounts. */
 export function scenarioImpact(result: PlanScenario) {
@@ -47,7 +50,9 @@ export function scenarioImpact(result: PlanScenario) {
   return {
     kind,
     rows,
-    affected: rows.filter(row => row.kind !== 'unchanged' && row.kind !== 'still_waiting'),
+    // Stable within each group; newly waiting goods must appear before truck-only moves.
+    affected: rows.filter(row => row.kind !== 'unchanged' && row.kind !== 'still_waiting')
+      .sort((a, b) => urgency[a.kind] - urgency[b.kind]),
     waiting: rows.filter(row => row.kind === 'still_waiting'),
     newWaiting, moreWaiting, worsened, improved, reassigned,
     alreadyWaiting: rows.filter(row => row.before.status !== 'planned' && row.after.status !== 'planned').length,
