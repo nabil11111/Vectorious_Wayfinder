@@ -1,6 +1,6 @@
 import type { PlanScenario, ScenarioOrder, ScenarioOutcome } from '@wayfinder/contracts';
 import { expect, it } from 'vitest';
-import { scenarioImpact } from './impact';
+import { impactHeadline, scenarioImpact } from './impact';
 const order = (orderId: string, status: ScenarioOrder['status'], vehicles = status === 'deferred' ? [] : ['VEH001'], waitedBefore = false): ScenarioOrder => ({ orderId, outletId: `OUT${orderId}`, shopName: `Shop ${orderId}`, status, vehicleIds: vehicles, waitedBefore, reasons: [`Actual reason for ${orderId}`] });
 const outcome = (orders: ScenarioOrder[]): ScenarioOutcome => ({ orders, summary: { totalOrders: orders.length, fullyPlanned: orders.filter(o => o.status === 'planned').length, partiallyPlanned: orders.filter(o => o.status === 'partial').length, deferred: orders.filter(o => o.status === 'deferred').length, shopsFullyPlanned: 0, shopsWithWaiting: 0, vehicles: 0, trips: 0, fuelLitres: 0, repeatedDeferrals: 0 }, check: { ok: true, problems: [], trips: [], vehicles: [] } });
 const result = (before: ScenarioOrder[], after: ScenarioOrder[]): PlanScenario => ({ depot: 'Peliyagoda', date: '2026-06-25', ref: { planId: null, demoDay: 1 }, excludedVehicleId: 'VEH001', comparedAt: '2026-06-25T04:00:00Z', snapshotKey: 'one', baseline: outcome(before), scenario: outcome(after) });
@@ -44,4 +44,12 @@ it('keeps all reasons available for unchanged waiting orders and zero demand', (
   const impact = scenarioImpact(result([order('1', 'deferred')], [order('1', 'deferred')]));
   expect(impact.kind).toBe('unchanged'); expect(impact.affected).toEqual([]); expect(impact.waiting).toHaveLength(1); expect(impact.rows[0]!.before.reasons).toEqual(['Actual reason for 1']);
   expect(scenarioImpact(result([], [])).kind).toBe('empty');
+});
+it('uses honest, plain headlines for unchanged, improved, mixed and reassigned results', () => {
+  const headline = (before: ScenarioOrder[], after: ScenarioOrder[]) => impactHeadline(scenarioImpact(result(before, after)), 'VEH001');
+  expect(headline([], [])).toBe('No orders to compare.');
+  expect(headline([order('1', 'partial')], [order('1', 'partial')])).toBe('The same orders are planned or waiting, using the same trucks.');
+  expect(headline([order('1', 'deferred')], [order('1', 'planned')])).toBe('Some orders could receive more goods.');
+  expect(headline([order('1', 'planned'), order('2', 'deferred')], [order('1', 'deferred'), order('2', 'planned')])).toContain('others would have more waiting');
+  expect(headline([order('1', 'partial')], [order('1', 'partial', ['VEH002'])])).toBe('Orders stay fully or partly planned as before, using different trucks.');
 });

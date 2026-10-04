@@ -57,3 +57,24 @@ it('S4 hides an old result after the chosen vehicle changes', () => {
   held.vehicle = 'VEH002'; const html = render(); held.vehicle = 'VEH001';
   expect(html).not.toContain('Fresh Nugegoda'); expect(html).not.toContain('More goods would wait');
 });
+it('S3 keeps actual warnings and all reasons in closed, keyboard-scrollable disclosures', () => {
+  const value = { ...preview, scenario: { ...preview.scenario, check: { ...preview.scenario.check, problems: [{ code: 'long_wait' as const, level: 'warn' as const, message: 'Actual warning: the truck waits 35 minutes.' }] } } };
+  held.value = { identity: scenarioIdentity(screen, me, 'Peliyagoda', 1, held.vehicle, false)!, value };
+  const html = render();
+  expect(html).toContain('Actual warning: the truck waits 35 minutes.');
+  expect(html).toContain('this view does not compare how much could be delivered');
+  expect(html).not.toMatch(/<details[^>]*\bopen=/);
+  expect(html).toContain('aria-label="Delivery details and reasons" tabindex="0"');
+  expect(html).toContain('aria-label="Things to review" tabindex="0"');
+});
+it('S2 distinguishes existing waiting from new delays even when no deliveries change', () => {
+  const value = { ...preview, baseline: preview.scenario };
+  held.value = { identity: scenarioIdentity(screen, me, 'Peliyagoda', 1, held.vehicle, false)!, value };
+  const html = render();
+  expect(html).toContain('The same orders are planned or waiting');
+  expect(html).toContain('Newly waiting: 0');
+  expect(html).toContain('Already waiting in both suggestions: 1');
+  expect(html).toContain('they are not all new delays');
+  expect(html).not.toContain('aria-label="Affected deliveries"');
+  expect(html).toContain('Fresh Nugegoda');
+});
