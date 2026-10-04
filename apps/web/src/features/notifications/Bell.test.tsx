@@ -21,7 +21,7 @@ const ready = update('t1', '21:06', 'Wasantha\'s reefer van is loaded and ready:
 
 const panel = (props: Partial<Parameters<typeof UpdatesPanel>[0]> = {}) => renderToStaticMarkup(
   <MemoryRouter>
-    <UpdatesPanel items={[ready, flag]} seenUpTo={flag.at} both={false} foot={null} alerts="ask" onRead={() => {}} onOpen={() => {}} onAsk={() => {}} {...props} />
+    <UpdatesPanel items={[ready, flag]} seenUpTo={flag.at} both={false} foot={null} alerts="ask" onRead={() => {}} onOpen={() => {}} onGo={() => {}} onAsk={() => {}} {...props} />
   </MemoryRouter>,
 );
 const text = (markup: string) => markup.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/\s+/g, ' ');
@@ -51,6 +51,16 @@ it('AC-2 with everything read, nothing to mark; with nothing yet, says so; on bo
   const both = panel({ both: true, items: [{ ...ready, depot: 'Kandy' }, { ...flag, depot: 'Peliyagoda' }] });
   expect(text(both)).toContain('Kandy');
   expect(text(both)).toContain('Peliyagoda');
+});
+
+it('spec 031 the other depot is a button that can switch, and sounds can be turned off', () => {
+  const waiting = update('k1', '16:00', 'Kandy has no plan yet for Thu 25 Jun.', {
+    kind: 'depot_unplanned', issueKind: null, tone: 'warn', link: '/dispatcher/plan/2026-06-25?depot=Kandy',
+  });
+  const markup = panel({ items: [waiting] });
+  expect(markup).toContain('<button');
+  expect(markup).not.toContain('href="/dispatcher/plan/2026-06-25?depot=Kandy"');
+  expect(text(markup)).toContain('Turn sounds off');
 });
 
 it('AC-3 has the button that asks for background alerts, and says where to turn them on once refused', () => {

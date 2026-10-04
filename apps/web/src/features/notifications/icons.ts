@@ -22,6 +22,7 @@ export const KIND_ICON: Record<NotificationKind, string> = {
   plan_out: orderList, plan_changed: sync, plan_taken_back: orderWaiting, flag_answered: shortfall,
   receiving_updated: deliveryWindow,
   trip_sent: route, trip_changed: sync, problem_answered: backToDepot,
+  depot_unplanned: orderWaiting,
 };
 
 // A new problem by its kind: short at the dock, refused at the door, a closed shop, a shop's report.

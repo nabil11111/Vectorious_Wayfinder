@@ -21,6 +21,8 @@ export const NOTIFICATION_KINDS = [
   // A driver's: their trip sent, their trip on a plan sent again, their truck ready (truck_ready), and the dispatcher's
   // answer to their problem.
   'trip_sent', 'trip_changed', 'problem_answered', 'receiving_updated',
+  // The dispatcher, after sending one depot, when the other still has orders and no sent plan (spec 031).
+  'depot_unplanned',
 ] as const;
 export const NotificationKind = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKind>;
@@ -57,6 +59,17 @@ export type Notification = z.infer<typeof Notification>;
 // shown per account and demo day, so a reset's earlier clock starts the bell afresh rather than reading as all seen.
 export const NotificationList = z.object({ demoDay: z.number().int().min(1), items: z.array(Notification).max(MAX_NOTIFICATIONS) });
 export type NotificationList = z.infer<typeof NotificationList>;
+
+// The browser's push subscription (spec 031). The public key is null when the server has no push keys configured.
+export const PushKey = z.object({ publicKey: z.string().min(1).nullable() });
+export type PushKey = z.infer<typeof PushKey>;
+export const PushSubscriptionRequest = z.object({
+  endpoint: z.string().url().max(2000),
+  keys: z.object({ p256dh: z.string().min(1).max(255), auth: z.string().min(1).max(255) }),
+});
+export type PushSubscriptionRequest = z.infer<typeof PushSubscriptionRequest>;
+export const PushUnsubscribeRequest = z.object({ endpoint: z.string().url().max(2000) });
+export type PushUnsubscribeRequest = z.infer<typeof PushUnsubscribeRequest>;
 
 // ── The dispatcher's answer to a driver's problem, in words both sides share ──────────────────────────────────────
 // The driver's phone words its own screens, because it works with no signal (spec 013), and the API words the bell's

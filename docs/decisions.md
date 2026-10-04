@@ -479,3 +479,10 @@ for the same day, and cannot carry across a date or demo reset (submission harde
 working vehicle and compare two generated plans built from the same authorized demand snapshot. Results reconcile
 split parts into original outstanding orders and show actual checks and reasons. The generated baseline may differ
 from the saved draft. There is no Apply action, new optimizer or claim of optimality (submission hardening spec 028).
+
+**D-107 · 4 Oct · Sending one depot warns about the other, and an alert can outlive the open page.** Ruwan is the only
+dispatcher. After one depot's plan is sent, his bell warns him when the other depot still has orders and no sent plan,
+and that row switches him there. A new update plays one of four saved sounds while the app is open. Allowing background
+alerts also subscribes the browser, and the server asks it to show a later update after the page has been sent home.
+A browser that has been killed is still not reached. The sounds are files, and the push keys stay in the environment
+(Nabil, 4 Oct, spec 031).

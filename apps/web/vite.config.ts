@@ -12,7 +12,8 @@ export default defineConfig({
     manifest: false,
     devOptions: { enabled: false },
     workbox: {
-      globPatterns: ['**/*.{html,js,css,png,svg,ico,woff,woff2}'],
+      globPatterns: ['**/*.{html,js,css,png,svg,ico,woff,woff2,mp3}'],
+      importScripts: ['push.js'],
       navigateFallback: '/index.html',
       navigateFallbackDenylist: [/^\/api(?:\/|$)/],
       runtimeCaching: [],

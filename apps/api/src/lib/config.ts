@@ -20,6 +20,11 @@ const Env = z.object({
   LIVE_MAX_STREAMS: z.coerce.number().int().positive().default(200),
   WEB_DIST: z.string().optional(),
   LOG_LEVEL: z.string().default('info'),
+  // Web push (spec 031). Empty means the bell still asks the browser's permission and does not subscribe the phone.
+  // A blank value from compose is the same as unset.
+  VAPID_PUBLIC_KEY: z.string().optional().transform((value) => value || undefined),
+  VAPID_PRIVATE_KEY: z.string().optional().transform((value) => value || undefined),
+  VAPID_SUBJECT: z.string().default('mailto:wayfinder@localhost'),
 });
 
 export const config = Env.parse(process.env);

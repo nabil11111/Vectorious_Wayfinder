@@ -88,6 +88,10 @@ export function announce(change: Announcement): void {
   const event: LiveEvent = { topic: change.topic, id: change.id };
   const message = `event: change\ndata: ${JSON.stringify(event)}\n\n`;
   for (const [res, user] of streams) if (hears(user, change)) send(res, message);
+  // The open page may already be frozen. Subscribed browsers are told after the stream, and a failure there
+  // never undoes the change that was just saved. Loaded here, not at the top: the push sender reads the bell,
+  // and the bell's order code announces, so a top-level import would be a circle.
+  void import('../push/send').then(({ pushFor }) => pushFor(change)).catch((err) => logger.warn({ err }, 'push failed'));
 }
 
 // Ends every open stream. server.ts calls it before it closes, or open streams would hold the process.

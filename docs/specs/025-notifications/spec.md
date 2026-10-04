@@ -108,4 +108,5 @@ The loader's opens the plan's changes. The shop's and the driver's bells do noth
   "Departures from the design" as ours.
 
 ## Out of scope
-Server push to a closed browser, e-mail or SMS, and notification settings per kind.
+E-mail or SMS, notification settings per kind, and a push to a browser that has been killed. A warning for the
+other depot's unsent plan, a sound while the app is open, and a push while it is in the background are spec 031.

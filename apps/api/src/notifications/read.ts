@@ -2,7 +2,7 @@ import {
   brandOfStop, driverAnswerSentence, driverAnswerShort, FlagReason, LoadingDecision, MAX_NOTIFICATIONS, Notification, PlanCheck, RefusalReason, tripFigures,
   ReceivingState, type Brand, type Issue, type NotificationList,
 } from '@wayfinder/contracts';
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Tx } from '../db/client';
 import { auditLog, deferrals, depots, orderLines, orders, outlets, plans, stopOrders, stops, trips, users, vehicles } from '../db/schema';
@@ -49,7 +49,7 @@ export async function notificationsOf(tx: Tx, reader: Reader, at: Date): Promise
   if (dates.length && reader.role === 'store_manager') items = await shopUpdates(tx, reader.outletId, dates);
   else if (dates.length && reader.role !== 'store_manager') {
     const day = await depotDay(tx, reader.depotId, dates);
-    if (reader.role === 'dispatcher') items = dispatcherUpdates(day);
+    if (reader.role === 'dispatcher') items = [...dispatcherUpdates(day), ...await otherDepotUnplanned(tx, reader.depotId, dates, day)];
     else if (reader.role === 'loader') items = loaderUpdates(day);
     else items = await driverUpdates(tx, day, reader.userId, at);
   }
@@ -244,6 +244,30 @@ async function shopUpdates(tx: Tx, outletId: string, dates: string[]): Promise<I
 }
 
 // ── A dispatcher's, for the depot the read is for ────────────────────────────────────────────────────────────
+
+// After this depot's plan is sent, one warning when another depot still has orders for that day and no sent plan
+// (spec 031). The time is the send, so the bell shows it once. A sent plan that defers orders still counts as sent.
+async function otherDepotUnplanned(tx: Tx, depotId: string, dates: string[], day: DepotDay): Promise<Item[]> {
+  const others = await tx.select({ id: depots.id, name: depots.name }).from(depots).where(ne(depots.id, depotId));
+  const items: Item[] = [];
+  for (const date of dates) {
+    const sent = day.plans.find((plan) => plan.date === date && plan.status === 'published' && plan.publishedAt);
+    if (!sent?.publishedAt) continue;
+    for (const other of others) {
+      const [planned] = await tx.select({ id: plans.id }).from(plans)
+        .where(and(eq(plans.depotId, other.id), eq(plans.date, date), eq(plans.status, 'published'))).limit(1);
+      if (planned) continue;
+      // The same orders the plan board is still waiting to send: placed, or deferred from an earlier day.
+      // A cancelled order or a split original is not demand, and neither is a draft.
+      const [demand] = await tx.select({ id: orders.id }).from(orders).innerJoin(outlets, eq(outlets.id, orders.outletId))
+        .where(and(eq(outlets.depotId, other.id), eq(orders.deliveryDate, date), inArray(orders.status, ['placed', 'deferred']))).limit(1);
+      if (!demand) continue;
+      items.push({ ...base, id: `depot_unplanned:${other.id}:${date}`, kind: 'depot_unplanned', at: iso(sent.publishedAt),
+        line: words.depotUnplannedLine(other.name, date), link: `/dispatcher/plan/${date}?depot=${encodeURIComponent(other.id)}`, tone: 'warn' });
+    }
+  }
+  return items;
+}
 
 function dispatcherUpdates(day: DepotDay): Item[] {
   const items: Item[] = [];

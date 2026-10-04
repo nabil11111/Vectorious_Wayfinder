@@ -31,6 +31,9 @@ services:
       DEMO_MODE: ${DEMO_MODE:-true}
       LIVE_HEARTBEAT_MS: ${LIVE_HEARTBEAT_MS:-20000}
       LIVE_MAX_STREAMS: ${LIVE_MAX_STREAMS:-200}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:wayfinder@localhost}
     ports:
       - "3000:3000"
 

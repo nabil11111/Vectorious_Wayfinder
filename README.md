@@ -226,11 +226,13 @@ picture, line and time, and a press goes where the person acts on it. They are r
 so a reset brings back the seeded day's. Nadeesha hears of her orders placed, her delivery planned or moved to another
 day with its reason, the truck leaving, the driver arriving, delivering, being refused or finding the shop closed, and the
 depot's answer to her report. Ruwan hears of every new problem and of each truck ready, leaving and back, for the depot
-on show (both under Both). Kasun hears that the plan is out, changed or taken back to edit, and Ruwan's answers to the
+on show (both under Both). After he sends one depot, the bell warns him when the other still has orders and no sent plan,
+and that row switches him to its plan board. Kasun hears that the plan is out, changed or taken back to edit, and Ruwan's answers to the
 dock's flags. Wasantha hears of his trip sent or changed, his truck ready and Ruwan's answers. A new update also shows as
-a toast with **Open**, once in each tab. The pop-up's **Turn on alerts when Wayfinder is in the background** asks the
+a toast with **Open**, once in each tab, and plays a short sound while Wayfinder is open. The pop-up's **Turn sounds off**
+keeps it quiet. **Turn on alerts when Wayfinder is in the background** asks the
 browser, and the app never asks on its own; once allowed, an update that comes while the tab is hidden shows as a
-system notification. What has been read is kept in the browser, per account and demo day, so a new device starts with
+system notification, including after the phone has been sent home, while the browser is still installed. What has been read is kept in the browser, per account and demo day, so a new device starts with
 the day's updates unread.
 
 ### The look-up pages
@@ -334,7 +336,9 @@ Anything we built differently from our Designathon submission, and why.
   from 1024 wide and a sheet from the bottom below, with "Mark all read", the role's own link at its foot ("Open Live
   day" for the dispatcher, "See what changed" for the loader) and the button that turns on background alerts. The
   count is the person's unread updates, where the dispatcher's bell counted open problems and the loader's the plan's
-  changes, and every role's bell now opens (D-99). A new update also shows as a toast, which no frame draws.
+  changes, and every role's bell now opens (D-99). A new update also shows as a toast, which no frame draws, and plays one of
+  four short sounds. **Turn sounds off** is on the pop-up. After one depot's plan is sent, one warning names the other
+  depot when it still has orders and no sent plan, and opens that plan board (spec 031).
 - **Below 1024 wide the nav is bottom tabs** for every role, and the name beside the avatar waits until 1320, so
   the dispatcher's six tabs fit the top bar.
 

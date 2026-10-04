@@ -98,6 +98,8 @@ export const reportRaisedLine = (by: string, report: string, shop: string) => `$
 export const truckReadyLine = (truck: TruckFacts, loaded: number, ordered: number) => `${Truck(truck)} is loaded and ready: ${loadedWords(loaded, ordered)}`;
 export const truckLeftLine = (truck: TruckFacts, stops: number) => `${Truck(truck)} left the depot with ${stopsWords(stops)}`;
 export const truckBackLine = (truck: TruckFacts, done: number, stops: number) => `${Truck(truck)} is back at the depot: ${whole(done)} of ${stopsWords(stops)} done`;
+// "Kandy has no plan yet for Thu 25 Jun." The day is written as every other sentence writes it.
+export const depotUnplannedLine = (depot: string, date: string) => `${depot} has no plan yet for ${dayLabel(date)}.`;
 
 // ── A loader's ────────────────────────────────────────────────────────────────────────────────────────────────
 

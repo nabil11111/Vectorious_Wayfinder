@@ -84,3 +84,4 @@ ideas go to `docs/ideas.md` and only become a spec when the team picks them up.
 | [028](028-sample-orders.md) | Sample shop orders from the demo control | In progress |
 | [029](029-planner-usability.md) | Planner shop progress, visible deferral and explicit withdrawal | In progress |
 | [030](030-inline-issue-photos.md) | Inline issue photos and compact dispatcher status controls | In progress |
+| [031](031-alerts.md) | The other depot's unsent plan, open-app sounds, and a background push | In progress |

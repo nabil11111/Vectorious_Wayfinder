@@ -3,7 +3,9 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { db, pool } from '../src/db/client';
-import { demoDay, orderLines, orders } from '../src/db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
+import { demoDay, orderLines, orders, outlets, plans, pushSubscriptions } from '../src/db/schema';
+import { pushFor, setDeliverForTests, type PushPayload } from '../src/push/send';
 import { depotInstant, initClock, setClockForTests } from '../src/lib/clock';
 import { answeredTrip, driverScreen, driverStop, driverTrip, driverWrite } from './driver-plan';
 import { answeredTruck, answerFlag, code, dryLine, loaderScreen, placeWalkthroughDraft, resetDay, sendThursdaysPlan, sendWalkthroughPlan, signIn, THU, truckOf, WED, type Agent } from './loading-plan';
@@ -120,8 +122,10 @@ it('AC-4 each walkthrough person\'s bell after each step of the walkthrough', as
   const dilshanSees = ['16:00 · Your trip for Thursday is sent: VEH035 leaves 04:36 with 2 stops'];
   expect(await rows(dilshan)).toEqual(dilshanSees);
   expect((await updatesOf(dilshan))[0]).toMatchObject({ kind: 'trip_sent', link: '/driver' });
-  const ruwanSees: string[] = [];
+  // Peliyagoda is sent and Kandy still has Thursday's orders and no plan (spec 031).
+  const ruwanSees = ['16:00 · Kandy has no plan yet for Thu 25 Jun.'];
   expect(await rows(ruwan)).toEqual(ruwanSees);
+  expect((await updatesOf(ruwan))[0]).toMatchObject({ kind: 'depot_unplanned', tone: 'warn', link: '/dispatcher/plan/2026-06-25?depot=Kandy' });
   // The orders the plan left out are their shops' news, with the reason Ruwan gave.
   expect(await rows(ishara)).toEqual([
     '16:00 · 135 boxes will not come on Thu 25 Jun: Scheduled for a later run.',
@@ -132,7 +136,7 @@ it('AC-4 each walkthrough person\'s bell after each step of the walkthrough', as
   // 8 and 9. Loading at 02:30: Kasun loads stop 2 and flags Nugegoda's dry cartons 1 short at 02:33. From here
   // Wednesday's times carry their day.
   freeze(THU, 2 * 60 + 30);
-  for (const list of [nadeeshaSees, kasunSees, dilshanSees]) list.splice(0, list.length, ...list.map((row) => `Wed 24 Jun ${row}`));
+  for (const list of [nadeeshaSees, kasunSees, dilshanSees, ruwanSees]) list.splice(0, list.length, ...list.map((row) => `Wed 24 Jun ${row}`));
   const day = await loader.read();
   let truck = answeredTruck(await loader.start(truckOf(day, 'VEH035'), day.plan!), 'VEH035');
   freeze(THU, 2 * 60 + 31);
@@ -365,6 +369,80 @@ it('AC-1 each person sees only their own: another shop, another depot, a dispatc
   // Admin belongs to no shop and no depot, and is told nothing.
   expect(await updatesOf(admin)).toEqual([]);
   expect(code(await request(server).get('/api/v1/notifications'))).toEqual([401, 'signed_out']);
+});
+
+it('spec 031 tells the dispatcher the other depot has no sent plan, and nobody else', async () => {
+  await sendThursdaysPlan(walk);
+  freeze(WED, 16 * 60 + 5);
+  expect((await updatesOf(ruwan)).find((item) => item.kind === 'depot_unplanned')).toMatchObject({
+    tone: 'warn', line: 'Kandy has no plan yet for Thu 25 Jun.', link: '/dispatcher/plan/2026-06-25?depot=Kandy',
+  });
+  for (const who of [kasun, dilshan, nadeesha]) expect((await updatesOf(who)).some((item) => item.kind === 'depot_unplanned')).toBe(false);
+  // Cancelled orders are not demand. The warning comes back when those orders are placed again.
+  const kandyShops = db.select({ id: outlets.id }).from(outlets).where(eq(outlets.depotId, 'Kandy'));
+  const kandyOrders = await db.select({ id: orders.id, status: orders.status }).from(orders)
+    .where(and(eq(orders.deliveryDate, THU), inArray(orders.outletId, kandyShops), inArray(orders.status, ['placed', 'deferred'])));
+  await db.update(orders).set({ status: 'cancelled' }).where(inArray(orders.id, kandyOrders.map((row) => row.id)));
+  expect((await updatesOf(ruwan)).some((item) => item.kind === 'depot_unplanned')).toBe(false);
+  for (const row of kandyOrders) await db.update(orders).set({ status: row.status }).where(eq(orders.id, row.id));
+  expect((await updatesOf(ruwan)).some((item) => item.kind === 'depot_unplanned')).toBe(true);
+  // A sent plan for a day the other depot has no orders for says nothing.
+  await db.insert(plans).values({ depotId: 'Peliyagoda', date: '2026-06-26', status: 'published', publishedAt: at(16 * 60) });
+  expect((await updatesOf(ruwan)).some((item) => item.id === 'depot_unplanned:Kandy:2026-06-26')).toBe(false);
+  // Once Kandy's plan is sent, the warning goes, even though this row carries no trips.
+  await db.insert(plans).values({ depotId: 'Kandy', date: THU, status: 'published', publishedAt: at(16 * 60) });
+  expect((await updatesOf(ruwan)).some((item) => item.kind === 'depot_unplanned')).toBe(false);
+
+  await resetDay();
+  await initClock();
+  freeze(WED, 16 * 60 + 5);
+  await db.insert(plans).values({ depotId: 'Kandy', date: THU, status: 'published', publishedAt: at(16 * 60) });
+  expect((await ruwan.put('/api/v1/me/depot').send({ depotId: 'Kandy' })).status).toBe(200);
+  expect((await updatesOf(ruwan))[0]).toMatchObject({
+    kind: 'depot_unplanned', line: 'Peliyagoda has no plan yet for Thu 25 Jun.', link: '/dispatcher/plan/2026-06-25?depot=Peliyagoda',
+  });
+  expect((await updatesOf(sarath)).some((item) => item.kind === 'depot_unplanned')).toBe(false);
+  expect((await ruwan.put('/api/v1/me/depot').send({ depotId: 'Peliyagoda' })).status).toBe(200);
+});
+
+it('spec 031 pushes a new update once and forgets a subscription the browser dropped', async () => {
+  const sent: PushPayload[] = [];
+  setDeliverForTests(async (_sub, payload) => { sent.push(payload); });
+  const endpoint = 'https://push.example/dilshan';
+  const body = { endpoint, keys: { p256dh: 'key', auth: 'auth' } };
+  try {
+    expect(code(await request(server).put('/api/v1/notifications/push').send(body))).toEqual([401, 'signed_out']);
+    await sendThursdaysPlan(walk);
+    freeze(WED, 16 * 60 + 5);
+    expect((await dilshan.put('/api/v1/notifications/push').send(body)).status).toBe(204);
+    await pushFor({ topic: 'plans', depotId: 'Peliyagoda' });
+    expect(sent).toEqual([]);
+    await db.update(pushSubscriptions).set({ pushedIds: [] }).where(eq(pushSubscriptions.endpoint, endpoint));
+    await pushFor({ topic: 'plans', depotId: 'Peliyagoda' });
+    expect(sent.some((item) => item.body.includes('Your trip for Thursday is sent'))).toBe(true);
+    const once = sent.map((item) => item.tag);
+    await pushFor({ topic: 'plans', depotId: 'Peliyagoda' });
+    expect(sent.map((item) => item.tag)).toEqual(once);
+    // Two announcements at once, as a send does, still hand the trip over once.
+    sent.length = 0;
+    await db.update(pushSubscriptions).set({ pushedIds: [] }).where(eq(pushSubscriptions.endpoint, endpoint));
+    setDeliverForTests(async (_sub, payload) => {
+      sent.push(payload);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    await Promise.all([
+      pushFor({ topic: 'plans', depotId: 'Peliyagoda' }),
+      pushFor({ topic: 'driver', depotId: 'Peliyagoda' }),
+    ]);
+    expect(sent.filter((item) => item.body.includes('Your trip for Thursday is sent'))).toHaveLength(1);
+    setDeliverForTests(async () => { throw Object.assign(new Error('gone'), { statusCode: 410 }); });
+    await db.update(pushSubscriptions).set({ pushedIds: [] }).where(eq(pushSubscriptions.endpoint, endpoint));
+    await pushFor({ topic: 'plans', depotId: 'Peliyagoda' });
+    expect(await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint))).toEqual([]);
+  } finally {
+    setDeliverForTests(null);
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  }
 });
 
 it('AC-1 answers at most 30, newest first', async () => {

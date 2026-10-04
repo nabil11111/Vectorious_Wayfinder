@@ -5,14 +5,18 @@ import alertIcon from '@/assets/icons/icon-alert.png';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useMe } from '@/features/auth/api';
+import { useSwitchDepot } from '@/features/dispatcher/depots';
 import { DepotTag } from '@/features/dispatcher/parts/DepotTag';
+import { useScope } from '@/features/dispatcher/scope';
 import { cn } from '@/lib/utils';
 import { alertInBackground, alertsState, ALERT_WORDS, askForAlerts, type AlertsState } from './alerts';
 import { useUpdates, type ShownUpdate } from './api';
 import { keepShown, keptShown, freshOf, type Shown } from './fresh';
 import { GlanceCard } from './GlanceCard';
 import { iconOf } from './icons';
+import { depotTarget } from './link';
 import { keptSeen, markAllRead, unreadOf } from './seen';
+import { playUpdate, setSoundsOn, soundsOn } from './sounds';
 
 // The bell of every role and what it opens (spec 025, D-99): a red count of the person's unread updates, and a small
 // pop-up under it with their updates for the day, newest first, a sheet from the bottom on a phone. It is built once and
@@ -46,6 +50,13 @@ export function NotificationBell({ depots = null, foot = null }: { depots?: read
   // Each update newer than the newest this tab has seen, once (rule 3).
   const shown = useRef<{ key: string; shown: Shown | null } | null>(null);
   const role = me?.role;
+  const { scope } = useScope();
+  const { choose } = useSwitchDepot(scope ?? '');
+  const go = useCallback((link: string) => {
+    const target = depotTarget(link);
+    if (target.depot) { void navigate(target.path); choose(target.depot); }
+    else void navigate(link);
+  }, [navigate, choose]);
   useEffect(() => {
     if (!key || !updates.ready) return;
     const before = shown.current?.key === key ? shown.current.shown : keptShown(key);
@@ -53,15 +64,17 @@ export function NotificationBell({ depots = null, foot = null }: { depots?: read
     shown.current = { key, shown: next };
     keepShown(key, next);
     for (const item of fresh) {
-      alertInBackground(item, (link) => { void navigate(link); });
+      alertInBackground(item, go);
       if (role === 'driver' && item.kind === 'problem_answered' && item.answer) setGlance(item);
       else toast(item.line, {
         id: item.id, duration: 8000, classNames: { title: 'text-pretty' },
         icon: <img src={iconOf(item)} alt="" className="size-6 object-contain" />,
-        action: { label: 'Open', onClick: () => { void navigate(item.link); } },
+        action: { label: 'Open', onClick: () => go(item.link) },
       });
     }
-  }, [key, updates.ready, updates.items, role, navigate]);
+    const newest = fresh.at(-1);
+    if (newest) playUpdate(newest.tone);
+  }, [key, updates.ready, updates.items, role, go]);
 
   if (!me) return null;
   const unread = unreadOf(updates.items, seenUpTo).length;
@@ -71,6 +84,7 @@ export function NotificationBell({ depots = null, foot = null }: { depots?: read
       items={updates.items} seenUpTo={seenUpTo} both={Boolean(depots && depots.length > 1)} foot={foot} alerts={alerts}
       onRead={() => { if (key) setSeen({ key, upTo: markAllRead(key, updates.items) }); }}
       onOpen={close}
+      onGo={go}
       onAsk={() => { void askForAlerts().then(setAlerts); }}
     />
   );
@@ -114,12 +128,13 @@ export function BellButton({ unread, className, ...props }: { unread: number } &
 
 // What the bell opens: the updates, each with its picture, line and time, unread ones marked, "Mark all read", the role's
 // own link at the foot and the button for background alerts.
-export function UpdatesPanel({ items, seenUpTo, both, foot, alerts, onRead, onOpen, onAsk }: {
+export function UpdatesPanel({ items, seenUpTo, both, foot, alerts, onRead, onOpen, onGo, onAsk }: {
   items: ShownUpdate[]; seenUpTo: string | null; both: boolean; foot: BellFoot | null; alerts: AlertsState;
-  onRead: () => void; onOpen: () => void; onAsk: () => void;
+  onRead: () => void; onOpen: () => void; onGo: (link: string) => void; onAsk: () => void;
 }) {
   const unread = unreadOf(items, seenUpTo);
   const alertWords = ALERT_WORDS[alerts];
+  const [sounds, setSounds] = useState(() => soundsOn());
   return (
     <div className="flex min-h-0 flex-col">
       <div className="flex items-center justify-between gap-3 px-1 pb-2">
@@ -133,40 +148,51 @@ export function UpdatesPanel({ items, seenUpTo, both, foot, alerts, onRead, onOp
         ? <p className="px-1 py-6 text-center text-sm text-muted-foreground">Nothing yet for this day.</p>
         : (
           <ul className="-mx-1 min-h-0 overflow-y-auto overscroll-contain lg:max-h-[min(60vh,440px)]">
-            {items.map((item) => {
-              const isUnread = unread.includes(item);
-              return (
-                <li key={`${item.depot ?? ''}:${item.id}`}>
-                  <Link to={item.link} onClick={onOpen} data-unread={isUnread}
-                    className="flex items-start gap-3 rounded-lg px-2 py-2.5 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-                    <img src={iconOf(item)} alt="" className="size-8 shrink-0 object-contain" />
-                    <span className="min-w-0 flex-1">
-                      <span className={cn('block text-sm leading-5 text-pretty', isUnread ? 'font-semibold' : 'text-foreground/85')}>{item.line}</span>
-                      <span className="mt-0.5 flex items-center gap-2 text-xs leading-4 text-muted-foreground tabular-nums">
-                        {item.time}
-                        {both && item.depot && <DepotTag depot={item.depot} />}
-                      </span>
-                    </span>
-                    {isUnread && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"><span className="sr-only">Unread</span></span>}
-                  </Link>
-                </li>
-              );
-            })}
+            {items.map((item) => (
+              <UpdateRow key={`${item.depot ?? ''}:${item.id}`} item={item} unread={unread.includes(item)} both={both} onOpen={onOpen} onGo={onGo} />
+            ))}
           </ul>
         )}
-      {(foot || alertWords) && (
-        <div className="mt-2 flex flex-col gap-2 border-t pt-3">
-          {foot && (
-            <Link to={foot.to} onClick={onOpen}
-              className="flex h-10 items-center justify-center rounded-[10px] border bg-card text-sm font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-              {foot.label}
-            </Link>
-          )}
-          {alertWords && (alerts === 'ask'
-            ? <button type="button" onClick={onAsk} className="rounded-md px-1 py-1 text-left text-xs font-semibold text-foreground underline underline-offset-2 outline-none hover:text-foreground/80 focus-visible:ring-3 focus-visible:ring-ring/50">{alertWords}</button>
-            : <p className="px-1 text-xs text-muted-foreground">{alertWords}</p>)}
-        </div>
-      )}
+      <div className="mt-2 flex flex-col gap-2 border-t pt-3">
+        {foot && (
+          <Link to={foot.to} onClick={onOpen}
+            className="flex h-10 items-center justify-center rounded-[10px] border bg-card text-sm font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+            {foot.label}
+          </Link>
+        )}
+        {alertWords && (alerts === 'ask'
+          ? <button type="button" onClick={onAsk} className="rounded-md px-1 py-1 text-left text-xs font-semibold text-foreground underline underline-offset-2 outline-none hover:text-foreground/80 focus-visible:ring-3 focus-visible:ring-ring/50">{alertWords}</button>
+          : <p className="px-1 text-xs text-muted-foreground">{alertWords}</p>)}
+        <button type="button" onClick={() => { const next = !sounds; setSoundsOn(next); setSounds(next); }}
+          className="rounded-md px-1 py-1 text-left text-xs font-semibold text-foreground underline underline-offset-2 outline-none hover:text-foreground/80 focus-visible:ring-3 focus-visible:ring-ring/50">
+          {sounds ? 'Turn sounds off' : 'Turn sounds on'}
+        </button>
+      </div>
     </div>
   );
+}
+
+const rowClass = 'flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50';
+
+function UpdateRow({ item, unread, both, onOpen, onGo }: {
+  item: ShownUpdate; unread: boolean; both: boolean; onOpen: () => void; onGo: (link: string) => void;
+}) {
+  const body = (
+    <>
+      <img src={iconOf(item)} alt="" className="size-8 shrink-0 object-contain" />
+      <span className="min-w-0 flex-1">
+        <span className={cn('block text-sm leading-5 text-pretty', unread ? 'font-semibold' : 'text-foreground/85')}>{item.line}</span>
+        <span className="mt-0.5 flex items-center gap-2 text-xs leading-4 text-muted-foreground tabular-nums">
+          {item.time}
+          {both && item.depot && <DepotTag depot={item.depot} />}
+        </span>
+      </span>
+      {unread && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"><span className="sr-only">Unread</span></span>}
+    </>
+  );
+  // The other depot's warning has to switch before the plan board opens, or it would show the depot already on screen.
+  if (depotTarget(item.link).depot) {
+    return <li><button type="button" data-unread={unread} className={rowClass} onClick={() => { onOpen(); onGo(item.link); }}>{body}</button></li>;
+  }
+  return <li><Link to={item.link} data-unread={unread} className={rowClass} onClick={onOpen}>{body}</Link></li>;
 }
